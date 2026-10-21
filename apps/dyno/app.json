@@ -1,0 +1,53 @@
+{
+  "id": "dyno",
+  "title": "Virtual Dyno",
+  "description": "Power and torque curves from a full-throttle pull, saved and compared",
+  "version": "1.0.0",
+  "vendor": "custom",
+  "loggingId": "OA98",
+  "iconGlyph": "dyno",
+  "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "statusLongitudinalAccelerationMassCenter": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusActualValueTorque2": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Virtual Dyno",
+      "buttons": [
+        ["BTN_ACTION", "Pin as baseline"],
+        ["BTN_PAGE", "Saved runs"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_red",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "weight", "label": "Weight with driver + fuel", "type": "number", "unit": "kg", "default": 1750,
+     "steps": [1300, 1400, 1500, 1550, 1600, 1650, 1700, 1750, 1800, 1850, 1900, 1950, 2000, 2100, 2200, 2300, 2400, 2500]},
+    {"key": "body", "label": "Body shape (air drag)", "type": "choice", "default": "coupe",
+     "options": [["coupe", "Coupe / sedan"], ["wagon", "Touring / hatch"], ["suv", "SUV"]]},
+    {"key": "loss", "label": "Drivetrain loss", "type": "number", "unit": "%", "default": 15, "steps": [0, 10, 12, 15, 18, 20, 25]},
+    {"key": "powerUnit", "label": "Power unit", "type": "choice", "default": "hp",
+     "options": [["hp", "hp"], ["ps", "PS"], ["kw", "kW"]]},
+    {"key": "torqueUnit", "label": "Torque unit", "type": "choice", "default": "nm",
+     "options": [["nm", "Nm"], ["lbft", "lb-ft"]]},
+    {"key": "maxRpm", "label": "Graph up to", "type": "number", "unit": "rpm", "default": 7500, "steps": [6000, 6500, 7000, 7500, 8000, 9000]},
+    {"key": "ecuTorque", "label": "Overlay ECU torque", "type": "bool", "default": true},
+    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 6, "steps": [4, 6, 8, 10]},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "id": "gforce",
+  "title": "G-Force",
+  "description": "Friction circle with grip envelope, peak g per direction and session records",
+  "version": "1.0.0",
+  "vendor": "custom",
+  "loggingId": "OA9B",
+  "iconGlyph": "gforce",
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "G-Force",
+      "buttons": [
+        ["BTN_ACTION", "New session"],
+        ["BTN_PAGE", "Records"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_red",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "scale", "label": "Circle size", "type": "number", "unit": "g", "default": 1.5, "steps": [1.0, 1.5, 2.0]},
+    {"key": "trail", "label": "Trail length", "type": "number", "unit": "s", "default": 4, "steps": [2, 4, 8, 15]},
+    {"key": "flipLat", "label": "Swap left / right", "type": "bool", "default": false},
+    {"key": "speedUnit", "label": "Units", "type": "choice", "default": "kmh", "options": [["kmh", "km/h"], ["mph", "mph"]]},
+    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 10, "steps": [6, 8, 10, 12, 15]},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+  ]
+}

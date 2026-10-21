@@ -1,0 +1,207 @@
+'use strict';
+/**
+ * G-Force - friction circle for the driver who wants to know how much grip
+ * they actually used.
+ *
+ *   - live dot with fading trail
+ *   - grip envelope: the furthest g reached in every direction this session
+ *     (the classic g-g diagram shape - fill it out and you're using the car)
+ *   - peak accel / brake / left / right, combined peak, top speed, max rpm
+ *   - all-time records saved in data/gforce_records.json
+ *
+ * Small spikes (kerbs, potholes) are filtered with a 150 ms moving average.
+ */
+const fs = require('fs');
+const path = require('path');
+const mgu = require('./kit/mgu');
+const { Canvas, withAlpha } = require('./kit/canvas');
+const G = require('./kit/gauges');
+const Car = require('./kit/car');
+
+const W = 1600, H = 520;
+const MPH = 1.609344;
+const SECT = 48;
+const GO = '#2fd27a';
+
+mgu.run({
+    async start(ctx) {
+        const { ui, settings, log } = ctx;
+        const car = new Car(ctx, ['accel', 'speed', 'rpm']);
+
+        const FILE = path.join(ctx.dataDir, 'gforce_records.json');
+        let rec = {};
+        try { rec = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { /* first start */ }
+        const demoRec = {};
+        let saveTimer = null;
+        const saveSoon = () => { if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; try { fs.writeFileSync(FILE, JSON.stringify(rec)); } catch (e) { log.warn('save: ' + e); } }, 5000); };
+
+        /* ---------- session ---------- */
+        let S;
+        const newSession = () => {
+            S = { start: Date.now(), env: new Array(SECT).fill(0), peak: { acc: 0, brk: 0, left: 0, right: 0, comb: 0 }, vmax: 0, rpmMax: 0, over05: 0, trail: [], lastT: 0 };
+        };
+        newSession();
+        const smooth = [];
+        let cur = { lat: null, long: null };
+
+        car.onSample((d, t) => {
+            if (!G.isNum(d.gLong)) return;
+            // a road car can't exceed ~3 g: anything above is a bad sample, not a record
+            if (Math.abs(d.gLong) > 3 || (G.isNum(d.gLat) && Math.abs(d.gLat) > 3)) return;
+            const lat0 = G.isNum(d.gLat) ? (settings.get('flipLat') ? -d.gLat : d.gLat) : 0;
+            smooth.push([t, lat0, d.gLong]);
+            while (smooth.length && t - smooth[0][0] > 150) smooth.shift();
+            const lat = smooth.reduce((a, s) => a + s[1], 0) / smooth.length, long = smooth.reduce((a, s) => a + s[2], 0) / smooth.length;
+            cur = { lat, long };
+            const dt = S.lastT ? Math.min(250, t - S.lastT) : 0; S.lastT = t;
+            const comb = Math.sqrt(lat * lat + long * long);
+            const p = S.peak;
+            p.acc = Math.max(p.acc, long); p.brk = Math.max(p.brk, -long);
+            p.left = Math.max(p.left, lat); p.right = Math.max(p.right, -lat); p.comb = Math.max(p.comb, comb);
+            if (comb > 0.5) S.over05 += dt / 1000;
+            // envelope sector: angle of (lat, long), 0 = accel (up), clockwise
+            const a = (Math.atan2(lat, long) * 180 / Math.PI + 360) % 360;
+            const si = Math.floor(a / (360 / SECT)) % SECT;
+            S.env[si] = Math.max(S.env[si], comb);
+            if (G.isNum(d.speed)) S.vmax = Math.max(S.vmax, d.speed);
+            if (G.isNum(d.rpm)) S.rpmMax = Math.max(S.rpmMax, d.rpm);
+            S.trail.push([t, lat, long]);
+            const keep = settings.get('trail') * 1000;
+            while (S.trail.length && t - S.trail[0][0] > keep) S.trail.shift();
+            // all-time records
+            const R = d.demo ? demoRec : rec;
+            let changed = false;
+            [['acc', p.acc], ['brk', p.brk], ['left', p.left], ['right', p.right], ['comb', comb], ['vmax', S.vmax]].forEach(([k, v]) => {
+                if (v > ((R[k] && R[k].v) || 0) + 1e-3) { R[k] = { v, at: Date.now() }; changed = true; }
+            });
+            if (changed && R === rec) saveSoon();
+        }, () => { newSession(); smooth.length = 0; });
+
+        /* ---------- drawing ---------- */
+        let page = 0;
+        const mph = () => settings.get('speedUnit') === 'mph';
+        const V = (k) => (mph() ? k / MPH : k);
+
+        function circle(cv, t, cx, cy, r) {
+            const max = settings.get('scale');
+            cv.circle(cx, cy, r + 14, withAlpha(t.panelTop, 0.9));
+            for (let ring = 0.25; ring <= max + 1e-6; ring += 0.25) {
+                const rr = (ring / max) * r, major = Math.abs(ring % 0.5) < 1e-6;
+                cv.arc(cx, cy, rr - (major ? 1.5 : 0.75), rr + (major ? 1.5 : 0.75), 0, 360, major ? t.tick : withAlpha(t.tick, 0.35));
+                if (major) cv.text(ring.toFixed(1), cx + rr * 0.7071 + 6, cy - rr * 0.7071 - 4, 18, t.dim);
+            }
+            cv.line(cx - r, cy, cx + r, cy, 2, withAlpha(t.tick, 0.5));
+            cv.line(cx, cy - r, cx, cy + r, 2, withAlpha(t.tick, 0.5));
+            const P = (lat, lon) => [cx - G.clamp(lat / max, -1.08, 1.08) * r, cy - G.clamp(lon / max, -1.08, 1.08) * r];
+            // grip envelope (left = positive lat drawn to the left)
+            const pts = S.env.map((g, i) => {
+                const a = (i + 0.5) * (360 / SECT) * Math.PI / 180;
+                return P(Math.sin(a) * g, Math.cos(a) * g);
+            });
+            if (S.env.some((g) => g > 0.05)) {
+                pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; cv.line(p[0], p[1], q[0], q[1], 3, withAlpha(t.accent2, 0.8)); });
+            }
+            // trail
+            const tr = S.trail, n = tr.length;
+            tr.forEach((s, i) => { if (i % 2) return; const [x, y] = P(s[1], s[2]); cv.circle(x, y, 4, withAlpha(t.accent, 0.08 + 0.55 * (i / n))); });
+            if (G.isNum(cur.long)) {
+                const [x, y] = P(cur.lat, cur.long);
+                cv.circle(x, y, 20, withAlpha(t.accent, 0.25));
+                cv.circle(x, y, 12, t.accent);
+                cv.circle(x, y, 5, t.text);
+            }
+            cv.text('ACCEL', cx, cy - r - 20, 18, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+            cv.text('BRAKE', cx, cy + r + 36, 18, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+            cv.text('L', cx - r - 30, cy + 8, 22, t.dim, { align: 'center', font: 'bold' });
+            cv.text('R', cx + r + 30, cy + 8, 22, t.dim, { align: 'center', font: 'bold' });
+        }
+
+        function peakBox(cv, t, x, y, label, v, rec) {
+            cv.text(label, x, y, 20, t.dim, { font: 'bold', spacing: 2 });
+            const w = cv.text(v > 0.005 ? v.toFixed(2) : '-.--', x, y + 58, 64, v > 0.005 ? t.text : t.dim, { font: 'num' });
+            cv.text('g', x + w + 6, y + 58, 24, t.dim);
+            if (rec && rec.v > 0) cv.text('record ' + rec.v.toFixed(2), x, y + 86, 18, Math.abs(rec.v - v) < 1e-3 && v > 0.05 ? GO : t.dim, { font: 'bold' });
+        }
+
+        function drawLive(cv, t) {
+            const R = car.data().demo ? demoRec : rec;
+            G.panel(cv, t, 24, 64, 600, 440, null);
+            circle(cv, t, 324, 284, 176);
+            // live readout
+            G.panel(cv, t, 648, 64, 420, 440, 'Now');
+            const comb = G.isNum(cur.long) ? Math.sqrt(cur.lat * cur.lat + cur.long * cur.long) : null;
+            const cw = cv.text(G.fmt(comb, 2), 672, 210, 120, G.isNum(comb) ? (comb > 0.9 ? t.accent2 : t.text) : t.dim, { font: 'num' });
+            cv.text('g', 680 + cw, 210, 36, t.dim);
+            const bars = [['LATERAL', G.isNum(cur.lat) ? Math.abs(cur.lat) : null, G.isNum(cur.lat) ? (cur.lat >= 0 ? 'L' : 'R') : ''],
+                ['LONGITUDINAL', G.isNum(cur.long) ? Math.abs(cur.long) : null, G.isNum(cur.long) ? (cur.long >= 0 ? 'ACC' : 'BRK') : '']];
+            bars.forEach(([l, v, side], i) => {
+                const y = 268 + i * 92;
+                cv.text(l + '  ' + side, 672, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
+                cv.text(G.fmt(v, 2), 1044, y + 4, 40, G.isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
+                cv.roundRect(672, y + 20, 372, 16, 8, t.track);
+                if (G.isNum(v)) cv.roundRect(672, y + 20, Math.max(16, 372 * G.clamp(v / settings.get('scale'), 0, 1)), 16, 8, i ? t.accent : t.accent2);
+            });
+            const d = car.data();
+            cv.text(G.fmt(V(d.speed), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 484, 22, t.dim, { font: 'bold', spacing: 1 });
+
+            // session peaks
+            G.panel(cv, t, 1092, 64, 484, 440, 'Session peaks');
+            peakBox(cv, t, 1116, 132, 'ACCEL', S.peak.acc, R.acc);
+            peakBox(cv, t, 1346, 132, 'BRAKE', S.peak.brk, R.brk);
+            peakBox(cv, t, 1116, 262, 'LEFT', S.peak.left, R.left);
+            peakBox(cv, t, 1346, 262, 'RIGHT', S.peak.right, R.right);
+            cv.fillRect(1116, 382, 436, 1, withAlpha(t.tick, 0.4));
+            cv.text('COMBINED  ' + (S.peak.comb ? S.peak.comb.toFixed(2) + ' g' : '--'), 1116, 418, 22, t.accent2, { font: 'bold', spacing: 1 });
+            cv.text('> 0.5 g  ' + S.over05.toFixed(0) + ' s', 1552, 418, 22, t.text, { align: 'right', font: 'bold' });
+            const mins = Math.floor((Date.now() - S.start) / 60000);
+            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  MAX ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 466, 18, t.dim, { font: 'bold', spacing: 1 });
+        }
+
+        function drawRecords(cv, t) {
+            const R = car.data().demo ? demoRec : rec;
+            G.panel(cv, t, 24, 64, 1552, 440, 'All-time records');
+            const rows = [['acc', 'Hardest launch', 'g'], ['brk', 'Hardest stop', 'g'], ['left', 'Left-hander', 'g'], ['right', 'Right-hander', 'g'], ['comb', 'Combined', 'g'], ['vmax', 'Top speed', mph() ? 'mph' : 'km/h']];
+            rows.forEach(([k, label, u], i) => {
+                const col = i % 2, row = Math.floor(i / 2), x = 48 + col * 760, y = 150 + row * 116;
+                const r = R[k], v = r ? (k === 'vmax' ? V(r.v) : r.v) : null;
+                cv.text(label.toUpperCase(), x, y, 22, t.dim, { font: 'bold', spacing: 2 });
+                const w = cv.text(v === null ? '--' : v.toFixed(k === 'vmax' ? 0 : 2), x, y + 66, 64, v === null ? t.dim : t.text, { font: 'num' });
+                cv.text(u, x + w + 8, y + 66, 26, t.dim);
+                if (r) { const d = new Date(r.at), p = (n) => String(n).padStart(2, '0'); cv.text(p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear(), x + 300, y + 66, 22, t.dim); }
+            });
+            cv.text('Records are kept until you clear them (press "Clear records" twice).', 48, 488, 18, t.dim);
+        }
+
+        function header(cv, t) {
+            cv.text(page === 0 ? 'G-FORCE' : 'G-FORCE RECORDS', 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
+            G.stripes(cv, t, 24, 44, 120);
+            if (car.data().demo) {
+                cv.roundRect(W - 124, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
+                cv.text('DEMO', W - 74, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
+            }
+        }
+
+        async function render() {
+            const t = ctx.theme(), cv = new Canvas(W, H).clear(t.bg);
+            header(cv, t);
+            (page === 0 ? drawLive : drawRecords)(cv, t);
+            await ui.image('MAIN_GFX', cv);
+        }
+
+        let clearArmed = null;
+        const actionLabel = () => ui.text('BTN_ACTION', page === 0 ? 'New session' : clearArmed ? 'Press again to clear' : 'Clear records');
+        ui.onClick('BTN_PAGE', () => { page = 1 - page; ui.text('BTN_PAGE', page ? 'Live' : 'Records'); actionLabel(); return render(); });
+        ui.onClick('BTN_ACTION', () => {
+            if (page === 0) { newSession(); return render(); }
+            if (!clearArmed) { clearArmed = setTimeout(() => { clearArmed = null; actionLabel(); }, 5000); return actionLabel(); }
+            clearTimeout(clearArmed); clearArmed = null;
+            const R = car.data().demo ? demoRec : rec;
+            Object.keys(R).forEach((k) => delete R[k]);
+            if (R === rec) saveSoon();
+            actionLabel(); return render();
+        });
+        let loop = ctx.loop('MAIN', settings.get('fps'), render);
+        settings.onChange((k) => { if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); } });
+        render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
+    },
+});

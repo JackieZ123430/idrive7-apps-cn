@@ -1,0 +1,28 @@
+#!/bin/bash
+# make-car-kit.sh - build the apps and pack everything the head unit needs into
+# one folder (+ .tar.gz) for a USB stick or push-to-car.sh.
+#
+#   deploy/make-car-kit.sh                 # all apps in apps/
+#   deploy/make-car-kit.sh car_vitals ...  # only these
+#
+# Output: dist/mgu-custom-apps/  and  dist/mgu-custom-apps.tar.gz
+set -euo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+KIT=$(dirname "$HERE")
+OUT=$KIT/dist/mgu-custom-apps
+APPS=("$@")
+if [ ${#APPS[@]} -eq 0 ]; then
+    for d in "$KIT"/apps/*/; do [ -f "$d/app.json" ] && APPS+=("$(basename "$d")"); done
+fi
+rm -rf "$OUT"; mkdir -p "$OUT/apps"
+for id in "${APPS[@]}"; do
+    python3 "$KIT/kit/tools/build.py" "$id"
+    ver=$(python3 -c "import json;print(json.load(open('$KIT/apps/$id/app.json'))['version'])")
+    cp "$KIT/dist/$id@$ver.mgu" "$OUT/apps/"
+done
+cp "$HERE/car/deploy-car.sh" "$HERE/mgu-app-install.sh" "$HERE/mainapp-patch.js" "$HERE/car/README.txt" "$OUT/"
+chmod +x "$OUT"/*.sh
+(cd "$OUT" && md5sum deploy-car.sh mgu-app-install.sh mainapp-patch.js apps/*.mgu > KIT_SUMS)
+tar czf "$KIT/dist/mgu-custom-apps.tar.gz" -C "$KIT/dist" mgu-custom-apps
+echo "kit: $OUT  ($(ls "$OUT/apps" | tr '\n' ' '))"
+echo "     $KIT/dist/mgu-custom-apps.tar.gz"

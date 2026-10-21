@@ -1,0 +1,297 @@
+{
+  "id": "car_vitals",
+  "title": "M Vitals",
+  "description": "Live engine, thermal and chassis gauges",
+  "version": "2.1.0",
+  "vendor": "custom",
+  "loggingId": "OA93",
+  "iconGlyph": "gauge",
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs",
+      "statusEngineTemperature": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusSwitchDriveDynamicSport2": "rs",
+      "statusVehicleDynamicEngine": "rs",
+      "statusActualValueTorque2": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.XView": {
+      "statusSteeringAngleDriver": "rs"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "basicDataSet": "s"
+    },
+    "de.bmw.infrastructure.EnvironmentalInformation": {
+      "ExteriorTemperature": "s",
+      "UnitBN2020": "rs"
+    },
+    "de.bmw.infotainment.vehicle.TPMS": {
+      "statusTyreTemperature": "rs",
+      "statusTyrePressure": "rs",
+      "statusTargetTyrePressure": "rs"
+    },
+    "de.bmw.infotainment.misc.MDrive": {
+      "statusMSystem": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "M Vitals",
+      "buttons": [
+        [
+          "BTN_PAGE",
+          "Next page"
+        ],
+        [
+          "BTN_PEAKS",
+          "Reset peaks"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_red",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
+    {
+      "key": "page",
+      "label": "Start page",
+      "type": "choice",
+      "default": "engine",
+      "options": [
+        [
+          "engine",
+          "Engine"
+        ],
+        [
+          "thermal",
+          "Thermals"
+        ],
+        [
+          "chassis",
+          "Chassis"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature",
+      "type": "choice",
+      "default": "C",
+      "options": [
+        [
+          "C",
+          "°C"
+        ],
+        [
+          "F",
+          "°F"
+        ]
+      ]
+    },
+    {
+      "key": "pressUnit",
+      "label": "Pressure unit",
+      "type": "choice",
+      "default": "bar",
+      "options": [
+        [
+          "bar",
+          "bar"
+        ],
+        [
+          "psi",
+          "psi"
+        ]
+      ]
+    },
+    {
+      "key": "speedUnit",
+      "label": "Speed",
+      "type": "choice",
+      "default": "kmh",
+      "options": [
+        [
+          "kmh",
+          "km/h"
+        ],
+        [
+          "mph",
+          "mph"
+        ]
+      ]
+    },
+    {
+      "key": "redline",
+      "label": "Redline",
+      "type": "number",
+      "unit": "rpm",
+      "default": 7000,
+      "steps": [
+        5500,
+        6000,
+        6500,
+        7000,
+        7200,
+        7500,
+        8000
+      ]
+    },
+    {
+      "key": "oilWarn",
+      "label": "Oil temp warning",
+      "type": "number",
+      "unit": "°C",
+      "default": 125,
+      "steps": [
+        110,
+        115,
+        120,
+        125,
+        130,
+        135
+      ]
+    },
+    {
+      "key": "fps",
+      "label": "Refresh rate",
+      "type": "number",
+      "unit": "fps",
+      "default": 4,
+      "steps": [
+        2,
+        4,
+        6,
+        10
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "Demo data",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Always"
+        ],
+        [
+          "off",
+          "Never"
+        ]
+      ]
+    },
+    {
+      "key": "peaks",
+      "label": "Show peak markers",
+      "type": "bool",
+      "default": true
+    }
+  ],
+  "config": {
+    "comment": "raw -> value*factor + offset. CDS/CDS2/Vehicle2/XView/ambient factors are BMW's own (M Laptimer's TypeConverters). FES boost and BasicDataSet scalings are best guesses: calibrate here against a known reading.",
+    "scaling": {
+      "rpm": {
+        "factor": 0.25,
+        "offset": 0,
+        "invalid": 65535
+      },
+      "speed": {
+        "factor": 0.015625,
+        "offset": 0,
+        "invalid": 65535
+      },
+      "accel": {
+        "factor": 0.002,
+        "offset": -65,
+        "invalid": 65535
+      },
+      "steering": {
+        "factor": 0.04395,
+        "offset": -1440.11,
+        "invalid": 65535
+      },
+      "ambient": {
+        "factor": 0.5,
+        "offset": -40,
+        "invalid": 255
+      },
+      "engineTemp": {
+        "factor": 1,
+        "offset": -48,
+        "invalid": 255
+      },
+      "gearboxTemp": {
+        "factor": 1,
+        "offset": -48,
+        "invalid": 255
+      },
+      "boost": {
+        "factor": 0.01,
+        "offset": 0,
+        "invalid": 255
+      },
+      "torque": {
+        "factor": 1,
+        "offset": 0,
+        "invalid": 65535
+      },
+      "tyreTemp": {
+        "factor": 0.1,
+        "offset": -273.15,
+        "invalid": 65535,
+        "note": "UInt16; assumed deci-Kelvin - calibrate"
+      },
+      "torqueSplitRear": {
+        "factor": 0.01,
+        "offset": 0,
+        "invalid": 65535
+      },
+      "tyrePress": {
+        "factor": 0.001,
+        "offset": 0,
+        "invalidFrom": 65532,
+        "note": "raw*0.1 = kPa (BMW x_call); stored in bar"
+      }
+    }
+  }
+}

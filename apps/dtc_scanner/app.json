@@ -1,0 +1,46 @@
+{
+  "id": "dtc_scanner",
+  "title": "Fault Scanner",
+  "description": "Read and clear fault memory of every control unit, plus active Check Control messages",
+  "version": "2.0.0",
+  "vendor": "custom",
+  "loggingId": "OA95",
+  "iconGlyph": "engine",
+  "signals": {
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": ["sendTasuRequest"],
+      "_broadcasts": ["sendTasuResponse"]
+    },
+    "de.bmw.infotainment.checkcontrol.CheckControlMaster": {
+      "basicList": "rs"
+    },
+    "de.bmw.infotainment.KombiInterface_2": {
+      "ccList": "rs",
+      "newCCMessage": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Fault Scanner",
+      "buttons": [
+        ["BTN_SCAN", "Scan all control units"],
+        ["BTN_CLEAR", "Clear fault memory"],
+        ["BTN_PAGE", "Next page"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_red",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "scope", "label": "Faults to read", "type": "choice", "default": "current",
+     "options": [["current", "Current"], ["all", "Incl. history"]]},
+    {"key": "info", "label": "Also read info memory", "type": "bool", "default": false},
+    {"key": "autoScan", "label": "Scan when opened", "type": "bool", "default": true},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+  ]
+}

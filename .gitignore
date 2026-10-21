@@ -1,0 +1,13 @@
+# BMW's SDK - extract it from your own head unit (kit/tools/extract_sdk.js), never commit it
+oap-sdk/
+# the unit's SOME/IP catalog (copied from your unit for check_signals.py / sigdoc.py)
+reference/
+# build output - every .mgu contains BMW's SDK, so don't publish these either
+dist/
+# keys / local stuff
+*.pem
+*.key
+node_modules/
+__pycache__/
+*.pyc
+.venv/
