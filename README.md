@@ -90,6 +90,9 @@ Copy any BMW app's bundle off the head unit (x_call is present on every unit) an
 ssh root@<unit> 'cat /var/opt/public/oap/oap_12204/source/javascript/app.js' > x_call_app.js
 node kit/tools/extract_sdk.js x_call_app.js        # writes ./oap-sdk/
 ```
+Or download it of a public internet webiste:
+https://bedrive.ru/da77
+
 
 `oap-sdk/` is listed in `.gitignore`. Never commit it.
 
