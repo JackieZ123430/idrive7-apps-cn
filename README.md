@@ -9,13 +9,14 @@ Everything can be removed again with one command.
 
 | | |
 |---|---|
-| ![Redline](docs/screenshots/redline.png) | ![G-Force](docs/screenshots/gforce.png) |
-| ![Virtual Dyno](docs/screenshots/dyno.png) | ![Brake Test](docs/screenshots/brake_test.png) |
-| ![Drag Timer](docs/screenshots/draggy.png) | ![M Vitals](docs/screenshots/car_vitals.png) |
-| ![Warm-Up](docs/screenshots/warmup.png) | ![Fault Scanner](docs/screenshots/dtc_scanner.png) |
+| ![Redline](docs/gifs/redline.gif)<br>**Redline**: M Red theme | ![G-Force](docs/gifs/gforce.gif)<br>**G-Force**: M Tricolour theme |
+| ![Virtual Dyno](docs/gifs/dyno.gif)<br>**Virtual Dyno**: Ice White theme | ![Brake Test](docs/gifs/brake_test.gif)<br>**Brake Test**: M Tricolour theme |
+| ![Drag Timer](docs/gifs/draggy.gif)<br>**Drag Timer**: Night Amber theme | ![M Vitals](docs/gifs/car_vitals.gif)<br>**M Vitals**: Ice White theme |
+| ![Warm-Up](docs/gifs/warmup.gif)<br>**Warm-Up**: Night Amber theme | ![Fault Scanner](docs/gifs/dtc_scanner.gif)<br>**Fault Scanner**: M Red theme |
 
-*(Screenshots are from the PC preview with the built-in demo drive. In the car the same
-screens show live data.)*
+*(Recorded on the real MGU firmware running in a VM, with each app's built-in demo drive.
+Every app has the same four themes, picked from its Settings page: M Red, M Tricolour,
+Ice White and Night Amber. In the car the same screens show live data.)*
 
 > **Disclaimer.** This is an unofficial hobby project. It is not affiliated with, endorsed by
 > or supported by BMW AG. You modify your own head unit at your own risk. Use the apps parked
@@ -485,7 +486,7 @@ kit/tools/            build.py, preview.js, make_icon.js, bake_fonts.py,
                       extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
 deploy/               make-car-kit.sh, push-to-car.sh, mgu-app-install.sh, mainapp-patch.js
 deploy/car/           deploy-car.sh (runs on the unit) + its README
-docs/                 RHMI widget reference, screenshots
+docs/                 RHMI widget reference, demo GIFs
 ```
 
 Not in the repository, on purpose:

@@ -233,12 +233,15 @@ async function runInner(impl) {
         theme: () => themes.theme(settings.get('theme')),
         /** Run fn about `fps` times a second while screen `stateName` is visible. */
         loop(stateName, fps, fn) {
-            let timer = null, running = false;
+            let timer = null, running = false, frames = 0;
             const tick = async () => {
                 if (running) return;
                 running = true;
                 const t0 = Date.now();
                 try { await fn(); } catch (e) { log.error('loop ' + stateName, e); }
+                // every frame allocates image and PNG buffers; Node 8 frees them lazily, which lets
+                // memory float up to the platform's limit (the app is then killed). Collect regularly.
+                if (++frames % 3 === 0 && typeof global.gc === 'function') { try { global.gc(); } catch (e) { /* ignore */ } }
                 running = false;
                 const dt = Date.now() - t0;
                 if (timer !== null) timer = setTimeout(tick, Math.max(30, 1000 / fps - dt));

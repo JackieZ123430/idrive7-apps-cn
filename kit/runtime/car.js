@@ -85,13 +85,20 @@ class Car {
         Object.keys(watches).forEach((iface) => ctx.signals.watch(iface, '1', watches[iface], this.log)
             .then((s) => this.log.info('signal ' + iface.split('.').pop() + (s.error ? ' error: ' + s.error : ' subscribed'))));
 
-        // demo feed (20 Hz) - also keeps the sim warm so switching is seamless
+        // demo feed (20 Hz) - also keeps the sim warm so switching is seamless. On a busy or
+        // slow CPU the timer fires late; replay every missed 50 ms step (up to 3 s) with its own
+        // timestamp, so timers, dyno and brake maths see the same data on any machine.
+        let simT = Date.now();
         setInterval(() => {
             const now = Date.now();
-            this.simData = this.sim.sample(now);
+            if (now - simT > 3000) simT = now - 3000;
             const d = this._wantDemo();
             if (d !== this.demoActive) { this.demoActive = d; this.log.info(d ? 'demo data on' : 'live car data'); this.listeners.forEach((l) => l.reset && l.reset()); }
-            if (d) this._emit(this.simData, now);
+            while (simT + 50 <= now) {
+                simT += 50;
+                this.simData = this.sim.sample(simT);
+                if (d) this._emit(this.simData, simT);
+            }
         }, 50);
     }
 

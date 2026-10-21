@@ -263,7 +263,7 @@ def build(app_id):
         'engines': {'node': '>=8.7.0'},
         'oapAppSettings': {
             'maxDiskUsage': spec.get('maxDiskUsage', 20971520), 'cpuLimit': spec.get('cpuLimit', 60),
-            'memoryThresholdKB': spec.get('memoryKB', 131072), 'priority': 'PRIO_LOW',
+            'memoryThresholdKB': spec.get('memoryKB', 196608), 'priority': 'PRIO_LOW',
             'visibility': 'FOREGROUND', 'latencyClass': 'FOREGROUND', 'loggingId': spec['loggingId'],
             'userLoginRequired': False, 'backgroundPriority': 200, 'someipManifest': 'manifest.json',
         },
