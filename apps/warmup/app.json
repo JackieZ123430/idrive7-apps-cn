@@ -1,8 +1,8 @@
 {
   "id": "warmup",
   "title": "Warm-Up",
-  "description": "Oil and coolant warm-up with a safe rev limit, ready ETA and turbo cool-down",
-  "version": "1.0.0",
+  "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit and turbo cool-down",
+  "version": "1.1.0",
   "vendor": "custom",
   "loggingId": "OA9A",
   "iconGlyph": "temp",
@@ -13,6 +13,9 @@
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
       "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusActualValueTorque2": "rs"
     }
   },
   "screens": [
@@ -21,21 +24,155 @@
       "kind": "canvas",
       "title": "Warm-Up",
       "buttons": [
-        ["BTN_SETTINGS", "Settings"]
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
       ]
     }
   ],
   "settings": [
-    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
-     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
-    {"key": "warmOil", "label": "Oil is warm at", "type": "number", "unit": "°C", "default": 80, "steps": [60, 70, 75, 80, 85, 90, 100]},
-    {"key": "coldLimit", "label": "Rev limit when cold", "type": "number", "unit": "rpm", "default": 3500, "steps": [2500, 3000, 3500, 4000, 4500]},
-    {"key": "redline", "label": "Redline", "type": "number", "unit": "rpm", "default": 7000,
-     "steps": [5000, 5500, 6000, 6500, 7000, 7200, 7500, 8000, 8500, 9000]},
-    {"key": "cooldown", "label": "Turbo cool-down advice", "type": "bool", "default": true},
-    {"key": "tempUnit", "label": "Temperature unit", "type": "choice", "default": "c", "options": [["c", "°C"], ["f", "°F"]]},
-    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 4, "steps": [2, 4, 6]},
-    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
-     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
+    {
+      "key": "warmOil",
+      "label": "Oil is warm at",
+      "type": "number",
+      "unit": "°C",
+      "default": 80,
+      "steps": [
+        60,
+        70,
+        75,
+        80,
+        85,
+        90,
+        100
+      ]
+    },
+    {
+      "key": "warmCoolant",
+      "label": "Coolant is warm at",
+      "type": "number",
+      "unit": "°C",
+      "default": 80,
+      "steps": [
+        60,
+        70,
+        75,
+        80,
+        85,
+        90
+      ]
+    },
+    {
+      "key": "coldLimit",
+      "label": "Rev limit when cold",
+      "type": "number",
+      "unit": "rpm",
+      "default": 3500,
+      "steps": [
+        2500,
+        3000,
+        3500,
+        4000,
+        4500
+      ]
+    },
+    {
+      "key": "redline",
+      "label": "Redline",
+      "type": "number",
+      "unit": "rpm",
+      "default": 7000,
+      "steps": [
+        5000,
+        5500,
+        6000,
+        6500,
+        7000,
+        7200,
+        7500,
+        8000,
+        8500,
+        9000
+      ]
+    },
+    {
+      "key": "cooldown",
+      "label": "Turbo cool-down after hard driving",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature unit",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "°C"
+        ],
+        [
+          "f",
+          "°F"
+        ]
+      ]
+    },
+    {
+      "key": "fps",
+      "label": "Refresh rate",
+      "type": "number",
+      "unit": "fps",
+      "default": 4,
+      "steps": [
+        2,
+        4,
+        6
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "Demo data",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Always"
+        ],
+        [
+          "off",
+          "Never"
+        ]
+      ]
+    }
   ]
 }
