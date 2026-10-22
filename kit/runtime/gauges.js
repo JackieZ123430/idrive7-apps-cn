@@ -7,9 +7,11 @@
  * Value objects: { value, min, max, label, unit, decimals, peak, zones }
  *   zones = [{ from, to, color: 'warn'|'crit'|'cold'|'#hex' }] colour the
  *   live arc/bar when the value is inside them.
+ * Radial gauges colour their arc with the theme's hotRamp instead: from the theme
+ * colour to red at g.limit (default max). g.hot = false turns that off.
  * value === null/undefined renders as "--" (no data).
  */
-const { mix, withAlpha } = require('./canvas');
+const { mix, ramp, withAlpha } = require('./canvas');
 
 const isNum = (x) => typeof x === 'number' && isFinite(x);
 const fmt = (v, d) => (isNum(v) ? v.toFixed(d || 0) : '--');
@@ -71,11 +73,16 @@ function radial(cv, t, cx, cy, r, g) {
     }
     // live arc with soft glow
     // live arc: the theme's colour ramp along the scale (a zone's colour when inside one), soft glow, bright tip
-    const col = zoneColor(t, g, v);
+    // (or, by default, the hot ramp: theme colour -> red at the limit)
+    let col = zoneColor(t, g, v);
+    const hot = g.hot !== false && (t.hotRamp || t.ramp);
+    const limA = a0 + clamp(((g.limit == null ? max : g.limit) - min) / (max - min), 0.05, 1) * 270;
     if (isNum(v) && f > 0.002) {
         const ae = a0 + f * 270, inZone = col !== t.accent;
+        if (hot) col = ramp(hot, (ae - a0) / (limA - a0));
         cv.arc(cx, cy, r - thick - 6, r + 6, a0, ae, withAlpha(col, 0.14));
-        cv.arc(cx, cy, r - thick, r, a0, ae, col, inZone || !t.ramp ? { round: true } : { round: true, ramp: t.ramp, rampFrom: a0, rampTo: a1 });
+        cv.arc(cx, cy, r - thick, r, a0, ae, col, hot ? { round: true, ramp: hot, rampFrom: a0, rampTo: limA }
+            : inZone || !t.ramp ? { round: true } : { round: true, ramp: t.ramp, rampFrom: a0, rampTo: a1 });
         const a = ae * Math.PI / 180, rm = r - thick / 2;
         cv.circle(cx + Math.sin(a) * rm, cy - Math.cos(a) * rm, thick * 0.5 + 4, withAlpha(t.text, 0.25));
         cv.circle(cx + Math.sin(a) * rm, cy - Math.cos(a) * rm, thick * 0.5 + 1, t.text);

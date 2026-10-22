@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal and chassis gauges",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -225,6 +225,26 @@
       "label": "Show peak markers",
       "type": "bool",
       "default": true
+    },
+    {
+      "key": "xdrive",
+      "label": "xDrive card",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Show"
+        ],
+        [
+          "off",
+          "Hide (RWD)"
+        ]
+      ]
     }
   ],
   "config": {

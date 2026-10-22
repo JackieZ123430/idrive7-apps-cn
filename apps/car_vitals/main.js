@@ -11,6 +11,8 @@
  * With no car attached (the VM, or the unit on the bench) demo data can drive
  * the gauges; a DEMO badge is drawn whenever it does.
  */
+const fs = require('fs');
+const path = require('path');
 const mgu = require('./kit/mgu');
 const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
@@ -32,6 +34,17 @@ mgu.run({
 
         /* ---------- live data ---------- */
         const live = {}, peak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [] };
+
+        // xDrive card: 'auto' shows it once the car has reported all-wheel drive (remembered),
+        // so rear-wheel-drive cars never see an empty card
+        const AWD_FILE = path.join(ctx.dataDir, 'awd.json');
+        let awdSeen = false;
+        try { awdSeen = !!JSON.parse(fs.readFileSync(AWD_FILE, 'utf8')).seen; } catch (e) { /* not yet */ }
+        const markAwd = () => {
+            if (awdSeen) return;
+            awdSeen = true; log.info('all-wheel drive detected');
+            try { fs.writeFileSync(AWD_FILE, JSON.stringify({ seen: true })); } catch (e) { log.warn('awd save: ' + e); }
+        };
         let lastCar = 0;
         const put = (k, v) => {
             if (v === null || v === undefined || !isFinite(v)) return;
@@ -57,7 +70,9 @@ mgu.run({
             ['de.bmw.infrastructure.analytics.BasicDataSet', {
                 basicDataSet: (v) => {
                     put('gearbox', sc('gearboxTemp', v.valueTemperatureTransmissionOil));
-                    put('splitRear', sc('torqueSplitRear', v.valueDistributionLongitudinalTorqueRearAxisFrontAxis));
+                    const split = sc('torqueSplitRear', v.valueDistributionLongitudinalTorqueRearAxisFrontAxis);
+                    put('splitRear', split);
+                    if (G.isNum(split) && split > 1 && split < 97) markAwd();     // torque going to the front axle
                 },
             }],
             ['de.bmw.infrastructure.EnvironmentalInformation', { ExteriorTemperature: (v) => put('ambient', sc('ambient', v.temperatureExterior)) }],
@@ -76,7 +91,12 @@ mgu.run({
                     put('ptRL', sc('tyrePress', v.targetPressureTyreRLH)); put('ptRR', sc('tyrePress', v.targetPressureTyreRRH));
                 },
             }],
-            ['de.bmw.infotainment.misc.MDrive', { statusMSystem: (v) => { live.awd = v.statusAllWheelSetup; live.awdQual = v.qualifierFunctionAllWheel; } }],
+            ['de.bmw.infotainment.misc.MDrive', {
+                statusMSystem: (v) => {
+                    live.awd = v.statusAllWheelSetup; live.awdQual = v.qualifierFunctionAllWheel;
+                    if (/^_4WD|SAND/.test(String(live.awd))) markAwd();
+                },
+            }],
         ];
         log.info('subscribing signals');
         Promise.all(watches.map(([iface, h]) => ctx.signals.watch(iface, '1', h, log)))
@@ -120,21 +140,21 @@ mgu.run({
             const showPk = settings.get('peaks');
             G.radial(cv, t, 300, 290, 225, {
                 value: d.rpm, min: 0, max, label: 'Engine', unit: 'rpm', ticks: max / 500, majorEvery: 2, tickDiv: 1000,
-                zones: [{ from: red, to: max, color: 'crit' }], peak: showPk ? peak.rpm : null, showPeak: showPk,
+                zones: [{ from: red, to: max, color: 'crit' }], limit: red, peak: showPk ? peak.rpm : null, showPeak: showPk,
             });
             const pmax = settings.get('pressUnit') === 'psi' ? 36 : 2.5;
             G.radial(cv, t, 820, 290, 225, {
                 value: P(d.boost), min: 0, max: pmax, decimals: settings.get('pressUnit') === 'psi' ? 1 : 2,
                 label: 'Boost', unit: settings.get('pressUnit'), ticks: 10, majorEvery: 2, tickDecimals: pmax < 5 ? 1 : 0,
-                peak: showPk ? P(peak.boost) : null, showPeak: showPk, zones: [{ from: pmax * 0.85, to: pmax, color: 'warn' }],
+                peak: showPk ? P(peak.boost) : null, showPeak: showPk, zones: [{ from: pmax * 0.85, to: pmax, color: 'warn' }], limit: pmax * 0.85,
             });
             const x = 1110, w = 466;
             G.panel(cv, t, x, 70, w, 160, 'Speed');
             const sp = V(d.speed);
             cv.text(G.fmt(sp, 0), x + 22, 212, 96, sp == null ? t.dim : t.text, { font: 'num' });
             cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + w - 24, 212, 30, t.dim, { align: 'right' });
-            G.bar(cv, t, x, 262, w, 92, { label: 'Power', value: d.powerPct, unit: '%', segments: 20, zones: [{ from: 90, to: 100, color: 'crit' }], peak: showPk ? peak.powerPct : null });
-            G.bar(cv, t, x, 380, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, segments: 20, peak: showPk ? peak.torque : null });
+            G.bar(cv, t, x, 262, w, 92, { label: 'Power', value: d.powerPct, unit: '%', zones: [{ from: 90, to: 100, color: 'crit' }], peak: showPk ? peak.powerPct : null });
+            G.bar(cv, t, x, 380, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, peak: showPk ? peak.torque : null });
         }
 
         function drawThermal(cv, t, d) {
@@ -159,22 +179,38 @@ mgu.run({
             if (G.isNum(d.gLat) && G.isNum(d.gLong)) { trail.push([d.gLat, d.gLong]); if (trail.length > 60) trail.shift(); }
             G.panel(cv, t, 24, 64, 520, 440, 'G-force');
             G.gmeter(cv, t, 284, 260, 160, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
-            // steering + xDrive
-            G.panel(cv, t, 568, 64, 460, 200, 'Steering');
+            // steering + xDrive (steering takes the full height when the xDrive card is hidden)
+            const xd = settings.get('xdrive');
+            const showAwd = xd === 'on' || (xd !== 'off' && (awdSeen || d.demo));
             const st = d.steer;
-            cv.arc(798, 230, 110, 122, -90, 90, t.track);
-            if (G.isNum(st)) {
-                const a = G.clamp(st / 540, -1, 1) * 90;
-                cv.arc(798, 230, 108, 124, Math.min(0, a), Math.max(0, a), t.accent);
+            if (showAwd) {
+                G.panel(cv, t, 568, 64, 460, 200, 'Steering');
+                cv.arc(798, 230, 110, 122, -90, 90, t.track);
+                if (G.isNum(st)) {
+                    const a = G.clamp(st / 540, -1, 1) * 90;
+                    cv.arc(798, 230, 108, 124, Math.min(0, a), Math.max(0, a), t.accent);
+                }
+                cv.text(G.fmt(st, 0) + '°', 798, 220, 64, G.isNum(st) ? t.text : t.dim, { align: 'center', font: 'num' });
+                G.panel(cv, t, 568, 288, 460, 216, 'xDrive');
+                const AWD = { _4WD_STANDARD: '4WD', _4WD_ALTERNATIV: '4WD Sport', _2WD: '2WD', AWDSAND: 'Sand' };
+                const mode = AWD[d.awd] || '--';
+                const hot = d.awdQual === 'FUNKTION_NICHT_VERFUEGBAR_FEHLER';
+                cv.text(mode, 592, 392, 56, hot ? t.crit : t.text, { font: 'bold' });
+                if (hot) cv.text('DERATED / OFF', 800, 392, 22, t.crit, { font: 'bold', spacing: 1.5 });
+                G.bar(cv, t, 592, 424, 412, 64, { label: 'Rear torque', value: d.splitRear, unit: '%' });
+            } else {
+                G.panel(cv, t, 568, 64, 460, 440, 'Steering');
+                cv.arc(798, 360, 170, 186, -90, 90, t.track, { round: true });
+                if (G.isNum(st)) {
+                    const a = G.clamp(st / 540, -1, 1) * 90;
+                    cv.arc(798, 360, 168, 188, Math.min(0, a), Math.max(0, a), t.accent, { round: true });
+                }
+                cv.line(798, 166, 798, 182, 3, t.tick);
+                cv.text(G.fmt(st, 0) + '°', 798, 350, 96, G.isNum(st) ? t.text : t.dim, { align: 'center', font: 'num' });
+                cv.text('LEFT', 628, 400, 18, t.dim, { font: 'bold', spacing: 1.5, align: 'center' });
+                cv.text('RIGHT', 968, 400, 18, t.dim, { font: 'bold', spacing: 1.5, align: 'center' });
+                cv.text('steering wheel angle', 798, 470, 20, t.dim, { align: 'center' });
             }
-            cv.text(G.fmt(st, 0) + '°', 798, 220, 64, G.isNum(st) ? t.text : t.dim, { align: 'center', font: 'num' });
-            G.panel(cv, t, 568, 288, 460, 216, 'xDrive');
-            const AWD = { _4WD_STANDARD: '4WD', _4WD_ALTERNATIV: '4WD Sport', _2WD: '2WD', AWDSAND: 'Sand' };
-            const mode = AWD[d.awd] || '--';
-            const hot = d.awdQual === 'FUNKTION_NICHT_VERFUEGBAR_FEHLER';
-            cv.text(mode, 592, 392, 56, hot ? t.crit : t.text, { font: 'bold' });
-            if (hot) cv.text('DERATED / OFF', 800, 392, 22, t.crit, { font: 'bold', spacing: 1.5 });
-            G.bar(cv, t, 592, 424, 412, 64, { label: 'Rear torque', value: d.splitRear, unit: '%', segments: 16 });
             G.tyres(cv, t, 1052, 64, 524, 440, {
                 label: 'Tyres', fl: T(d.tFL), fr: T(d.tFR), rl: T(d.tRL), rr: T(d.tRR), unit: tU(),
                 coldBelow: T(20), warnAbove: T(90), hotAbove: T(105),
