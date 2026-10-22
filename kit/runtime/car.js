@@ -9,7 +9,8 @@
  * Scalings are BMW's own (M Laptimer TypeConverters); an app's app.json
  * "config.scaling" entries override them. The app's app.json "signals" must
  * list the interfaces (see SIGNALS below for the exact entries).
- * Demo: setting "demo" = auto (no car data for 5 s) / on / off.
+ * Demo: setting "demo" = auto (until the car answers) / on / off.
+ * data().stage = the selector position 'P' / 'R' / 'N' / 'D' (gearbox signal), else undefined.
  */
 const Sim = require('./sim');
 
@@ -18,11 +19,16 @@ const SCALE = {
     speed: { factor: 0.015625, offset: 0, invalid: 65535 },
     accel: { factor: 0.002, offset: -65, invalid: 65535 },
     temp: { factor: 1, offset: -48, invalid: 255 },
-    torque: { factor: 1, offset: 0, invalid: 65535, invalidFrom: 4095 },   // 4095 = 12-bit 'no value'
+    // 12 bit, 0.5 Nm per bit with 0 Nm at raw 2047 (negative = engine braking), 4095 = 'no value'
+    torque: { factor: 0.5, offset: -1023.5, invalid: 65535, invalidFrom: 4095 },
 };
 const GEARS = { G1: 1, G2: 2, G3: 3, G4: 4, G5: 5, G6: 6, G7: 7, G8: 8, G9: 9, G10: 10, R: -1, N_OR_P: 0 };
 // the binding may hand enums over as names or as wire numbers (G1 = 3 ... G10 = 12, R = 1, N_OR_P = 2)
 const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x === 1 ? -1 : x === 2 ? 0 : undefined) : GEARS[x]);
+// selector position (statusActualStageDrive): names or wire numbers (P = 1, R = 2, N = 3, D = 4);
+// the gear field alone can't tell P from N (both N_OR_P)
+const STAGES = { P: 'P', R: 'R', N: 'N', D: 'D', 1: 'P', 2: 'R', 3: 'N', 4: 'D' };
+const stageOf = (x) => STAGES[x];
 
 // app.json "signals" entries per group (copy into the app)
 const SIGNALS = {
@@ -80,10 +86,18 @@ class Car {
             add('de.bmw.infotainment.vehicle.CDS2', 'statusLongitudinalAccelerationMassCenter', (v) => { const a = sc('accel', v.longitudinalAccelerationCentreOfGravity); put('gLong', a === null ? null : a / 9.80665, true); });
             add('de.bmw.infotainment.vehicle.CDS2', 'statusLateralAccelerationMassCenter', (v) => { const a = sc('accel', v.lateralAccelerationCentreOfGravity); put('gLat', a === null ? null : a / 9.80665); });
         }
-        if (groups.includes('gear')) add('de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive', (v) => { const g = gearOf(v.statusActualGearDrive); if (g !== undefined) put('gear', g); });
+        if (groups.includes('gear')) add('de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive', (v) => {
+            const g = gearOf(v.statusActualGearDrive), s = stageOf(v.statusActualStageDrive);
+            if (s !== undefined) put('stage', s);
+            if (g !== undefined) put('gear', g);
+        });
         if (groups.includes('torque')) add('de.bmw.infotainment.drivingexcitement.FES', 'statusActualValueTorque2', (v) => put('torque', sc('torque', v.actualValueTorqueCrankshaft)));
+        // a parked car sends nothing new for minutes (fields are notified on change), so "no data for
+        // a while" doesn't mean "no car": once a signal's provider is there, stay on live data
+        this.subs = [];
+        this.t0 = Date.now();
         Object.keys(watches).forEach((iface) => ctx.signals.watch(iface, '1', watches[iface], this.log)
-            .then((s) => this.log.info('signal ' + iface.split('.').pop() + (s.error ? ' error: ' + s.error : ' subscribed'))));
+            .then((s) => { this.subs.push(s); this.log.info('signal ' + iface.split('.').pop() + (s.error ? ' error: ' + s.error : ' subscribed')); }));
 
         // demo feed (20 Hz) - also keeps the sim warm so switching is seamless. On a busy or
         // slow CPU the timer fires late; replay every missed 50 ms step (up to 3 s) with its own
@@ -102,9 +116,12 @@ class Car {
         }, 50);
     }
 
+    /** Has the car answered: a value arrived, or a signal's provider is available. */
+    carPresent() { return this.lastCar > 0 || this.subs.some((s) => s.available); }
+
     _wantDemo() {
         const m = this.ctx.settings.get('demo');
-        return m === 'on' || (m !== 'off' && Date.now() - this.lastCar > 5000);
+        return m === 'on' || (m !== 'off' && !this.carPresent() && Date.now() - this.t0 > 5000);
     }
 
     data() {

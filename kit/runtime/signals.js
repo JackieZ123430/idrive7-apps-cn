@@ -47,8 +47,10 @@ function loadConfig(iface) {
  * Build a proxy and subscribe to fields. handlers = { fieldName: fn(value) }.
  * Also does an initial getValue() for fields that have a getter, so values
  * show up without waiting for the next change.
+ * opts.pollMs: also re-read those fields that often while the provider is available - for
+ * fields a car may not notify (BMW's x_call only ever reads TPMS, it never subscribes).
  */
-async function watch(iface, instance, handlers, log) {
+async function watch(iface, instance, handlers, log, opts) {
     const res = { iface, available: false, proxy: null, error: null, shutdown: () => Promise.resolve() };
     if (!someip) { res.error = 'someip native module not available'; return res; }
     try {
@@ -73,6 +75,7 @@ async function watch(iface, instance, handlers, log) {
             }
         }
         if (p.isAvailable && p.isAvailable()) { res.available = true; fetchAll(); }
+        if (opts && opts.pollMs) setInterval(() => { if (res.available) setImmediate(fetchAll); }, opts.pollMs);
     } catch (e) {
         res.error = String(e);
         if (log) log.warn('signals ' + iface + ': ' + e);

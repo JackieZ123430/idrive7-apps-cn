@@ -84,9 +84,12 @@ mgu.run({
 
         /* ---------- live data ---------- */
         const live = { speed: null, g: null, rpm: null };
-        let lastCar = 0, feedDemo = false, peakG = 0;
-        const demo = new Demo();
-        const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && Date.now() - lastCar > 5000);
+        let lastCar = 0, feedDemo = false, peakG = 0, speedSub = null;
+        const demo = new Demo(), t0 = Date.now();
+        // Auto: demo only until the car answers. A parked car sends no new speed for minutes; going by
+        // "no speed for 5 s" switched to demo runs while standing (and back on the first real sample).
+        const carPresent = () => lastCar > 0 || !!(speedSub && speedSub.available);
+        const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !carPresent() && Date.now() - t0 > 5000);
         newTimer();
 
         ctx.signals.watch('de.bmw.infotainment.vehicle.Vehicle2', '1', {
@@ -96,7 +99,7 @@ mgu.run({
                 lastCar = Date.now(); live.speed = kmh;
                 if (!feedDemo) timer.feed(lastCar, kmh);
             },
-        }, log).then((s) => log.info('speed signal ' + (s.error ? 'error ' + s.error : 'subscribed')));
+        }, log).then((s) => { speedSub = s; log.info('speed signal ' + (s.error ? 'error ' + s.error : 'subscribed')); return s; });
         ctx.signals.watch('de.bmw.infotainment.vehicle.CDS2', '1', {
             statusLongitudinalAccelerationMassCenter: (v) => {
                 const a = sc('accel', v.longitudinalAccelerationCentreOfGravity);
@@ -114,7 +117,7 @@ mgu.run({
         setInterval(() => {
             const d = usingDemo();
             if (d !== feedDemo) { feedDemo = d; newTimer(); log.info(d ? 'demo data on' : 'live speed'); }
-            if (!feedDemo) return;
+            if (!feedDemo) { timer.idle(Date.now()); return; }
             const now = Date.now(), v = demo.speed(now);
             live.g = (v - prevV) / 3.6 / 0.05 / 9.80665; prevV = v;
             live.speed = v;

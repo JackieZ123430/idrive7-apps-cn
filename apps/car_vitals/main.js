@@ -52,6 +52,8 @@ const TYRES = ['FL', 'FR', 'RL', 'RR'];
 // gearbox enum: names or wire numbers (G1 = 3 ... G10 = 12, R = 1, N_OR_P = 2), as in kit/car.js
 const GEARS = { G1: 1, G2: 2, G3: 3, G4: 4, G5: 5, G6: 6, G7: 7, G8: 8, G9: 9, G10: 10, R: -1, N_OR_P: 0 };
 const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x === 1 ? -1 : x === 2 ? 0 : undefined) : GEARS[x]);
+// selector position (statusActualStageDrive), names or wire numbers (P = 1, R = 2, N = 3, D = 4), as in kit/car.js
+const STAGES = { P: 'P', R: 'R', N: 'N', D: 'D', 1: 'P', 2: 'R', 3: 'N', 4: 'D' };
 
 /**
  * Selector programme (D / S / M / P / R / N) from the gearbox status. Field names differ
@@ -59,7 +61,7 @@ const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x ==
  */
 function modeOf(o) {
     for (const k of Object.keys(o || {})) {
-        if (k === 'statusActualGearDrive' || !/select|lever|position|program|mode|range|manual|sport|tip/i.test(k)) continue;
+        if (k === 'statusActualGearDrive' || /StageDrive/.test(k) || !/select|lever|position|program|mode|range|manual|sport|tip/i.test(k)) continue;
         const v = o[k];
         if (v === true || v === 1) { if (/manual|tip/i.test(k)) return 'M'; if (/sport/i.test(k)) return 'S'; continue; }
         const x = String(v).toUpperCase();
@@ -86,6 +88,17 @@ mgu.run({
 
         /* ---------- live data ---------- */
         const live = {}, peak = {}, demoPeak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [] };
+        /*
+         * Peak hold: a peak follows new highs, and "peakHold" s after it was last raised it drops back
+         * to the current value (0 = until "Reset peaks"). Called per sample and per frame, so it also
+         * drops while the car sends nothing new.
+         */
+        const peakAt = new Map();
+        const raise = (o, k, v) => {
+            if (!G.isNum(v)) return;
+            const at = peakAt.get(o) || peakAt.set(o, {}).get(o), now = Date.now(), hold = settings.get('peakHold') * 1000;
+            if (o[k] === undefined || v >= o[k] || (hold > 0 && now - (at[k] || 0) > hold)) { o[k] = v; at[k] = now; }
+        };
 
         // xDrive card: 'auto' shows it once the car has reported all-wheel drive (remembered),
         // so rear-wheel-drive cars never see an empty card
@@ -133,7 +146,7 @@ mgu.run({
             } else if (GROUP[k]) remember([GROUP[k]]);
             live[k] = v;
             if (k === 'boostFes' || k === 'boostDme') { updBoost(); return; }
-            if (peak[k] === undefined || v > peak[k]) peak[k] = v;
+            raise(peak, k, v);
             if (k === 'rpm' || k === 'torque') {
                 // fallback when the car sends no sport-display power: crankshaft torque x speed (engine only)
                 if (G.isNum(live.torque) && G.isNum(live.rpm)) live.powerCalc = Math.max(0, live.torque * live.rpm / 9549);
@@ -157,12 +170,13 @@ mgu.run({
                 statusSwitchDriveDynamicSport2: (v) => { logRaw('FES boost', v.displayBoostPressure); put('boostFes', sc('boost', v.displayBoostPressure)); },
                 // the HMI's sport display: power / torque in % of the car's maximum
                 statusVehicleDynamicEngine: (v) => { put('powerPct', sc('sportPct', v.displaySportEnginePower)); put('torquePct', sc('sportPct', v.displaySportEngineTorque)); },
-                statusActualValueTorque2: (v) => put('torque', sc('torque', v.actualValueTorqueCrankshaft)),
+                statusActualValueTorque2: (v) => { logRaw('torque', v.actualValueTorqueCrankshaft); put('torque', sc('torque', v.actualValueTorqueCrankshaft)); },
             }],
             ['de.bmw.infrastructure.VehicleInformation', {
                 statusGearboxDrive: (v) => {
                     const g = gearOf(v && v.statusActualGearDrive);
                     if (g !== undefined) { live.gear = g; lastCar = Date.now(); }
+                    live.stage = STAGES[v && v.statusActualStageDrive];
                     live.gearMode = modeOf(v);
                     // field names / values differ per car: log them so the D/S/M detection can be checked
                     const key = JSON.stringify(Object.keys(v || {}).filter((x) => x !== 'statusActualGearDrive').map((x) => [x, v[x]]));
@@ -204,11 +218,16 @@ mgu.run({
             }],
         ];
         log.info('subscribing signals');
-        Promise.all(watches.map(([iface, h]) => ctx.signals.watch(iface, '1', h, log)))
-            .then((subs) => log.info('signals: ' + subs.map((s) => s.iface.split('.').pop() + (s.error ? '(err)' : '')).join(' ')));
+        // tyre values: also read every 10 s - BMW's own x_call only ever reads them, so a car may not notify them
+        const subs = [], startT = Date.now();
+        Promise.all(watches.map(([iface, h]) => ctx.signals.watch(iface, '1', h, log, /\.TPMS$/.test(iface) ? { pollMs: 10000 } : undefined)
+            .then((s) => { subs.push(s); return s; })))
+            .then((all) => log.info('signals: ' + all.map((s) => s.iface.split('.').pop() + (s.error ? '(err)' : '')).join(' ')));
 
         const demo = new Demo();
-        const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && Date.now() - lastCar > 5000);
+        // Auto: demo only until the car answers - a parked car sends nothing new for minutes, which is not "no car"
+        const carPresent = () => lastCar > 0 || subs.some((s) => s.available);
+        const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !carPresent() && Date.now() - startT > 5000);
         /**
          * What the screen shows: the car's values, with doubtful ones (MOVE) left out until they
          * have proven real; demo data as it is.
@@ -226,7 +245,7 @@ mgu.run({
             const v = src === 'fes' ? fes : src === 'dme' ? dmeB
                 : fes !== null && trusted('boostFes') ? fes : dmeB !== null && trusted('boostDme') ? dmeB : null;
             live.boost = v;
-            if (v !== null && (peak.boost === undefined || v > peak.boost)) peak.boost = v;
+            if (v !== null) raise(peak, 'boost', v);
         }
         /** Boost still needed from the engine unit (UDS)? */
         const boostFromDme = () => (dme.boost || []).length > 0 && (settings.get('boostSource') === 'dme'
@@ -324,7 +343,6 @@ mgu.run({
         }
 
         /** Power in kW: { kw, calc } (calc = estimated from torque x rpm, no sport-display data). */
-        let peakPower = null;
         function power(d) {
             const useSport = settings.get('powerSource') !== 'calc' && G.isNum(d.powerPct);
             if (useSport) return { kw: d.powerPct / 100 * settings.get('maxPower'), calc: false };
@@ -333,15 +351,21 @@ mgu.run({
         const PW = (kw) => (G.isNum(kw) ? kw * ({ kw: 1, hp: 1.34102, ps: 1.35962 }[settings.get('powerUnit')] || 1) : null);
         const pwU = () => ({ kw: 'kW', hp: 'hp', ps: 'PS' }[settings.get('powerUnit')] || 'kW');
 
-        /** { letter, num, est } for the gear readout, or null without any gear information. */
+        /**
+         * { letter, num, est } for the gear readout, or null without any gear information.
+         * P / R / N come from the selector position: the gear field says N_OR_P for both P and N,
+         * and while stopped in D (no gear engaged yet) it says N_OR_P too - that shows as D.
+         */
         function gearText(d) {
+            const st = d.stage, m = d.gearMode;
+            if (st === 'P' || st === 'R' || st === 'N') return { letter: st, num: '', est: false };
             let g = d.gear, est = false;
             if (!G.isNum(g)) { g = d.gearGuess; est = true; }
-            if (!G.isNum(g)) return null;
+            const letter = m === 'S' || m === 'M' ? m : 'D';
+            if (!G.isNum(g)) return st === 'D' ? { letter, num: '', est: false } : null;
             if (g < 0) return { letter: 'R', num: '', est };
-            const m = d.gearMode;
-            if (g === 0) return { letter: m === 'P' ? 'P' : 'N', num: '', est };
-            return { letter: m === 'S' || m === 'M' ? m : 'D', num: String(g), est };
+            if (g === 0) return st === 'D' ? { letter, num: '', est } : { letter: m === 'P' ? 'P' : 'N', num: '', est };
+            return { letter, num: String(g), est };
         }
 
         /** Speed + gear card; tall = the full-height card of the Engine page without boost. */
@@ -366,9 +390,12 @@ mgu.run({
             const red = settings.get('redline');
             const max = Math.ceil((red + 1000) / 1000) * 1000;
             const showPk = settings.get('peaks');
-            // demo data keeps its own peaks, so they never mix with the car's
+            // demo data keeps its own peaks, so they never mix with the car's; raising them every frame
+            // also lets a held peak drop back while the car sends nothing new
             const pk = usingDemo() ? demoPeak : peak;
-            if (usingDemo()) ['rpm', 'boost', 'torque'].forEach((k) => { if (G.isNum(d[k]) && !(pk[k] >= d[k])) pk[k] = d[k]; });
+            const pw = power(d), powMax = PW(settings.get('maxPower'));
+            ['rpm', 'boost', 'torque'].forEach((k) => raise(pk, k, d[k]));
+            raise(pk, 'power', pw.kw);
             // rpm + boost as tach bars (Redline style): theme colour -> red at the redline / warning zone
             G.segBar(cv, t, 24, G.TOP, 1062, 226, {
                 label: 'Engine speed', value: d.rpm, unit: 'rpm', decimals: 0, min: 0, max, step: 500,
@@ -377,12 +404,10 @@ mgu.run({
             });
             // power: the sport display's % x your car's max power (tuned cars: set the tuned max);
             // without sport-display data, torque x rpm. Shown in kW, hp or PS.
-            const pw = power(d), powMax = PW(settings.get('maxPower'));
-            if (G.isNum(pw.kw)) peakPower = Math.max(peakPower || 0, pw.kw);
             const bars = (x, y, w, gap) => {
                 G.bar(cv, t, x, y, w, 92, {
                     label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax, niceMax: true, ramp: 'hot',
-                    peak: showPk && G.isNum(peakPower) ? PW(peakPower) : null,
+                    peak: showPk && G.isNum(pk.power) ? PW(pk.power) : null,
                 });
                 G.bar(cv, t, x, y + gap, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, niceMax: true, ramp: 'hot', peak: showPk ? pk.torque : null });
             };
@@ -531,10 +556,10 @@ mgu.run({
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
         ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
-        ui.onClick('BTN_PEAKS', () => { [peak, demoPeak].forEach((o) => Object.keys(o).forEach((k) => delete o[k])); peakPower = null; trail.length = 0; return render(); });
+        ui.onClick('BTN_PEAKS', () => { [peak, demoPeak].forEach((o) => Object.keys(o).forEach((k) => delete o[k])); trail.length = 0; return render(); });
         let loop = ctx.loop('MAIN', settings.get('fps'), render);
         settings.onChange((k) => {
-            if (k === 'maxPower' || k === 'powerSource') peakPower = null;
+            if (k === 'maxPower' || k === 'powerSource') { delete peak.power; delete demoPeak.power; }
             if (k === 'boostSource') { delete peak.boost; updBoost(); }
             if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
             if (k === 'page') page = Math.max(0, PAGES.indexOf(settings.get('page')));

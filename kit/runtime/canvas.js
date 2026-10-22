@@ -70,6 +70,13 @@ class Canvas {
                 const a = s[si + 3];
                 if (a === 0) continue;
                 if (a === 255) { d[di] = s[si]; d[di + 1] = s[si + 1]; d[di + 2] = s[si + 2]; d[di + 3] = 255; continue; }
+                // translucent over an opaque pixel (panels over the background - most of every frame):
+                // _blend's maths with da = 1, inlined - same result without a call per pixel
+                if (d[di + 3] === 255) {
+                    const sa = a / 255, k = 1 - sa;
+                    d[di] = s[si] * sa + d[di] * k; d[di + 1] = s[si + 1] * sa + d[di + 1] * k; d[di + 2] = s[si + 2] * sa + d[di + 2] * k;
+                    continue;
+                }
                 px[0] = s[si]; px[1] = s[si + 1]; px[2] = s[si + 2]; px[3] = a;
                 this._blend(qx, py, px, 1);
             }
@@ -401,17 +408,19 @@ class Canvas {
      */
     png(level) {
         const w = this.w, h = this.h, d = this.d;
-        let opaque = true;
-        for (let i = 3; i < d.length; i += 4) if (d[i] !== 255) { opaque = false; break; }
-        const bpp = opaque ? 3 : 4, stride = w * bpp + 1;
-        const raw = Buffer.alloc(stride * h);
-        if (opaque) {
-            let o = 0, i = 0;
-            for (let y = 0; y < h; y++) {
-                raw[o++] = 0;                               // filter: none
-                for (let x = 0; x < w; x++, i += 4) { raw[o++] = d[i]; raw[o++] = d[i + 1]; raw[o++] = d[i + 2]; }
+        // one pass: pack RGB rows while checking that every pixel is opaque (every byte of raw
+        // gets written, so it needs no zero fill); the first translucent pixel switches to RGBA
+        let opaque = true, raw = Buffer.allocUnsafe((w * 3 + 1) * h);
+        pack: for (let y = 0, o = 0, i = 0; y < h; y++) {
+            raw[o++] = 0;                                   // filter: none
+            for (let x = 0; x < w; x++, i += 4) {
+                if (d[i + 3] !== 255) { opaque = false; break pack; }
+                raw[o++] = d[i]; raw[o++] = d[i + 1]; raw[o++] = d[i + 2];
             }
-        } else {
+        }
+        const stride = w * (opaque ? 3 : 4) + 1;
+        if (!opaque) {
+            raw = Buffer.alloc(stride * h);
             const src = Buffer.from(d.buffer, d.byteOffset, d.length);
             for (let y = 0; y < h; y++) src.copy(raw, y * stride + 1, y * w * 4, (y + 1) * w * 4);
         }

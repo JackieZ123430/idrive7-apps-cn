@@ -154,6 +154,7 @@ class Ui {
     _setVisible(stateName, on) {
         if (this._visible[stateName] === on) return;
         this._visible[stateName] = on;
+        if (on) Object.keys(this._img).forEach((k) => { this._img[k].lastPx = null; });      // push the next frame for sure
         log.debug('state ' + stateName + (on ? ' visible' : ' hidden'));
         this._visHandlers.forEach((fn) => { try { fn(stateName, on); } catch (e) { log.error(e); } });
     }
@@ -162,33 +163,48 @@ class Ui {
      * Show a drawn image (canvas.js Canvas or PNG Buffer) in a graphic cell.
      * The PNG goes to rhmiData/resources (readable by the HMI through the
      * install ACLs), gets a resource handle from the app's ResourceBundle, and
-     * the old handle is released. Two alternating files avoid the HMI reading
-     * a file while it is rewritten.
+     * an older handle is released.
+     *
+     * The HMI loads a new image after setValue has already returned. Releasing the previous
+     * image right then made the screen blink black (~0.5 s) whenever loading was slow - mostly
+     * the first minutes after the head unit starts. So the previous image stays until the next
+     * frame is set (handles released two frames late), four files rotate so none is rewritten
+     * while it may still be on screen or loading, and each file is written under a temporary
+     * name and renamed into place, so the HMI never reads half a file.
      */
     image(name, img, cell) {
-        const st = this._img[name] || (this._img[name] = { n: 0, prev: null, busy: null, next: null });
+        const st = this._img[name] || (this._img[name] = { n: 0, live: [], busy: null, next: null });
         // coalesce: if a push is in flight, remember only the newest frame
         if (st.busy) { st.next = img; return st.busy; }
         const run = async (frame) => {
             const c = this.comp(name);
             if (!c) return;
+            // a frame identical to the one on screen (parked car, steady values) is not encoded and
+            // pushed again - that is most of a frame's cost. Re-sent every 5 s anyway, and after the
+            // screen is opened again (_setVisible), in case the HMI dropped it.
+            const px = Buffer.isBuffer(frame) ? null : Buffer.from(frame.d.buffer, frame.d.byteOffset, frame.d.length);
+            if (px && st.shown && st.lastPx && Date.now() - st.lastPush < 5000 && px.equals(st.lastPx)) return;
             const rb = this.rhmi.getResourceBundle();
             // per-run file names: the HMI keeps state per resource path, so
             // names reused from an earlier run of the app get rejected
-            const file = path.join(RHMI_RES, 'dyn_' + RUN_TAG + '_' + name.toLowerCase() + '_' + (st.n++ % 3) + '.png');
+            const file = path.join(RHMI_RES, 'dyn_' + RUN_TAG + '_' + name.toLowerCase() + '_' + (st.n++ % 4) + '.png');
             const t0 = Date.now(), first = !st.shown;
-            fs.writeFileSync(file, Buffer.isBuffer(frame) ? frame : frame.png());
+            fs.writeFileSync(file + '.tmp', Buffer.isBuffer(frame) ? frame : frame.png());
+            fs.renameSync(file + '.tmp', file);
             if (first) log.info('image ' + name + ': png written ' + (Date.now() - t0) + ' ms');
             await rb.createResourceHandles([file]);
             const handle = rb.getResourceHandle(file);
             if (first) log.info('image ' + name + ': handle ' + JSON.stringify(handle));
             await c.setValue(0, cell || 'Graphic', handle, 'Asset');
+            if (px) { st.lastPx = Buffer.from(px); st.lastPush = Date.now(); }       // a copy: the canvas may be drawn on again
             if (first) { st.shown = true; log.info('image ' + name + ': shown after ' + (Date.now() - t0) + ' ms'); }
-            if (st.prev && st.prev !== file) {
-                const old = st.prev;
+            // keep the image on screen and the one before it (the HMI may still show it while it
+            // loads this one); release anything older
+            st.live = st.live.filter((f) => f !== file).concat([file]);
+            while (st.live.length > 2) {
+                const old = st.live.shift();
                 rb.destroyResourceHandles([old]).catch((e) => { if (!st.destroyWarned) { st.destroyWarned = true; log.warn('destroy handle: ' + e); } });
             }
-            st.prev = file;
         };
         st.busy = run(img).catch((e) => log.warn('image ' + name + ': ' + e)).then(() => {
             st.busy = null;

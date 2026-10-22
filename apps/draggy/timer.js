@@ -5,7 +5,7 @@
  * samples, so the result does not depend on how often the car sends speed.
  *
  * States: wait  - moving, waiting for the car to stop
- *         ready - stopped >= 1 s, launch arms automatically
+ *         ready - stopped >= 1 s (by the clock, see idle()), launch arms automatically
  *         run   - timing
  *         done  - finished (slowed down, all splits done, or 90 s); results kept
  */
@@ -56,6 +56,20 @@ class RunTimer {
             return;
         }
         if (this.state === 'run' && p) this._step(p, { t, v });
+    }
+
+    /**
+     * Call often (every 50 ms) between samples. A stopped car sends no new speed (the value doesn't
+     * change), so the 1 s standstill that arms the timer is counted by the clock here; and the
+     * standstill is carried forward to now, so the launch is interpolated from the last moment the
+     * car was known to stand, not from a sample seconds old.
+     */
+    idle(now) {
+        const p = this.prev;
+        if (this.state === 'run' || !p || typeof p.v !== 'number' || !isFinite(p.v) || p.v >= LAUNCH_KMH || now <= p.t) return;
+        if (this.stopSince === null) this.stopSince = p.t;
+        if (now - this.stopSince >= 1000) this.state = 'ready';
+        this.prev = { t: now, v: p.v };
     }
 
     _launch(p, c) {

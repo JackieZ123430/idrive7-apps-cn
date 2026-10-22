@@ -237,7 +237,7 @@ def make_icon(spec, out):
         shutil.copy(src, out)
         return
     # rendered by the kit's own canvas (node) so no extra tooling is needed
-    os.system(f'node {os.path.join(HERE, "make_icon.js")} "{spec.get("iconGlyph", spec["title"][:2])}" "{out}"')
+    os.system(f'node "{os.path.join(HERE, "make_icon.js")}" "{spec.get("iconGlyph", spec["title"][:2])}" "{out}"')
 
 
 def build(app_id):

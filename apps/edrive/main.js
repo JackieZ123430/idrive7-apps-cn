@@ -158,7 +158,7 @@ mgu.run({
          * remembered, so the next start shows the 12 V page straight away. */
         let smeMiss = 0, lastSocTry = 0;
         function detectHybrid(otherUnitAnswered) {
-            const rs = (cfg.soc || []).map((c) => raws[(c.ecu == null ? cfg.ecu : c.ecu) + ':' + c.did]);
+            const rs = (cfg.soc || []).map((c) => raws[reader.key(c)]);
             if (rs.some((r) => r && r.bytes)) {
                 smeMiss = 0;
                 if (st.noHybrid || !st.hybrid) { st.noHybrid = false; st.hybrid = true; save(); log.info('hybrid battery unit answers'); }
@@ -466,18 +466,18 @@ mgu.run({
         function renderDiag(cv, t, d) {
             G.panel(cv, t, 24, 44, 1552, 468, 'Battery diagnostics');
             const link = diag.p ? (diag.available ? 'link up' : 'link down') : 'no link (' + (diag.error || 'not started') + ')';
-            cv.text('UDS 22 ReadDataByIdentifier  ·  ' + link + '  ·  ambient ' + (G.isNum(live.ambient) ? G.fmt(live.ambient, 1) + ' °C' : 'n/a')
+            cv.text('UDS 22 ReadDataByIdentifier / OBD 01  ·  ' + link + '  ·  ambient ' + (G.isNum(live.ambient) ? G.fmt(live.ambient, 1) + ' °C' : 'n/a')
                 + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(live.speed, 0) + ' km/h' : 'n/a'), 48, 121, 24, t.text, { font: 'label' });
             const cols = [48, 160, 260, 380, 820, 1000, 1290];
             ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS', 'READ'].forEach((h, i) => cv.text(h, cols[i], 167, 20, t.dim, { font: 'bold', spacing: 1.5 }));
             cv.fillRect(48, 178, 1504, 1, t.tick);
             let y = 214;
             VALUES.forEach((key) => (cfg[key] || []).forEach((c, i) => {
-                const ecu = c.ecu == null ? cfg.ecu : c.ecu, r = raws[ecu + ':' + c.did];
+                const ecu = c.ecu == null ? cfg.ecu : c.ecu, r = raws[reader.key(c)];
                 const used = pick[key] === i && r && r.ok;
                 cv.text(key.toUpperCase() + (used ? ' *' : ''), cols[0], y, 24, used ? GO : t.text, { font: 'bold' });
                 cv.text('0x' + hex(ecu), cols[1], y, 24, t.text, { font: 'label' });
-                cv.text(c.did, cols[2], y, 24, t.text, { font: 'label' });
+                cv.text(DidReader.label(c), cols[2], y, 24, t.text, { font: 'label' });
                 const bytes = r ? r.bytes || '-' : '-';
                 cv.text(bytes.length > 36 ? bytes.slice(0, 35) + '…' : bytes, cols[3], y, 22, t.dim, { font: 'label' });
                 cv.text(r && G.isNum(r.value) ? G.fmt(r.value, key === 'v12' ? 2 : 1) : '-', cols[4], y, 24, t.text, { font: 'label' });
