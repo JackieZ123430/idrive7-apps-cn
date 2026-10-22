@@ -27,7 +27,8 @@ const path = require('path');
 const mgu = require('./kit/mgu');
 const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
-const { Diag, hex, NRC } = require('./kit/diag');
+const { Diag, hex } = require('./kit/diag');
+const { DidReader } = require('./kit/dids');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
@@ -94,8 +95,6 @@ mgu.run({
             try { fs.writeFileSync(STATE, JSON.stringify(st)); } catch (e) { log.warn('save: ' + e); }
         };
         const live = { soc: null, socT: 0, soh: G.isNum(st.soh) ? st.soh : null, sohT: st.sohT || 0, v12: null, v12T: 0, ambient: null, speed: null };
-        const raws = {};                       // 'ecu:did' -> { bytes, value, ok, why, t }
-        const pick = { soc: 0, soh: 0, v12: 0 };   // index of the candidate that answered last
 
         ctx.signals.watch('de.bmw.infrastructure.EnvironmentalInformation', '1', {
             ExteriorTemperature: (v) => { const a = sc('ambient', v.temperatureExterior); if (a !== null) live.ambient = a; },
@@ -109,39 +108,10 @@ mgu.run({
         const demo = new Demo();
         const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !diag.available && !live.socT);
 
-        /* ---------- UDS reads ---------- */
-        /** Read one candidate { ecu?, did, bytes, at, factor, offset, min, max }; returns the value or null. */
-        async function readDid(c) {
-            const ecu = c.ecu == null ? cfg.ecu : c.ecu, did = parseInt(c.did, 16);
-            const r = { t: Date.now(), ok: false, value: null, bytes: '', why: '' };
-            raws[ecu + ':' + c.did] = r;
-            let uds;
-            try { uds = await diag.physical(ecu, 0x22, [did >> 8, did & 0xFF], 4000); } catch (e) { r.why = String(e.message || e); return null; }
-            if (!uds) { r.why = 'no reply'; return null; }
-            r.bytes = uds.map((x) => hex(x)).join(' ');
-            if (uds[0] === 0x7F) { r.why = 'NRC ' + hex(uds[2]) + (NRC[uds[2]] ? ' ' + NRC[uds[2]] : ''); return null; }
-            if (uds[0] !== 0x62 || ((uds[1] << 8) | uds[2]) !== did) { r.why = 'unexpected reply'; return null; }
-            const at = 3 + (c.at || 0), n = c.bytes || 1;
-            if (uds.length < at + n) { r.why = 'reply too short'; return null; }
-            let raw = 0;
-            for (let i = 0; i < n; i++) raw = raw * 256 + uds[at + i];
-            const v = raw * (c.factor == null ? 1 : c.factor) + (c.offset || 0);
-            r.value = v;
-            if ((c.min != null && v < c.min) || (c.max != null && v > c.max)) { r.why = 'out of range'; return null; }
-            r.ok = true;
-            return v;
-        }
-
-        /** Try a value's candidates, starting with the one that worked last. */
-        async function readValue(key) {
-            const list = cfg[key] || [];
-            for (let k = 0; k < list.length; k++) {
-                const i = (pick[key] + k) % list.length;
-                const v = await readDid(list[i]);
-                if (v !== null) { pick[key] = i; return v; }
-            }
-            return null;
-        }
+        /* ---------- UDS reads (candidates per value, see kit/dids.js) ---------- */
+        const reader = new DidReader(diag, { ecu: cfg.ecu });
+        const raws = reader.raws, pick = reader.pick;      // for the Diagnostics page
+        const readValue = (key) => reader.value(key, cfg[key]);
 
         /* ---------- last charge ----------
          * A charge = the charge level rising by >= chargeMinPct while the car stands still

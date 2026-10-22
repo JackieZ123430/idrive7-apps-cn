@@ -128,12 +128,7 @@ function bar(cv, t, x, y, w, h, g) {
 function stat(cv, t, x, y, w, h, g) {
     panel(cv, t, x, y, w, h, g.label);
     const v = g.value, col = zoneColor(t, g, v, t.accent), vcol = zoneColor(t, g, v, t.text);
-    const size = g.size || Math.min(96, h * 0.42);
-    const vs = fmt(v, g.decimals);
-    const vw = cv.textWidth(vs, size, { font: 'num' });
-    cv.text(vs, x + 18, y + 52 + size * 0.78, size, isNum(v) ? vcol : t.dim, { font: 'num' });
-    if (g.unit) cv.text(g.unit, x + 26 + vw, y + 52 + size * 0.78, 28, t.dim);
-    if (g.sub) cv.text(g.sub, x + 18, y + h - 16, 22, t.dim, { spacing: 0.5 });
+    // history trace first, so the big value stays readable on top of it
     const hist = (g.history || []).filter(isNum);
     if (hist.length > 2 && h > 150) {
         const hx = x + 18, hw = w - 36, hy = y + h - (g.sub ? 44 : 18), hh = Math.min(60, h * 0.25);
@@ -142,8 +137,14 @@ function stat(cv, t, x, y, w, h, g) {
         const pts = g.history.map((p, i) => [hx + (i / Math.max(1, g.history.length - 1)) * hw,
             isNum(p) ? hy - ((p - lo) / (hi - lo)) * hh : hy]);
         cv.fillUnder(pts, hy, withAlpha(col, 0.16));
-        cv.polyline(pts, 2.5, col);
+        cv.polyline(pts, 2.5, withAlpha(col, 0.85));
     }
+    const size = g.size || Math.min(96, h * 0.42);
+    const vs = fmt(v, g.decimals);
+    const vw = cv.textWidth(vs, size, { font: 'num' });
+    cv.text(vs, x + 18, y + 52 + size * 0.78, size, isNum(v) ? vcol : t.dim, { font: 'num' });
+    if (g.unit) cv.text(g.unit, x + 26 + vw, y + 52 + size * 0.78, 28, t.dim);
+    if (g.sub) cv.text(g.sub, x + 18, y + h - 16, 22, t.dim, { spacing: 0.5 });
 }
 
 /** Top-down tyre map: four tyres coloured by temperature or pressure. */

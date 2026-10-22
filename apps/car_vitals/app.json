@@ -1,8 +1,8 @@
 {
   "id": "car_vitals",
   "title": "M Vitals",
-  "description": "Live engine, thermal, tyre and chassis gauges",
-  "version": "2.4.0",
+  "description": "Live engine, thermal, intake / fuel pressure, tyre and chassis gauges",
+  "version": "2.5.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -40,6 +40,15 @@
     },
     "de.bmw.infrastructure.VehicleInformation": {
       "statusGearboxDrive": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
     }
   },
   "screens": [
@@ -101,6 +110,10 @@
         [
           "thermal",
           "Thermals"
+        ],
+        [
+          "fuel",
+          "Intake & fuel"
         ],
         [
           "chassis",
@@ -390,6 +403,75 @@
         "invalid": 255,
         "note": "sport display power / torque in % of the car maximum; calibrate if the raw value is not 0-100"
       }
+    },
+    "dme": {
+      "comment": "Intake / fuel values from the engine unit (DME, ecu 18 = 0x12) with UDS 0x22. F4xx = the standard OBD PIDs (F40F = PID 0x0F). Candidates are tried in order; the first plausible one wins. value = raw * factor + offset (bar / deg C). If a tile says 'not available from this DME', add your engine's BMW-specific DID here.",
+      "ecu": 18,
+      "iat": [
+        {
+          "did": "F40F",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 150
+        },
+        {
+          "did": "F477",
+          "bytes": 1,
+          "at": 1,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 150,
+          "note": "charge air cooler temperature, bank 1 sensor 1"
+        }
+      ],
+      "hpfp": [
+        {
+          "did": "F423",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.1,
+          "offset": 0,
+          "min": 0,
+          "max": 500,
+          "note": "fuel rail gauge pressure (direct injection), 10 kPa per bit"
+        },
+        {
+          "did": "F459",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.1,
+          "offset": -1,
+          "min": 0,
+          "max": 500,
+          "note": "fuel rail absolute pressure, 10 kPa per bit"
+        }
+      ],
+      "lpfp": [
+        {
+          "did": "F40A",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.03,
+          "offset": 0,
+          "min": 0.5,
+          "max": 8,
+          "note": "fuel pressure (gauge), 3 kPa per bit"
+        },
+        {
+          "did": "F422",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.00079,
+          "offset": 0,
+          "min": 0.5,
+          "max": 15,
+          "note": "fuel rail pressure relative to manifold, 0.079 kPa per bit"
+        }
+      ]
     }
   }
 }

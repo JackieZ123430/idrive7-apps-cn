@@ -5,6 +5,8 @@
  * Pages (button "Next page"):
  *   engine  - RPM + boost dials, power/torque bars, speed
  *   thermal - coolant / engine oil / gearbox / ambient with 5-minute traces
+ *   fuel    - intake air temperature, high / low pressure fuel (read from the DME
+ *             over UDS, see config.dme), intake air above outside temperature
  *   chassis - friction circle (g-g diagram), tyre pressures + temperatures, xDrive split
  *
  * Signals come straight from the car over SOME/IP (see app.json "signals").
@@ -18,9 +20,12 @@ const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Demo = require('./demo');
 const { GearGuess } = require('./kit/car');
+const { Diag } = require('./kit/diag');
+const { DidReader } = require('./kit/dids');
 
 const W = 1600, H = 520;
-const PAGES = ['engine', 'thermal', 'chassis'];
+const PAGES = ['engine', 'thermal', 'fuel', 'chassis'];
+const FUEL = ['iat', 'hpfp', 'lpfp'];
 const HIST_SEC = 300;
 // gearbox enum: names or wire numbers (G1 = 3 ... G10 = 12, R = 1, N_OR_P = 2), as in kit/car.js
 const GEARS = { G1: 1, G2: 2, G3: 3, G4: 4, G5: 5, G6: 6, G7: 7, G8: 8, G9: 9, G10: 10, R: -1, N_OR_P: 0 };
@@ -58,7 +63,7 @@ mgu.run({
         };
 
         /* ---------- live data ---------- */
-        const live = {}, peak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [] };
+        const live = {}, peak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [] };
 
         // xDrive card: 'auto' shows it once the car has reported all-wheel drive (remembered),
         // so rear-wheel-drive cars never see an empty card
@@ -151,10 +156,53 @@ mgu.run({
         const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && Date.now() - lastCar > 5000);
         const data = () => (usingDemo() ? demo.sample() : live);
 
+        /* ---------- intake + fuel from the DME (UDS 0x22; candidates in app.json config.dme) ----------
+         * Fast (~2/s) while the Intake & fuel page is on screen, every 5 s otherwise so the history
+         * keeps filling. A value the DME refuses is only re-tried every 30 s. */
+        const dme = Object.assign({ ecu: 18 }, (ctx.spec.config && ctx.spec.config.dme) || {});
+        const link = await new Diag(ctx.signals, log).init();
+        link.quiet = true;
+        const rd = new DidReader(link, { ecu: dme.ecu });
+        const fuelT = {}, fuelFail = {}, fuelTry = {};
+        let fuelSeen = 0, fuelTimer = null, fuelBusy = false, fuelLast = 0;
+        async function pollFuel() {
+            fuelBusy = true; fuelLast = Date.now();
+            try {
+                if (link.available) {
+                    for (const k of FUEL) {
+                        if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
+                        fuelTry[k] = Date.now();
+                        const v = await rd.value(k, dme[k]);
+                        if (v !== null) { put(k, v); fuelT[k] = Date.now(); fuelFail[k] = 0; } else fuelFail[k] = (fuelFail[k] || 0) + 1;
+                    }
+                }
+            } catch (e) { log.warn('fuel poll: ' + e); }
+            fuelBusy = false;
+            fuelTimer = setTimeout(pollFuel, Date.now() - fuelSeen < 1500 ? 400 : 5000);    // fuelSeen: page drawn just now
+        }
+        fuelTimer = setTimeout(pollFuel, 1000);
+        /** Page opened: don't wait for the slow timer. */
+        const kickFuel = () => { if (!fuelBusy && Date.now() - fuelLast > 600) { clearTimeout(fuelTimer); fuelTimer = setTimeout(pollFuel, 0); } };
+        /** Why a fuel value is missing, for its tile. */
+        function fuelWhy(k) {
+            if (!link.p) return 'no diagnostic link';
+            if (!link.available) return 'diagnostic link down';
+            const r = (dme[k] || []).map((c) => rd.raws[rd.key(c)]).filter(Boolean);
+            if (!r.length) return 'reading...';
+            if (r.every((x) => /NRC 31|NRC 11|NRC 12/.test(x.why))) return 'not available from this DME (' + r.map((x) => x.why.split(' ').slice(0, 2).join(' ')).join(', ') + ')';
+            return r[0].why || 'no data';
+        }
+
         // 1 Hz history sampler for the thermal traces
         setInterval(() => {
             const d = data();
-            Object.keys(hist).forEach((k) => { hist[k].push(d[k] == null ? null : d[k]); if (hist[k].length > HIST_SEC) hist[k].shift(); });
+            const fuelOk = (k) => usingDemo() || (fuelT[k] && Date.now() - fuelT[k] < 15000);
+            Object.keys(hist).forEach((k) => {
+                let v = d[k] == null ? null : d[k];
+                if (FUEL.indexOf(k) >= 0 && !fuelOk(k)) v = null;
+                if (k === 'iatRise') v = fuelOk('iat') && G.isNum(d.iat) && G.isNum(d.ambient) ? d.iat - d.ambient : null;
+                hist[k].push(v); if (hist[k].length > HIST_SEC) hist[k].shift();
+            });
         }, 1000);
 
         /* ---------- units ---------- */
@@ -257,6 +305,37 @@ mgu.run({
             });
         }
 
+        function drawFuel(cv, t, d) {
+            fuelSeen = Date.now();
+            kickFuel();
+            const pu = settings.get('pressUnit'), running = G.isNum(d.rpm) && d.rpm > 500;
+            const val = (k) => (usingDemo() || (fuelT[k] && Date.now() - fuelT[k] < 15000) ? d[k] : null);
+            const mm = (h, f, dec) => {
+                const v = h.filter(G.isNum);
+                return v.length ? 'last 5 min  ·  min ' + G.fmt(f(Math.min.apply(null, v)), dec) + '  max ' + G.fmt(f(Math.max.apply(null, v)), dec) : 'last 5 min';
+            };
+            const dT = (x) => (G.isNum(x) ? (settings.get('tempUnit') === 'F' ? x * 1.8 : x) : null);
+            const iatRise = G.isNum(val('iat')) && G.isNum(d.ambient) ? d.iat - d.ambient : null;
+            const tiles = [
+                ['Intake air (IAT)', T(val('iat')), tU(), 0, hist.iat.map(T),
+                    [{ from: T(50), to: T(65), color: 'warn' }, { from: T(65), to: 999, color: 'crit' }],
+                    G.isNum(val('iat')) ? mm(hist.iat, T, 0) : fuelWhy('iat')],
+                ['High pressure fuel (HPFP)', P(val('hpfp')), pu, 0, hist.hpfp.map(P),
+                    running ? [{ from: -99, to: P(20), color: 'crit' }] : [],
+                    G.isNum(val('hpfp')) ? mm(hist.hpfp, P, 0) + (running ? '' : '  ·  engine off') : fuelWhy('hpfp')],
+                ['Low pressure fuel (LPFP)', P(val('lpfp')), pu, pu === 'psi' ? 0 : 1, hist.lpfp.map(P),
+                    running ? [{ from: -99, to: P(3), color: 'crit' }, { from: P(3), to: P(4), color: 'warn' }] : [],
+                    G.isNum(val('lpfp')) ? mm(hist.lpfp, P, 1) + (running ? '' : '  ·  engine off') : fuelWhy('lpfp')],
+                ['Intake air above outside', dT(iatRise), tU(), 0, hist.iatRise.map(dT),
+                    [{ from: dT(25), to: dT(40), color: 'warn' }, { from: dT(40), to: 999, color: 'crit' }],
+                    G.isNum(iatRise) ? 'heat soak  ·  ' + mm(hist.iatRise, dT, 0).replace('last 5 min  ·  ', '') : 'needs IAT + outside temperature'],
+            ];
+            tiles.forEach(([label, v, unit, decimals, h, zones, sub], i) => {
+                const x = 24 + (i % 2) * 784, y = 64 + Math.floor(i / 2) * 226;
+                G.stat(cv, t, x, y, 760, 210, { label, value: v, unit, decimals, zones, size: 100, history: h, sub });
+            });
+        }
+
         function drawChassis(cv, t, d) {
             if (G.isNum(d.gLat) && G.isNum(d.gLong)) { trail.push([d.gLat, d.gLong]); if (trail.length > 60) trail.shift(); }
             G.panel(cv, t, 24, 64, 480, 440, 'G-force');
@@ -315,8 +394,8 @@ mgu.run({
         async function render() {
             const t = ctx.theme(), d = data();
             const cv = new Canvas(W, H).clear(t.bg);
-            header(cv, t, ['Engine', 'Thermals', 'Chassis'][page], d);
-            [drawEngine, drawThermal, drawChassis][page](cv, t, d);
+            header(cv, t, ['Engine', 'Thermals', 'Intake & fuel', 'Chassis'][page], d);
+            [drawEngine, drawThermal, drawFuel, drawChassis][page](cv, t, d);
             if (!render.n) { render.n = 1; log.info('first frame drawn'); }
             await ui.image('MAIN_GFX', cv);
         }

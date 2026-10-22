@@ -108,14 +108,19 @@ class Diag extends EventEmitter {
         return done;
     }
 
-    /** Physical request to one ECU; resolves with its UDS reply (null on timeout). */
-    async physical(target, sid, data, timeoutMs) {
+    /**
+     * Physical request to one ECU; resolves with its UDS reply (null on timeout).
+     * accept(uds) (optional) skips replies that aren't ours - another app may be
+     * talking to the same ECU at the same time.
+     */
+    async physical(target, sid, data, timeoutMs, accept) {
         let t, onFrame, finish;
         const got = new Promise((resolve) => {
             finish = (v) => { clearTimeout(t); this.removeListener('frame', onFrame); resolve(v); };
             onFrame = (f) => {
                 if (f.ecu !== target) return;
                 if (f.uds[0] === 0x7F && f.uds[2] === 0x78) { clearTimeout(t); t = setTimeout(() => finish(null), 10000); return; }
+                if (accept && !accept(f.uds)) return;
                 finish(f.uds);
             };
             this.on('frame', onFrame);
