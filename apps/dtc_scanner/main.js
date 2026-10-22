@@ -19,7 +19,7 @@ const path = require('path');
 const mgu = require('./kit/mgu');
 const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
-const { Diag, parseDtcReply, statusInfo, hex, NRC } = require('./diag');
+const { Diag, parseDtcReply, statusInfo, hex, NRC } = require('./kit/diag');
 const DEMO = require('./demo');
 
 const W = 1600, H = 520, PER_PAGE = 6;

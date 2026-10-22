@@ -56,6 +56,7 @@ the unit and kept across reboots.
 | **Warm-Up** | Oil and coolant gauges, a safe rev limit that rises with oil temperature, an estimate of minutes until the engine is ready, a temperature trend graph, and a turbo cool-down countdown after hard driving. |
 | **M Vitals** | A sport cluster: rpm, boost, speed, power and torque output, coolant and oil temperature, g-forces and more, over several pages, with peak values. |
 | **Fault Scanner** | Scans every control unit for stored fault codes (UDS over the head unit's diagnostic gateway), shows them per module with status, shows live Check Control messages, and can clear fault memories (two-press confirm). |
+| **eDrive** | For plug-in hybrids / EVs: real electric range from the battery's charge and the outside temperature (your own km per full charge for cold / mild / hot, e.g. 40 km below 10 °C, 50 km at 10-25 °C), battery health (SOH, capacity vs. new) and design capacity left (charge × SOH, in % and kWh). Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
 
 On the VM or a bench unit without vehicle data, every app switches to a built-in demo drive
 after 5 seconds (launch, pull through the gears, a hard stop, corners, an engine warming up from
@@ -347,7 +348,7 @@ all 33 HMI languages, manifest, permissions and runner.
 | Key | Meaning |
 |---|---|
 | `loggingId` | 4-character log tag, **unique per app** (BMW apps use `OA1x`, the apps here `OA93`-`OA9B`) |
-| `iconGlyph` | tile icon drawn by `make_icon.js`: `gauge`, `flag`, `engine`, `rpm`, `dyno`, `brake`, `temp`, `gforce`, or up to ~3 letters |
+| `iconGlyph` | tile icon drawn by `make_icon.js`: `gauge`, `flag`, `engine`, `rpm`, `dyno`, `brake`, `temp`, `gforce`, `battery`, or up to ~3 letters |
 | `signals` | `interface → { field: flags }`; `r` = read once at start (needs a getter), `s` = subscribe to changes (needs a notifier). Optional `_instances`, `_methods`, `_broadcasts` |
 | `screens` | `canvas` screens: one big image + up to 4 buttons. `BTN_SETTINGS` opens the settings screen generated from `settings` |
 | `settings` | `choice`, `number` (stepped through `steps`) and `bool`, saved in the app's `data/settings.json` |
@@ -483,7 +484,8 @@ explore it.
 ```
 apps/<id>/            app.json + main.js (+ helpers) per app
 kit/runtime/          app runtime: mgu.js (platform glue), canvas.js, gauges.js, themes.js,
-                      car.js (signals + demo), sim.js (demo drive), signals.js (SOME/IP), fonts/
+                      car.js (signals + demo), sim.js (demo drive), signals.js (SOME/IP),
+                      diag.js (UDS over TASU), fonts/
 kit/platform/         permissions template used by build.py
 kit/tools/            build.py, preview.js, make_icon.js, bake_fonts.py,
                       extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js

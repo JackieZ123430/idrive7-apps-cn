@@ -2,7 +2,7 @@
 /**
  * make_icon.js <glyph> <out.png> - 140x140 app tile icon in the HMI's style
  * (white line art on transparent, one accent element). Glyphs: gauge, flag,
- * engine, lab, or any 1-3 characters (drawn as text).
+ * engine, battery, lab, or any 1-3 characters (drawn as text).
  */
 const fs = require('fs');
 const path = require('path');
@@ -83,6 +83,12 @@ if (glyph === 'gauge') {
     c.line(14, 70, 126, 70, 3, W); c.line(70, 14, 70, 126, 3, W);
     c.circle(98, 54, 12, A);
     c.circle(98, 54, 5, W);
+} else if (glyph === 'battery') {
+    // HV battery with charge segments + lightning bolt
+    c.strokeRoundRect(10, 40, 108, 60, 10, 6, W);
+    c.roundRect(118, 58, 12, 24, 3, W);
+    for (let i = 0; i < 3; i++) c.roundRect(22 + i * 22, 52, 16, 36, 3, i < 2 ? '#2fd27a' : W);
+    c.polyline([[96, 46], [84, 72], [100, 72], [88, 96]], 6, A);
 } else {
     c.strokeRoundRect(14, 14, 112, 112, 22, 6, W);
     c.text(glyph, 70, 88, 56, W, { font: 'bold', align: 'center' });
