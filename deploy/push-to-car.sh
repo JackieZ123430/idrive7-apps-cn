@@ -17,7 +17,8 @@ CMD=${1:-check}
 [ -d "$KIT" ] || { echo "run deploy/make-car-kit.sh first"; exit 1; }
 SSH=(ssh -p "$PORT" -o ConnectTimeout=10 "$HU")
 # tar over ssh: the unit's busybox has no scp/sftp server in some builds
-tar czf - -C "$KIT" . | "${SSH[@]}" "mkdir -p '$DEST' && tar xzf - -C '$DEST' && cd '$DEST' && md5sum -c KIT_SUMS >/dev/null && echo 'kit copied + verified'"
+# apps/ is replaced, not merged: old .mgu files left there would be installed too (old, then new)
+tar czf - -C "$KIT" . | "${SSH[@]}" "mkdir -p '$DEST' && rm -rf '$DEST/apps' && tar xzf - -C '$DEST' && cd '$DEST' && md5sum -c KIT_SUMS >/dev/null && echo 'kit copied + verified'"
 if [ "$CMD" = restore ]; then
     "${SSH[@]}" -t "cd '$DEST' && sh deploy-car.sh restore"     # asks to type YES
 else

@@ -244,8 +244,11 @@ install_one() {
     "$NODE" "$TMP/oapgen/gen.js" "$CATALOG" "$top/source/manifest.json" "$u" "$top/someipInterfaces" \
         || die "interface generation failed (see above)"
 
-    # ownership/modes as on stock installs
-    chown -Rh 12201:$u "$top"
+    # ownership/modes as on stock installs. data/ kvs/ share/ security/ keep what the app
+    # (or the platform) put in them: on an update, chowning their contents to 12201 leaves
+    # e.g. data/.joynr unwritable for the app, which then crashes on its first start.
+    chown -h 12201:$u "$top" "$top/data" "$top/kvs" "$top/share" "$top/security"
+    chown -Rh 12201:$u "$top/source" "$top/someipInterfaces" "$top/rhmiData"
     chmod 750 "$top" "$top/source" "$top/someipInterfaces"
     chmod 770 "$top/data" "$top/kvs" "$top/share" "$top/security" "$top/rhmiData"
     find "$top/source" -type d -exec chmod 750 {} \;
