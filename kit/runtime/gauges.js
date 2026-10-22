@@ -49,28 +49,24 @@ function zoneColor(t, g, v, base) {
     return c;
 }
 
-/** Panel card: rounded, soft vertical gradient, hairline edge, accent pill + title. */
+/** Widget in the OEM (G20 / MGU7) style; cached as a layer (see layer()). */
 function panel(cv, t, x, y, w, h, title) {
     x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
     const key = ['panel', w, h, title || '', t.name].join('|');
     cv.blit(layer(key, w, h, (c) => drawPanel(c, t, 0, 0, w, h, title)), x, y);
 }
 function drawPanel(cv, t, x, y, w, h, title) {
-    const R = 16, E = 1.5, lo = mix(t.panelEdge, t.panelBottom, 0.6);
-    cv.card(x, y, w, h, R, [[0, t.panelTop], [1, t.panelBottom]]);
-    // hairline edge, fading towards the bottom: straight runs + quarter-circle corners
-    cv.fillRect(x + R, y, w - 2 * R, E, t.panelEdge);
-    cv.fillRect(x + R, y + h - E, w - 2 * R, E, lo);
-    cv.gradientRect(x, y + R, E, h - 2 * R, [[0, t.panelEdge], [1, lo]]);
-    cv.gradientRect(x + w - E, y + R, E, h - 2 * R, [[0, t.panelEdge], [1, lo]]);
-    cv.arc(x + R, y + R, R - E, R, -90, 0, t.panelEdge);
-    cv.arc(x + w - R, y + R, R - E, R, 0, 90, t.panelEdge);
-    cv.arc(x + w - R, y + h - R, R - E, R, 90, 180, lo);
-    cv.arc(x + R, y + h - R, R - E, R, 180, 270, lo);
-    if (title) {
-        cv.roundRect(x + 18, y + 21, 4, 24, 2, t.accent);
-        cv.text(String(title).toUpperCase(), x + 32, y + 40, 22, t.dim, { font: 'bold', spacing: 2 });
-    }
+    // flat light grey overlay; top: a short bold bar in the theme's stripe colours (M tricolour:
+    // light blue, dark blue, red; the last part with an angled end), then a thin white line;
+    // large white title in normal case
+    cv.fillRect(x, y, w, h, withAlpha('#b4bccc', 0.07));
+    const st = t.stripes || [t.accent], BW = 78, gap = 3, sw = (BW - gap * (st.length - 1)) / st.length;
+    st.forEach((c, i) => {
+        const sx = x + i * (sw + gap), last = i === st.length - 1;
+        for (let r = 0; r < 5; r++) cv.fillRect(sx, y + r, last ? sw - r * 1.6 : sw, 1, c);
+    });
+    cv.fillRect(x + BW + 2, y + 2, w - BW - 2, 1.5, withAlpha('#ffffff', 0.9));
+    if (title) cv.text(String(title), x + 18, y + 42, 26, t.text, { font: 'bold' });
 }
 
 /** 270-degree radial gauge centred at (cx, cy). */
@@ -152,20 +148,76 @@ function bar(cv, t, x, y, w, h, g) {
     if (f > 0) {
         const col = zoneColor(t, g, v);
         const fw = Math.max(bh, w * f);
-        if (col !== t.accent || !t.ramp) cv.roundRect(x, by, fw, bh, bh / 2, col);
-        else cv.rampRect(x, by, fw, bh, bh / 2, t.ramp, x, w);
-        cv.roundRect(x + fw - bh, by - 3, bh, bh + 6, bh / 2, withAlpha(t.text, 0.9));
+        // rounded start, square end, so the '|' marker sits on a straight edge
+        const sq = Math.min(fw, bh / 2 + 1);
+        if (col !== t.accent || !t.ramp) { cv.roundRect(x, by, fw, bh, bh / 2, col); cv.fillRect(x + fw - sq, by, sq, bh, col); }
+        else { cv.rampRect(x, by, fw, bh, bh / 2, t.ramp, x, w); cv.rampRect(x + fw - sq, by, sq, bh, 0, t.ramp, x, w); }
+        // marker: theme colour, white when the bar itself is red / warning-coloured (else it would vanish)
+        const mk = col === t.crit || col === t.warn || col === t.marker ? t.text : t.marker || t.text;
+        cv.roundRect(x + fw - 3, by - 11, 6, bh + 22, 2, mk);
     }
     if (isNum(g.peak)) {
         const px = x + clamp((g.peak - min) / (max - min), 0, 1) * w;
-        cv.roundRect(px - 2, by - 8, 4, bh + 16, 2, t.accent2);
+        cv.roundRect(px - 1.5, by - 15, 3, 9, 1.5, t.accent2);              // peak: small tick above the bar
+    }
+}
+
+/**
+ * Tach bar widget (the Redline rev bar as a widget): digital value top right, a slanted bar
+ * filling left to right in segments, scale below. g = { label, value, unit, decimals, min, max,
+ * step (segment size), scale: { every, div, decimals }, peak, marks: [{ value, color }],
+ * ramp: 'hot' (theme hot ramp to red at g.limit, solid red above) or zones / g.color per segment }.
+ */
+function segBar(cv, t, x, y, w, h, g) {
+    panel(cv, t, x, y, w, h, g.label);
+    const min = g.min || 0, max = g.max, v = g.value, step = g.step || (max - min) / 16, SL = 18;
+    const hot = g.ramp === 'hot', lim = g.limit == null ? max : g.limit, over = hot && isNum(v) && v >= lim;
+    const base = g.color ? t[g.color] || g.color : t.accent;
+    const segCol = (mid) => (over ? '#ff2a2a' : hot ? ramp(t.hotRamp || t.ramp, clamp((mid - min) / (lim - min), 0, 1)) : zoneColor(t, g, mid, base));
+    // digital value (top right)
+    const uw = g.unit ? cv.textWidth(' ' + g.unit, 26) : 0;
+    cv.text(fmt(v, g.decimals), x + w - 24 - uw, y + 60, 64, !isNum(v) ? t.dim : over ? '#ff4a4a' : t.text, { align: 'right', font: 'num' });
+    if (g.unit) cv.text(' ' + g.unit, x + w - 24, y + 60, 26, t.dim, { align: 'right' });
+    // bar geometry: top edge shifted right by SL (slant)
+    const bx = x + 24, bw = w - 48 - SL, y0 = y + 80, y1 = y + Math.max(130, h - 82);
+    const X = (val) => bx + clamp((val - min) / (max - min), 0, 1) * bw;
+    const off = (yy) => SL * (y1 - yy) / (y1 - y0);
+    const band = (a, b, c, pad) => {
+        pad = pad || 0; const xa = X(a), xb = X(b);
+        if (xb - xa <= 0) return;
+        for (let yy = y0 - pad; yy < y1 + pad; yy++) cv.fillRect(off(Math.min(y1, Math.max(y0, yy + 0.5))) + xa - pad, yy, xb - xa + 2 * pad, 1, c);
+    };
+    const gapAt = (val, c) => { const xx = X(val); for (let yy = y0; yy < y1; yy++) cv.fillRect(off(yy + 0.5) + xx - 1.5, yy, 3, 1, c); };
+    // track (tinted where the red / warning zones are)
+    band(min, max, t.track);
+    if (hot && lim < max) band(lim, max, withAlpha(t.crit, 0.3));
+    for (const z of g.zones || []) if (!z.tintOnly && (z.color === 'warn' || z.color === 'crit')) band(Math.max(min, z.from), Math.min(max, z.to), withAlpha(t[z.color], 0.25));
+    // fill: each segment in the colour of its position
+    if (isNum(v) && v > min) {
+        const vv = Math.min(v, max);
+        band(min, vv, withAlpha(segCol(vv), 0.14), 6);
+        for (let a = min; a < vv; a += step) band(a, Math.min(vv, a + step), segCol(a + step / 2));
+        const xe = X(vv);
+        cv.line(xe, y1 + 4, xe + SL, y0 - 4, 6, '#ffffff');                  // bright leading edge
+    }
+    for (let a = min + step; a < max - 1e-9; a += step) gapAt(a, t.bg);
+    // marks above the bar (shift point, warm, ...) + peak
+    for (const m of g.marks || []) { const xx = X(m.value) + SL; cv.fillRect(xx - 2, y0 - 14, 4, 12, t[m.color] || m.color); }
+    if (isNum(g.peak) && g.peak > min) { const xx = X(g.peak) + SL; cv.fillRect(xx - 1.5, y0 - 20, 3, 14, t.accent2); }
+    // scale
+    const sc = g.scale || {};
+    for (let a = min; a <= max + 1e-9; a += step) {
+        const xx = X(a), lab = sc.every && Math.abs((a - min) / sc.every - Math.round((a - min) / sc.every)) < 1e-6;
+        cv.fillRect(xx - (lab ? 1.5 : 1), y1 + 8, lab ? 3 : 2, lab ? 12 : 7, lab ? t.text : t.tick);
+        if (lab) cv.text(fmt(a / (sc.div || 1), sc.decimals || 0), xx, y1 + 42, 24, hot && a >= lim ? t.crit : t.dim, { align: 'center', font: 'bold' });
     }
 }
 
 /** Stat tile: label, big value + unit, optional history trace. */
 function stat(cv, t, x, y, w, h, g) {
     panel(cv, t, x, y, w, h, g.label);
-    const v = g.value, col = zoneColor(t, g, v, g.color ? t[g.color] || g.color : t.accent), vcol = zoneColor(t, g, v, t.text);
+    const v = g.value, col = zoneColor(t, g, v, g.color ? t[g.color] || g.color : t.accent);
+    const vcol = zoneColor(t, g, v, g.valueColor ? t[g.valueColor] || g.valueColor : t.text);
     // history trace first, so the big value stays readable on top of it
     const hist = (g.history || []).filter(isNum);
     if (hist.length > 2 && h > 150) {
@@ -259,6 +311,39 @@ function gmeter(cv, t, cx, cy, r, g) {
     cv.text('ACCEL', cx, cy - r + 30, 18, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
 }
 
+/*
+ * G20 / MGU7-style frame: a slim tab bar along the top (BAR_H px) with the page names; pages
+ * draw their content from TOP to BOTTOM below it. Grey bar, thin line on its bottom edge, the
+ * selected tab with a thick bar on that line + glow in the theme's selection colour and its name
+ * in selText (white in M Tricolour), the others grey. badges = [{ text, color }] on the right.
+ */
+const BAR_H = 36, TOP = 44, BOTTOM = 512;
+function frame(cv, t, tabs, sel, badges) {
+    const W = cv.w, S = t.sel || t.accent;
+    cv.fillRect(0, 0, W, BAR_H, t.bg);
+    cv.fillRect(0, 0, W, BAR_H, withAlpha('#ffffff', 0.07));
+    cv.fillRect(0, BAR_H - 1, W, 1, withAlpha('#ffffff', 0.18));
+    const opt = { align: 'center', font: 'bold', spacing: 1.5 };
+    let x = 16;
+    (tabs || []).forEach((name, i) => {
+        const label = String(name).toUpperCase(), tw = Math.max(150, cv.textWidth(label, 17, opt) + 48), on = i === sel;
+        if (on) {
+            cv.gradientRect(x, 0, tw, BAR_H, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.22)]]);
+            cv.fillRect(x, BAR_H - 4, tw, 4, S);
+        }
+        cv.text(label, x + tw / 2, 24, 17, on ? t.selText || S : t.dim, opt);
+        if (i < tabs.length - 1) cv.fillRect(x + tw, 9, 1, BAR_H - 18, withAlpha('#ffffff', 0.12));
+        x += tw;
+    });
+    let bx = W - 16;
+    (badges || []).filter(Boolean).forEach((b) => {
+        const bw = Math.max(84, cv.textWidth(b.text, 16, opt) + 24), c = t[b.color] || b.color || t.warn;
+        cv.roundRect(bx - bw, 6, bw, 24, 5, withAlpha(c, 0.2));
+        cv.text(b.text, bx - bw / 2, 24, 16, c, opt);
+        bx -= bw + 10;
+    });
+}
+
 /** Accent stripes (M-style) under a header. */
 function stripes(cv, t, x, y, w) {
     const s = t.stripes || [t.accent];
@@ -266,4 +351,4 @@ function stripes(cv, t, x, y, w) {
     s.forEach((c, i) => cv.roundRect(x + i * sw, y, sw - (i < s.length - 1 ? 4 : 0), 4, 2, c));
 }
 
-module.exports = { layer, panel, radial, bar, stat, tyres, gmeter, stripes, fmt, isNum, clamp, mix, zoneColor };
+module.exports = { BAR_H, TOP, BOTTOM, frame, layer, panel, segBar, radial, bar, stat, tyres, gmeter, stripes, fmt, isNum, clamp, mix, zoneColor };

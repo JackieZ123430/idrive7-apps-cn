@@ -2,7 +2,7 @@
   "id": "gforce",
   "title": "G-Force",
   "description": "Friction circle with grip envelope, peak g per direction and session records",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "vendor": "custom",
   "loggingId": "OA9B",
   "iconGlyph": "gforce",
@@ -25,7 +25,8 @@
       "title": "G-Force",
       "buttons": [
         ["BTN_ACTION", "New session"],
-        ["BTN_PAGE", "Records"],
+        ["BTN_PAGE", "Next page"],
+        ["BTN_PREV", "Previous page"],
         ["BTN_SETTINGS", "Settings"]
       ]
     }

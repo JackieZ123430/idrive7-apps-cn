@@ -21,7 +21,7 @@ const Car = require('./kit/car');
 
 const W = 1600, H = 520;
 // rev bar (G20 style): left to right, slanted segments; top edge shifted right by 'slant'
-const BAR = { x0: 400, x1: 1200, y0: 188, y1: 252, slant: 22 };
+const BAR = { x0: 400, x1: 1200, y0: 213, y1: 275, slant: 22 };
 const GX = 800;                                     // centre column (rpm, bar, gear)
 const MPH = 1.609344;
 const GREEN = '#2fd27a', YELLOW = '#ffc21a', BLUE = '#2a7dff';
@@ -116,9 +116,9 @@ mgu.run({
             const cv = new Canvas(W, H).clear(t.bg);
             // angular frame lines (the G20's outline) around the centre
             const fl = withAlpha(t.tick, 0.55);
-            cv.polyline([[24, 64], [330, 64], [370, 96], [1230, 96], [1270, 64], [1576, 64]], 2, fl);
-            cv.polyline([[370, 96], [1230, 96]], 3, withAlpha(t.accent, 0.5));
-            cv.polyline([[24, 498], [330, 498], [370, 470], [1230, 470], [1270, 498], [1576, 498]], 2, fl);
+            cv.polyline([[24, 92], [330, 92], [370, 122], [1230, 122], [1270, 92], [1576, 92]], 2, fl);
+            cv.polyline([[370, 122], [1230, 122]], 3, withAlpha(t.accent, 0.5));
+            cv.polyline([[24, 512], [330, 512], [370, 486], [1230, 486], [1270, 512], [1576, 512]], 2, fl);
             // track, redline part tinted, segment gaps
             band(cv, 0, redline(), t.track);
             band(cv, redline(), maxRpm(), withAlpha(t.crit, 0.3));
@@ -153,7 +153,7 @@ mgu.run({
 
         function shiftLights(cv, t, rpm, sp, on) {
             const cols = ledColors(t);
-            const x0 = GX - 330, w = 660, gap = 10, lw = (w - gap * (N_LEDS - 1)) / N_LEDS, y = 14, h = 30;
+            const x0 = GX - 330, w = 660, gap = 10, lw = (w - gap * (N_LEDS - 1)) / N_LEDS, y = 48, h = 30;
             const start = sp - LED_RANGE;
             const lit = G.isNum(rpm) ? Math.floor(G.clamp((rpm - start) / LED_RANGE, 0, 1) * N_LEDS) : 0;
             const strobe = G.isNum(rpm) && rpm >= sp;
@@ -199,55 +199,55 @@ mgu.run({
             if (peakRpm > 0) { const x = BAR.x0 + barX(peakRpm) + BAR.slant; cv.fillRect(x - 1.5, BAR.y0 - 22, 3, 16, t.accent2); }
 
             // ---- centre: digital rpm above the bar, gear below it
-            const rw = cv.text(G.isNum(rpm) ? String(Math.round(rpm / 10) * 10) : '----', GX - 30, 172, 80, G.isNum(rpm) ? (shiftNow ? '#ff4a4a' : t.text) : t.dim, { align: 'center', font: 'num' });
-            cv.text('RPM', GX - 30 + rw / 2 + 12, 172, 22, t.dim, { font: 'bold', spacing: 2 });
+            const rw = cv.text(G.isNum(rpm) ? String(Math.round(rpm / 10) * 10) : '----', GX - 30, 198, 80, G.isNum(rpm) ? (shiftNow ? '#ff4a4a' : t.text) : t.dim, { align: 'center', font: 'num' });
+            cv.text('RPM', GX - 30 + rw / 2 + 12, 198, 22, t.dim, { font: 'bold', spacing: 2 });
             const g = d.gear;
             const gs = g === -1 ? 'R' : g === 0 ? 'N' : G.isNum(g) ? String(g) : '-';
-            cv.text(gs, GX, 488, 210, shiftNow && blink ? '#ff2a2a' : t.text, { align: 'center', font: 'gear' });
-            if (d.gearGuessed && G.isNum(g) && g > 0) cv.text('EST.', GX + 90, 330, 16, t.dim, { font: 'bold', spacing: 1.5 });
-            if (shiftNow) cv.text('SHIFT', GX + 150, 420, 30, blink ? '#ff2a2a' : withAlpha('#ff2a2a', 0.5), { font: 'bold', spacing: 3 });
+            cv.text(gs, GX, 500, 200, shiftNow && blink ? '#ff2a2a' : t.text, { align: 'center', font: 'gear' });
+            if (d.gearGuessed && G.isNum(g) && g > 0) cv.text('EST.', GX + 90, 352, 16, t.dim, { font: 'bold', spacing: 1.5 });
+            if (shiftNow) cv.text('SHIFT', GX + 150, 436, 30, blink ? '#ff2a2a' : withAlpha('#ff2a2a', 0.5), { font: 'bold', spacing: 3 });
 
             // ---- left: digital speed, temperatures, cold oil, stats
             const v = G.isNum(d.speed) ? (mph() ? d.speed / MPH : d.speed) : null;
-            cv.text('SPEED', 40, 128, 18, t.dim, { font: 'bold', spacing: 2 });
-            const vw = cv.text(G.fmt(v, 0), 36, 252, 120, G.isNum(v) ? t.text : t.dim, { font: 'num' });
-            cv.text(mph() ? 'mph' : 'km/h', 46 + vw, 252, 26, t.dim);
-            cv.fillRect(40, 276, 300, 1, withAlpha(t.tick, 0.6));
+            cv.text('SPEED', 40, 156, 18, t.dim, { font: 'bold', spacing: 2 });
+            const vw = cv.text(G.fmt(v, 0), 36, 276, 116, G.isNum(v) ? t.text : t.dim, { font: 'num' });
+            cv.text(mph() ? 'mph' : 'km/h', 46 + vw, 276, 26, t.dim);
+            cv.fillRect(40, 298, 300, 1, withAlpha(t.tick, 0.6));
             const warm = settings.get('warmOil'), coldOil = G.isNum(d.oil) && d.oil < warm;
             const oilCol = !G.isNum(d.oil) ? t.dim : d.oil < 60 ? t.cold : coldOil ? YELLOW : d.oil > 130 ? t.crit : t.text;
-            cv.text('OIL', 40, 312, 18, t.dim, { font: 'bold', spacing: 2 });
-            cv.text(G.fmt(d.oil, 0) + (G.isNum(d.oil) ? '°' : ''), 40, 356, 40, oilCol, { font: 'bold' });
-            cv.text('WATER', 190, 312, 18, t.dim, { font: 'bold', spacing: 2 });
-            cv.text(G.fmt(d.coolant, 0) + (G.isNum(d.coolant) ? '°' : ''), 190, 356, 40, t.text, { font: 'bold' });
+            cv.text('OIL', 40, 334, 18, t.dim, { font: 'bold', spacing: 2 });
+            cv.text(G.fmt(d.oil, 0) + (G.isNum(d.oil) ? '°' : ''), 40, 376, 40, oilCol, { font: 'bold' });
+            cv.text('WATER', 190, 334, 18, t.dim, { font: 'bold', spacing: 2 });
+            cv.text(G.fmt(d.coolant, 0) + (G.isNum(d.coolant) ? '°' : ''), 190, 376, 40, t.text, { font: 'bold' });
             // cold oil is always shown: with the guard on it also lowers the shift point
             if (coldOil) {
-                cv.roundRect(40, 374, 300, 36, 8, withAlpha(t.cold, 0.2));
-                cv.text(sp.cold ? 'COLD  ·  LIMIT ' + sp.rpm : 'OIL COLD  ·  GO EASY', 190, 399, 18, t.cold, { align: 'center', font: 'bold', spacing: 1 });
+                cv.roundRect(40, 392, 300, 36, 8, withAlpha(t.cold, 0.2));
+                cv.text(sp.cold ? 'COLD  ·  LIMIT ' + sp.rpm : 'OIL COLD  ·  GO EASY', 190, 417, 18, t.cold, { align: 'center', font: 'bold', spacing: 1 });
             }
-            cv.text('PEAK ' + (peakRpm ? Math.round(peakRpm) : '--') + '  ·  LIMITER ' + limiterHits + 'x', 40, 444, 16, t.dim, { font: 'bold', spacing: 1 });
-            cv.text('ABOVE SHIFT POINT ' + (overShiftMs / 1000).toFixed(1) + ' s', 40, 468, 16, t.dim, { font: 'bold', spacing: 1 });
+            cv.text('PEAK ' + (peakRpm ? Math.round(peakRpm) : '--') + '  ·  LIMITER ' + limiterHits + 'x', 40, 462, 16, t.dim, { font: 'bold', spacing: 1 });
+            cv.text('ABOVE SHIFT POINT ' + (overShiftMs / 1000).toFixed(1) + ' s', 40, 486, 16, t.dim, { font: 'bold', spacing: 1 });
 
             // ---- right: shift point + last shift
             const rx = W - 40;
-            cv.text('SHIFT AT', rx, 128, 18, t.dim, { align: 'right', font: 'bold', spacing: 2 });
-            cv.text(String(sp.rpm), rx, 196, 64, sp.cold ? t.cold : t.text, { align: 'right', font: 'num' });
-            cv.fillRect(W - 340, 276, 300, 1, withAlpha(t.tick, 0.6));
-            cv.text('LAST SHIFT', rx, 312, 18, t.dim, { align: 'right', font: 'bold', spacing: 2 });
+            cv.text('SHIFT AT', rx, 156, 18, t.dim, { align: 'right', font: 'bold', spacing: 2 });
+            cv.text(String(sp.rpm), rx, 222, 64, sp.cold ? t.cold : t.text, { align: 'right', font: 'num' });
+            cv.fillRect(W - 340, 298, 300, 1, withAlpha(t.tick, 0.6));
+            cv.text('LAST SHIFT', rx, 334, 18, t.dim, { align: 'right', font: 'bold', spacing: 2 });
             if (lastShift) {
                 const age = now - lastShift.at, vc = VCOL[lastShift.verdict];
-                const lw2 = cv.text(String(lastShift.rpm), rx, 366, 52, t.text, { align: 'right', font: 'num' });
-                if (lastShift.from !== '?') cv.text(lastShift.from + ' > ' + lastShift.to, rx - lw2 - 14, 366, 22, t.dim, { align: 'right', font: 'bold' });
-                cv.roundRect(rx - 200, 384, 200, 38, 8, withAlpha(vc, age < 2500 ? 0.45 : 0.18));
-                cv.text(lastShift.verdict, rx - 100, 410, 20, age < 2500 ? t.text : vc, { align: 'center', font: 'bold', spacing: 2 });
-            } else cv.text('--', rx, 366, 52, t.dim, { align: 'right', font: 'num' });
+                const lw2 = cv.text(String(lastShift.rpm), rx, 386, 52, t.text, { align: 'right', font: 'num' });
+                if (lastShift.from !== '?') cv.text(lastShift.from + ' > ' + lastShift.to, rx - lw2 - 14, 386, 22, t.dim, { align: 'right', font: 'bold' });
+                cv.roundRect(rx - 200, 404, 200, 38, 8, withAlpha(vc, age < 2500 ? 0.45 : 0.18));
+                cv.text(lastShift.verdict, rx - 100, 430, 20, age < 2500 ? t.text : vc, { align: 'center', font: 'bold', spacing: 2 });
+            } else cv.text('--', rx, 386, 52, t.dim, { align: 'right', font: 'num' });
         }
 
         function drawLog(cv, t) {
-            G.panel(cv, t, 24, 64, 760, 440, 'Recent upshifts');
+            G.panel(cv, t, 24, 44, 760, 468, 'Recent upshifts');
             const up = shifts.slice(0, 9);
-            if (!up.length) cv.text('No shifts yet - go and use the rev range.', 48, 200, 26, t.dim);
+            if (!up.length) cv.text('No shifts yet - go and use the rev range.', 48, 189, 26, t.dim);
             up.forEach((s, i) => {
-                const y = 150 + i * 39;
+                const y = 135 + i * 41;
                 const d = new Date(s.at), p = (n) => String(n).padStart(2, '0');
                 cv.text(p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()), 48, y, 22, t.dim);
                 cv.text(s.from === '?' ? 'upshift' : s.from + ' > ' + s.to, 200, y, 26, t.text, { font: 'bold' });
@@ -257,14 +257,14 @@ mgu.run({
                 cv.text(s.verdict, 675, y - 2, 20, VCOL[s.verdict], { align: 'center', font: 'bold', spacing: 1.5 });
             });
 
-            G.panel(cv, t, 808, 64, 768, 440, 'Shift accuracy');
+            G.panel(cv, t, 808, 44, 768, 468, 'Shift accuracy');
             const n = shifts.length;
             const cnt = (v) => shifts.filter((s) => s.verdict === v).length;
             const spot = cnt('SPOT ON');
-            cv.text(n ? Math.round(spot / n * 100) + '%' : '--', 832, 210, 96, n ? GREEN : t.dim, { font: 'num' });
-            cv.text('SPOT ON  (' + n + ' shifts)', 836, 244, 22, t.dim, { font: 'bold', spacing: 1 });
+            cv.text(n ? Math.round(spot / n * 100) + '%' : '--', 832, 199, 96, n ? GREEN : t.dim, { font: 'num' });
+            cv.text('SPOT ON  (' + n + ' shifts)', 836, 235, 22, t.dim, { font: 'bold', spacing: 1 });
             ['EARLY', 'SPOT ON', 'LATE', 'COLD REV', 'LIMITER'].forEach((v, i) => {
-                const y = 282 + i * 43, c = cnt(v), f = n ? c / n : 0;
+                const y = 276 + i * 46, c = cnt(v), f = n ? c / n : 0;
                 cv.text(v, 836, y + 22, 22, VCOL[v], { font: 'bold', spacing: 1 });
                 cv.roundRect(990, y + 2, 460, 26, 6, t.track);
                 if (f > 0) cv.roundRect(990, y + 2, Math.max(12, 460 * f), 26, 6, VCOL[v]);
@@ -274,18 +274,14 @@ mgu.run({
             if (n) {
                 const ys = shifts.slice(0, 30).map((s) => s.rpm - s.target);
                 const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
-                cv.text('AVG ' + (avg >= 0 ? '+' : '') + Math.round(avg) + ' rpm vs shift point', 1240, 210, 24, t.text, { align: 'center', font: 'bold' });
-                cv.text('PEAK ' + Math.round(peakRpm) + ' RPM  ·  ' + G.fmt(mph() ? peakSpeed / MPH : peakSpeed, 0) + (mph() ? ' MPH' : ' KM/H'), 1240, 244, 20, t.dim, { align: 'center', font: 'bold', spacing: 1 });
+                cv.text('AVG ' + (avg >= 0 ? '+' : '') + Math.round(avg) + ' rpm vs shift point', 1240, 199, 24, t.text, { align: 'center', font: 'bold' });
+                cv.text('PEAK ' + Math.round(peakRpm) + ' RPM  ·  ' + G.fmt(mph() ? peakSpeed / MPH : peakSpeed, 0) + (mph() ? ' MPH' : ' KM/H'), 1240, 235, 20, t.dim, { align: 'center', font: 'bold', spacing: 1 });
             }
         }
 
+        /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t, d) {
-            cv.text(page === 0 ? 'REDLINE' : 'SHIFT LOG', 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
-            G.stripes(cv, t, 24, 44, 120);
-            if (d.demo) {
-                cv.roundRect(W - 124, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
-                cv.text('DEMO', W - 74, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
-            }
+            G.frame(cv, t, ['Tach', 'Shift log'], page, [d.demo && { text: 'DEMO' }]);
         }
 
         async function render() {
@@ -297,7 +293,9 @@ mgu.run({
         }
 
         /* ---------- buttons ---------- */
-        ui.onClick('BTN_PAGE', () => { page = 1 - page; ui.text('BTN_PAGE', page ? 'Tach' : 'Shift log'); return render(); });
+        const flip = () => { page = 1 - page; return render(); };
+        ui.onClick('BTN_PAGE', flip);
+        ui.onClick('BTN_PREV', flip);
         ui.onClick('BTN_RESET', () => {
             peakRpm = 0; peakSpeed = 0; overShiftMs = 0; limiterHits = 0; shifts = []; lastShift = null;
             log.info('peaks reset'); return render();

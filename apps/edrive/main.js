@@ -261,16 +261,13 @@ mgu.run({
         /* ---------- drawing ---------- */
         let page = 0;
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; return render(); });
+        ui.onClick('BTN_PREV', () => { const n = pages().length; page = (page + n - 1) % n; return render(); });
         ui.onClick('BTN_READ', () => poll(true).then(render));
 
-        function header(cv, t, title, d) {
-            cv.text(title, 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
-            G.stripes(cv, t, 24, 44, 120);
-            pages().forEach((p, i) => cv.circle(W - 196 + i * 22, 26, i === page ? 6 : 4, i === page ? t.accent : t.tick));
-            if (d.demo) {
-                cv.roundRect(W - 124, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
-                cv.text('DEMO', W - 74, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
-            }
+        /** G20-style frame: tab bar with the page names along the top. */
+        function header(cv, t, d) {
+            const names = { main: isHybrid() ? 'Range' : '12 V battery', log: 'Charge log', diag: 'Diagnostics' };
+            G.frame(cv, t, pages().map((p) => names[p]), page, [d.demo && { text: 'DEMO' }]);
         }
 
         function battery(cv, t, x, y, w, h, soc) {
@@ -295,16 +292,16 @@ mgu.run({
                 else if (v >= 12.2) { state = 'HALF  (about 50 %) - drive or charge soon'; col = t.warn; }
                 else { state = 'LOW - charge the battery'; col = t.crit; }
             }
-            G.stat(cv, t, 24, 64, 1040, 440, {
+            G.stat(cv, t, 24, 44, 1040, 468, {
                 label: '12 V battery', value: v, unit: 'V', decimals: 2, size: 150, history: v12hist,
                 zones: [{ from: 0, to: 12.2, color: 'crit' }, { from: 12.2, to: 12.4, color: 'warn' }],
                 sub: 'last hour  ·  resting 12.4-12.8 V is healthy, 13.5-14.8 V while charging',
             });
-            cv.text(state, 1040, 130, 24, col, { font: 'bold', spacing: 1, align: 'right' });
-            G.panel(cv, t, 1088, 64, 488, 212, 'Outside');
-            cv.text(G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) : '--', 1112, 210, 96, G.isNum(d.ambient) ? t.text : t.dim, { font: 'num' });
-            cv.text(tU(), 1552, 210, 32, t.dim, { align: 'right' });
-            G.panel(cv, t, 1088, 292, 488, 212, 'No hybrid system');
+            cv.text(state, 1040, 114, 24, col, { font: 'bold', spacing: 1, align: 'right' });
+            G.panel(cv, t, 1088, 44, 488, 225, 'Outside');
+            cv.text(G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) : '--', 1112, 199, 96, G.isNum(d.ambient) ? t.text : t.dim, { font: 'num' });
+            cv.text(tU(), 1552, 199, 32, t.dim, { align: 'right' });
+            G.panel(cv, t, 1088, 287, 488, 225, 'No hybrid system');
             ['No high-voltage battery answered, so', 'eDrive shows the 12 V battery only.', 'Hybrid car? Settings > Hybrid system > Yes'].forEach((l, i) =>
                 cv.text(l, 1112, 376 + i * 34, 22, i === 2 ? t.dim : t.text));
         }
@@ -340,46 +337,46 @@ mgu.run({
             const f = has ? d.soc / 100 : 0;
 
             // ---- range
-            G.panel(cv, t, 24, 64, 720, 440, 'Real electric range');
+            G.panel(cv, t, 24, 44, 720, 468, 'Real electric range');
             const rs = has ? String(Math.round(D(r.mid * f))) : '--';
-            const rw = cv.text(rs, 48, 214, 130, has ? t.text : t.dim, { font: 'num' });
-            cv.text(dU(), 62 + rw, 214, 40, t.dim, { font: 'bold' });
-            if (d.stale && has) cv.text('charge read ' + ago(d.socAge), 720, 130, 20, t.warn, { align: 'right' });
+            const rw = cv.text(rs, 48, 204, 130, has ? t.text : t.dim, { font: 'num' });
+            cv.text(dU(), 62 + rw, 204, 40, t.dim, { font: 'bold' });
+            if (d.stale && has) cv.text('charge read ' + ago(d.socAge), 720, 114, 20, t.warn, { align: 'right' });
             if (has) {
-                cv.text('between ' + Math.round(D(r.lo * f)) + ' and ' + Math.round(D(r.hi * f)) + ' ' + dU(), 300, 172, 26, t.text, { font: 'bold' });
+                cv.text('between ' + Math.round(D(r.lo * f)) + ' and ' + Math.round(D(r.hi * f)) + ' ' + dU(), 300, 159, 26, t.text, { font: 'bold' });
                 cv.text(G.fmt(d.soc, 0) + ' % of ' + Math.round(D(r.mid)) + ' ' + dU() + ' (full battery at '
-                    + (G.isNum(d.ambient) ? G.fmt(T(d.ambient), 0) + tU() : '10' + tU() + ', assumed') + ')', 300, 206, 20, t.dim);
+                    + (G.isNum(d.ambient) ? G.fmt(T(d.ambient), 0) + tU() : '10' + tU() + ', assumed') + ')', 300, 195, 20, t.dim);
             } else {
-                cv.text('no charge reading - see Diagnostics page', 300, 206, 22, t.dim);
+                cv.text('no charge reading - see Diagnostics page', 300, 195, 22, t.dim);
             }
-            cv.text('FULL BATTERY RANGE BY OUTSIDE TEMPERATURE', 48, 262, 16, t.dim, { font: 'bold', spacing: 1.5 });
-            rangeChart(cv, t, 64, 284, 640, 136, d.ambient);
+            cv.text('FULL BATTERY RANGE BY OUTSIDE TEMPERATURE', 48, 255, 16, t.dim, { font: 'bold', spacing: 1.5 });
+            rangeChart(cv, t, 64, 278, 640, 145, d.ambient);
             const amb = G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) + ' ' + tU() : 'n/a';
-            cv.text('OUTSIDE  ' + amb, 48, 480, 22, t.dim, { font: 'bold', spacing: 1.5 });
+            cv.text('OUTSIDE  ' + amb, 48, 486, 22, t.dim, { font: 'bold', spacing: 1.5 });
             // 12 V battery: resting ~12.4-12.8 V, 13.5-14.8 V while the DC/DC or alternator charges it
             const v = d.v12, vcol = !G.isNum(v) ? t.dim : v < 11.8 ? t.crit : v < 12.2 || v > 15.2 ? t.warn : t.text;
-            const vw = cv.text(G.isNum(v) ? v.toFixed(2) + ' V' : 'n/a', 720, 482, 32, vcol, { font: 'bold', align: 'right' });
-            cv.text('12 V BATTERY', 708 - vw, 480, 22, t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
+            const vw = cv.text(G.isNum(v) ? v.toFixed(2) + ' V' : 'n/a', 720, 489, 32, vcol, { font: 'bold', align: 'right' });
+            cv.text('12 V BATTERY', 708 - vw, 486, 22, t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
 
             // ---- charge + last charge
-            G.panel(cv, t, 768, 64, 380, 440, 'Charge');
-            battery(cv, t, 796, 118, 300, 100, d.soc);
+            G.panel(cv, t, 768, 44, 380, 468, 'Charge');
+            battery(cv, t, 796, 101, 300, 106, d.soc);
             const ss = G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--';
-            const sw = cv.text(ss, 940, 318, 96, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'center' });
-            cv.text('%', 948 + sw / 2, 318, 36, t.dim, { font: 'bold' });
-            cv.text(d.demo ? 'demo data' : 'read ' + ago(d.socAge), 958, 350, 20, t.dim, { align: 'center' });
-            cv.fillRect(792, 368, 332, 1, t.tick);
+            const sw = cv.text(ss, 940, 314, 96, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'center' });
+            cv.text('%', 948 + sw / 2, 314, 36, t.dim, { font: 'bold' });
+            cv.text(d.demo ? 'demo data' : 'read ' + ago(d.socAge), 958, 348, 20, t.dim, { align: 'center' });
+            cv.fillRect(792, 367, 332, 1, t.tick);
             const c = d.charge;
-            cv.text(c && c.open ? 'CHARGING / JUST CHARGED' : 'LAST CHARGE', 792, 398, 20, c && c.open ? GO : t.dim, { font: 'bold', spacing: 1.5 });
+            cv.text(c && c.open ? 'CHARGING / JUST CHARGED' : 'LAST CHARGE', 792, 399, 20, c && c.open ? GO : t.dim, { font: 'bold', spacing: 1.5 });
             if (c) {
                 const add = c.to - c.from;
-                const aw = cv.text('+' + add.toFixed(0) + ' %', 792, 446, 44, GO, { font: 'bold' });
+                const aw = cv.text('+' + add.toFixed(0) + ' %', 792, 450, 44, GO, { font: 'bold' });
                 const extra = [G.isNum(c.kwh) ? c.kwh.toFixed(1) + ' kWh' : null, '+' + Math.round(D(add / 100 * warmRange())) + ' ' + dU()].filter(Boolean).join('  ·  ');
-                cv.text(extra, 806 + aw, 444, 24, t.text, { font: 'label' });
-                cv.text('from ' + Math.round(c.from) + ' to ' + Math.round(c.to) + ' %  ·  ' + (c.open ? 'now' : ago(Date.now() - c.toT)), 792, 484, 22, t.dim);
+                cv.text(extra, 806 + aw, 448, 24, t.text, { font: 'label' });
+                cv.text('from ' + Math.round(c.from) + ' to ' + Math.round(c.to) + ' %  ·  ' + (c.open ? 'now' : ago(Date.now() - c.toT)), 792, 491, 22, t.dim);
             } else {
-                cv.text('no charge seen yet', 792, 444, 24, t.dim);
-                cv.text('shows after the next charge', 792, 484, 20, t.dim);
+                cv.text('no charge seen yet', 792, 448, 24, t.dim);
+                cv.text('shows after the next charge', 792, 491, 20, t.dim);
             }
 
             // ---- battery: health (capacity vs. new) + energy in it now
@@ -387,21 +384,21 @@ mgu.run({
             const cap = G.isNum(soh) ? kwh * soh / 100 : null;                     // what a full charge holds today
             const now = G.isNum(cap) && G.isNum(d.soc) ? cap * d.soc / 100 : null;  // energy in the pack right now
             const bx = 1172, bw = 404;
-            G.panel(cv, t, bx, 64, bw, 440, 'Battery health (SOH)');
+            G.panel(cv, t, bx, 44, bw, 468, 'Battery health (SOH)');
             const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
-            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', bx + 24, 190, 96, hc, { font: 'num' });
-            cv.text('%', bx + 32 + hw, 190, 32, t.dim, { font: 'bold' });
-            cv.text(G.isNum(soh) ? 'of the capacity it had new' : 'not readable - see Diagnostics', bx + 24, 224, 20, t.dim);
-            G.bar(cv, t, bx + 24, 236, bw - 48, 64, {
+            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', bx + 24, 178, 96, hc, { font: 'num' });
+            cv.text('%', bx + 32 + hw, 178, 32, t.dim, { font: 'bold' });
+            cv.text(G.isNum(soh) ? 'of the capacity it had new' : 'not readable - see Diagnostics', bx + 24, 214, 20, t.dim);
+            G.bar(cv, t, bx + 24, 227, bw - 48, 68, {
                 label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh,
                 zones: [{ from: 0, to: kwh * 0.7, color: 'crit' }, { from: kwh * 0.7, to: kwh * 0.8, color: 'warn' }],
             });
-            cv.text('of ' + kwh + ' kWh new', bx + bw - 24, 326, 18, t.dim, { align: 'right' });
-            cv.fillRect(bx + 24, 344, bw - 48, 1, t.panelEdge);
+            cv.text('of ' + kwh + ' kWh new', bx + bw - 24, 323, 18, t.dim, { align: 'right' });
+            cv.fillRect(bx + 24, 342, bw - 48, 1, t.panelEdge);
             cv.text('ENERGY IN BATTERY NOW', bx + 24, 376, 18, t.dim, { font: 'bold', spacing: 1.5 });
-            const ew = cv.text(G.isNum(now) ? G.fmt(now, 1) : '--', bx + 24, 440, 64, G.isNum(now) ? t.text : t.dim, { font: 'num' });
-            cv.text('kWh', bx + 34 + ew, 440, 26, t.dim);
-            cv.text(d.demo ? 'demo data' : G.isNum(soh) ? 'health read ' + ago(d.sohAge) : '', bx + 24, 482, 18, t.dim);
+            const ew = cv.text(G.isNum(now) ? G.fmt(now, 1) : '--', bx + 24, 444, 64, G.isNum(now) ? t.text : t.dim, { font: 'num' });
+            cv.text('kWh', bx + 34 + ew, 444, 26, t.dim);
+            cv.text(d.demo ? 'demo data' : G.isNum(soh) ? 'health read ' + ago(d.sohAge) : '', bx + 24, 489, 18, t.dim);
         }
 
         const pad = (n) => (n < 10 ? '0' : '') + n;
@@ -414,17 +411,17 @@ mgu.run({
             const kwhOf = (c) => (G.isNum(c.kwh) ? c.kwh : 0);
 
             // ---- list, newest first
-            G.panel(cv, t, 24, 64, 1040, 440, 'Charges' + (all.length ? '  (' + all.length + ')' : ''));
+            G.panel(cv, t, 24, 44, 1040, 468, 'Charges' + (all.length ? '  (' + all.length + ')' : ''));
             const cols = [48, 230, 380, 590, 760, 920];
-            ['DATE', 'ADDED', 'FROM - TO', 'ENERGY', 'RANGE', price() > 0 ? 'COST (EST.)' : ''].forEach((h, i) => cv.text(h, cols[i], 136, 18, t.dim, { font: 'bold', spacing: 1.5 }));
-            cv.fillRect(48, 148, 992, 1, t.panelEdge);
+            ['DATE', 'ADDED', 'FROM - TO', 'ENERGY', 'RANGE', price() > 0 ? 'COST (EST.)' : ''].forEach((h, i) => cv.text(h, cols[i], 121, 18, t.dim, { font: 'bold', spacing: 1.5 }));
+            cv.fillRect(48, 133, 992, 1, t.panelEdge);
             if (!all.length) {
-                cv.text('No charges logged yet.', 544, 290, 32, t.dim, { align: 'center', font: 'bold' });
-                cv.text('Every charge of at least ' + cfg.chargeMinPct + ' % is added here, also overnight charges', 544, 330, 22, t.dim, { align: 'center' });
-                cv.text('(seen at the next start). Needs charge readings - see the Diagnostics page.', 544, 358, 22, t.dim, { align: 'center' });
+                cv.text('No charges logged yet.', 544, 284, 32, t.dim, { align: 'center', font: 'bold' });
+                cv.text('Every charge of at least ' + cfg.chargeMinPct + ' % is added here, also overnight charges', 544, 327, 22, t.dim, { align: 'center' });
+                cv.text('(seen at the next start). Needs charge readings - see the Diagnostics page.', 544, 357, 22, t.dim, { align: 'center' });
             }
             all.slice(-8).reverse().forEach((c, i) => {
-                const y = 186 + i * 40;
+                const y = 174 + i * 43;
                 if (i % 2 === 0) cv.roundRect(40, y - 28, 1008, 38, 8, withAlpha(t.track, 0.55));
                 const add = c.to - c.from;
                 cv.text(dateOf(c.toT), cols[0], y, 24, t.text, { font: 'label' });
@@ -437,7 +434,7 @@ mgu.run({
             });
 
             // ---- totals + 14-day chart
-            G.panel(cv, t, 1088, 64, 488, 440, 'Totals');
+            G.panel(cv, t, 1088, 44, 488, 468, 'Totals');
             const now = new Date(), monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
             const month = all.filter((c) => c.toT >= monthStart);
             const sum = (list) => list.reduce((a, c) => a + kwhOf(c), 0);
@@ -448,15 +445,15 @@ mgu.run({
                 const extra = [list.length + (list.length === 1 ? ' charge' : ' charges'), '+' + Math.round(D(list.reduce((a, c) => a + (c.to - c.from), 0) / 100 * warmRange())) + ' ' + dU(), money(sum(list))].filter(Boolean).join('  ·  ');
                 cv.text(extra, 1552, y + 50, 20, t.dim, { align: 'right' });
             };
-            block(132, 'THIS MONTH', month);
-            block(222, 'ALL TIME', all);
+            block(116, 'THIS MONTH', month);
+            block(212, 'ALL TIME', all);
             // kWh per day, last 14 days
             const day = 86400000, today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
             const days = [];
             for (let i = 13; i >= 0; i--) days.push(sum(all.filter((c) => c.toT >= today0 - i * day && c.toT < today0 - (i - 1) * day)));
             const top = Math.max(4, Math.max.apply(null, days));
-            const gx = 1112, gy = 470, gh = 130, bw = 440 / 14;
-            cv.text('KWH PER DAY, LAST 14 DAYS', gx, 326, 18, t.dim, { font: 'bold', spacing: 1.5 });
+            const gx = 1112, gy = 476, gh = 138, bw = 440 / 14;
+            cv.text('KWH PER DAY, LAST 14 DAYS', gx, 323, 18, t.dim, { font: 'bold', spacing: 1.5 });
             days.forEach((v, i) => {
                 const h = v > 0 ? Math.max(6, v / top * gh) : 0;
                 cv.roundRect(gx + i * bw + 3, gy - gh, bw - 6, gh, 4, withAlpha(t.track, 0.6));
@@ -467,14 +464,14 @@ mgu.run({
         }
 
         function renderDiag(cv, t, d) {
-            G.panel(cv, t, 24, 64, 1552, 440, 'Battery diagnostics');
+            G.panel(cv, t, 24, 44, 1552, 468, 'Battery diagnostics');
             const link = diag.p ? (diag.available ? 'link up' : 'link down') : 'no link (' + (diag.error || 'not started') + ')';
             cv.text('UDS 22 ReadDataByIdentifier  ·  ' + link + '  ·  ambient ' + (G.isNum(live.ambient) ? G.fmt(live.ambient, 1) + ' °C' : 'n/a')
-                + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(live.speed, 0) + ' km/h' : 'n/a'), 48, 136, 24, t.text, { font: 'label' });
+                + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(live.speed, 0) + ' km/h' : 'n/a'), 48, 121, 24, t.text, { font: 'label' });
             const cols = [48, 160, 260, 380, 820, 1000, 1290];
-            ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS', 'READ'].forEach((h, i) => cv.text(h, cols[i], 180, 20, t.dim, { font: 'bold', spacing: 1.5 }));
-            cv.fillRect(48, 190, 1504, 1, t.tick);
-            let y = 224;
+            ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS', 'READ'].forEach((h, i) => cv.text(h, cols[i], 167, 20, t.dim, { font: 'bold', spacing: 1.5 }));
+            cv.fillRect(48, 178, 1504, 1, t.tick);
+            let y = 214;
             VALUES.forEach((key) => (cfg[key] || []).forEach((c, i) => {
                 const ecu = c.ecu == null ? cfg.ecu : c.ecu, r = raws[ecu + ':' + c.did];
                 const used = pick[key] === i && r && r.ok;
@@ -486,11 +483,11 @@ mgu.run({
                 cv.text(r && G.isNum(r.value) ? G.fmt(r.value, key === 'v12' ? 2 : 1) : '-', cols[4], y, 24, t.text, { font: 'label' });
                 cv.text(r ? (r.ok ? 'OK' : r.why) : 'not read', cols[5], y, 22, r && r.ok ? GO : r ? t.warn : t.dim, { font: 'label' });
                 cv.text(r ? ago(Date.now() - r.t) : '-', cols[6], y, 22, t.dim, { font: 'label' });
-                y += 36;
+                y += 38;
             }));
-            cv.text('DIDs differ between models. If a value is n/a or wrong, edit config.battery in apps/edrive/app.json', 48, 440, 20, t.dim);
-            cv.text('(ECU, DID, byte position, factor) and rebuild. Range at 20 °C, battery size and hybrid system are in Settings.', 48, 468, 20, t.dim);
-            if (d.demo) cv.text('Demo data is shown on the main page until the diagnostic link answers.', 1552, 468, 20, t.warn, { align: 'right' });
+            cv.text('DIDs differ between models. If a value is n/a or wrong, edit config.battery in apps/edrive/app.json', 48, 444, 20, t.dim);
+            cv.text('(ECU, DID, byte position, factor) and rebuild. Range at 20 °C, battery size and hybrid system are in Settings.', 48, 474, 20, t.dim);
+            if (d.demo) cv.text('Demo data is shown on the main page until the diagnostic link answers.', 1552, 474, 20, t.warn, { align: 'right' });
         }
 
         function render() {
@@ -498,11 +495,11 @@ mgu.run({
             const cv = new Canvas(W, H).clear(t.bg);
             const pg = pages();
             if (page >= pg.length) page = 0;
-            header(cv, t, { main: isHybrid() ? 'EDRIVE' : 'EDRIVE · 12 V BATTERY', log: 'EDRIVE · CHARGE LOG', diag: 'EDRIVE · DIAGNOSTICS' }[pg[page]], d);
             if (pg[page] === 'diag') renderDiag(cv, t, d);
             else if (pg[page] === 'log') renderLog(cv, t, d);
             else if (isHybrid()) renderMain(cv, t, d);
             else render12V(cv, t, d);
+            header(cv, t, d);
             return ui.image('MAIN_GFX', cv);
         }
 

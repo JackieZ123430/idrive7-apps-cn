@@ -221,14 +221,9 @@ mgu.run({
 
         const GO = '#2fd27a';
 
-        function header(cv, t, title, d) {
-            cv.text(title.toUpperCase(), 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
-            G.stripes(cv, t, 24, 44, 120);
-            PAGES.forEach((p, i) => cv.circle(W - 90 + i * 22, 26, i === page ? 6 : 4, i === page ? t.accent : t.tick));
-            if (usingDemo()) {
-                cv.roundRect(W - 230, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
-                cv.text('DEMO', W - 180, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
-            }
+        /** G20-style frame: tab bar with the page names along the top. */
+        function header(cv, t) {
+            G.frame(cv, t, ['Engine', 'Thermals', 'Intake & fuel', 'Chassis'], page, [usingDemo() && { text: 'DEMO' }]);
         }
 
         /** Power in kW: { kw, calc } (calc = estimated from torque x rpm, no sport-display data). */
@@ -256,37 +251,39 @@ mgu.run({
             const red = settings.get('redline');
             const max = Math.ceil((red + 1000) / 1000) * 1000;
             const showPk = settings.get('peaks');
-            G.radial(cv, t, 300, 290, 225, {
-                value: d.rpm, min: 0, max, label: 'Engine', unit: 'rpm', ticks: max / 500, majorEvery: 2, tickDiv: 1000,
-                zones: [{ from: red, to: max, color: 'crit' }], limit: red, peak: showPk ? peak.rpm : null, showPeak: showPk,
+            // rpm + boost as tach bars (Redline style): theme colour -> red at the redline / warning zone
+            G.segBar(cv, t, 24, G.TOP, 1062, 226, {
+                label: 'Engine speed', value: d.rpm, unit: 'rpm', decimals: 0, min: 0, max, step: 500,
+                scale: { every: 1000, div: 1000 }, ramp: 'hot', limit: red, marks: [{ value: red, color: 'crit' }],
+                peak: showPk ? peak.rpm : null,
             });
-            const pmax = settings.get('pressUnit') === 'psi' ? 36 : 2.5;
-            G.radial(cv, t, 820, 290, 225, {
-                value: P(d.boost), min: 0, max: pmax, decimals: settings.get('pressUnit') === 'psi' ? 1 : 2,
-                label: 'Boost', unit: settings.get('pressUnit'), ticks: 10, majorEvery: 2, tickDecimals: pmax < 5 ? 1 : 0,
-                peak: showPk ? P(peak.boost) : null, showPeak: showPk, zones: [{ from: pmax * 0.85, to: pmax, color: 'warn' }], limit: pmax * 0.85,
+            const psi = settings.get('pressUnit') === 'psi', pmax = psi ? 36 : 2.5;
+            G.segBar(cv, t, 24, G.TOP + 242, 1062, 226, {
+                label: 'Boost', value: P(d.boost), unit: settings.get('pressUnit'), decimals: psi ? 1 : 2, min: 0, max: pmax,
+                step: psi ? 2 : 0.125, scale: { every: psi ? 6 : 0.5, decimals: psi ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
+                marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(peak.boost) : null,
             });
             const x = 1110, w = 466;
-            G.panel(cv, t, x, 70, w, 160, 'Speed');
+            G.panel(cv, t, x, G.TOP, w, 190, 'Speed');
             const sp = V(d.speed);
-            const sw = cv.text(G.fmt(sp, 0), x + 22, 212, 96, sp == null ? t.dim : t.text, { font: 'num' });
-            cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + 30 + sw, 212, 26, t.dim);
+            const sw = cv.text(G.fmt(sp, 0), x + 22, 204, 96, sp == null ? t.dim : t.text, { font: 'num' });
+            cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + 30 + sw, 204, 26, t.dim);
             // gear: D / S / M + number (R, N, P alone)
             const gr = gearText(d);
             if (gr) {
-                const nw = gr.num ? cv.text(gr.num, x + w - 24, 214, 120, t.text, { align: 'right', font: 'gear' }) : 0;
-                cv.text(gr.letter, x + w - 28 - nw, 214, 120, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
-                if (gr.est) cv.text('EST.', x + w - 24, 104, 16, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
+                const nw = gr.num ? cv.text(gr.num, x + w - 24, 206, 120, t.text, { align: 'right', font: 'gear' }) : 0;
+                cv.text(gr.letter, x + w - 28 - nw, 206, 120, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
+                if (gr.est) cv.text('EST.', x + w - 24, 78, 16, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
             }
             // power: the sport display's % x your car's max power (tuned cars: set the tuned max);
             // without sport-display data, torque x rpm. Shown in kW, hp or PS.
             const pw = power(d), powMax = PW(settings.get('maxPower'));
             if (G.isNum(pw.kw)) peakPower = Math.max(peakPower || 0, pw.kw);
-            G.bar(cv, t, x, 262, w, 92, {
+            G.bar(cv, t, x, 272, w, 92, {
                 label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax,
-                zones: [{ from: powMax * 0.9, to: powMax * 3, color: 'crit' }], peak: showPk && G.isNum(peakPower) ? PW(peakPower) : null,
+                peak: showPk && G.isNum(peakPower) ? PW(peakPower) : null,
             });
-            G.bar(cv, t, x, 380, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, peak: showPk ? peak.torque : null });
+            G.bar(cv, t, x, 404, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, peak: showPk ? peak.torque : null });
         }
 
         function drawThermal(cv, t, d) {
@@ -296,12 +293,12 @@ mgu.run({
                 ['Coolant', d.coolant, hist.coolant, [{ from: T(112), to: 999, color: 'crit' }, { from: -99, to: T(60), color: 'cold' }]],
                 ['Engine oil', d.oil, hist.oil, [{ from: T(oilWarn), to: 999, color: 'crit' }, { from: -99, to: T(70), color: 'cold', tintOnly: true }], 'oil'],
                 ['Gearbox oil', d.gearbox, hist.gearbox, [{ from: T(120), to: 999, color: 'warn' }, { from: -99, to: T(50), color: 'cold' }]],
-                ['Ambient', d.ambient, hist.ambient, [{ from: -99, to: T(3), color: 'cold' }]],
+                ['Ambient', d.ambient, hist.ambient, [{ from: -99, to: T(3), color: 'cold' }], '#2fd27a', '#2fd27a'],
             ];
-            tiles.forEach(([label, v, h, zones, color], i) => {
-                const x = 24 + (i % 2) * 784, y = 64 + Math.floor(i / 2) * 226;
-                G.stat(cv, t, x, y, 760, 210, {
-                    label, value: T(v), unit, zones, color, size: 100, history: h.map(T),
+            tiles.forEach(([label, v, h, zones, color, valueColor], i) => {
+                const x = 24 + (i % 2) * 784, y = G.TOP + Math.floor(i / 2) * 242;
+                G.stat(cv, t, x, y, 760, 226, {
+                    label, value: T(v), unit, zones, color, valueColor, size: 100, history: h.map(T),
                     sub: v == null ? 'no data' : 'last 5 min  ·  min ' + G.fmt(T(Math.min.apply(null, h.filter(G.isNum))), 0) + '  max ' + G.fmt(T(Math.max.apply(null, h.filter(G.isNum))), 0),
                 });
             });
@@ -333,31 +330,31 @@ mgu.run({
                     G.isNum(iatRise) ? 'heat soak  ·  ' + mm(hist.iatRise, dT, 0).replace('last 5 min  ·  ', '') : 'needs IAT + outside temperature'],
             ];
             tiles.forEach(([label, v, unit, decimals, h, zones, sub], i) => {
-                const x = 24 + (i % 2) * 784, y = 64 + Math.floor(i / 2) * 226;
-                G.stat(cv, t, x, y, 760, 210, { label, value: v, unit, decimals, zones, size: 100, history: h, sub });
+                const x = 24 + (i % 2) * 784, y = G.TOP + Math.floor(i / 2) * 242;
+                G.stat(cv, t, x, y, 760, 226, { label, value: v, unit, decimals, zones, size: 100, history: h, sub });
             });
         }
 
         function drawChassis(cv, t, d) {
             if (G.isNum(d.gLat) && G.isNum(d.gLong)) { trail.push([d.gLat, d.gLong]); if (trail.length > 60) trail.shift(); }
-            G.panel(cv, t, 24, 64, 480, 440, 'G-force');
-            G.gmeter(cv, t, 264, 262, 156, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
+            G.panel(cv, t, 24, G.TOP, 480, G.BOTTOM - G.TOP, 'G-force');
+            G.gmeter(cv, t, 264, 258, 164, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
             // xDrive column (when shown), tyres take the rest
             const xd = settings.get('xdrive');
             const showAwd = xd === 'on' || (xd !== 'off' && (awdSeen || usingDemo()));
             const tx = 528, tw = showAwd ? 668 : 1048;
-            drawTyres(cv, t, tx, 64, tw, 440, d);
+            drawTyres(cv, t, tx, G.TOP, tw, G.BOTTOM - G.TOP, d);
             if (showAwd) {
                 const ax = 1220, aw = 356;
-                G.panel(cv, t, ax, 64, aw, 440, 'xDrive');
+                G.panel(cv, t, ax, G.TOP, aw, G.BOTTOM - G.TOP, 'xDrive');
                 const AWD = { _4WD_STANDARD: '4WD', _4WD_ALTERNATIV: '4WD Sport', _2WD: '2WD', AWDSAND: 'Sand' };
                 const mode = AWD[d.awd] || '--';
                 const hot = d.awdQual === 'FUNKTION_NICHT_VERFUEGBAR_FEHLER';
-                cv.text(mode, ax + 24, 170, 52, hot ? t.crit : t.text, { font: 'bold' });
-                if (hot) cv.text('DERATED / OFF', ax + 24, 206, 22, t.crit, { font: 'bold', spacing: 1.5 });
+                cv.text(mode, ax + 24, 160, 52, hot ? t.crit : t.text, { font: 'bold' });
+                if (hot) cv.text('DERATED / OFF', ax + 24, 196, 22, t.crit, { font: 'bold', spacing: 1.5 });
                 const rear = d.splitRear;
-                G.bar(cv, t, ax + 24, 250, aw - 48, 80, { label: 'Rear', value: rear, unit: '%' });
-                G.bar(cv, t, ax + 24, 360, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%' });
+                G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%' });
+                G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%' });
             }
         }
 
@@ -396,13 +393,14 @@ mgu.run({
         async function render() {
             const t = ctx.theme(), d = data();
             const cv = new Canvas(W, H).clear(t.bg);
-            header(cv, t, ['Engine', 'Thermals', 'Intake & fuel', 'Chassis'][page], d);
             [drawEngine, drawThermal, drawFuel, drawChassis][page](cv, t, d);
+            header(cv, t);
             if (!render.n) { render.n = 1; log.info('first frame drawn'); }
             await ui.image('MAIN_GFX', cv);
         }
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
+        ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
         ui.onClick('BTN_PEAKS', () => { Object.keys(peak).forEach((k) => delete peak[k]); peakPower = null; trail.length = 0; return render(); });
         let loop = ctx.loop('MAIN', settings.get('fps'), render);
         settings.onChange((k) => {

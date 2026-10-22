@@ -173,46 +173,46 @@ mgu.run({
             const st = store();
             const cur = lastRun && st.runs.indexOf(lastRun) >= 0 ? lastRun : st.runs[0];
             const base = st.baseline;
-            G.panel(cv, t, 24, 64, 1120, 440, 'Dyno sheet');
-            plot(cv, t, 104, 150, 960, 276, [cur, base]);
+            G.panel(cv, t, 24, 44, 1120, 468, 'Dyno sheet');
+            plot(cv, t, 104, 135, 960, 294, [cur, base]);
             if (base) {
-                cv.fillRect(600, 92, 26, 4, withAlpha(t.dim, 0.7));
-                cv.text('BASELINE ' + Math.round(pw(base.peakP)) + ' ' + pU(), 634, 101, 18, t.dim, { font: 'bold', spacing: 1 });
+                cv.fillRect(600, 74, 26, 4, withAlpha(t.dim, 0.7));
+                cv.text('BASELINE ' + Math.round(pw(base.peakP)) + ' ' + pU(), 634, 83, 18, t.dim, { font: 'bold', spacing: 1 });
             }
             if (settings.get('ecuTorque') && cur && cur.curve.some((c) => G.isNum(c.ecu))) {
-                cv.fillRect(880, 92, 26, 3, withAlpha(t.text, 0.55));
-                cv.text('ECU TORQUE', 914, 101, 18, t.dim, { font: 'bold', spacing: 1 });
+                cv.fillRect(880, 74, 26, 3, withAlpha(t.text, 0.55));
+                cv.text('ECU TORQUE', 914, 83, 18, t.dim, { font: 'bold', spacing: 1 });
             }
 
-            G.panel(cv, t, 1168, 64, 408, 440, live.state === 'pull' ? 'Recording' : 'Peak');
+            G.panel(cv, t, 1168, 44, 408, 468, live.state === 'pull' ? 'Recording' : 'Peak');
             const now = Date.now();
             if (live.state === 'pull') {
-                cv.circle(1540, 102, 9, Math.floor(now / 300) % 2 ? t.crit : withAlpha(t.crit, 0.3));
-                bigStat(cv, t, 1192, 146, 'POWER NOW', pw(live.power), pU(), null, t.accent);
+                cv.circle(1540, 84, 9, Math.floor(now / 300) % 2 ? t.crit : withAlpha(t.crit, 0.3));
+                bigStat(cv, t, 1192, 131, 'POWER NOW', pw(live.power), pU(), null, t.accent);
                 const d = car.data();
-                cv.text(G.fmt(d.rpm, 0) + ' rpm  ·  ' + G.fmt(d.gLong, 2) + ' g', 1192, 286, 26, t.text, { font: 'bold' });
-                cv.text('keep it pinned...', 1192, 330, 22, t.dim);
+                cv.text(G.fmt(d.rpm, 0) + ' rpm  ·  ' + G.fmt(d.gLong, 2) + ' g', 1192, 280, 26, t.text, { font: 'bold' });
+                cv.text('keep it pinned...', 1192, 327, 22, t.dim);
             } else {
-                bigStat(cv, t, 1192, 146, 'POWER', cur ? pw(cur.peakP) : null, pU(), cur ? '@ ' + cur.peakPrpm + ' RPM' : null, t.accent,
+                bigStat(cv, t, 1192, 131, 'POWER', cur ? pw(cur.peakP) : null, pU(), cur ? '@ ' + cur.peakPrpm + ' RPM' : null, t.accent,
                     cur && base && cur !== base ? pw(cur.peakP) - pw(base.peakP) : null);
-                bigStat(cv, t, 1192, 304, 'TORQUE', cur ? tq(cur.peakT) : null, tU(), cur ? '@ ' + cur.peakTrpm + ' RPM' : null, t.accent2,
+                bigStat(cv, t, 1192, 299, 'TORQUE', cur ? tq(cur.peakT) : null, tU(), cur ? '@ ' + cur.peakTrpm + ' RPM' : null, t.accent2,
                     cur && base && cur !== base ? tq(cur.peakT) - tq(base.peakT) : null);
                 let msg = cur ? 'crank, est. · ' + cur.weight + ' kg · ' + cur.loss + '% loss' : 'waiting for a pull';
                 let col = t.dim;
                 if (live.state === 'done' && now < live.until) { msg = 'NEW RUN RECORDED'; col = GO; }
                 if (live.state === 'short' && now < live.until) { msg = 'pull too short (need 1500 rpm in one gear)'; col = t.warn; }
-                cv.text(msg, 1192, 478, 18, col, { font: 'bold', spacing: 0.5 });
+                cv.text(msg, 1192, 484, 18, col, { font: 'bold', spacing: 0.5 });
             }
         }
 
         function drawRuns(cv, t) {
             const st = store();
-            G.panel(cv, t, 24, 64, 1552, 440, 'Saved runs');
+            G.panel(cv, t, 24, 44, 1552, 468, 'Saved runs');
             const cols = [48, 320, 560, 800, 1050, 1300];
-            ['WHEN', 'PEAK POWER', 'PEAK TORQUE', 'SPEED RANGE', 'SETUP', ''].forEach((h, i) => cv.text(h, cols[i], 142, 18, t.dim, { font: 'bold', spacing: 1 }));
-            if (!st.runs.length) cv.text('No runs yet.', 48, 220, 26, t.dim);
+            ['WHEN', 'PEAK POWER', 'PEAK TORQUE', 'SPEED RANGE', 'SETUP', ''].forEach((h, i) => cv.text(h, cols[i], 127, 18, t.dim, { font: 'bold', spacing: 1 }));
+            if (!st.runs.length) cv.text('No runs yet.', 48, 210, 26, t.dim);
             st.runs.slice(0, 8).forEach((r, i) => {
-                const y = 186 + i * 39, d = new Date(r.at), p = (n) => String(n).padStart(2, '0');
+                const y = 174 + i * 41, d = new Date(r.at), p = (n) => String(n).padStart(2, '0');
                 const isBase = st.baseline && st.baseline.at === r.at, isSel = i === sel;
                 if (isSel) cv.roundRect(36, y - 28, 1528, 38, 6, withAlpha(t.accent, 0.18));
                 cv.text(p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' + p(d.getHours()) + ':' + p(d.getMinutes()), cols[0], y, 24, t.text);
@@ -222,33 +222,28 @@ mgu.run({
                 cv.text(r.weight + ' kg · ' + r.loss + '%', cols[4], y, 24, t.dim);
                 if (isBase) cv.text('BASELINE', cols[5], y, 20, t.text, { font: 'bold', spacing: 2 });
             });
-            cv.text('Select a run with "Next run", pin it as the baseline to compare every new pull against it.', 48, 488, 18, t.dim);
+            cv.text('Select a run with "Next run", pin it as the baseline to compare every new pull against it.', 48, 495, 18, t.dim);
         }
 
+        /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t) {
-            cv.text(page === 0 ? 'VIRTUAL DYNO' : 'SAVED RUNS', 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
-            G.stripes(cv, t, 24, 44, 120);
-            if (car.data().demo) {
-                cv.roundRect(W - 124, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
-                cv.text('DEMO', W - 74, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
-            }
+            G.frame(cv, t, ['Virtual dyno', 'Saved runs'], page, [car.data().demo && { text: 'DEMO' }]);
         }
 
         async function render() {
             const t = ctx.theme();
             const cv = new Canvas(W, H).clear(t.bg);
-            header(cv, t);
             (page === 0 ? drawMain : drawRuns)(cv, t);
+            header(cv, t);
             await ui.image('MAIN_GFX', cv);
         }
 
         /* ---------- buttons ---------- */
         let sel = 0;
-        const labels = () => {
-            ui.text('BTN_PAGE', page ? 'Dyno sheet' : 'Saved runs');
-            ui.text('BTN_ACTION', page ? 'Next run' : 'Pin as baseline');
-        };
-        ui.onClick('BTN_PAGE', () => { page = 1 - page; sel = 0; labels(); return render(); });
+        const labels = () => ui.text('BTN_ACTION', page ? 'Next run' : 'Pin as baseline');
+        const flip = () => { page = 1 - page; sel = 0; labels(); return render(); };
+        ui.onClick('BTN_PAGE', flip);
+        ui.onClick('BTN_PREV', flip);
         ui.onClick('BTN_ACTION', () => {
             const st = store();
             if (page === 1) { if (st.runs.length) sel = (sel + 1) % Math.min(8, st.runs.length); lastRun = st.runs[sel] || null; return render(); }

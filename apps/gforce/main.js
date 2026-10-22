@@ -125,72 +125,70 @@ mgu.run({
 
         function drawLive(cv, t) {
             const R = car.data().demo ? demoRec : rec;
-            G.panel(cv, t, 24, 64, 600, 440, null);
-            circle(cv, t, 324, 284, 176);
+            G.panel(cv, t, 24, 44, 600, 468, null);
+            circle(cv, t, 324, 282, 182);
             // live readout
-            G.panel(cv, t, 648, 64, 420, 440, 'Now');
+            G.panel(cv, t, 648, 44, 420, 468, 'Now');
             const comb = G.isNum(cur.long) ? Math.sqrt(cur.lat * cur.lat + cur.long * cur.long) : null;
-            const cw = cv.text(G.fmt(comb, 2), 672, 210, 120, G.isNum(comb) ? (comb > 0.9 ? t.accent2 : t.text) : t.dim, { font: 'num' });
-            cv.text('g', 680 + cw, 210, 36, t.dim);
+            const cw = cv.text(G.fmt(comb, 2), 672, 199, 120, G.isNum(comb) ? (comb > 0.9 ? t.accent2 : t.text) : t.dim, { font: 'num' });
+            cv.text('g', 680 + cw, 199, 36, t.dim);
             const bars = [['LATERAL', G.isNum(cur.lat) ? Math.abs(cur.lat) : null, G.isNum(cur.lat) ? (cur.lat >= 0 ? 'L' : 'R') : ''],
                 ['LONGITUDINAL', G.isNum(cur.long) ? Math.abs(cur.long) : null, G.isNum(cur.long) ? (cur.long >= 0 ? 'ACC' : 'BRK') : '']];
             bars.forEach(([l, v, side], i) => {
-                const y = 268 + i * 92;
+                const y = 261 + i * 98;
                 cv.text(l + '  ' + side, 672, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
                 cv.text(G.fmt(v, 2), 1044, y + 4, 40, G.isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
                 cv.roundRect(672, y + 20, 372, 16, 8, t.track);
                 if (G.isNum(v)) cv.roundRect(672, y + 20, Math.max(16, 372 * G.clamp(v / settings.get('scale'), 0, 1)), 16, 8, i ? t.accent : t.accent2);
             });
             const d = car.data();
-            cv.text(G.fmt(V(d.speed), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 484, 22, t.dim, { font: 'bold', spacing: 1 });
+            cv.text(G.fmt(V(d.speed), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });
 
             // session peaks
-            G.panel(cv, t, 1092, 64, 484, 440, 'Session peaks');
-            peakBox(cv, t, 1116, 132, 'ACCEL', S.peak.acc, R.acc);
-            peakBox(cv, t, 1346, 132, 'BRAKE', S.peak.brk, R.brk);
-            peakBox(cv, t, 1116, 262, 'LEFT', S.peak.left, R.left);
-            peakBox(cv, t, 1346, 262, 'RIGHT', S.peak.right, R.right);
+            G.panel(cv, t, 1092, 44, 484, 468, 'Session peaks');
+            peakBox(cv, t, 1116, 116, 'ACCEL', S.peak.acc, R.acc);
+            peakBox(cv, t, 1346, 116, 'BRAKE', S.peak.brk, R.brk);
+            peakBox(cv, t, 1116, 255, 'LEFT', S.peak.left, R.left);
+            peakBox(cv, t, 1346, 255, 'RIGHT', S.peak.right, R.right);
             cv.fillRect(1116, 382, 436, 1, withAlpha(t.tick, 0.4));
-            cv.text('COMBINED  ' + (S.peak.comb ? S.peak.comb.toFixed(2) + ' g' : '--'), 1116, 418, 22, t.accent2, { font: 'bold', spacing: 1 });
-            cv.text('> 0.5 g  ' + S.over05.toFixed(0) + ' s', 1552, 418, 22, t.text, { align: 'right', font: 'bold' });
+            cv.text('COMBINED  ' + (S.peak.comb ? S.peak.comb.toFixed(2) + ' g' : '--'), 1116, 421, 22, t.accent2, { font: 'bold', spacing: 1 });
+            cv.text('> 0.5 g  ' + S.over05.toFixed(0) + ' s', 1552, 421, 22, t.text, { align: 'right', font: 'bold' });
             const mins = Math.floor((Date.now() - S.start) / 60000);
-            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  MAX ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 466, 18, t.dim, { font: 'bold', spacing: 1 });
+            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  MAX ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 472, 18, t.dim, { font: 'bold', spacing: 1 });
         }
 
         function drawRecords(cv, t) {
             const R = car.data().demo ? demoRec : rec;
-            G.panel(cv, t, 24, 64, 1552, 440, 'All-time records');
+            G.panel(cv, t, 24, 44, 1552, 468, 'All-time records');
             const rows = [['acc', 'Hardest launch', 'g'], ['brk', 'Hardest stop', 'g'], ['left', 'Left-hander', 'g'], ['right', 'Right-hander', 'g'], ['comb', 'Combined', 'g'], ['vmax', 'Top speed', mph() ? 'mph' : 'km/h']];
             rows.forEach(([k, label, u], i) => {
-                const col = i % 2, row = Math.floor(i / 2), x = 48 + col * 760, y = 150 + row * 116;
+                const col = i % 2, row = Math.floor(i / 2), x = 48 + col * 760, y = 135 + row * 123;
                 const r = R[k], v = r ? (k === 'vmax' ? V(r.v) : r.v) : null;
                 cv.text(label.toUpperCase(), x, y, 22, t.dim, { font: 'bold', spacing: 2 });
                 const w = cv.text(v === null ? '--' : v.toFixed(k === 'vmax' ? 0 : 2), x, y + 66, 64, v === null ? t.dim : t.text, { font: 'num' });
                 cv.text(u, x + w + 8, y + 66, 26, t.dim);
                 if (r) { const d = new Date(r.at), p = (n) => String(n).padStart(2, '0'); cv.text(p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear(), x + 300, y + 66, 22, t.dim); }
             });
-            cv.text('Records are kept until you clear them (press "Clear records" twice).', 48, 488, 18, t.dim);
+            cv.text('Records are kept until you clear them (press "Clear records" twice).', 48, 495, 18, t.dim);
         }
 
+        /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t) {
-            cv.text(page === 0 ? 'G-FORCE' : 'G-FORCE RECORDS', 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
-            G.stripes(cv, t, 24, 44, 120);
-            if (car.data().demo) {
-                cv.roundRect(W - 124, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
-                cv.text('DEMO', W - 74, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
-            }
+            G.frame(cv, t, ['G-force', 'Records'], page, [car.data().demo && { text: 'DEMO' }]);
         }
 
         async function render() {
             const t = ctx.theme(), cv = new Canvas(W, H).clear(t.bg);
-            header(cv, t);
             (page === 0 ? drawLive : drawRecords)(cv, t);
+            header(cv, t);
             await ui.image('MAIN_GFX', cv);
         }
 
         let clearArmed = null;
         const actionLabel = () => ui.text('BTN_ACTION', page === 0 ? 'New session' : clearArmed ? 'Press again to clear' : 'Clear records');
-        ui.onClick('BTN_PAGE', () => { page = 1 - page; ui.text('BTN_PAGE', page ? 'Live' : 'Records'); actionLabel(); return render(); });
+        const flip = () => { page = 1 - page; actionLabel(); return render(); };
+        ui.onClick('BTN_PAGE', flip);
+        ui.onClick('BTN_PREV', flip);
         ui.onClick('BTN_ACTION', () => {
             if (page === 0) { newSession(); return render(); }
             if (!clearArmed) { clearArmed = setTimeout(() => { clearArmed = null; actionLabel(); }, 5000); return actionLabel(); }

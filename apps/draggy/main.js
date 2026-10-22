@@ -135,20 +135,9 @@ mgu.run({
             wait: ['STOP TO ARM', 'dim'], ready: ['READY - LAUNCH', 'go'], run: ['TIMING', 'accent'], done: ['FINISHED', 'text'],
         };
 
-        function header(cv, t, title) {
-            cv.text(title, 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
-            G.stripes(cv, t, 24, 44, 120);
-            [0, 1].forEach((i) => cv.circle(W - 68 + i * 22, 26, i === page ? 6 : 4, i === page ? t.accent : t.tick));
-            let x = W - 110;
-            if (feedDemo) {
-                cv.roundRect(x - 100, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
-                cv.text('DEMO', x - 50, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
-                x -= 116;
-            }
-            if (settings.get('rollout')) {
-                cv.roundRect(x - 150, 12, 150, 30, 6, withAlpha(t.dim, 0.2));
-                cv.text('ROLLOUT 1 FT', x - 75, 35, 20, t.dim, { align: 'center', font: 'bold', spacing: 1 });
-            }
+        /** G20-style frame: tab bar with the page names along the top. */
+        function header(cv, t) {
+            G.frame(cv, t, ['Drag timer', 'Best times'], page, [feedDemo && { text: 'DEMO' }, settings.get('rollout') && { text: 'ROLLOUT 1 FT', color: 'dim' }]);
         }
 
         function drawRun(cv, t) {
@@ -156,23 +145,23 @@ mgu.run({
             const [stTxt, stCol] = STATE[timer.state];
             const col = stCol === 'go' ? GO : t[stCol];
             // --- speed + clock ---
-            G.panel(cv, t, 24, 64, 520, 440, 'Speed');
+            G.panel(cv, t, 24, 44, 520, 468, 'Speed');
             const sp = V(live.speed);
-            cv.text(G.fmt(sp, 0), 460, 236, 150, G.isNum(sp) ? t.text : t.dim, { align: 'right', font: 'num' });
-            cv.text(vU(), 476, 236, 28, t.dim);
-            cv.fillRect(44, 262, 480, 2, t.panelEdge);
+            cv.text(G.fmt(sp, 0), 460, 227, 150, G.isNum(sp) ? t.text : t.dim, { align: 'right', font: 'num' });
+            cv.text(vU(), 476, 227, 28, t.dim);
+            cv.fillRect(44, 255, 480, 2, t.panelEdge);
             const el = timer.elapsed(now);
             cv.text(secs(el), 400, 384, 96, timer.state === 'run' ? t.text : timer.state === 'done' ? t.accent2 : t.dim, { align: 'right', font: 'num' });
             cv.text('s', 412, 384, 32, t.dim);
-            cv.roundRect(44, 410, 480, 44, 8, withAlpha(col, 0.18));
-            if (timer.state === 'ready') cv.roundRect(44, 410, 480, 44, 8, withAlpha(GO, 0.35 + 0.25 * Math.sin(now / 160)));
-            cv.text(stTxt, 284, 442, 26, col, { align: 'center', font: 'bold', spacing: 3 });
-            cv.text('PEAK ' + (peakG > 0 ? peakG.toFixed(2) : '-.--') + ' g', 44, 486, 22, t.dim, { font: 'bold', spacing: 1 });
-            if (G.isNum(live.rpm)) cv.text(Math.round(live.rpm) + ' rpm', 524, 486, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
+            cv.roundRect(44, 412, 480, 44, 8, withAlpha(col, 0.18));
+            if (timer.state === 'ready') cv.roundRect(44, 412, 480, 44, 8, withAlpha(GO, 0.35 + 0.25 * Math.sin(now / 160)));
+            cv.text(stTxt, 284, 446, 26, col, { align: 'center', font: 'bold', spacing: 3 });
+            cv.text('PEAK ' + (peakG > 0 ? peakG.toFixed(2) : '-.--') + ' g', 44, 493, 22, t.dim, { font: 'bold', spacing: 1 });
+            if (G.isNum(live.rpm)) cv.text(Math.round(live.rpm) + ' rpm', 524, 493, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
 
             // --- speed trace ---
-            G.panel(cv, t, 568, 64, 520, 440, 'Speed trace');
-            const px = 640, py = 120, pw = 424, ph = 330;
+            G.panel(cv, t, 568, 44, 520, 468, 'Speed trace');
+            const px = 640, py = 104, pw = 424, ph = 351;
             const tr = timer.trace;
             const tMax = Math.max(6, Math.ceil(tr.length ? tr[tr.length - 1][0] / 2 + 0.5 : 0) * 2);
             const vMax = Math.max(mph() ? 80 : 120, Math.ceil(((V(timer.vmax) || 0) + 5) / 40) * 40);
@@ -199,9 +188,9 @@ mgu.run({
             }
 
             // --- splits ---
-            G.panel(cv, t, 1112, 64, 464, 440, 'Splits');
+            G.panel(cv, t, 1112, 44, 464, 468, 'Splits');
             splits().forEach((s, i) => {
-                const y = 118 + i * 77;
+                const y = 101 + i * 82;
                 const r = timer.result[s.key], b = store.best[bestKey(s.key)];
                 cv.text(s.label, 1136, y + 22, 24, t.dim, { font: 'bold', spacing: 0.5 });
                 cv.text(secs(r), 1520, y + 46, 44, G.isNum(r) ? t.text : withAlpha(t.dim, 0.6), { align: 'right', font: 'num' });
@@ -218,9 +207,9 @@ mgu.run({
 
         function drawBest(cv, t) {
             const sp = splits();
-            G.panel(cv, t, 24, 64, 640, 440, 'Best times' + (settings.get('rollout') ? ' (rollout)' : ''));
+            G.panel(cv, t, 24, 44, 640, 468, 'Best times' + (settings.get('rollout') ? ' (rollout)' : ''));
             sp.forEach((s, i) => {
-                const y = 112 + i * 78, b = store.best[bestKey(s.key)];
+                const y = 95 + i * 83, b = store.best[bestKey(s.key)];
                 cv.text(s.label, 48, y + 34, 28, t.text, { font: 'bold' });
                 cv.text(b ? secs(b.s) : '--.--', 560, y + 40, 52, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
                 cv.text('s', 568, y + 40, 24, t.dim);
@@ -228,15 +217,15 @@ mgu.run({
                 if (i < 4) cv.fillRect(48, y + 70, 592, 1, withAlpha(t.tick, 0.35));
             });
 
-            G.panel(cv, t, 688, 64, 888, 440, 'Recent runs');
+            G.panel(cv, t, 688, 44, 888, 468, 'Recent runs');
             const cols = [sp[1], sp[2], sp[4]];
             const cx = [920, 1140, 1360];
-            cv.text('WHEN', 712, 142, 20, t.dim, { font: 'bold', spacing: 1 });
-            cols.forEach((c, i) => cv.text(c.label.toUpperCase(), cx[i] + 150, 142, 20, t.dim, { align: 'right', font: 'bold', spacing: 1 }));
+            cv.text('WHEN', 712, 127, 20, t.dim, { font: 'bold', spacing: 1 });
+            cols.forEach((c, i) => cv.text(c.label.toUpperCase(), cx[i] + 150, 127, 20, t.dim, { align: 'right', font: 'bold', spacing: 1 }));
             const runs = store.runs.filter((r) => (r.unit || 'kmh') === settings.get('speedUnit')).slice(0, 8);
-            if (!runs.length) cv.text('No runs yet - stop, launch, and they show up here.', 712, 230, 26, t.dim);
+            if (!runs.length) cv.text('No runs yet - stop, launch, and they show up here.', 712, 221, 26, t.dim);
             runs.forEach((r, i) => {
-                const y = 188 + i * 39;
+                const y = 176 + i * 41;
                 cv.text(when(r.at) + (r.rollout ? '  RO' : ''), 712, y, 24, t.text);
                 cols.forEach((c, j) => {
                     const v = r.result[c.key], b = store.best[(c.key) + (r.rollout ? '@ro' : '')];
@@ -249,20 +238,17 @@ mgu.run({
         async function render() {
             const t = ctx.theme();
             const cv = new Canvas(W, H).clear(t.bg);
-            header(cv, t, page === 0 ? 'DRAG TIMER' : 'BEST TIMES');
             (page === 0 ? drawRun : drawBest)(cv, t);
+            header(cv, t);
             await ui.image('MAIN_GFX', cv);
         }
 
         /* ---------- buttons ---------- */
         let clearArmed = null;
         const actionLabel = () => ui.text('BTN_ACTION', page === 0 ? 'Reset run' : clearArmed ? 'Press again to clear' : 'Clear best times');
-        ui.onClick('BTN_PAGE', () => {
-            page = (page + 1) % 2;
-            ui.text('BTN_PAGE', page === 0 ? 'Best times' : 'Live run');
-            actionLabel();
-            return render();
-        });
+        const flip = () => { page = 1 - page; actionLabel(); return render(); };
+        ui.onClick('BTN_PAGE', flip);
+        ui.onClick('BTN_PREV', flip);
         ui.onClick('BTN_ACTION', () => {
             if (page === 0) { timer.reset(); peakG = 0; lastNewBest = {}; return render(); }
             if (!clearArmed) {

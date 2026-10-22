@@ -101,13 +101,17 @@ mgu.run({
         }
 
         /* ---------- drawing ---------- */
-        /** Temperature dial; oil = the theme's oil colour throughout (cold only marked on the rim). */
-        function gauge(cv, t, cx, cy, r, val, label, warm, oil) {
-            G.radial(cv, t, cx, cy, r, {
-                value: T(val), min: T(0), max: T(150), label, unit: tU(), decimals: 0, ticks: 6, majorEvery: 1,
-                zones: [{ from: T(0), to: T(warm - 0.01), color: 'cold', tintOnly: !!oil }, { from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(150), color: 'crit' }],
-                tickLabels: true, hot: false,       // temperature: cold = blue, warm = theme colour, hot = warn / crit zones
-                color: oil ? 'oil' : undefined,
+        /**
+         * Temperature as a tach bar (Redline style), 0-150 deg C in 10 deg segments: oil in the theme's
+         * oil colour throughout (cold only tints the track), coolant blue while cold; warn / crit
+         * zones when hot; green mark where it counts as warm.
+         */
+        function gauge(cv, t, y, val, label, warm, oil) {
+            const st = F() ? 18 : 10;
+            G.segBar(cv, t, 24, y, 880, 225, {
+                label, value: T(val), unit: tU(), decimals: 0, min: T(0), max: T(150), step: st, scale: { every: st * 2.5 },
+                zones: [{ from: T(-50), to: T(warm - 0.01), color: 'cold', tintOnly: !!oil }, { from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(160), color: 'crit' }],
+                color: oil ? 'oil' : undefined, marks: [{ value: T(warm), color: GO }],
             });
         }
 
@@ -132,19 +136,12 @@ mgu.run({
         function render() {
             const t = ctx.theme(), d = car.data(), now = Date.now();
             const cv = new Canvas(W, H).clear(t.bg);
-            cv.text('WARM-UP', 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
-            G.stripes(cv, t, 24, 44, 120);
-            if (d.demo) {
-                cv.roundRect(W - 124, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
-                cv.text('DEMO', W - 74, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
-            }
             const warm = settings.get('warmOil'), warmC = settings.get('warmCoolant');
-            G.panel(cv, t, 24, 64, 880, 440, null);
-            gauge(cv, t, 240, 300, 196, d.oil, 'Oil', warm, true);
-            gauge(cv, t, 688, 300, 196, d.coolant, 'Coolant', warmC);
+            gauge(cv, t, G.TOP, d.oil, 'Oil', warm, true);
+            gauge(cv, t, G.TOP + 242, d.coolant, 'Coolant', warmC);
 
             // ---- status panel
-            G.panel(cv, t, 928, 64, 648, 440, null);
+            G.panel(cv, t, 928, 44, 648, 468, null);
             const lim = limit(d.oil);
             const ready = G.isNum(d.oil) && d.oil >= warm;
             const hot = G.isNum(d.oil) && d.oil > 125;
@@ -156,9 +153,9 @@ mgu.run({
             else if (ready) { st = 'READY'; col = GO; }
             else if (d.oil >= warm - 20) { st = 'WARMING UP'; col = t.warn; }
             else { st = 'COLD'; col = t.cold; }
-            cv.roundRect(952, 88, 600, 60, 10, withAlpha(col, 0.22));
-            if (st === 'READY') cv.roundRect(952, 88, 600, 60, 10, withAlpha(col, 0.15 + 0.1 * Math.sin(now / 400)));
-            cv.text(st, 1252, 130, st.length > 14 ? 30 : 38, col, { align: 'center', font: 'bold', spacing: 3 });
+            cv.roundRect(952, 70, 600, 60, 10, withAlpha(col, 0.22));
+            if (st === 'READY') cv.roundRect(952, 70, 600, 60, 10, withAlpha(col, 0.15 + 0.1 * Math.sin(now / 400)));
+            cv.text(st, 1252, 114, st.length > 14 ? 30 : 38, col, { align: 'center', font: 'bold', spacing: 3 });
 
             if (cooling) {
                 // big countdown: gentle driving / idling cools the turbo and oil
@@ -168,28 +165,28 @@ mgu.run({
                 const eo = eta('oil', d.oil, warm, d);
                 const line = eo.state === 'ready' ? 'Oil warm' : eo.state === 'warming' ? 'Oil ready in ~' + Math.max(1, Math.round(eo.min)) + ' min (at ' + clock(now + eo.min * 60000) + ')'
                     : eo.state === 'off' ? 'Engine off - oil not warming' : eo.state === 'stalled' ? 'Oil not warming' : '';
-                cv.text(line, 952, 182, 20, eo.state === 'ready' ? GO : t.dim, { font: 'bold' });
-                cv.text('COOL-DOWN LEFT', 952, 216, 18, t.dim, { font: 'bold', spacing: 2 });
-                const lw = cv.text(left > 0 ? String(Math.ceil(left)) : '0', 952, 292, 80, left > 0 ? t.text : GO, { font: 'num' });
-                cv.text('s', 962 + lw, 292, 30, t.dim);
-                cv.text(left > 0 ? (gentleNow ? 'counting - keep it gentle' : 'paused - under ' + GENTLE_RPM + ' rpm to count') : 'done', 1552, 252, 22, left > 0 && !gentleNow ? t.warn : t.text, { align: 'right', font: 'bold' });
-                cv.text('after ' + Math.round(hardS) + ' s of hard driving', 1552, 282, 20, t.dim, { align: 'right' });
+                cv.text(line, 952, 170, 20, eo.state === 'ready' ? GO : t.dim, { font: 'bold' });
+                cv.text('COOL-DOWN LEFT', 952, 206, 18, t.dim, { font: 'bold', spacing: 2 });
+                const lw = cv.text(left > 0 ? String(Math.ceil(left)) : '0', 952, 287, 80, left > 0 ? t.text : GO, { font: 'num' });
+                cv.text('s', 962 + lw, 287, 30, t.dim);
+                cv.text(left > 0 ? (gentleNow ? 'counting - keep it gentle' : 'paused - under ' + GENTLE_RPM + ' rpm to count') : 'done', 1552, 244, 22, left > 0 && !gentleNow ? t.warn : t.text, { align: 'right', font: 'bold' });
+                cv.text('after ' + Math.round(hardS) + ' s of hard driving', 1552, 276, 20, t.dim, { align: 'right' });
                 const f = needS ? G.clamp(cool / needS, 0, 1) : 1;
-                cv.roundRect(952, 306, 600, 12, 6, t.track);
-                if (f > 0) cv.rampRect(952, 306, Math.max(12, 600 * f), 12, 6, [t.warn, GO], 952, 600);
+                cv.roundRect(952, 301, 600, 12, 6, t.track);
+                if (f > 0) cv.rampRect(952, 301, Math.max(12, 600 * f), 12, 6, [t.warn, GO], 952, 600);
             } else {
-                etaRow(cv, t, 182, 'OIL READY IN', eta('oil', d.oil, warm, d), warm);
-                etaRow(cv, t, 262, 'COOLANT READY IN', eta('coolant', d.coolant, warmC, d), warmC);
+                etaRow(cv, t, 170, 'OIL READY IN', eta('oil', d.oil, warm, d), warm);
+                etaRow(cv, t, 255, 'COOLANT READY IN', eta('coolant', d.coolant, warmC, d), warmC);
             }
 
             // ---- safe rev limit (always) + trend
             const red = settings.get('redline'), fl = lim ? lim / red : 0;
-            cv.text('SAFE REV LIMIT', 952, 352, 16, t.dim, { font: 'bold', spacing: 2 });
-            cv.text(lim ? lim + ' rpm' : '---- rpm', 1552, 354, 22, ready ? GO : t.text, { align: 'right', font: 'bold' });
-            cv.roundRect(1130, 344, 280, 8, 4, t.track);
-            if (fl > 0) cv.roundRect(1130, 344, 280 * fl, 8, 4, ready ? GO : col);
+            cv.text('SAFE REV LIMIT', 952, 350, 16, t.dim, { font: 'bold', spacing: 2 });
+            cv.text(lim ? lim + ' rpm' : '---- rpm', 1552, 352, 22, ready ? GO : t.text, { align: 'right', font: 'bold' });
+            cv.roundRect(1130, 342, 280, 8, 4, t.track);
+            if (fl > 0) cv.roundRect(1130, 342, 280 * fl, 8, 4, ready ? GO : col);
 
-            const gx = 952, gy = 376, gw = 600, gh = 90;
+            const gx = 952, gy = 376, gw = 600, gh = 96;
             const now0 = hist.length ? hist[hist.length - 1][0] : now;
             const span = G.clamp(hist.length ? now0 - hist[0][0] : 0, 300000, 1200000);
             const ahead = 300000;                                  // projection: up to 5 min ahead
@@ -216,6 +213,7 @@ mgu.run({
                 }
             });
             cv.fillRect(gx, gy + gh, gw, 1, withAlpha(t.tick, 0.5));
+            G.frame(cv, t, ['Warm-up'], 0, [d.demo && { text: 'DEMO' }]);     // G20-style frame
             return ui.image('MAIN_GFX', cv);
         }
 
