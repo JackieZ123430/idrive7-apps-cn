@@ -130,7 +130,7 @@ over SSH:
 
 ```sh
 deploy/make-car-kit.sh                                    # -> dist/mgu-custom-apps(.tar.gz)
-HU=root@<unit-ip> PORT=22 deploy/push-to-car.sh check     # read-only: checks the unit, lists what it would touch
+HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh check     # read-only: checks the unit, lists what it would touch
 HU=root@<unit-ip> PORT=22 deploy/push-to-car.sh install   # backup -> install -> restart the app platform
 ```
 
