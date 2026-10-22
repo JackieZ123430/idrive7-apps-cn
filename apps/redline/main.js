@@ -1,8 +1,8 @@
 'use strict';
 /**
- * Redline - full-screen rev tach drawn like the G20 Live Cockpit in Sport mode:
- * two mirrored open gauges (speed left, revs right) filling from the outer bottom
- * corners towards the centre, a huge gear between them, angular frame lines.
+ * Redline - full-screen rev display in the style of the G20 Live Cockpit (Sport):
+ * a tall slanted rev bar that rises with the revs (segmented, theme colour to red
+ * at the shift point), a huge gear in the middle, digital speed, angular lines.
  *
  *   - shift-light bar that fills over the last 2000 rpm and strobes at the shift point
  *   - huge gear number (from the gearbox, or learned from rpm/speed ratios)
@@ -13,16 +13,15 @@
  * Pages: tach / shift log. Peaks reset with BTN_RESET.
  */
 const mgu = require('./kit/mgu');
-const { Canvas, withAlpha, mix } = require('./kit/canvas');
+const { Canvas, withAlpha, ramp } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
 
 const W = 1600, H = 520;
-// two mirrored pods (G20 style): speed left, revs right; angles in degrees from 12 o'clock
-const PY = 300, PR = 226, THICK = 16;
-const SPD = { cx: 380, a0: -140, a1: 40 };          // fills clockwise from the lower left
-const TAC = { cx: 1220, a0: 140, a1: -40 };         // fills anticlockwise from the lower right
-const SPEED_MAX = { kmh: 260, mph: 160 };
+// rising rev bar (G20 style): a slanted parallelogram, bottom-left corner at (x, y0),
+// leaning right by 'slant' over its height
+const BAR = { x: 1150, w: 104, y0: 486, y1: 70, slant: 64 };
+const GX = 790;                                     // centre column (gear + rpm)
 const MPH = 1.609344;
 const GREEN = '#2fd27a', YELLOW = '#ffc21a', BLUE = '#2a7dff';
 const N_LEDS = 12, LED_RANGE = 2000;
@@ -90,59 +89,41 @@ mgu.run({
             if (G.isNum(g)) lastGear = g;
         }, () => { recent.length = 0; lastGear = null; lastT = 0; });
 
-        /* ---------- static cluster background (cached) ---------- */
-        const P = (cx, a, r) => [cx + Math.sin(a * Math.PI / 180) * r, PY - Math.cos(a * Math.PI / 180) * r];
-        const tacA = (rpm) => TAC.a0 + G.clamp(rpm / maxRpm(), 0, 1) * (TAC.a1 - TAC.a0);
-        const spdMax = () => SPEED_MAX[mph() ? 'mph' : 'kmh'];
-        const spdA = (v) => SPD.a0 + G.clamp(v / spdMax(), 0, 1) * (SPD.a1 - SPD.a0);
+        /* ---------- rev bar geometry + static background (cached) ---------- */
+        const barY = (rpm) => BAR.y0 - G.clamp(rpm / maxRpm(), 0, 1) * (BAR.y0 - BAR.y1);
+        const barX = (y) => BAR.x + BAR.slant * (BAR.y0 - y) / (BAR.y0 - BAR.y1);     // left edge at height y
+        /** Fill the bar between two heights (row by row, so the slant stays anti-aliased). */
+        function barRows(cv, yTop, yBot, colAt, pad) {
+            pad = pad || 0;
+            for (let y = Math.floor(yTop); y < Math.ceil(yBot); y++) {
+                const h = Math.min(y + 1, yBot) - Math.max(y, yTop);
+                if (h > 0) cv.fillRect(barX(y + 0.5) - pad, Math.max(y, yTop), BAR.w + 2 * pad, h, colAt(y));
+            }
+        }
         let bg = null, bgKey = '';
         function background(t, sp) {
-            const key = [settings.get('theme'), maxRpm(), redline(), sp.rpm, settings.get('speedUnit')].join('|');
+            const key = [settings.get('theme'), maxRpm(), redline(), sp.rpm].join('|');
             if (bg && key === bgKey) return bg;
             const cv = new Canvas(W, H).clear(t.bg);
-            // soft glow behind each pod
-            [SPD.cx, TAC.cx].forEach((cx) => {
-                cv.arc(cx, PY, 0, PR + 30, 0, 360, withAlpha(t.panelTop, 0.55));
-                cv.arc(cx, PY, 0, PR - 60, 0, 360, withAlpha(t.bg, 0.35));
-            });
-            // angular frame lines (the G20's hexagonal outline): over the top and under the centre
-            const fl = withAlpha(t.tick, 0.55), fa = withAlpha(t.accent, 0.5);
-            cv.polyline([[SPD.cx + 90, 64], [560, 64], [610, 112], [990, 112], [1040, 64], [TAC.cx - 90, 64]], 2, fl);
-            cv.polyline([[610, 112], [990, 112]], 3, fa);
-            cv.polyline([[560, 498], [620, 452], [980, 452], [1040, 498]], 2, fl);
-            cv.polyline([[20, 498], [560, 498]], 1.5, withAlpha(t.tick, 0.35));
-            cv.polyline([[1040, 498], [1580, 498]], 1.5, withAlpha(t.tick, 0.35));
-            // tracks
-            cv.arc(SPD.cx, PY, PR - THICK, PR, SPD.a0, SPD.a1, t.track, { round: true });
-            cv.arc(TAC.cx, PY, PR - THICK, PR, TAC.a1, TAC.a0, t.track, { round: true });
-            // speed ticks: every 20 (10 mph), numbers every 40 (20 mph)
-            const sStep = mph() ? 10 : 20;
-            for (let v = 0; v <= spdMax(); v += sStep) {
-                const a = spdA(v), major = v % (sStep * 2) === 0;
-                const [xa, ya] = P(SPD.cx, a, PR - THICK - (major ? 18 : 10)), [xb, yb] = P(SPD.cx, a, PR - THICK - 4);
-                cv.line(xa, ya, xb, yb, major ? 3 : 2, major ? t.tick : withAlpha(t.tick, 0.6));
-                if (major) { const [lx, ly] = P(SPD.cx, a, PR - THICK - 42); cv.text(String(v), lx, ly + 8, 22, t.dim, { align: 'center', font: 'label' }); }
-            }
-            // rev ticks every 500, numbers every 1000; shift zone + redline on the rim
-            cv.arc(TAC.cx, PY, PR + 6, PR + 12, tacA(redline()), tacA(sp.rpm), withAlpha(t.warn, 0.9));
-            cv.arc(TAC.cx, PY, PR + 6, PR + 16, TAC.a1, tacA(redline()), t.crit);
+            // angular frame lines (the G20's outline)
+            const fl = withAlpha(t.tick, 0.55);
+            cv.polyline([[24, 64], [470, 64], [510, 96], [1060, 96], [1100, 64], [BAR.x - 20, 64]], 2, fl);
+            cv.polyline([[510, 96], [1060, 96]], 3, withAlpha(t.accent, 0.5));
+            cv.polyline([[24, 498], [470, 498], [510, 470], [1060, 470], [1100, 498], [BAR.x - 30, 498]], 2, fl);
+            // bar track, with the redline part tinted
+            barRows(cv, BAR.y1, BAR.y0, (y) => (y < barY(redline()) ? withAlpha(t.crit, 0.28) : t.track));
+            // segment gaps every 500 rpm + scale on the right: ticks, numbers every 1000, shift / redline marks
+            for (let rpm = 500; rpm < maxRpm(); rpm += 500) cv.fillRect(barX(barY(rpm)) - 1, barY(rpm) - 1.5, BAR.w + 2, 3, t.bg);
             for (let rpm = 0; rpm <= maxRpm(); rpm += 500) {
-                const a = tacA(rpm), major = rpm % 1000 === 0, red = rpm >= redline();
-                const [xa, ya] = P(TAC.cx, a, PR - THICK - (major ? 20 : 10)), [xb, yb] = P(TAC.cx, a, PR - THICK - 4);
-                cv.line(xa, ya, xb, yb, major ? 4 : 2, red ? t.crit : major ? t.text : t.tick);
-                if (major) { const [lx, ly] = P(TAC.cx, a, PR - THICK - 46); cv.text(String(rpm / 1000), lx, ly + 11, 30, red ? t.crit : t.text, { align: 'center', font: 'bold' }); }
+                const y = barY(rpm), x = barX(y) + BAR.w + 10, major = rpm % 1000 === 0, red = rpm >= redline();
+                cv.fillRect(x, y - (major ? 1.5 : 1), major ? 18 : 10, major ? 3 : 2, red ? t.crit : major ? t.text : t.tick);
+                if (major) cv.text(String(rpm / 1000), x + 26, y + 11, 30, red ? t.crit : t.text, { font: 'bold' });
             }
+            const ys = barY(sp.rpm), yr = barY(redline());
+            cv.fillRect(barX(ys) - 12, ys - 2, BAR.w + 24, 4, t.warn);                      // shift point
+            cv.fillRect(barX(yr) - 12, yr - 2, BAR.w + 24, 4, t.crit);                      // redline
             bg = cv; bgKey = key;
             return cv;
-        }
-
-        /** Gauge fill with a soft glow and a bright tip. */
-        function fill(cv, cx, a0, a, ramp, from, to, col) {
-            cv.arc(cx, PY, PR - THICK - 8, PR + 6, a0, a, withAlpha(col, 0.14));
-            cv.arc(cx, PY, PR - THICK, PR, a0, a, col, ramp ? { round: true, ramp, rampFrom: from, rampTo: to } : { round: true });
-            const [x, y] = P(cx, a, PR - THICK / 2);
-            cv.circle(x, y, THICK / 2 + 7, withAlpha('#ffffff', 0.22));
-            cv.circle(x, y, THICK / 2 + 2, '#ffffff');
         }
 
         /* ---------- drawing ---------- */
@@ -161,7 +142,7 @@ mgu.run({
 
         function shiftLights(cv, t, rpm, sp, now) {
             const cols = ledColors(t);
-            const x0 = 470, w = 660, gap = 10, lw = (w - gap * (N_LEDS - 1)) / N_LEDS, y = 14, h = 30;
+            const x0 = GX - 330, w = 660, gap = 10, lw = (w - gap * (N_LEDS - 1)) / N_LEDS, y = 14, h = 30;
             const start = sp - LED_RANGE;
             const lit = G.isNum(rpm) ? Math.floor(G.clamp((rpm - start) / LED_RANGE, 0, 1) * N_LEDS) : 0;
             const strobe = G.isNum(rpm) && rpm >= sp;
@@ -186,49 +167,56 @@ mgu.run({
                 cv.gradientRect(0, 0, W, H, [[0, withAlpha(t.crit, 0.30)], [0.5, withAlpha(t.crit, 0.06)], [1, withAlpha(t.crit, 0.22)]]);
             }
 
-            // ---- speed pod (left)
-            const v = G.isNum(d.speed) ? (mph() ? d.speed / MPH : d.speed) : null;
-            if (G.isNum(v) && v > 0.5) fill(cv, SPD.cx, SPD.a0, spdA(v), t.ramp, SPD.a0, SPD.a1, t.accent);
-            cv.text(G.fmt(v, 0), SPD.cx, PY + 30, 110, G.isNum(v) ? t.text : t.dim, { align: 'center', font: 'num' });
-            cv.text(mph() ? 'mph' : 'km/h', SPD.cx, PY + 66, 24, t.dim, { align: 'center' });
-            const oilCol = !G.isNum(d.oil) ? t.dim : d.oil < 60 ? t.cold : d.oil < settings.get('warmOil') ? YELLOW : d.oil > 130 ? t.crit : t.text;
-            const ow = cv.text('OIL ', SPD.cx - 80, PY + 128, 18, t.dim, { font: 'bold', spacing: 2 });
-            cv.text(G.fmt(d.oil, 0) + (G.isNum(d.oil) ? '°' : ''), SPD.cx - 80 + ow, PY + 128, 26, oilCol, { font: 'bold' });
-            cv.text('WATER ' + G.fmt(d.coolant, 0) + '°', SPD.cx + 100, PY + 128, 18, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
-            if (sp.cold) {
-                cv.roundRect(SPD.cx - 130, PY + 146, 260, 34, 8, withAlpha(t.cold, 0.2));
-                cv.text('COLD  ·  LIMIT ' + sp.rpm, SPD.cx, PY + 170, 18, t.cold, { align: 'center', font: 'bold', spacing: 1 });
-            }
-
-            // ---- rev pod (right): theme colour -> red at the shift point, solid red above it
+            // ---- rev bar: rises with the revs; theme colour -> red at the shift point, solid red above
             if (G.isNum(rpm) && rpm > 50) {
-                const a = tacA(rpm), over = rpm >= sp.rpm;
-                fill(cv, TAC.cx, TAC.a0, a, over ? null : (t.hotRamp || t.ramp), TAC.a0, tacA(sp.rpm), over ? '#ff2a2a' : t.accent);
+                const top = barY(rpm), over = rpm >= sp.rpm, hot = t.hotRamp || t.ramp, ys = barY(sp.rpm);
+                const colAt = (y) => (over ? '#ff2a2a' : ramp(hot, G.clamp((BAR.y0 - y) / (BAR.y0 - ys), 0, 1)));
+                barRows(cv, top, BAR.y0, (y) => withAlpha(colAt(y), 0.16), 8);                // glow
+                barRows(cv, top, BAR.y0, colAt);
+                for (let r = 500; r < rpm; r += 500) { const y = barY(r); cv.fillRect(barX(y) - 1, y - 1.5, BAR.w + 2, 3, t.bg); }
+                cv.fillRect(barX(top) - 6, top - 3, BAR.w + 12, 6, '#ffffff');               // bright top edge
             }
-            if (peakRpm > 0) {
-                const [xa, ya] = P(TAC.cx, tacA(peakRpm), PR - THICK), [xb, yb] = P(TAC.cx, tacA(peakRpm), PR + 20);
-                cv.line(xa, ya, xb, yb, 3, t.accent2);
-            }
-            cv.text('SHIFT AT', TAC.cx, PY - 52, 16, t.dim, { align: 'center', font: 'bold', spacing: 2 });
-            cv.text(String(sp.rpm), TAC.cx, PY - 4, 52, sp.cold ? t.cold : t.text, { align: 'center', font: 'num' });
-            cv.text('LAST SHIFT', TAC.cx, PY + 40, 16, t.dim, { align: 'center', font: 'bold', spacing: 2 });
-            if (lastShift) {
-                const age = now - lastShift.at, vc = VCOL[lastShift.verdict];
-                cv.text(String(lastShift.rpm) + (lastShift.from !== '?' ? '   ' + lastShift.from + '>' + lastShift.to : ''), TAC.cx, PY + 78, 30, t.text, { align: 'center', font: 'bold' });
-                cv.roundRect(TAC.cx - 95, PY + 92, 190, 36, 8, withAlpha(vc, age < 2500 ? 0.45 : 0.18));
-                cv.text(lastShift.verdict, TAC.cx, PY + 117, 20, age < 2500 ? t.text : vc, { align: 'center', font: 'bold', spacing: 2 });
-            } else cv.text('--', TAC.cx, PY + 78, 30, t.dim, { align: 'center', font: 'bold' });
+            if (peakRpm > 0) { const y = barY(peakRpm); cv.fillRect(barX(y) - 16, y - 1.5, 12, 3, t.accent2); }
 
-            // ---- centre: gear + rpm
+            // ---- centre: huge gear + rpm
             const g = d.gear;
             const gs = g === -1 ? 'R' : g === 0 ? 'N' : G.isNum(g) ? String(g) : '-';
             const gc = strobe ? (Math.floor(now / 90) % 2 ? t.text : '#ff2a2a') : t.text;
-            cv.text(gs, 800, 352, 250, gc, { align: 'center', font: 'gear' });
-            if (d.gearGuessed && G.isNum(g) && g > 0) cv.text('EST.', 800, 134, 16, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
-            cv.text(G.isNum(rpm) ? String(Math.round(rpm / 10) * 10) : '----', 800, 418, 52, G.isNum(rpm) ? (rpm >= sp.rpm ? '#ff4a4a' : t.text) : t.dim, { align: 'center', font: 'num' });
-            cv.text('RPM', 800, 442, 16, t.dim, { align: 'center', font: 'bold', spacing: 3 });
+            cv.text(gs, GX, 352, 300, gc, { align: 'center', font: 'gear' });
+            if (d.gearGuessed && G.isNum(g) && g > 0) cv.text('EST.', GX, 124, 16, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+            const rw = cv.text(G.isNum(rpm) ? String(Math.round(rpm / 10) * 10) : '----', GX - 24, 452, 96, G.isNum(rpm) ? (rpm >= sp.rpm ? '#ff4a4a' : t.text) : t.dim, { align: 'center', font: 'num' });
+            cv.text('RPM', GX - 24 + rw / 2 + 12, 452, 22, t.dim, { font: 'bold', spacing: 2 });
+
+            // ---- left: digital speed, temperatures, cold guard, stats
+            const v = G.isNum(d.speed) ? (mph() ? d.speed / MPH : d.speed) : null;
+            cv.text('SPEED', 40, 112, 18, t.dim, { font: 'bold', spacing: 2 });
+            const vw = cv.text(G.fmt(v, 0), 36, 258, 150, G.isNum(v) ? t.text : t.dim, { font: 'num' });
+            cv.text(mph() ? 'mph' : 'km/h', 48 + vw, 258, 28, t.dim);
+            cv.fillRect(40, 288, 400, 1, withAlpha(t.tick, 0.6));
+            const oilCol = !G.isNum(d.oil) ? t.dim : d.oil < 60 ? t.cold : d.oil < settings.get('warmOil') ? YELLOW : d.oil > 130 ? t.crit : t.text;
+            cv.text('OIL', 40, 330, 18, t.dim, { font: 'bold', spacing: 2 });
+            cv.text(G.fmt(d.oil, 0) + (G.isNum(d.oil) ? '°' : ''), 40, 378, 44, oilCol, { font: 'bold' });
+            cv.text('WATER', 220, 330, 18, t.dim, { font: 'bold', spacing: 2 });
+            cv.text(G.fmt(d.coolant, 0) + (G.isNum(d.coolant) ? '°' : ''), 220, 378, 44, t.text, { font: 'bold' });
+            if (sp.cold) {
+                cv.roundRect(40, 400, 300, 36, 8, withAlpha(t.cold, 0.2));
+                cv.text('COLD  ·  LIMIT ' + sp.rpm, 190, 425, 18, t.cold, { align: 'center', font: 'bold', spacing: 1 });
+            }
             cv.text('PEAK ' + (peakRpm ? Math.round(peakRpm) : '--') + '  ·  LIMITER ' + limiterHits + 'x  ·  ABOVE SHIFT ' + (overShiftMs / 1000).toFixed(1) + ' s',
-                800, 486, 16, t.dim, { align: 'center', font: 'bold', spacing: 1 });
+                40, 476, 16, t.dim, { font: 'bold', spacing: 1 });
+
+            // ---- right of the bar: shift point + last shift
+            const rx = W - 24;
+            cv.text('SHIFT AT', rx, 112, 16, t.dim, { align: 'right', font: 'bold', spacing: 2 });
+            cv.text(String(sp.rpm), rx, 164, 48, sp.cold ? t.cold : t.text, { align: 'right', font: 'num' });
+            cv.text('LAST SHIFT', rx, 300, 16, t.dim, { align: 'right', font: 'bold', spacing: 2 });
+            if (lastShift) {
+                const age = now - lastShift.at, vc = VCOL[lastShift.verdict];
+                cv.text(String(lastShift.rpm), rx, 350, 44, t.text, { align: 'right', font: 'num' });
+                if (lastShift.from !== '?') cv.text(lastShift.from + ' > ' + lastShift.to, rx, 380, 20, t.dim, { align: 'right', font: 'bold' });
+                cv.roundRect(rx - 150, 394, 150, 34, 8, withAlpha(vc, age < 2500 ? 0.45 : 0.18));
+                cv.text(lastShift.verdict, rx - 75, 418, 18, age < 2500 ? t.text : vc, { align: 'center', font: 'bold', spacing: 1.5 });
+            } else cv.text('--', rx, 350, 44, t.dim, { align: 'right', font: 'num' });
         }
 
         function drawLog(cv, t) {
