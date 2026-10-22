@@ -88,15 +88,28 @@ cold). A **DEMO** badge shows when the data isn't from the car.
 
 ### 3.1 Get the SDK from your unit
 
-Copy any BMW app's bundle off the head unit (x_call is present on every unit) and extract the SDK:
+Copy the x_call app that ships in the firmware off the head unit, and extract the SDK from it:
 
 ```sh
-ssh root@<unit> 'cat /var/opt/public/oap/oap_12204/source/javascript/app.js' > x_call_app.js
-node kit/tools/extract_sdk.js x_call_app.js        # writes ./oap-sdk/
+scp root@<unit>:'/usr/lib/oap-mainapp/preinstalled_apps/x_call@*.tgz' .
+mkdir x_call && tar xzf x_call@*.tgz -C x_call
+node kit/tools/extract_sdk.js x_call/javascript/app.js     # writes ./oap-sdk/
 ```
 Or download it of a public internet webiste:
 https://bedrive.ru/da77
 
+
+You get:
+
+| Path | What it is |
+|---|---|
+| `oap-sdk/index.js`, `package.json` | the runtime the build vendors into each app (`require('oap-sdk')`) |
+| `oap-sdk/source/` | every SDK module as a readable file at its real path (`source/src/core/OnlineApp.js`, ...) |
+
+The firmware copy (SDK 24.10.x) has the full public API. The x_call your car may download
+later (`/var/opt/public/oap/oap_12204/source/javascript/app.js`) carries a newer SDK that
+lacks `telephony`, `appstart`, `map` and `poi`. The kit's apps don't need those, so it works
+too; the tool lists anything missing.
 
 `oap-sdk/` is listed in `.gitignore`. Never commit it.
 

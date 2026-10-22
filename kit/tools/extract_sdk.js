@@ -4,15 +4,21 @@
  * extract_sdk.js - rebuild BMW's oap-sdk from an app on YOUR OWN head unit.
  *
  * BMW does not ship oap-sdk as a separate module: it is browserified into every
- * app's javascript/app.js. This tool takes one of those bundles, keeps all of
- * its modules, and writes oap-sdk/index.js that exposes the SDK's public API
- * (OnlineApp, someipBuilders, RhmiApplication, ...) as require('oap-sdk').
+ * app's javascript/app.js. This tool takes one of those bundles and writes:
+ *
+ *   <out>/index.js       require('oap-sdk') - the SDK's public API (OnlineApp,
+ *                        someipBuilders, RhmiApplication, ...) backed by the bundle
+ *   <out>/package.json
+ *   <out>/source/        every oap-sdk module as a readable file at its real path
+ *                        (source/src/core/OnlineApp.js, ...) - for reading, not loading
  *
  *   node kit/tools/extract_sdk.js <path/to/app.js> [out_dir=oap-sdk]
  *
  * Good sources on the unit (any BMW OAP app works, x_call is always there):
  *   /var/opt/public/oap/oap_12204/source/javascript/app.js     (x_call)
  *   /usr/lib/oap-mainapp/preinstalled_apps/x_call@*.tgz        (javascript/app.js inside)
+ *
+ * Only the bundle's module table is built; no module code runs during extraction.
  */
 const fs = require('fs');
 const path = require('path');
@@ -21,47 +27,94 @@ const [src, outDir = path.join(__dirname, '..', '..', 'oap-sdk')] = process.argv
 if (!src) { console.error('usage: extract_sdk.js <app.js> [out_dir]'); process.exit(2); }
 const text = fs.readFileSync(src, 'utf8');
 
-// Public API name -> module path inside the bundle (as the bundle's require maps name it)
+// Public API name -> file inside oap-sdk
 const API = {
-    OnlineApp: /oap-sdk\/src\/core\/OnlineApp(\.js)?$/,
-    NsmProxy: /oap-sdk\/src\/core\/NsmProxy(\.js)?$/,
-    config: /oap-sdk\/src\/config\/config(\.js)?$/,
-    logging: /oap-sdk\/src\/logging\/logging(\.js)?$/,
-    loggingLevel: /oap-sdk\/src\/logging\/loggingLevel(\.js)?$/,
-    SDKError: /oap-sdk\/src\/+errors\/SDKError(\.js)?$/,
-    someipBuilders: /oap-sdk\/src\/someip\/someipBuilders(\.js)?$/,
-    RhmiApplication: /oap-sdk\/src\/rhmi\/RhmiApplication(\.js)?$/,
-    RhmiResourcesLocator: /oap-sdk\/src\/rhmi\/RhmiResourcesLocator(\.js)?$/,
-    telephony: /oap-sdk\/src\/telephony\/telephony(\.js)?$/,
-    getVin: /oap-sdk\/src\/utils\/getVin(\.js)?$/,
-    runtimeVariant: /oap-sdk\/src\/utils\/runtimeVariant(\.js)?$/,
-    appstart: /oap-sdk\/src-gen\/joynr-includes\/telematics\/appstart(\.js)?$/,
-    guidance: /oap-sdk\/src\/navigation\/guiding\/guidance(\.js)?$/,
-    map: /oap-sdk\/src\/navigation\/map\/map(\.js)?$/,
-    MapKmlContentTypeConverters: /oap-sdk\/src\/navigation\/map\/MapKmlContentTypeConverters(\.js)?$/,
-    poi: /oap-sdk\/src\/navigation\/poi\/poi(\.js)?$/,
+    OnlineApp: 'src/core/OnlineApp.js',
+    NsmProxy: 'src/core/NsmProxy.js',
+    config: 'src/config/config.js',
+    logging: 'src/logging/logging.js',
+    loggingLevel: 'src/logging/loggingLevel.js',
+    SDKError: 'src/errors/SDKError.js',
+    someipBuilders: 'src/someip/someipBuilders.js',
+    RhmiApplication: 'src/rhmi/RhmiApplication.js',
+    RhmiResourcesLocator: 'src/rhmi/RhmiResourcesLocator.js',
+    telephony: 'src/telephony/telephony.js',
+    getVin: 'src/utils/getVin.js',
+    runtimeVariant: 'src/utils/runtimeVariant.js',
+    appstart: 'src-gen/joynr-includes/telematics/appstart.js',
+    guidance: 'src/navigation/guiding/guidance.js',
+    map: 'src/navigation/map/map.js',
+    MapKmlContentTypeConverters: 'src/navigation/map/MapKmlContentTypeConverters.js',
+    poi: 'src/navigation/poi/poi.js',
 };
 
-// Every "path":id pair from the bundle's per-module require maps.
-const ids = {};
-const re = /"((?:\.\.?\/|oap-sdk)[^"]*)":(\d+)/g;
-let m;
-while ((m = re.exec(text))) {
-    for (const [name, rx] of Object.entries(API)) if (!ids[name] && rx.test(m[1])) ids[name] = m[2];
+// Browserify bundle: (function(){function r(e,n,t){...}return r})()({modules},{},[entry]);
+const prelude = '(function(){function r(e,n,t){';
+const tail = /,\{\},\[[\d,]*\]\)\s*;?\s*$/;
+if (!text.startsWith(prelude) || !tail.test(text)) { console.error('not a browserify bundle'); process.exit(1); }
+const body = text.replace(tail, ',{},[])');          // drop the entry so nothing app-specific runs
+
+// Module table: id -> [factory, {requireName: id}]
+let mods;
+// eslint-disable-next-line no-new-func
+new Function('__cap', prelude + '__cap(e);' + body.slice(prelude.length))((e) => { mods = e; });
+
+// Give every oap-sdk module its path: start at the "oap-sdk/..." requires, then follow relative ones.
+const norm = (p) => path.posix.normalize(p).replace(/\.js$/, '') + '.js';
+const name = {};
+const queue = [];
+for (const entry of Object.values(mods)) {
+    for (const [k, v] of Object.entries(entry[1])) {
+        if (k.startsWith('oap-sdk/') && typeof v === 'number' && !name[v]) { name[v] = norm(k.slice(8)); queue.push(v); }
+    }
 }
-if (!ids.OnlineApp || !ids.someipBuilders) {
+while (queue.length) {
+    const id = queue.shift();
+    const here = path.posix.dirname(name[id]);
+    for (const [k, v] of Object.entries(mods[id][1])) {
+        if (!k.startsWith('.') || typeof v !== 'number' || name[v]) continue;
+        const p = norm(path.posix.join(here, k));
+        if (p.startsWith('..')) continue;                   // left the SDK (app or joynr code)
+        name[v] = p;
+        queue.push(v);
+    }
+}
+const byPath = {};
+for (const [id, p] of Object.entries(name)) byPath[p] = Number(id);
+const ids = {};
+for (const [api, p] of Object.entries(API)) if (byPath[p] !== undefined) ids[api] = byPath[p];
+if (ids.OnlineApp === undefined || ids.someipBuilders === undefined) {
     console.error('this bundle does not contain the oap-sdk core (OnlineApp/someipBuilders) - try another app');
     process.exit(1);
 }
 
-// Browserify bundle: (function(){...return r})()({modules},{},[entry]); - drop the entry so nothing app-specific runs.
-const tail = /,\{\},\[\d+\]\)\s*;?\s*$/;
-if (!tail.test(text)) { console.error('not a browserify bundle (unexpected ending)'); process.exit(1); }
-const body = text.replace(tail, ',{},[])');
+// SDK version: the app's package.json (next to javascript/) names the oap-sdk it was built with
+const appDir = path.dirname(path.dirname(path.resolve(src)));
+let version = '0.0.0-extracted';
+try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
+    const v = (pkg.dependencies || {})['oap-sdk'];
+    if (v) version = v.replace(/^[^\d]*/, '');
+} catch (e) { /* no package.json next to the bundle */ }
 
-const out = `/* oap-sdk - extracted by extract_sdk.js from ${path.basename(path.dirname(path.dirname(src)))} (${path.basename(src)}).
-   Generated locally from the user's own firmware; not for redistribution. */
-var __r = ${body};
+// Keep only what the public API needs (the SDK plus the lodash/joynr/... it uses), not the app itself.
+const keep = new Set();
+const todo = Object.keys(name).map(Number);           // every SDK module, reachable from the API or not
+while (todo.length) {
+    const id = todo.pop();
+    if (keep.has(id) || !mods[id]) continue;
+    keep.add(id);
+    for (const v of Object.values(mods[id][1])) if (typeof v === 'number') todo.push(v);
+}
+const table = [...keep].sort((a, b) => a - b)
+    .map((id) => `${id}:[${mods[id][0].toString()},${JSON.stringify(mods[id][1])}]`).join(',\n');
+
+const out = `/* oap-sdk ${version} - extracted by extract_sdk.js from ${path.basename(appDir)} (${path.basename(src)}).
+   Generated locally from the user's own firmware; not for redistribution.
+   Readable source of every module: ./source/ */
+var __r = ${text.slice(0, text.indexOf(')()(') + 4)}{
+${table}
+},{},[]);
 var __ids = ${JSON.stringify(ids)};
 Object.keys(__ids).forEach(function (name) {
     Object.defineProperty(module.exports, name, { enumerable: true, configurable: true,
@@ -71,9 +124,24 @@ Object.keys(__ids).forEach(function (name) {
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, 'index.js'), out);
 fs.writeFileSync(path.join(outDir, 'package.json'), JSON.stringify({
-    name: 'oap-sdk', version: '0.0.0-extracted', main: 'index.js',
+    name: 'oap-sdk', version, main: 'index.js',
     description: 'Extracted locally from an OAP app bundle by extract_sdk.js',
 }, null, 2) + '\n');
-console.log('oap-sdk written to ' + outDir + ' (' + Object.keys(ids).length + ' API entries: ' + Object.keys(ids).join(', ') + ')');
-const missing = Object.keys(API).filter((k) => !ids[k]);
-if (missing.length) console.log('not in this bundle (only matters if your app uses them): ' + missing.join(', '));
+
+// Readable source tree
+const srcDir = path.join(outDir, 'source');
+fs.rmSync(srcDir, { recursive: true, force: true });
+for (const [id, p] of Object.entries(name)) {
+    const fn = mods[id][0].toString();
+    const code = fn.slice(fn.indexOf('{') + 1, fn.lastIndexOf('}')).replace(/^\n/, '');
+    const reqs = Object.keys(mods[id][1]);
+    const head = `/* oap-sdk/${p}\n * requires: ${reqs.join(', ') || '-'} */\n`;
+    fs.mkdirSync(path.join(srcDir, path.dirname(p)), { recursive: true });
+    fs.writeFileSync(path.join(srcDir, p), head + code + (code.endsWith('\n') ? '' : '\n'));
+}
+
+console.log(`oap-sdk ${version} written to ${outDir}`);
+console.log(`  API (${Object.keys(ids).length}): ${Object.keys(ids).join(', ')}`);
+console.log(`  readable source: ${Object.keys(name).length} modules in ${srcDir}`);
+const missing = Object.keys(API).filter((k) => ids[k] === undefined);
+if (missing.length) console.log('  not in this bundle (only matters if your app uses them): ' + missing.join(', '));
