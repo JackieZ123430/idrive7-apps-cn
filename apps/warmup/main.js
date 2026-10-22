@@ -105,7 +105,7 @@ mgu.run({
             G.radial(cv, t, cx, cy, r, {
                 value: T(val), min: T(0), max: T(150), label, unit: tU(), decimals: 0, ticks: 6, majorEvery: 1,
                 zones: [{ from: T(0), to: T(warm - 0.01), color: 'cold' }, { from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(150), color: 'crit' }],
-                tickLabels: true,
+                tickLabels: true, hot: false,       // temperature: cold = blue, warm = theme colour, hot = warn / crit zones
             });
         }
 

@@ -102,8 +102,10 @@ mgu.run({
             statusCarSpeed2: (v) => { const k = v.speedVehicleCentreOfGravity; live.speed = k === 65535 || k == null ? null : k * 0.015625; },
         }, log).then((s) => log.info('speed ' + (s.error ? 'error: ' + s.error : 'subscribed')));
 
-        const diag = await new Diag(ctx.signals, log).init();
+        // connect in the background: the screen must not wait for the diagnostic link
+        const diag = new Diag(ctx.signals, log);
         diag.quiet = true;                     // polled every few seconds: keep the log file small
+        diag.init();
         const demo = new Demo();
         const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !diag.available && !live.socT);
 
@@ -134,7 +136,9 @@ mgu.run({
                     if (!st.session) st.session = { from: prev, fromT: st.lastSocT || now };
                     st.session.to = soc; st.session.toT = now;
                     save();
-                } else if (st.session && (soc < st.session.to - 0.5 || moving)) {
+                } else if (st.session && (soc < st.session.to - 2 || moving)) {
+                    // ends when driving off or on a real drop; small dips while parked (cabin
+                    // pre-conditioning, display wobble) keep the session open
                     closeSession();
                 }
             }

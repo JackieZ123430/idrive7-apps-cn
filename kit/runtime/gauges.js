@@ -17,11 +17,11 @@ const { Canvas, mix, ramp, withAlpha } = require('./canvas');
  * Layer cache: the parts of a widget that don't change between frames (card
  * background, gauge track / ticks / numbers) are drawn once into their own
  * transparent canvas and blitted every frame, which is several times cheaper
- * than drawing them again. Least recently used layers go first, ~24 MB max.
+ * than drawing them again. Least recently used layers go first, ~16 MB max.
  */
 const layers = new Map();
 let layerBytes = 0;
-const LAYER_MAX = 24 * 1024 * 1024;
+const LAYER_MAX = 16 * 1024 * 1024;
 function layer(key, w, h, draw) {
     let c = layers.get(key);
     if (c) { layers.delete(key); layers.set(key, c); return c; }        // most recent last

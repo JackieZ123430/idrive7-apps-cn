@@ -160,8 +160,10 @@ mgu.run({
          * Fast (~2/s) while the Intake & fuel page is on screen, every 5 s otherwise so the history
          * keeps filling. A value the DME refuses is only re-tried every 30 s. */
         const dme = Object.assign({ ecu: 18 }, (ctx.spec.config && ctx.spec.config.dme) || {});
-        const link = await new Diag(ctx.signals, log).init();
+        // connect in the background: the screen must not wait for the diagnostic link
+        const link = new Diag(ctx.signals, log);
         link.quiet = true;
+        link.init();
         const rd = new DidReader(link, { ecu: dme.ecu });
         const fuelT = {}, fuelFail = {}, fuelTry = {};
         let fuelSeen = 0, fuelTimer = null, fuelBusy = false, fuelLast = 0;
