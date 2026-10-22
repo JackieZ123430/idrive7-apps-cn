@@ -204,7 +204,7 @@ mgu.run({
             }
             if (!f.length && phase !== 'scanning') {
                 cv.circle(800, 330, 40, withAlpha(GO, 0.2));
-                cv.text('✓', 800, 346, 44, GO, { align: 'center', font: 'bold' });
+                cv.polyline([[782, 330], [796, 344], [820, 316]], 7, GO);     // check mark ('✓' isn't in the baked fonts)
                 cv.text(scan.ecus.length ? 'No faults stored' : 'No answer', 800, 430, 32, t.text, { align: 'center', font: 'bold' });
                 return;
             }

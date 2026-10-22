@@ -1,19 +1,26 @@
 {
   "id": "edrive",
   "title": "eDrive",
-  "description": "Real electric range from charge and outside temperature, HV battery health (SOH) and design capacity left",
-  "version": "1.0.0",
+  "description": "Real electric range, HV battery health (SOH), design capacity left, last charge and 12 V battery voltage",
+  "version": "1.1.0",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
-      "_methods": ["sendTasuRequest"],
-      "_broadcasts": ["sendTasuResponse"]
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
     },
     "de.bmw.infrastructure.EnvironmentalInformation": {
       "ExteriorTemperature": "s"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
     }
   },
   "screens": [
@@ -22,47 +29,302 @@
       "kind": "canvas",
       "title": "eDrive",
       "buttons": [
-        ["BTN_READ", "Read battery now"],
-        ["BTN_PAGE", "Next page"],
-        ["BTN_SETTINGS", "Settings"]
+        [
+          "BTN_READ",
+          "Read battery now"
+        ],
+        [
+          "BTN_PAGE",
+          "Next page"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
       ]
     }
   ],
   "settings": [
-    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
-     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
-    {"key": "rangeMild", "label": "Range at 100%, 10-25 °C", "type": "number", "unit": "km", "default": 50,
-     "steps": [30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100]},
-    {"key": "rangeCold", "label": "Range at 100%, cold", "type": "number", "unit": "km", "default": 40,
-     "steps": [20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80]},
-    {"key": "rangeHot", "label": "Range at 100%, above 25 °C", "type": "number", "unit": "km", "default": 50,
-     "steps": [30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100]},
-    {"key": "coldBelow", "label": "Cold below", "type": "number", "unit": "°C", "default": 10, "steps": [0, 3, 5, 8, 10, 12, 15]},
-    {"key": "hotAbove", "label": "Hot above", "type": "number", "unit": "°C", "default": 25, "steps": [20, 25, 28, 30, 35]},
-    {"key": "designKwh", "label": "Battery design capacity", "type": "number", "unit": "kWh", "default": 12,
-     "steps": [7.6, 9.2, 10.4, 11.2, 12, 14.1, 17.7, 19.4, 25.7, 42.2]},
-    {"key": "distUnit", "label": "Distance unit", "type": "choice", "default": "km", "options": [["km", "km"], ["mi", "miles"]]},
-    {"key": "tempUnit", "label": "Temperature unit", "type": "choice", "default": "c", "options": [["c", "°C"], ["f", "°F"]]},
-    {"key": "poll", "label": "Read charge every", "type": "number", "unit": "s", "default": 15, "steps": [5, 10, 15, 30, 60]},
-    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 2, "steps": [1, 2, 4]},
-    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
-     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
+    {
+      "key": "rangeMild",
+      "label": "Range at 100%, 10-25 °C",
+      "type": "number",
+      "unit": "km",
+      "default": 50,
+      "steps": [
+        30,
+        35,
+        40,
+        45,
+        50,
+        55,
+        60,
+        65,
+        70,
+        80,
+        90,
+        100
+      ]
+    },
+    {
+      "key": "rangeCold",
+      "label": "Range at 100%, cold",
+      "type": "number",
+      "unit": "km",
+      "default": 40,
+      "steps": [
+        20,
+        25,
+        30,
+        35,
+        40,
+        45,
+        50,
+        55,
+        60,
+        70,
+        80
+      ]
+    },
+    {
+      "key": "rangeHot",
+      "label": "Range at 100%, above 25 °C",
+      "type": "number",
+      "unit": "km",
+      "default": 50,
+      "steps": [
+        30,
+        35,
+        40,
+        45,
+        50,
+        55,
+        60,
+        65,
+        70,
+        80,
+        90,
+        100
+      ]
+    },
+    {
+      "key": "coldBelow",
+      "label": "Cold below",
+      "type": "number",
+      "unit": "°C",
+      "default": 10,
+      "steps": [
+        0,
+        3,
+        5,
+        8,
+        10,
+        12,
+        15
+      ]
+    },
+    {
+      "key": "hotAbove",
+      "label": "Hot above",
+      "type": "number",
+      "unit": "°C",
+      "default": 25,
+      "steps": [
+        20,
+        25,
+        28,
+        30,
+        35
+      ]
+    },
+    {
+      "key": "designKwh",
+      "label": "Battery design capacity",
+      "type": "number",
+      "unit": "kWh",
+      "default": 12,
+      "steps": [
+        7.6,
+        9.2,
+        10.4,
+        11.2,
+        12,
+        14.1,
+        17.7,
+        19.4,
+        25.7,
+        42.2
+      ]
+    },
+    {
+      "key": "distUnit",
+      "label": "Distance unit",
+      "type": "choice",
+      "default": "km",
+      "options": [
+        [
+          "km",
+          "km"
+        ],
+        [
+          "mi",
+          "miles"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature unit",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "°C"
+        ],
+        [
+          "f",
+          "°F"
+        ]
+      ]
+    },
+    {
+      "key": "poll",
+      "label": "Read charge every",
+      "type": "number",
+      "unit": "s",
+      "default": 15,
+      "steps": [
+        5,
+        10,
+        15,
+        30,
+        60
+      ]
+    },
+    {
+      "key": "fps",
+      "label": "Refresh rate",
+      "type": "number",
+      "unit": "fps",
+      "default": 2,
+      "steps": [
+        1,
+        2,
+        4
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "Demo data",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Always"
+        ],
+        [
+          "off",
+          "Never"
+        ]
+      ]
+    }
   ],
   "config": {
-    "comment": "HV battery values are read with UDS ReadDataByIdentifier (0x22) from the battery management unit (SME). Each value tries its DIDs in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong.",
+    "comment": "HV battery values and the 12 V voltage are read with UDS ReadDataByIdentifier (0x22). Each value tries its candidates in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). 'ecu' on a candidate overrides battery.ecu (decimal: 7 = SME battery unit, 18 = DME engine unit). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong. F442 is the standard OBD 'control module voltage' (terminal 30, i.e. the 12 V battery).",
     "battery": {
       "ecu": 7,
       "soc": [
-        {"did": "DDBC", "bytes": 2, "at": 0, "factor": 0.1, "offset": 0, "min": 0, "max": 100}
+        {
+          "did": "DDBC",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.1,
+          "offset": 0,
+          "min": 0,
+          "max": 100
+        }
       ],
       "soh": [
-        {"did": "DD7B", "bytes": 1, "at": 0, "factor": 1, "offset": 0, "min": 40, "max": 110},
-        {"did": "6335", "bytes": 1, "at": 0, "factor": 1, "offset": 0, "min": 40, "max": 110}
+        {
+          "did": "DD7B",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": 0,
+          "min": 40,
+          "max": 110
+        },
+        {
+          "did": "6335",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": 0,
+          "min": 40,
+          "max": 110
+        }
       ],
-      "sohEverySec": 300
+      "sohEverySec": 300,
+      "v12": [
+        {
+          "ecu": 18,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18
+        },
+        {
+          "ecu": 7,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18
+        }
+      ],
+      "chargeMinPct": 3
     },
     "scaling": {
-      "ambient": {"factor": 0.5, "offset": -40, "invalid": 255}
+      "ambient": {
+        "factor": 0.5,
+        "offset": -40,
+        "invalid": 255
+      }
     }
   }
 }

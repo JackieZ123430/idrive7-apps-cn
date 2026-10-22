@@ -40,6 +40,7 @@ class Diag extends EventEmitter {
         super();
         this.signals = signals; this.log = log;
         this.p = null; this.available = false; this.error = null;
+        this.quiet = false;           // true: don't log every request (apps that poll)
     }
 
     async init() {
@@ -68,7 +69,7 @@ class Diag extends EventEmitter {
     async send(target, sid, data) {
         if (!this.p) throw new Error(this.error || 'no diagnostic link');
         const d = data || [];
-        this.log.info('UDS -> ' + hex(target) + ': ' + hex(sid) + ' ' + d.map((x) => hex(x)).join(' '));
+        if (!this.quiet) this.log.info('UDS -> ' + hex(target) + ': ' + hex(sid) + ' ' + d.map((x) => hex(x)).join(' '));
         const r = await this.signals.call(this.p, 'sendTasuRequest', {
             sourceAddress: TESTER, targetAddress: target, serviceID: sid, subroutineID: 0,
             udsDataLength: d.length, udsData: Buffer.from(d), deadlockTime: 0,
