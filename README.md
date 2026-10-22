@@ -129,10 +129,14 @@ Car parked, ignition on, ideally with a battery charger connected. Pack the kit 
 over SSH:
 
 ```sh
-deploy/make-car-kit.sh                                    # -> dist/mgu-custom-apps(.tar.gz)
-HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh check     # read-only: checks the unit, lists what it would touch
-HU=root@<unit-ip> PORT=22 deploy/push-to-car.sh install   # backup -> install -> restart the app platform
+deploy/make-car-kit.sh                                                  # -> dist/mgu-custom-apps(.tar.gz)
+HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh check    # read-only: checks the unit, lists what it would touch
+HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh install  # backup -> install -> restart the app platform
+HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh restore  # undo: back to the backup
 ```
+
+`KEY` is the SSH private key for the unit (`chmod 600` it). Every command needs it, unless
+the key is already in your `~/.ssh/config` or ssh-agent.
 
 No network? Copy `dist/mgu-custom-apps/` to a USB stick and on the unit run
 `sh deploy-car.sh check`, then `sh deploy-car.sh install`.
@@ -433,7 +437,7 @@ switches to the simulated drive when no car data arrives for 5 s.
 ```sh
 python3 kit/tools/build.py boost
 node kit/tools/preview.js dist/boost out wait=8 BTN_RESET render --set theme=ice
-deploy/make-car-kit.sh boost && HU=root@<unit> deploy/push-to-car.sh install
+deploy/make-car-kit.sh boost && HU=root@<unit> KEY=~/.ssh/id_mgu deploy/push-to-car.sh install
 ```
 
 `preview.js` runs the built app on your PC with a stubbed head unit and demo data, and saves
