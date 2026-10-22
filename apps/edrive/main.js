@@ -390,7 +390,7 @@ mgu.run({
             cv.text('%', bx + 32 + hw, 178, 32, t.dim, { font: 'bold' });
             cv.text(G.isNum(soh) ? 'of the capacity it had new' : 'not readable - see Diagnostics', bx + 24, 214, 20, t.dim);
             G.bar(cv, t, bx + 24, 227, bw - 48, 68, {
-                label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh,
+                label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh, ramp: 'hot',     // tach colours; amber / red when worn
                 zones: [{ from: 0, to: kwh * 0.7, color: 'crit' }, { from: kwh * 0.7, to: kwh * 0.8, color: 'warn' }],
             });
             cv.text('of ' + kwh + ' kWh new', bx + bw - 24, 323, 18, t.dim, { align: 'right' });

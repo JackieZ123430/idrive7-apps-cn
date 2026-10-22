@@ -63,7 +63,7 @@ mgu.run({
         };
 
         /* ---------- live data ---------- */
-        const live = {}, peak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [] };
+        const live = {}, peak = {}, demoPeak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [] };
 
         // xDrive card: 'auto' shows it once the car has reported all-wheel drive (remembered),
         // so rear-wheel-drive cars never see an empty card
@@ -251,17 +251,20 @@ mgu.run({
             const red = settings.get('redline');
             const max = Math.ceil((red + 1000) / 1000) * 1000;
             const showPk = settings.get('peaks');
+            // demo data keeps its own peaks, so they never mix with the car's
+            const pk = usingDemo() ? demoPeak : peak;
+            if (usingDemo()) ['rpm', 'boost', 'torque'].forEach((k) => { if (G.isNum(d[k]) && !(pk[k] >= d[k])) pk[k] = d[k]; });
             // rpm + boost as tach bars (Redline style): theme colour -> red at the redline / warning zone
             G.segBar(cv, t, 24, G.TOP, 1062, 226, {
                 label: 'Engine speed', value: d.rpm, unit: 'rpm', decimals: 0, min: 0, max, step: 500,
                 scale: { every: 1000, div: 1000 }, ramp: 'hot', limit: red, marks: [{ value: red, color: 'crit' }],
-                peak: showPk ? peak.rpm : null,
+                peak: showPk ? pk.rpm : null,
             });
             const psi = settings.get('pressUnit') === 'psi', pmax = psi ? 36 : 2.5;
             G.segBar(cv, t, 24, G.TOP + 242, 1062, 226, {
                 label: 'Boost', value: P(d.boost), unit: settings.get('pressUnit'), decimals: psi ? 1 : 2, min: 0, max: pmax,
                 step: psi ? 2 : 0.125, scale: { every: psi ? 6 : 0.5, decimals: psi ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
-                marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(peak.boost) : null,
+                marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(pk.boost) : null,
             });
             const x = 1110, w = 466;
             G.panel(cv, t, x, G.TOP, w, 190, 'Speed');
@@ -280,10 +283,10 @@ mgu.run({
             const pw = power(d), powMax = PW(settings.get('maxPower'));
             if (G.isNum(pw.kw)) peakPower = Math.max(peakPower || 0, pw.kw);
             G.bar(cv, t, x, 272, w, 92, {
-                label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax,
+                label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax, niceMax: true, ramp: 'hot',
                 peak: showPk && G.isNum(peakPower) ? PW(peakPower) : null,
             });
-            G.bar(cv, t, x, 404, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, peak: showPk ? peak.torque : null });
+            G.bar(cv, t, x, 404, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, niceMax: true, ramp: 'hot', peak: showPk ? pk.torque : null });
         }
 
         function drawThermal(cv, t, d) {
@@ -353,8 +356,8 @@ mgu.run({
                 cv.text(mode, ax + 24, 160, 52, hot ? t.crit : t.text, { font: 'bold' });
                 if (hot) cv.text('DERATED / OFF', ax + 24, 196, 22, t.crit, { font: 'bold', spacing: 1.5 });
                 const rear = d.splitRear;
-                G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%' });
-                G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%' });
+                G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
+                G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
             }
         }
 
@@ -401,7 +404,7 @@ mgu.run({
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
         ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
-        ui.onClick('BTN_PEAKS', () => { Object.keys(peak).forEach((k) => delete peak[k]); peakPower = null; trail.length = 0; return render(); });
+        ui.onClick('BTN_PEAKS', () => { [peak, demoPeak].forEach((o) => Object.keys(o).forEach((k) => delete o[k])); peakPower = null; trail.length = 0; return render(); });
         let loop = ctx.loop('MAIN', settings.get('fps'), render);
         settings.onChange((k) => {
             if (k === 'maxPower' || k === 'powerSource') peakPower = null;

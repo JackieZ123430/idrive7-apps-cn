@@ -134,12 +134,10 @@ mgu.run({
             cv.text('g', 680 + cw, 199, 36, t.dim);
             const bars = [['LATERAL', G.isNum(cur.lat) ? Math.abs(cur.lat) : null, G.isNum(cur.lat) ? (cur.lat >= 0 ? 'L' : 'R') : ''],
                 ['LONGITUDINAL', G.isNum(cur.long) ? Math.abs(cur.long) : null, G.isNum(cur.long) ? (cur.long >= 0 ? 'ACC' : 'BRK') : '']];
+            // OEM-style bars; the hang is this session's peak on the side it is pulling to now
+            const pk = [cur.lat >= 0 ? S.peak.left : S.peak.right, cur.long >= 0 ? S.peak.acc : S.peak.brk];
             bars.forEach(([l, v, side], i) => {
-                const y = 261 + i * 98;
-                cv.text(l + '  ' + side, 672, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
-                cv.text(G.fmt(v, 2), 1044, y + 4, 40, G.isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
-                cv.roundRect(672, y + 20, 372, 16, 8, t.track);
-                if (G.isNum(v)) cv.roundRect(672, y + 20, Math.max(16, 372 * G.clamp(v / settings.get('scale'), 0, 1)), 16, 8, i ? t.accent : t.accent2);
+                G.bar(cv, t, 672, 235 + i * 98, 372, 92, { label: l + '  ' + side, value: v, decimals: 2, max: settings.get('scale'), ramp: 'hot', peak: pk[i] });
             });
             const d = car.data();
             cv.text(G.fmt(V(d.speed), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });

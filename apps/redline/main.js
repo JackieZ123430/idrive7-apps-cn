@@ -187,8 +187,8 @@ mgu.run({
 
             // ---- rev bar: left to right; theme colour -> red at the shift point, solid red above.
             // Each 500 rpm segment takes the colour of its position (stepped like the G20).
+            const hot = t.hotRamp || t.ramp;
             if (G.isNum(rpm) && rpm > 50) {
-                const hot = t.hotRamp || t.ramp;
                 const colOf = (r) => (shiftNow ? '#ff2a2a' : ramp(hot, G.clamp(r / sp.rpm, 0, 1)));
                 band(cv, 0, rpm, withAlpha(colOf(rpm), 0.14), 7);                               // glow
                 for (let r = 0; r < rpm; r += 500) band(cv, r, Math.min(rpm, r + 500), colOf(r + 250));
@@ -196,7 +196,12 @@ mgu.run({
                 const x = BAR.x0 + barX(rpm);
                 cv.line(x, BAR.y1 + 4, x + BAR.slant, BAR.y0 - 4, 6, '#ffffff');               // bright leading edge
             }
-            if (peakRpm > 0) { const x = BAR.x0 + barX(peakRpm) + BAR.slant; cv.fillRect(x - 1.5, BAR.y0 - 22, 3, 16, t.accent2); }
+            // peak: a slanted line across the bar at the highest rpm (no line along the top on the tach)
+            if (peakRpm > 0 && !(G.isNum(rpm) && rpm >= peakRpm)) {
+                const pk = Math.min(peakRpm, maxRpm()), px = BAR.x0 + barX(pk);
+                const pc = t.hang || (pk >= sp.rpm ? '#ff2a2a' : ramp(hot, G.clamp(pk / sp.rpm, 0, 1)));
+                cv.line(px + BAR.slant, BAR.y0, px, BAR.y1, 3, pc);
+            }
 
             // ---- centre: digital rpm above the bar, gear below it
             const rw = cv.text(G.isNum(rpm) ? String(Math.round(rpm / 10) * 10) : '----', GX - 30, 198, 80, G.isNum(rpm) ? (shiftNow ? '#ff4a4a' : t.text) : t.dim, { align: 'center', font: 'num' });

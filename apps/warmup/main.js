@@ -102,16 +102,16 @@ mgu.run({
 
         /* ---------- drawing ---------- */
         /**
-         * Temperature as a tach bar (Redline style), 0-150 deg C in 10 deg segments: oil in the theme's
-         * oil colour throughout (cold only tints the track), coolant blue while cold; warn / crit
-         * zones when hot; green mark where it counts as warm.
+         * Temperature as a tach bar (Redline style), 0-150 deg C in 10 deg segments in the tach colours
+         * (blue -> purple -> red at 120 deg C, solid red above); cold / warn / crit zones tint the
+         * track, green mark where it counts as warm.
          */
-        function gauge(cv, t, y, val, label, warm, oil) {
+        function gauge(cv, t, y, val, label, warm) {
             const st = F() ? 18 : 10;
             G.segBar(cv, t, 24, y, 880, 225, {
                 label, value: T(val), unit: tU(), decimals: 0, min: T(0), max: T(150), step: st, scale: { every: st * 2.5 },
-                zones: [{ from: T(-50), to: T(warm - 0.01), color: 'cold', tintOnly: !!oil }, { from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(160), color: 'crit' }],
-                color: oil ? 'oil' : undefined, marks: [{ value: T(warm), color: GO }],
+                zones: [{ from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(160), color: 'crit' }],
+                ramp: 'hot', limit: T(120), marks: [{ value: T(warm), color: GO }],
             });
         }
 
@@ -137,7 +137,7 @@ mgu.run({
             const t = ctx.theme(), d = car.data(), now = Date.now();
             const cv = new Canvas(W, H).clear(t.bg);
             const warm = settings.get('warmOil'), warmC = settings.get('warmCoolant');
-            gauge(cv, t, G.TOP, d.oil, 'Oil', warm, true);
+            gauge(cv, t, G.TOP, d.oil, 'Oil', warm);
             gauge(cv, t, G.TOP + 242, d.coolant, 'Coolant', warmC);
 
             // ---- status panel
