@@ -78,8 +78,8 @@ mgu.run({
             live[k] = v; lastCar = Date.now();
             if (peak[k] === undefined || v > peak[k]) peak[k] = v;
             if (k === 'rpm' || k === 'torque') {
-                // crankshaft power from torque x speed (engine only; electric motor not included)
-                if (G.isNum(live.torque) && G.isNum(live.rpm)) put('powerKw', Math.max(0, live.torque * live.rpm / 9549));
+                // fallback when the car sends no sport-display power: crankshaft torque x speed (engine only)
+                if (G.isNum(live.torque) && G.isNum(live.rpm)) live.powerCalc = Math.max(0, live.torque * live.rpm / 9549);
             }
             if ((k === 'rpm' || k === 'speed') && G.isNum(live.rpm) && G.isNum(live.speed)) {
                 const g = guess.feed(live.rpm, live.speed);
@@ -98,7 +98,8 @@ mgu.run({
             ['de.bmw.infotainment.vehicle.Vehicle2', { statusCarSpeed2: (v) => put('speed', sc('speed', v.speedVehicleCentreOfGravity)) }],
             ['de.bmw.infotainment.drivingexcitement.FES', {
                 statusSwitchDriveDynamicSport2: (v) => put('boost', sc('boost', v.displayBoostPressure)),
-                statusVehicleDynamicEngine: (v) => { put('powerPct', v.displaySportEnginePower); put('torquePct', v.displaySportEngineTorque); },
+                // the HMI's sport display: power / torque in % of the car's maximum
+                statusVehicleDynamicEngine: (v) => { put('powerPct', sc('sportPct', v.displaySportEnginePower)); put('torquePct', sc('sportPct', v.displaySportEngineTorque)); },
                 statusActualValueTorque2: (v) => put('torque', sc('torque', v.actualValueTorqueCrankshaft)),
             }],
             ['de.bmw.infrastructure.VehicleInformation', {
@@ -180,6 +181,16 @@ mgu.run({
             }
         }
 
+        /** Power in kW: { kw, calc } (calc = estimated from torque x rpm, no sport-display data). */
+        let peakPower = null;
+        function power(d) {
+            const useSport = settings.get('powerSource') !== 'calc' && G.isNum(d.powerPct);
+            if (useSport) return { kw: d.powerPct / 100 * settings.get('maxPower'), calc: false };
+            return { kw: G.isNum(d.powerCalc) ? d.powerCalc : null, calc: true };
+        }
+        const PW = (kw) => (G.isNum(kw) ? kw * ({ kw: 1, hp: 1.34102, ps: 1.35962 }[settings.get('powerUnit')] || 1) : null);
+        const pwU = () => ({ kw: 'kW', hp: 'hp', ps: 'PS' }[settings.get('powerUnit')] || 'kW');
+
         /** { letter, num, est } for the gear readout, or null without any gear information. */
         function gearText(d) {
             let g = d.gear, est = false;
@@ -217,8 +228,14 @@ mgu.run({
                 cv.text(gr.letter, x + w - 28 - nw, 214, 120, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
                 if (gr.est) cv.text('EST.', x + w - 24, 104, 16, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
             }
-            const pmaxKw = settings.get('maxPower');
-            G.bar(cv, t, x, 262, w, 92, { label: 'Engine power', value: d.powerKw, unit: 'kW', max: pmaxKw, zones: [{ from: pmaxKw * 0.9, to: pmaxKw * 2, color: 'crit' }], peak: showPk ? peak.powerKw : null });
+            // power: the sport display's % x your car's max power (tuned cars: set the tuned max);
+            // without sport-display data, torque x rpm. Shown in kW, hp or PS.
+            const pw = power(d), powMax = PW(settings.get('maxPower'));
+            if (G.isNum(pw.kw)) peakPower = Math.max(peakPower || 0, pw.kw);
+            G.bar(cv, t, x, 262, w, 92, {
+                label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax,
+                zones: [{ from: powMax * 0.9, to: powMax * 3, color: 'crit' }], peak: showPk && G.isNum(peakPower) ? PW(peakPower) : null,
+            });
             G.bar(cv, t, x, 380, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, peak: showPk ? peak.torque : null });
         }
 
@@ -305,9 +322,10 @@ mgu.run({
         }
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
-        ui.onClick('BTN_PEAKS', () => { Object.keys(peak).forEach((k) => delete peak[k]); trail.length = 0; return render(); });
+        ui.onClick('BTN_PEAKS', () => { Object.keys(peak).forEach((k) => delete peak[k]); peakPower = null; trail.length = 0; return render(); });
         let loop = ctx.loop('MAIN', settings.get('fps'), render);
         settings.onChange((k) => {
+            if (k === 'maxPower' || k === 'powerSource') peakPower = null;
             if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
             if (k === 'page') page = Math.max(0, PAGES.indexOf(settings.get('page')));
         });

@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH), design capacity left, last charge, charge log and 12 V battery voltage",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -131,25 +131,58 @@
     },
     {
       "key": "price",
-      "label": "Electricity price (charge log)",
+      "label": "Electricity price (tap: up)",
       "type": "number",
       "unit": "€/kWh",
-      "default": 0.27,
+      "default": 0.25,
       "steps": [
         0,
+        0.05,
         0.1,
         0.12,
         0.15,
+        0.16,
+        0.17,
         0.18,
+        0.19,
         0.2,
+        0.21,
         0.22,
+        0.23,
+        0.24,
         0.25,
+        0.26,
         0.27,
+        0.28,
+        0.29,
         0.3,
+        0.31,
+        0.32,
+        0.33,
+        0.34,
         0.35,
+        0.36,
+        0.37,
+        0.38,
+        0.39,
         0.4,
+        0.45,
         0.5,
-        0.6
+        0.55,
+        0.6,
+        0.7
+      ]
+    },
+    {
+      "key": "priceDown",
+      "label": "Electricity price (tap: down)",
+      "type": "choice",
+      "default": "tap",
+      "options": [
+        [
+          "tap",
+          "lower 1 step"
+        ]
       ]
     },
     {

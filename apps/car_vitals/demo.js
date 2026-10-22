@@ -12,7 +12,7 @@ class Demo {
         const warm = Math.min(1, t / 240);
         const torque = Math.round(120 + pull * 640);
         return {
-            rpm, powerKw: torque * rpm / 9549, speed: 40 + pull * 160 + 10 * Math.sin(t / 5), boost: Math.max(0, pull * 1.7 - 0.15 + 0.05 * Math.sin(t * 3)),
+            rpm, powerCalc: torque * rpm / 9549, speed: 40 + pull * 160 + 10 * Math.sin(t / 5), boost: Math.max(0, pull * 1.7 - 0.15 + 0.05 * Math.sin(t * 3)),
             powerPct: Math.round(pull * 100), torquePct: Math.round(pull * 92), torque,
             coolant: 70 + 22 * warm + 2 * Math.sin(t / 40), oil: 60 + 50 * warm + 6 * pull, gearbox: 45 + 40 * warm + 3 * pull,
             ambient: 17.5 + 0.5 * Math.sin(t / 90),
