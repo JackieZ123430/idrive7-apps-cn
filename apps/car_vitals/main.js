@@ -19,7 +19,7 @@ const mgu = require('./kit/mgu');
 const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Demo = require('./demo');
-const { GearGuess } = require('./kit/car');
+const { GearGuess, selectionOf } = require('./kit/car');
 const { Diag } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
 
@@ -153,7 +153,8 @@ mgu.run({
             }
             if ((k === 'rpm' || k === 'speed') && G.isNum(live.rpm) && G.isNum(live.speed)) {
                 const g = guess.feed(live.rpm, live.speed);
-                live.gearGuess = live.speed < 3 ? 0 : g;
+                // nothing at a standstill: the guess can't tell P, N or D there (it showed "N" in park / in D)
+                live.gearGuess = live.speed < 3 ? null : g;
             }
         };
         const watches = [
@@ -182,6 +183,14 @@ mgu.run({
                     const key = JSON.stringify(Object.keys(v || {}).filter((x) => x !== 'statusActualGearDrive').map((x) => [x, v[x]]));
                     if (key !== lastModeKey && gearLogs < 40) { gearLogs++; lastModeKey = key; log.info('gearbox: ' + JSON.stringify(v) + ' -> ' + (live.gearMode || '?')); }
                 },
+                // this car never sent statusGearboxDrive (2.8.0 logs): P / R / N / gear from here too
+                DataPowerTrain2: (v) => {
+                    logRaw('gear selection', v && v.statusGearSelectionDrive);
+                    const sel = selectionOf(v && v.statusGearSelectionDrive);
+                    if (!sel) return;
+                    if (sel.stage !== undefined) live.stage = sel.stage;
+                    live.gear = sel.gear; lastCar = Date.now();
+                },
             }],
             ['de.bmw.infrastructure.analytics.BasicDataSet', {
                 basicDataSet: (v) => {
@@ -199,7 +208,7 @@ mgu.run({
                     put('tFL', sc('tyreTemp', v.actualValueTemperatureTyreFLH)); put('tFR', sc('tyreTemp', v.actualValueTemperatureTyreFRH));
                     put('tRL', sc('tyreTemp', v.actualValueTemperatureTyreRLH)); put('tRR', sc('tyreTemp', v.actualValueTemperatureTyreRRH));
                 },
-                // kPa = 0.1 x raw, >= 65532 invalid (BMW x_call's converter); stored in bar
+                // bar = 0.1 x raw, >= 65532 invalid (BMW x_call's converter)
                 statusTyrePressure: (v) => {
                     logRaw('tyre pressure', [v.actualValuePressureTyreFLH, v.actualValuePressureTyreFRH, v.actualValuePressureTyreRLH, v.actualValuePressureTyreRRH]);
                     put('pFL', sc('tyrePress', v.actualValuePressureTyreFLH)); put('pFR', sc('tyrePress', v.actualValuePressureTyreFRH));

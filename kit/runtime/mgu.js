@@ -255,7 +255,7 @@ async function runInner(impl) {
         theme: () => themes.theme(settings.get('theme')),
         /** Run fn about `fps` times a second while screen `stateName` is visible. */
         loop(stateName, fps, fn) {
-            let timer = null, running = false, frames = 0;
+            let timer = null, running = false, frames = 0, spent = 0;
             const tick = async () => {
                 if (running) return;
                 running = true;
@@ -266,6 +266,9 @@ async function runInner(impl) {
                 if (++frames % 3 === 0 && typeof global.gc === 'function') { try { global.gc(); } catch (e) { /* ignore */ } }
                 running = false;
                 const dt = Date.now() - t0;
+                // what a frame really costs on the unit (draw + PNG + HMI), to tune the refresh rate by
+                spent += dt;
+                if (frames % 100 === 0) { log.info('loop ' + stateName + ': ' + Math.round(spent / 100) + ' ms per frame (asked for ' + fps + ' fps)'); spent = 0; }
                 // at least 15 ms between frames so car data and HMI events get handled
                 if (timer !== null) timer = setTimeout(tick, Math.max(15, 1000 / fps - dt));
             };

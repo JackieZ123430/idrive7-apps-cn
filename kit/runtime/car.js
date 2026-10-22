@@ -29,6 +29,20 @@ const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x ==
 // the gear field alone can't tell P from N (both N_OR_P)
 const STAGES = { P: 'P', R: 'R', N: 'N', D: 'D', 1: 'P', 2: 'R', 3: 'N', 4: 'D' };
 const stageOf = (x) => STAGES[x];
+/**
+ * DataPowerTrain2.statusGearSelectionDrive: P / R / N and the engaged gear in one enum, names or
+ * wire numbers (N = 1, R = 2, P = 3, NP = 4, _1 = 5 ... _9 = 13) -> { stage, gear } or undefined.
+ * Some cars never send statusGearboxDrive; this field comes in another event group.
+ */
+function selectionOf(x) {
+    const n = typeof x === 'number' ? x : { N: 1, R: 2, P: 3, NP: 4 }[x] || (/^_\d$/.test(String(x)) ? 4 + Number(String(x).slice(1)) : undefined);
+    if (n === 1) return { stage: 'N', gear: 0 };
+    if (n === 2) return { stage: 'R', gear: -1 };
+    if (n === 3) return { stage: 'P', gear: 0 };
+    if (n === 4) return { stage: undefined, gear: 0 };              // N or P, not told apart
+    if (n >= 5 && n <= 13) return { stage: 'D', gear: n - 4 };
+    return undefined;                                               // initialising / invalid
+}
 
 // app.json "signals" entries per group (copy into the app)
 const SIGNALS = {
@@ -36,7 +50,7 @@ const SIGNALS = {
     temps: ['de.bmw.infotainment.vehicle.CDS', 'statusEngineTemperature'],
     speed: ['de.bmw.infotainment.vehicle.Vehicle2', 'statusCarSpeed2'],
     accel: ['de.bmw.infotainment.vehicle.CDS2', 'statusLongitudinalAccelerationMassCenter', 'statusLateralAccelerationMassCenter'],
-    gear: ['de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive'],
+    gear: ['de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive', 'DataPowerTrain2'],
     torque: ['de.bmw.infotainment.drivingexcitement.FES', 'statusActualValueTorque2'],
 };
 
@@ -74,7 +88,9 @@ class Car {
         const put = (k, v, tick) => {
             if (v === null || v === undefined || (typeof v === 'number' && !isFinite(v))) return;
             this.live[k] = v; this.lastCar = Date.now();
-            if (k === 'rpm' || k === 'speed') { const g = this.guess.feed(this.live.rpm, this.live.speed); if (g !== null || this.live.speed < 3) this.guessed = this.live.speed < 3 ? 0 : g; }
+            // learned gear while driving; nothing at a standstill - the guess can't tell P, N or D
+            // there, and "N" shown in park or in D was wrong
+            if (k === 'rpm' || k === 'speed') { const g = this.guess.feed(this.live.rpm, this.live.speed); if (g !== null || this.live.speed < 3) this.guessed = this.live.speed < 3 ? undefined : g; }
             if (tick && !this.demoActive) this._emit(this.live, this.lastCar);
         };
         const watches = {};
@@ -86,11 +102,21 @@ class Car {
             add('de.bmw.infotainment.vehicle.CDS2', 'statusLongitudinalAccelerationMassCenter', (v) => { const a = sc('accel', v.longitudinalAccelerationCentreOfGravity); put('gLong', a === null ? null : a / 9.80665, true); });
             add('de.bmw.infotainment.vehicle.CDS2', 'statusLateralAccelerationMassCenter', (v) => { const a = sc('accel', v.lateralAccelerationCentreOfGravity); put('gLat', a === null ? null : a / 9.80665); });
         }
-        if (groups.includes('gear')) add('de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive', (v) => {
-            const g = gearOf(v.statusActualGearDrive), s = stageOf(v.statusActualStageDrive);
-            if (s !== undefined) put('stage', s);
-            if (g !== undefined) put('gear', g);
-        });
+        if (groups.includes('gear')) {
+            add('de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive', (v) => {
+                const g = gearOf(v.statusActualGearDrive), s = stageOf(v.statusActualStageDrive);
+                if (s !== undefined) put('stage', s);
+                if (g !== undefined) put('gear', g);
+            });
+            const selSeen = [];
+            add('de.bmw.infrastructure.VehicleInformation', 'DataPowerTrain2', (v) => {
+                const raw = v && v.statusGearSelectionDrive, sel = selectionOf(raw);
+                if (selSeen.length < 12 && selSeen.indexOf(String(raw)) < 0) { selSeen.push(String(raw)); this.log.info('gear selection: ' + JSON.stringify(raw)); }
+                if (!sel) return;
+                if (sel.stage !== undefined) put('stage', sel.stage);
+                put('gear', sel.gear);
+            });
+        }
         if (groups.includes('torque')) add('de.bmw.infotainment.drivingexcitement.FES', 'statusActualValueTorque2', (v) => put('torque', sc('torque', v.actualValueTorqueCrankshaft)));
         // a parked car sends nothing new for minutes (fields are notified on change), so "no data for
         // a while" doesn't mean "no car": once a signal's provider is there, stay on live data
@@ -142,4 +168,5 @@ class Car {
 
 Car.SIGNALS = SIGNALS;
 Car.GearGuess = GearGuess;
+Car.selectionOf = selectionOf;
 module.exports = Car;

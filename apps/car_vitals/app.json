@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel pressure, tyre and chassis gauges",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -39,7 +39,8 @@
       "statusMSystem": "rs"
     },
     "de.bmw.infrastructure.VehicleInformation": {
-      "statusGearboxDrive": "s"
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
     },
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
@@ -504,10 +505,10 @@
         "note": "12 bit, 0.5 Nm per bit, 0 Nm at raw 2047 (negative = engine braking), 4095 = no value. With factor 1 a running engine read as ~2047 Nm."
       },
       "tyreTemp": {
-        "factor": 0.1,
-        "offset": -273.15,
+        "factor": 1,
+        "offset": -40,
         "invalid": 65535,
-        "note": "UInt16; assumed deci-Kelvin - calibrate. Values outside -40..150 deg C are shown as no data; the raw values go to the log ('raw tyre temperature')"
+        "note": "deg C + 40: a G05 PHEV sent raw 53-57 on a ~10 deg C day (2.8.0 log), not deci-Kelvin. Values outside -40..150 deg C are shown as no data; the raw values go to the log ('raw tyre temperature')"
       },
       "torqueSplitRear": {
         "factor": 0.01,
@@ -515,10 +516,10 @@
         "invalid": 65535
       },
       "tyrePress": {
-        "factor": 0.001,
+        "factor": 0.1,
         "offset": 0,
         "invalidFrom": 65532,
-        "note": "raw*0.1 = kPa (BMW x_call); stored in bar"
+        "note": "0.1 bar per bit (BMW x_call: raw * 0.1, valid up to 530; a car sent raw 22-25 = 2.2-2.5 bar). Read as 0.1 kPa before, every tyre came out at 0.02 bar and was hidden."
       },
       "sportPct": {
         "factor": 1,
