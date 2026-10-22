@@ -19,7 +19,7 @@ const mgu = require('./kit/mgu');
 const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Demo = require('./demo');
-const { GearGuess } = require('./kit/car');
+const { GearGuess, selectionOf } = require('./kit/car');
 const { Diag } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
 
@@ -27,9 +27,36 @@ const W = 1600, H = 520;
 const PAGES = ['engine', 'thermal', 'fuel', 'chassis'];
 const FUEL = ['iat', 'hpfp', 'lpfp'];
 const HIST_SEC = 300;
+/*
+ * Plausible ranges (deg C / bar). A value outside is the car's "no data" marker or a field this
+ * car fills differently (a tyre at 255 deg C, a pressure of 0): shown as no data, never drawn.
+ */
+const TYRE_T = [-40, 150], TYRE_P = [0.5, 6], TYRE_PT = [1, 6];
+const RANGE = {
+    rpm: [0, 12000], coolant: [-40, 160], oil: [-40, 170], gearbox: [-40, 160], ambient: [-50, 60],
+    boostFes: [-1, 4], boostDme: [-1, 4], tFL: TYRE_T, tFR: TYRE_T, tRL: TYRE_T, tRR: TYRE_T,
+    pFL: TYRE_P, pFR: TYRE_P, pRL: TYRE_P, pRR: TYRE_P, ptFL: TYRE_PT, ptFR: TYRE_PT, ptRL: TYRE_PT, ptRR: TYRE_PT,
+};
+/*
+ * Fields some cars never fill sit at one number (gearbox oil at 0 deg C): they only count once
+ * they have changed by this much. Once seen working the car is remembered (seen.json), so the
+ * next start shows them straight away.
+ */
+// (tyre temperatures are not doubtful any more: with the right scaling a car's "no data" is 65535)
+const MOVE = { gearbox: 1, boostFes: 0.03, boostDme: 0.03 };
+/** Remembered per car: which groups sent real data (the "Auto" setting shows only those). */
+const GROUP = { gearbox: 'gearbox', boostFes: 'boost', boostDme: 'boost', tFL: 'tyreTemp', tFR: 'tyreTemp', tRL: 'tyreTemp', tRR: 'tyreTemp',
+    pFL: 'tyres', pFR: 'tyres', pRL: 'tyres', pRR: 'tyres' };
+/** "Auto / Show / Hide" setting of each group. */
+const SHOW = { boost: 'showBoost', gearbox: 'showGearbox', tyres: 'showTyres', tyreTemp: 'showTyreTemp' };
+const TYRES = ['FL', 'FR', 'RL', 'RR'];
 // gearbox enum: names or wire numbers (G1 = 3 ... G10 = 12, R = 1, N_OR_P = 2), as in kit/car.js
 const GEARS = { G1: 1, G2: 2, G3: 3, G4: 4, G5: 5, G6: 6, G7: 7, G8: 8, G9: 9, G10: 10, R: -1, N_OR_P: 0 };
 const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x === 1 ? -1 : x === 2 ? 0 : undefined) : GEARS[x]);
+// selector position (statusActualStageDrive), names or wire numbers (P = 1, R = 2, N = 3, D = 4), as in kit/car.js
+const STAGES = { P: 'P', R: 'R', N: 'N', D: 'D', 1: 'P', 2: 'R', 3: 'N', 4: 'D' };
+// MDrive.dataDisplayGearbox: the programme the cluster shows next to the gear (names or wire numbers)
+const PROGRAMS = { S_MINUS_PROGRAMM: 'S', M_MINUS_PROGRAMM: 'M', 1: 'S', 2: 'M' };
 
 /**
  * Selector programme (D / S / M / P / R / N) from the gearbox status. Field names differ
@@ -37,7 +64,7 @@ const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x ==
  */
 function modeOf(o) {
     for (const k of Object.keys(o || {})) {
-        if (k === 'statusActualGearDrive' || !/select|lever|position|program|mode|range|manual|sport|tip/i.test(k)) continue;
+        if (k === 'statusActualGearDrive' || /StageDrive/.test(k) || !/select|lever|position|program|mode|range|manual|sport|tip/i.test(k)) continue;
         const v = o[k];
         if (v === true || v === 1) { if (/manual|tip/i.test(k)) return 'M'; if (/sport/i.test(k)) return 'S'; continue; }
         const x = String(v).toUpperCase();
@@ -63,7 +90,18 @@ mgu.run({
         };
 
         /* ---------- live data ---------- */
-        const live = {}, peak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [] };
+        const live = {}, peak = {}, demoPeak = {}, hist = { coolant: [], oil: [], gearbox: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [] };
+        /*
+         * Peak hold: a peak follows new highs, and "peakHold" s after it was last raised it drops back
+         * to the current value (0 = until "Reset peaks"). Called per sample and per frame, so it also
+         * drops while the car sends nothing new.
+         */
+        const peakAt = new Map();
+        const raise = (o, k, v) => {
+            if (!G.isNum(v)) return;
+            const at = peakAt.get(o) || peakAt.set(o, {}).get(o), now = Date.now(), hold = settings.get('peakHold') * 1000;
+            if (o[k] === undefined || v >= o[k] || (hold > 0 && now - (at[k] || 0) > hold)) { o[k] = v; at[k] = now; }
+        };
 
         // xDrive card: 'auto' shows it once the car has reported all-wheel drive (remembered),
         // so rear-wheel-drive cars never see an empty card
@@ -75,26 +113,62 @@ mgu.run({
             awdSeen = true; log.info('all-wheel drive detected');
             try { fs.writeFileSync(AWD_FILE, JSON.stringify({ seen: true })); } catch (e) { log.warn('awd save: ' + e); }
         };
-        let lastCar = 0;
+        // which groups / sources this car has sent real data for (see MOVE, GROUP)
+        const SEEN_FILE = path.join(ctx.dataDir, 'seen.json');
+        let seen = {};
+        try { seen = JSON.parse(fs.readFileSync(SEEN_FILE, 'utf8')) || {}; } catch (e) { /* not yet */ }
+        const remember = (keys) => {
+            const add = keys.filter((x) => x && !seen[x]);
+            if (!add.length) return;
+            add.forEach((x) => { seen[x] = true; });
+            log.info('real data from the car: ' + add.join(', '));
+            try { fs.writeFileSync(SEEN_FILE, JSON.stringify(seen)); } catch (e) { log.warn('seen save: ' + e); }
+        };
+        const bad = {}, first = {}, moved = {};
+        /** A MOVE value counts once it changed this session or the car is known to send it. */
+        const trusted = (k) => MOVE[k] == null || !!moved[k] || !!seen[k] || (/^t(FL|FR|RL|RR)$/.test(k) && !!seen.tyreTemp);
+        /** The first raw values of the doubtful fields go to the log, to calibrate app.json from. */
+        const rawLogged = {};
+        const logRaw = (name, raw) => {
+            const key = JSON.stringify(raw), l = rawLogged[name] || (rawLogged[name] = []);
+            if (l.length >= 12 || l.indexOf(key) >= 0) return;
+            l.push(key); log.info('raw ' + name + ': ' + key);
+        };
+        let lastCar = 0, oilCarT = 0;          // oilCarT: last valid oil temperature from the car's own signal
         const guess = new GearGuess();
         let gearLogs = 0, lastModeKey = '';
         const put = (k, v) => {
             if (v === null || v === undefined || !isFinite(v)) return;
-            live[k] = v; lastCar = Date.now();
-            if (peak[k] === undefined || v > peak[k]) peak[k] = v;
+            lastCar = Date.now();
+            const r = RANGE[k];
+            if (r && (v < r[0] || v > r[1])) { bad[k] = v; return; }
+            delete bad[k];
+            if (MOVE[k] != null) {
+                if (first[k] === undefined) first[k] = v;
+                else if (!moved[k] && Math.abs(v - first[k]) >= MOVE[k]) { moved[k] = true; remember([GROUP[k], k]); }
+            } else if (GROUP[k]) remember([GROUP[k]]);
+            live[k] = v;
+            if (k === 'boostFes' || k === 'boostDme') { updBoost(); return; }
+            raise(peak, k, v);
             if (k === 'rpm' || k === 'torque') {
                 // fallback when the car sends no sport-display power: crankshaft torque x speed (engine only)
                 if (G.isNum(live.torque) && G.isNum(live.rpm)) live.powerCalc = Math.max(0, live.torque * live.rpm / 9549);
             }
             if ((k === 'rpm' || k === 'speed') && G.isNum(live.rpm) && G.isNum(live.speed)) {
                 const g = guess.feed(live.rpm, live.speed);
-                live.gearGuess = live.speed < 3 ? 0 : g;
+                // nothing at a standstill: the guess can't tell P, N or D there (it showed "N" in park / in D)
+                live.gearGuess = live.speed < 3 ? null : g;
             }
         };
         const watches = [
             ['de.bmw.infotainment.vehicle.CDS', {
                 statusEngineSpeed2: (v) => put('rpm', sc('rpm', v.actualValueRPMEngineCrankshaft)),
-                statusEngineTemperature: (v) => { put('coolant', sc('engineTemp', v.temperatureEngineDrive)); put('oil', sc('engineTemp', v.temperatureEngineOilDrive)); },
+                statusEngineTemperature: (v) => {
+                    logRaw('engine temperatures', [v.temperatureEngineDrive, v.temperatureEngineOilDrive]);
+                    put('coolant', sc('engineTemp', v.temperatureEngineDrive));
+                    const oil = sc('engineTemp', v.temperatureEngineOilDrive);
+                    if (oil !== null) { oilCarT = Date.now(); put('oil', oil); }
+                },
             }],
             ['de.bmw.infotainment.vehicle.CDS2', {
                 statusLongitudinalAccelerationMassCenter: (v) => put('gLong', sc('accel', v.longitudinalAccelerationCentreOfGravity) / 9.80665),
@@ -102,23 +176,34 @@ mgu.run({
             }],
             ['de.bmw.infotainment.vehicle.Vehicle2', { statusCarSpeed2: (v) => put('speed', sc('speed', v.speedVehicleCentreOfGravity)) }],
             ['de.bmw.infotainment.drivingexcitement.FES', {
-                statusSwitchDriveDynamicSport2: (v) => put('boost', sc('boost', v.displayBoostPressure)),
+                statusSwitchDriveDynamicSport2: (v) => { logRaw('FES boost', v.displayBoostPressure); put('boostFes', sc('boost', v.displayBoostPressure)); },
                 // the HMI's sport display: power / torque in % of the car's maximum
                 statusVehicleDynamicEngine: (v) => { put('powerPct', sc('sportPct', v.displaySportEnginePower)); put('torquePct', sc('sportPct', v.displaySportEngineTorque)); },
-                statusActualValueTorque2: (v) => put('torque', sc('torque', v.actualValueTorqueCrankshaft)),
+                // negative = engine braking (falling rpm): shown as 0
+                statusActualValueTorque2: (v) => { const tq = sc('torque', v.actualValueTorqueCrankshaft); put('torque', tq === null ? null : Math.max(0, tq)); },
             }],
             ['de.bmw.infrastructure.VehicleInformation', {
                 statusGearboxDrive: (v) => {
                     const g = gearOf(v && v.statusActualGearDrive);
                     if (g !== undefined) { live.gear = g; lastCar = Date.now(); }
+                    live.stage = STAGES[v && v.statusActualStageDrive];
                     live.gearMode = modeOf(v);
                     // field names / values differ per car: log them so the D/S/M detection can be checked
                     const key = JSON.stringify(Object.keys(v || {}).filter((x) => x !== 'statusActualGearDrive').map((x) => [x, v[x]]));
                     if (key !== lastModeKey && gearLogs < 40) { gearLogs++; lastModeKey = key; log.info('gearbox: ' + JSON.stringify(v) + ' -> ' + (live.gearMode || '?')); }
                 },
+                // this car never sent statusGearboxDrive (2.8.0 logs): P / R / N / gear from here too
+                DataPowerTrain2: (v) => {
+                    logRaw('gear selection', v && v.statusGearSelectionDrive);
+                    const sel = selectionOf(v && v.statusGearSelectionDrive);
+                    if (!sel) return;
+                    if (sel.stage !== undefined) live.stage = sel.stage;
+                    live.gear = sel.gear; lastCar = Date.now();
+                },
             }],
             ['de.bmw.infrastructure.analytics.BasicDataSet', {
                 basicDataSet: (v) => {
+                    logRaw('gearbox oil', v.valueTemperatureTransmissionOil);
                     put('gearbox', sc('gearboxTemp', v.valueTemperatureTransmissionOil));
                     const split = sc('torqueSplitRear', v.valueDistributionLongitudinalTorqueRearAxisFrontAxis);
                     put('splitRear', split);
@@ -128,11 +213,13 @@ mgu.run({
             ['de.bmw.infrastructure.EnvironmentalInformation', { ExteriorTemperature: (v) => put('ambient', sc('ambient', v.temperatureExterior)) }],
             ['de.bmw.infotainment.vehicle.TPMS', {
                 statusTyreTemperature: (v) => {
+                    logRaw('tyre temperature', [v.actualValueTemperatureTyreFLH, v.actualValueTemperatureTyreFRH, v.actualValueTemperatureTyreRLH, v.actualValueTemperatureTyreRRH]);
                     put('tFL', sc('tyreTemp', v.actualValueTemperatureTyreFLH)); put('tFR', sc('tyreTemp', v.actualValueTemperatureTyreFRH));
                     put('tRL', sc('tyreTemp', v.actualValueTemperatureTyreRLH)); put('tRR', sc('tyreTemp', v.actualValueTemperatureTyreRRH));
                 },
-                // kPa = 0.1 x raw, >= 65532 invalid (BMW x_call's converter); stored in bar
+                // bar = 0.1 x raw, >= 65532 invalid (BMW x_call's converter)
                 statusTyrePressure: (v) => {
+                    logRaw('tyre pressure', [v.actualValuePressureTyreFLH, v.actualValuePressureTyreFRH, v.actualValuePressureTyreRLH, v.actualValuePressureTyreRRH]);
                     put('pFL', sc('tyrePress', v.actualValuePressureTyreFLH)); put('pFR', sc('tyrePress', v.actualValuePressureTyreFRH));
                     put('pRL', sc('tyrePress', v.actualValuePressureTyreRLH)); put('pRR', sc('tyrePress', v.actualValuePressureTyreRRH));
                 },
@@ -146,15 +233,54 @@ mgu.run({
                     live.awd = v.statusAllWheelSetup; live.awdQual = v.qualifierFunctionAllWheel;
                     if (/^_4WD|SAND/.test(String(live.awd))) markAwd();
                 },
+                // S / M next to the gear: this car sends no selector programme with the gearbox status
+                dataDisplayGearbox: (v) => {
+                    logRaw('gear programme', v && v.displayProgramGearbox);
+                    live.program = PROGRAMS[v && v.displayProgramGearbox] || null;
+                },
             }],
         ];
         log.info('subscribing signals');
-        Promise.all(watches.map(([iface, h]) => ctx.signals.watch(iface, '1', h, log)))
-            .then((subs) => log.info('signals: ' + subs.map((s) => s.iface.split('.').pop() + (s.error ? '(err)' : '')).join(' ')));
+        // tyre values: also read every 10 s - BMW's own x_call only ever reads them, so a car may not notify them
+        const subs = [], startT = Date.now();
+        Promise.all(watches.map(([iface, h]) => ctx.signals.watch(iface, '1', h, log, /\.TPMS$/.test(iface) ? { pollMs: 10000 } : undefined)
+            .then((s) => { subs.push(s); return s; })))
+            .then((all) => log.info('signals: ' + all.map((s) => s.iface.split('.').pop() + (s.error ? '(err)' : '')).join(' ')));
 
         const demo = new Demo();
-        const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && Date.now() - lastCar > 5000);
-        const data = () => (usingDemo() ? demo.sample() : live);
+        // Auto: demo only until the car answers - a parked car sends nothing new for minutes, which is not "no car"
+        const carPresent = () => lastCar > 0 || subs.some((s) => s.available);
+        const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !carPresent() && Date.now() - startT > 5000);
+        /**
+         * What the screen shows: the car's values, with doubtful ones (MOVE) left out until they
+         * have proven real; demo data as it is.
+         */
+        const data = () => {
+            if (usingDemo()) return demo.sample();
+            const v = Object.assign({}, live);
+            Object.keys(MOVE).forEach((k) => { if (!trusted(k)) v[k] = null; });
+            return v;
+        };
+        /** Boost from the source the setting asks for; Auto: the sport display if it works, else the engine unit. */
+        function updBoost() {
+            const src = settings.get('boostSource');
+            const fes = G.isNum(live.boostFes) ? live.boostFes : null, dmeB = G.isNum(live.boostDme) ? live.boostDme : null;
+            const v = src === 'fes' ? fes : src === 'dme' ? dmeB
+                : fes !== null && trusted('boostFes') ? fes : dmeB !== null && trusted('boostDme') ? dmeB : null;
+            live.boost = v;
+            if (v !== null) raise(peak, 'boost', v);
+        }
+        /** Boost still needed from the engine unit (UDS)? */
+        const boostFromDme = () => (dme.boost || []).length > 0 && (settings.get('boostSource') === 'dme'
+            || (settings.get('boostSource') !== 'fes' && !(G.isNum(live.boostFes) && trusted('boostFes'))));
+        /** Auto / Show / Hide: Auto shows a group once the car has sent real data for it (demo: always). */
+        const shown = (g) => { const s = settings.get(SHOW[g]); return s === 'on' || (s !== 'off' && (usingDemo() || !!seen[g])); };
+        /** Why a temperature is missing, for its tile. */
+        function why(k) {
+            if (bad[k] !== undefined) return 'car sends ' + G.fmt(T(bad[k]), 0) + tU() + ' - not a real value';
+            if (G.isNum(live[k]) && !trusted(k)) return 'stuck at ' + G.fmt(T(live[k]), 0) + tU() + ' - waiting for it to change';
+            return 'no data from the car';
+        }
 
         /* ---------- intake + fuel from the DME (UDS 0x22; candidates in app.json config.dme) ----------
          * Fast (~2/s) while the Intake & fuel page is on screen, every 5 s otherwise so the history
@@ -166,21 +292,37 @@ mgu.run({
         link.init();
         const rd = new DidReader(link, { ecu: dme.ecu });
         const fuelT = {}, fuelFail = {}, fuelTry = {};
-        let fuelSeen = 0, fuelTimer = null, fuelBusy = false, fuelLast = 0;
+        let fuelSeen = 0, engineSeen = 0, fuelTimer = null, fuelBusy = false, fuelLast = 0;
+        let baro = 101.3, baroT = 0;                                       // outside air pressure, kPa
+        /** Boost from the engine unit: charge / manifold pressure (absolute, kPa) minus outside air pressure. */
+        async function readBoost() {
+            if (Date.now() - baroT > 60000) { baroT = Date.now(); const b = await rd.value('baro', dme.baro); if (b !== null) baro = b; }
+            const m = await rd.value('boost', dme.boost);
+            return m === null ? null : (m - baro) / 100;
+        }
+        /*
+         * Fast (~2/s) for the values of the page on screen (Intake & fuel, or boost on Engine when it
+         * comes from the engine unit), all of them every 5 s otherwise so the history keeps filling.
+         */
         async function pollFuel() {
             fuelBusy = true; fuelLast = Date.now();
+            const now = Date.now(), needBoost = boostFromDme();
+            // oil temperature from the engine unit while the car's own signal has none (a 330e sends none)
+            const needOil = (dme.oil || []).length > 0 && now - oilCarT > 15000;
+            const fast = now - fuelSeen < 1500 ? FUEL : now - engineSeen < 1500 && needBoost ? ['boost'] : null;
             try {
                 if (link.available) {
-                    for (const k of FUEL) {
+                    for (const k of fast || FUEL.concat(needBoost ? ['boost'] : [], needOil ? ['oil'] : [])) {
                         if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
                         fuelTry[k] = Date.now();
-                        const v = await rd.value(k, dme[k]);
-                        if (v !== null) { put(k, v); fuelT[k] = Date.now(); fuelFail[k] = 0; } else fuelFail[k] = (fuelFail[k] || 0) + 1;
+                        const v = k === 'boost' ? await readBoost() : await rd.value(k, dme[k]);
+                        if (k === 'oil' && v !== null && Date.now() - oilCarT < 15000) continue;      // the car's own value came meanwhile
+                        if (v !== null) { put(k === 'boost' ? 'boostDme' : k, v); fuelT[k] = Date.now(); fuelFail[k] = 0; } else fuelFail[k] = (fuelFail[k] || 0) + 1;
                     }
                 }
-            } catch (e) { log.warn('fuel poll: ' + e); }
+            } catch (e) { log.warn('engine unit poll: ' + e); }
             fuelBusy = false;
-            fuelTimer = setTimeout(pollFuel, Date.now() - fuelSeen < 1500 ? 400 : 5000);    // fuelSeen: page drawn just now
+            fuelTimer = setTimeout(pollFuel, fast ? 400 : 5000);
         }
         fuelTimer = setTimeout(pollFuel, 1000);
         /** Page opened: don't wait for the slow timer. */
@@ -191,8 +333,9 @@ mgu.run({
             if (!link.available) return 'diagnostic link down';
             const r = (dme[k] || []).map((c) => rd.raws[rd.key(c)]).filter(Boolean);
             if (!r.length) return 'reading...';
-            if (r.every((x) => /NRC 31|NRC 11|NRC 12/.test(x.why))) return 'not available from this DME (' + r.map((x) => x.why.split(' ').slice(0, 2).join(' ')).join(', ') + ')';
-            return r[0].why || 'no data';
+            // plain words on the tile; the reply codes are in the log
+            if (r.every((x) => /NRC 31|NRC 11|NRC 12/.test(x.why))) return 'not available on this car';
+            return /NRC|refused|reply/.test(r[0].why) ? 'no reading from the engine unit' : r[0].why || 'no data';
         }
 
         // 1 Hz history sampler for the thermal traces
@@ -227,7 +370,6 @@ mgu.run({
         }
 
         /** Power in kW: { kw, calc } (calc = estimated from torque x rpm, no sport-display data). */
-        let peakPower = null;
         function power(d) {
             const useSport = settings.get('powerSource') !== 'calc' && G.isNum(d.powerPct);
             if (useSport) return { kw: d.powerPct / 100 * settings.get('maxPower'), calc: false };
@@ -236,70 +378,108 @@ mgu.run({
         const PW = (kw) => (G.isNum(kw) ? kw * ({ kw: 1, hp: 1.34102, ps: 1.35962 }[settings.get('powerUnit')] || 1) : null);
         const pwU = () => ({ kw: 'kW', hp: 'hp', ps: 'PS' }[settings.get('powerUnit')] || 'kW');
 
-        /** { letter, num, est } for the gear readout, or null without any gear information. */
+        /**
+         * { letter, num, est } for the gear readout, or null without any gear information.
+         * P / R / N come from the selector position: the gear field says N_OR_P for both P and N,
+         * and while stopped in D (no gear engaged yet) it says N_OR_P too - that shows as D.
+         */
         function gearText(d) {
+            const st = d.stage, m = d.gearMode || d.program;
+            if (st === 'P' || st === 'R' || st === 'N') return { letter: st, num: '', est: false };
             let g = d.gear, est = false;
             if (!G.isNum(g)) { g = d.gearGuess; est = true; }
-            if (!G.isNum(g)) return null;
+            const letter = m === 'S' || m === 'M' ? m : 'D';
+            if (!G.isNum(g)) return st === 'D' ? { letter, num: '', est: false } : null;
             if (g < 0) return { letter: 'R', num: '', est };
-            const m = d.gearMode;
-            if (g === 0) return { letter: m === 'P' ? 'P' : 'N', num: '', est };
-            return { letter: m === 'S' || m === 'M' ? m : 'D', num: String(g), est };
+            if (g === 0) return st === 'D' ? { letter, num: '', est } : { letter: m === 'P' ? 'P' : 'N', num: '', est };
+            return { letter, num: String(g), est };
+        }
+
+        /** Speed + gear card; tall = the full-height card of the Engine page without boost. */
+        function speedCard(cv, t, d, x, y, w, h) {
+            const tall = h > 300, sz = tall ? 150 : 96, gz = tall ? 230 : 120;
+            G.panel(cv, t, x, y, w, h, 'Speed');
+            const sp = V(d.speed), sy = tall ? y + 220 : y + 160;
+            const sw = cv.text(G.fmt(sp, 0), x + 22, sy, sz, sp == null ? t.dim : t.text, { font: 'num' });
+            cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + 30 + sw, sy, tall ? 34 : 26, t.dim);
+            // gear: D / S / M + number (R, N, P alone)
+            const gr = gearText(d), gy = tall ? y + h - 30 : y + 162;
+            if (gr) {
+                const nw = gr.num ? cv.text(gr.num, x + w - 24, gy, gz, t.text, { align: 'right', font: 'gear' }) : 0;
+                cv.text(gr.letter, x + w - 28 - nw, gy, gz, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
+                if (gr.est) cv.text('EST.', x + w - 24, y + 34, 16, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
+            }
         }
 
         function drawEngine(cv, t, d) {
+            engineSeen = Date.now();
+            if (boostFromDme()) kickFuel();
             const red = settings.get('redline');
             const max = Math.ceil((red + 1000) / 1000) * 1000;
             const showPk = settings.get('peaks');
+            // demo data keeps its own peaks, so they never mix with the car's; raising them every frame
+            // also lets a held peak drop back while the car sends nothing new
+            const pk = usingDemo() ? demoPeak : peak;
+            const pw = power(d), powMax = PW(settings.get('maxPower'));
+            ['rpm', 'boost', 'torque'].forEach((k) => raise(pk, k, d[k]));
+            raise(pk, 'power', pw.kw);
             // rpm + boost as tach bars (Redline style): theme colour -> red at the redline / warning zone
             G.segBar(cv, t, 24, G.TOP, 1062, 226, {
                 label: 'Engine speed', value: d.rpm, unit: 'rpm', decimals: 0, min: 0, max, step: 500,
                 scale: { every: 1000, div: 1000 }, ramp: 'hot', limit: red, marks: [{ value: red, color: 'crit' }],
-                peak: showPk ? peak.rpm : null,
+                peak: showPk ? pk.rpm : null,
             });
-            const psi = settings.get('pressUnit') === 'psi', pmax = psi ? 36 : 2.5;
-            G.segBar(cv, t, 24, G.TOP + 242, 1062, 226, {
-                label: 'Boost', value: P(d.boost), unit: settings.get('pressUnit'), decimals: psi ? 1 : 2, min: 0, max: pmax,
-                step: psi ? 2 : 0.125, scale: { every: psi ? 6 : 0.5, decimals: psi ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
-                marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(peak.boost) : null,
-            });
-            const x = 1110, w = 466;
-            G.panel(cv, t, x, G.TOP, w, 190, 'Speed');
-            const sp = V(d.speed);
-            const sw = cv.text(G.fmt(sp, 0), x + 22, 204, 96, sp == null ? t.dim : t.text, { font: 'num' });
-            cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + 30 + sw, 204, 26, t.dim);
-            // gear: D / S / M + number (R, N, P alone)
-            const gr = gearText(d);
-            if (gr) {
-                const nw = gr.num ? cv.text(gr.num, x + w - 24, 206, 120, t.text, { align: 'right', font: 'gear' }) : 0;
-                cv.text(gr.letter, x + w - 28 - nw, 206, 120, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
-                if (gr.est) cv.text('EST.', x + w - 24, 78, 16, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
-            }
             // power: the sport display's % x your car's max power (tuned cars: set the tuned max);
             // without sport-display data, torque x rpm. Shown in kW, hp or PS.
-            const pw = power(d), powMax = PW(settings.get('maxPower'));
-            if (G.isNum(pw.kw)) peakPower = Math.max(peakPower || 0, pw.kw);
-            G.bar(cv, t, x, 272, w, 92, {
-                label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax,
-                peak: showPk && G.isNum(peakPower) ? PW(peakPower) : null,
-            });
-            G.bar(cv, t, x, 404, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, peak: showPk ? peak.torque : null });
+            const bars = (x, y, w, gap) => {
+                G.bar(cv, t, x, y, w, 92, {
+                    label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax, niceMax: true, ramp: 'hot',
+                    peak: showPk && G.isNum(pk.power) ? PW(pk.power) : null,
+                });
+                G.bar(cv, t, x, y + gap, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, niceMax: true, ramp: 'hot', peak: showPk ? pk.torque : null });
+            };
+            if (shown('boost')) {
+                const psi = settings.get('pressUnit') === 'psi', pmax = psi ? 36 : 2.5;
+                G.segBar(cv, t, 24, G.TOP + 242, 1062, 226, {
+                    label: 'Boost', value: P(d.boost), unit: settings.get('pressUnit'), decimals: psi ? 1 : 2, min: 0, max: pmax,
+                    step: psi ? 2 : 0.125, scale: { every: psi ? 6 : 0.5, decimals: psi ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
+                    marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(pk.boost) : null,
+                });
+                if (!G.isNum(d.boost) && !usingDemo()) cv.text(boostWhy(), 48, G.TOP + 242 + 210, 18, t.dim);
+                speedCard(cv, t, d, 1110, G.TOP, 466, 190);
+                bars(1110, 272, 466, 132);
+            } else {
+                // no boost: power + torque take its place, speed + gear the whole right column
+                G.panel(cv, t, 24, G.TOP + 242, 1062, 226, null);
+                bars(48, G.TOP + 256, 1014, 108);
+                speedCard(cv, t, d, 1110, G.TOP, 466, G.BOTTOM - G.TOP);
+            }
+        }
+        /** Why boost is missing (Auto: tells which sources were tried). */
+        function boostWhy() {
+            const src = settings.get('boostSource');
+            const dmeMsg = !link.p ? 'no diagnostic link' : !link.available ? 'diagnostic link down' : fuelFail.boost ? 'engine unit: no boost DID answers' : 'engine unit: reading...';
+            if (src === 'fes') return bad.boostFes !== undefined ? 'sport display sends ' + G.fmt(bad.boostFes, 2) + ' - not a real value' : 'no boost from the sport display';
+            if (src === 'dme') return dmeMsg;
+            return 'sport display: ' + (G.isNum(live.boostFes) ? 'not changing' : 'nothing') + '  ·  ' + dmeMsg;
         }
 
         function drawThermal(cv, t, d) {
             const oilWarn = settings.get('oilWarn');
             const unit = tU();
             const tiles = [
-                ['Coolant', d.coolant, hist.coolant, [{ from: T(112), to: 999, color: 'crit' }, { from: -99, to: T(60), color: 'cold' }]],
-                ['Engine oil', d.oil, hist.oil, [{ from: T(oilWarn), to: 999, color: 'crit' }, { from: -99, to: T(70), color: 'cold', tintOnly: true }], 'oil'],
-                ['Gearbox oil', d.gearbox, hist.gearbox, [{ from: T(120), to: 999, color: 'warn' }, { from: -99, to: T(50), color: 'cold' }]],
-                ['Ambient', d.ambient, hist.ambient, [{ from: -99, to: T(3), color: 'cold' }], '#2fd27a', '#2fd27a'],
-            ];
-            tiles.forEach(([label, v, h, zones, color, valueColor], i) => {
+                ['coolant', 'Coolant', [{ from: T(112), to: 999, color: 'crit' }, { from: -99, to: T(60), color: 'cold' }]],
+                ['oil', 'Engine oil', [{ from: T(oilWarn), to: 999, color: 'crit' }, { from: -99, to: T(70), color: 'cold', tintOnly: true }], 'oil'],
+                shown('gearbox') && ['gearbox', 'Gearbox oil', [{ from: T(120), to: 999, color: 'warn' }, { from: -99, to: T(50), color: 'cold' }]],
+                ['ambient', 'Ambient', [{ from: -99, to: T(3), color: 'cold' }], '#2fd27a', '#2fd27a'],
+            ].filter(Boolean);
+            // 2 x 2; with a tile hidden the last one takes the whole bottom row
+            tiles.forEach(([k, label, zones, color, valueColor], i) => {
+                const v = d[k], h = hist[k], wide = tiles.length === 3 && i === 2;
                 const x = 24 + (i % 2) * 784, y = G.TOP + Math.floor(i / 2) * 242;
-                G.stat(cv, t, x, y, 760, 226, {
+                G.stat(cv, t, x, y, wide ? 1552 : 760, 226, {
                     label, value: T(v), unit, zones, color, valueColor, size: 100, history: h.map(T),
-                    sub: v == null ? 'no data' : 'last 5 min  ·  min ' + G.fmt(T(Math.min.apply(null, h.filter(G.isNum))), 0) + '  max ' + G.fmt(T(Math.max.apply(null, h.filter(G.isNum))), 0),
+                    sub: v == null ? (usingDemo() ? 'no data' : why(k)) : 'last 5 min  ·  min ' + G.fmt(T(Math.min.apply(null, h.filter(G.isNum))), 0) + '  max ' + G.fmt(T(Math.max.apply(null, h.filter(G.isNum))), 0),
                 });
             });
         }
@@ -337,13 +517,14 @@ mgu.run({
 
         function drawChassis(cv, t, d) {
             if (G.isNum(d.gLat) && G.isNum(d.gLong)) { trail.push([d.gLat, d.gLong]); if (trail.length > 60) trail.shift(); }
-            G.panel(cv, t, 24, G.TOP, 480, G.BOTTOM - G.TOP, 'G-force');
-            G.gmeter(cv, t, 264, 258, 164, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
-            // xDrive column (when shown), tyres take the rest
+            // xDrive column and tyre card when shown; the g-force card takes the space of hidden ones
             const xd = settings.get('xdrive');
             const showAwd = xd === 'on' || (xd !== 'off' && (awdSeen || usingDemo()));
-            const tx = 528, tw = showAwd ? 668 : 1048;
-            drawTyres(cv, t, tx, G.TOP, tw, G.BOTTOM - G.TOP, d);
+            const showTyres = shown('tyres'), right = showAwd ? 1196 : 1576;
+            const gw = showTyres ? 480 : right - 24;
+            G.panel(cv, t, 24, G.TOP, gw, G.BOTTOM - G.TOP, 'G-force');
+            G.gmeter(cv, t, 24 + gw / 2, 258, 164, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
+            if (showTyres) drawTyres(cv, t, 528, G.TOP, right - 528, G.BOTTOM - G.TOP, d);
             if (showAwd) {
                 const ax = 1220, aw = 356;
                 G.panel(cv, t, ax, G.TOP, aw, G.BOTTOM - G.TOP, 'xDrive');
@@ -353,13 +534,14 @@ mgu.run({
                 cv.text(mode, ax + 24, 160, 52, hot ? t.crit : t.text, { font: 'bold' });
                 if (hot) cv.text('DERATED / OFF', ax + 24, 196, 22, t.crit, { font: 'bold', spacing: 1.5 });
                 const rear = d.splitRear;
-                G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%' });
-                G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%' });
+                G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
+                G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
             }
         }
 
-        /** Top-down car with each tyre's pressure (against the car's target) and temperature. */
+        /** Top-down car with each tyre's pressure (against the car's target) and temperature (when shown). */
         function drawTyres(cv, t, x, y, w, h, d) {
+            const temps = shown('tyreTemp');
             G.panel(cv, t, x, y, w, h, 'Tyres');
             const unitP = settings.get('pressUnit'), dec = unitP === 'psi' ? 0 : 1;
             const cx = x + w / 2, top = y + 70, bh = h - 100, bw = 150;
@@ -373,20 +555,20 @@ mgu.run({
             const corners = [['FL', -1, top + 30], ['FR', 1, top + 30], ['RL', -1, top + bh - 30 - tyh], ['RR', 1, top + bh - 30 - tyh]];
             for (const [k, side, ty] of corners) {
                 const temp = d['t' + k], pr = Pt(d['p' + k]), tgt = Pt(d['pt' + k]);
-                // tyre colour: temperature
-                const tc = !G.isNum(temp) ? t.tick : temp < 20 ? t.cold : temp > 105 ? t.crit : temp > 90 ? t.warn : t.accent;
-                const tx0 = side < 0 ? cx - bw / 2 - tyw - 8 : cx + bw / 2 + 8;
-                cv.roundRect(tx0, ty, tyw, tyh, 10, tc);
-                for (let i = 1; i < 4; i++) cv.fillRect(tx0 + 6, ty + i * tyh / 4, tyw - 12, 2, withAlpha(t.bg, 0.35));
                 // pressure: big, coloured against the target
                 let pc = G.isNum(pr) ? t.text : t.dim;
                 if (G.isNum(pr) && G.isNum(tgt) && tgt > 0) { const r = pr / tgt; pc = r < 0.85 ? t.crit : r < 0.93 || r > 1.15 ? t.warn : GO; }
+                // tyre colour: temperature, or the pressure state when temperatures are hidden
+                const tc = !temps ? (G.isNum(pr) ? pc : t.tick) : !G.isNum(temp) ? t.tick : temp < 20 ? t.cold : temp > 105 ? t.crit : temp > 90 ? t.warn : t.accent;
+                const tx0 = side < 0 ? cx - bw / 2 - tyw - 8 : cx + bw / 2 + 8;
+                cv.roundRect(tx0, ty, tyw, tyh, 10, tc);
+                for (let i = 1; i < 4; i++) cv.fillRect(tx0 + 6, ty + i * tyh / 4, tyw - 12, 2, withAlpha(t.bg, 0.35));
                 const al = side < 0 ? 'right' : 'left', lx = side < 0 ? tx0 - 26 : tx0 + tyw + 26;
-                const ps = G.fmt(pr, dec), size = big ? 72 : 56;
-                const pw = cv.text(ps, lx + (side < 0 ? -cv.textWidth(' ' + unitP, 24) : 0), ty + 52, size, pc, { align: al, font: 'num' });
-                cv.text(' ' + unitP, side < 0 ? lx : lx + pw, ty + 52, 24, t.dim, { align: al });
-                cv.text(G.isNum(tgt) ? 'target ' + G.fmt(tgt, dec) : 'no target', lx, ty + 80, 18, t.dim, { align: al });
-                cv.text(G.isNum(temp) ? G.fmt(T(temp), 0) + tU() : '--' + tU(), lx, ty + 118, 30, G.isNum(temp) ? tc : t.dim, { align: al, font: 'bold' });
+                const ps = G.fmt(pr, dec), size = (big ? 72 : 56) + (temps ? 0 : 16), py = ty + (temps ? 52 : 62);
+                const pw = cv.text(ps, lx + (side < 0 ? -cv.textWidth(' ' + unitP, 24) : 0), py, size, pc, { align: al, font: 'num' });
+                cv.text(' ' + unitP, side < 0 ? lx : lx + pw, py, 24, t.dim, { align: al });
+                cv.text(G.isNum(tgt) ? 'target ' + G.fmt(tgt, dec) : 'no target', lx, py + 28, 18, t.dim, { align: al });
+                if (temps) cv.text(G.isNum(temp) ? G.fmt(T(temp), 0) + tU() : '--' + tU(), lx, ty + 118, 30, G.isNum(temp) ? tc : t.dim, { align: al, font: 'bold' });
             }
         }
 
@@ -401,10 +583,10 @@ mgu.run({
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
         ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
-        ui.onClick('BTN_PEAKS', () => { Object.keys(peak).forEach((k) => delete peak[k]); peakPower = null; trail.length = 0; return render(); });
         let loop = ctx.loop('MAIN', settings.get('fps'), render);
         settings.onChange((k) => {
-            if (k === 'maxPower' || k === 'powerSource') peakPower = null;
+            if (k === 'maxPower' || k === 'powerSource') { delete peak.power; delete demoPeak.power; }
+            if (k === 'boostSource') { delete peak.boost; updBoost(); }
             if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
             if (k === 'page') page = Math.max(0, PAGES.indexOf(settings.get('page')));
         });

@@ -158,7 +158,7 @@ mgu.run({
          * remembered, so the next start shows the 12 V page straight away. */
         let smeMiss = 0, lastSocTry = 0;
         function detectHybrid(otherUnitAnswered) {
-            const rs = (cfg.soc || []).map((c) => raws[(c.ecu == null ? cfg.ecu : c.ecu) + ':' + c.did]);
+            const rs = (cfg.soc || []).map((c) => raws[reader.key(c)]);
             if (rs.some((r) => r && r.bytes)) {
                 smeMiss = 0;
                 if (st.noHybrid || !st.hybrid) { st.noHybrid = false; st.hybrid = true; save(); log.info('hybrid battery unit answers'); }
@@ -167,7 +167,9 @@ mgu.run({
             }
         }
         const isHybrid = () => (settings.get('hybrid') === 'yes' ? true : settings.get('hybrid') === 'no' ? false : !st.noHybrid);
-        const pages = () => (isHybrid() ? PAGES_HYBRID : PAGES_12V);
+        // the Diagnostics page (UDS replies per value) only when switched on in Settings: it is for tuning DIDs
+        const pages = () => (isHybrid() ? PAGES_HYBRID : PAGES_12V).filter((p) => p !== 'diag' || settings.get('diagPage'));
+        const diagHint = (s) => (settings.get('diagPage') ? s + ' - see Diagnostics page' : s);
 
         // 12 V history (one sample per 30 s)
         const v12hist = [];
@@ -284,7 +286,7 @@ mgu.run({
         /** Cars without a hybrid system: the 12 V battery only. */
         function render12V(cv, t, d) {
             const v = d.v12;
-            let state = 'no reading - see Diagnostics page', col = t.dim;
+            let state = diagHint('no reading yet'), col = t.dim;
             if (G.isNum(v)) {
                 if (v >= 13.2) { state = 'CHARGING  (engine / DC-DC running)'; col = GO; }
                 else if (v >= 12.6) { state = 'FULL'; col = GO; }
@@ -347,7 +349,7 @@ mgu.run({
                 cv.text(G.fmt(d.soc, 0) + ' % of ' + Math.round(D(r.mid)) + ' ' + dU() + ' (full battery at '
                     + (G.isNum(d.ambient) ? G.fmt(T(d.ambient), 0) + tU() : '10' + tU() + ', assumed') + ')', 300, 195, 20, t.dim);
             } else {
-                cv.text('no charge reading - see Diagnostics page', 300, 195, 22, t.dim);
+                cv.text(diagHint('no charge reading yet'), 300, 195, 22, t.dim);
             }
             cv.text('FULL BATTERY RANGE BY OUTSIDE TEMPERATURE', 48, 255, 16, t.dim, { font: 'bold', spacing: 1.5 });
             rangeChart(cv, t, 64, 278, 640, 145, d.ambient);
@@ -388,9 +390,9 @@ mgu.run({
             const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
             const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', bx + 24, 178, 96, hc, { font: 'num' });
             cv.text('%', bx + 32 + hw, 178, 32, t.dim, { font: 'bold' });
-            cv.text(G.isNum(soh) ? 'of the capacity it had new' : 'not readable - see Diagnostics', bx + 24, 214, 20, t.dim);
+            cv.text(G.isNum(soh) ? 'of the capacity it had new' : diagHint('not read yet'), bx + 24, 214, 20, t.dim);
             G.bar(cv, t, bx + 24, 227, bw - 48, 68, {
-                label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh,
+                label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh, ramp: 'hot',     // tach colours; amber / red when worn
                 zones: [{ from: 0, to: kwh * 0.7, color: 'crit' }, { from: kwh * 0.7, to: kwh * 0.8, color: 'warn' }],
             });
             cv.text('of ' + kwh + ' kWh new', bx + bw - 24, 323, 18, t.dim, { align: 'right' });
@@ -418,7 +420,7 @@ mgu.run({
             if (!all.length) {
                 cv.text('No charges logged yet.', 544, 284, 32, t.dim, { align: 'center', font: 'bold' });
                 cv.text('Every charge of at least ' + cfg.chargeMinPct + ' % is added here, also overnight charges', 544, 327, 22, t.dim, { align: 'center' });
-                cv.text('(seen at the next start). Needs charge readings - see the Diagnostics page.', 544, 357, 22, t.dim, { align: 'center' });
+                cv.text('(seen at the next start). Needs charge readings' + (settings.get('diagPage') ? ' - see the Diagnostics page.' : '.'), 544, 357, 22, t.dim, { align: 'center' });
             }
             all.slice(-8).reverse().forEach((c, i) => {
                 const y = 174 + i * 43;
@@ -466,18 +468,18 @@ mgu.run({
         function renderDiag(cv, t, d) {
             G.panel(cv, t, 24, 44, 1552, 468, 'Battery diagnostics');
             const link = diag.p ? (diag.available ? 'link up' : 'link down') : 'no link (' + (diag.error || 'not started') + ')';
-            cv.text('UDS 22 ReadDataByIdentifier  ·  ' + link + '  ·  ambient ' + (G.isNum(live.ambient) ? G.fmt(live.ambient, 1) + ' °C' : 'n/a')
+            cv.text('UDS 22 ReadDataByIdentifier / OBD 01  ·  ' + link + '  ·  ambient ' + (G.isNum(live.ambient) ? G.fmt(live.ambient, 1) + ' °C' : 'n/a')
                 + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(live.speed, 0) + ' km/h' : 'n/a'), 48, 121, 24, t.text, { font: 'label' });
             const cols = [48, 160, 260, 380, 820, 1000, 1290];
             ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS', 'READ'].forEach((h, i) => cv.text(h, cols[i], 167, 20, t.dim, { font: 'bold', spacing: 1.5 }));
             cv.fillRect(48, 178, 1504, 1, t.tick);
             let y = 214;
             VALUES.forEach((key) => (cfg[key] || []).forEach((c, i) => {
-                const ecu = c.ecu == null ? cfg.ecu : c.ecu, r = raws[ecu + ':' + c.did];
+                const ecu = c.ecu == null ? cfg.ecu : c.ecu, r = raws[reader.key(c)];
                 const used = pick[key] === i && r && r.ok;
                 cv.text(key.toUpperCase() + (used ? ' *' : ''), cols[0], y, 24, used ? GO : t.text, { font: 'bold' });
                 cv.text('0x' + hex(ecu), cols[1], y, 24, t.text, { font: 'label' });
-                cv.text(c.did, cols[2], y, 24, t.text, { font: 'label' });
+                cv.text(DidReader.label(c), cols[2], y, 24, t.text, { font: 'label' });
                 const bytes = r ? r.bytes || '-' : '-';
                 cv.text(bytes.length > 36 ? bytes.slice(0, 35) + '…' : bytes, cols[3], y, 22, t.dim, { font: 'label' });
                 cv.text(r && G.isNum(r.value) ? G.fmt(r.value, key === 'v12' ? 2 : 1) : '-', cols[4], y, 24, t.text, { font: 'label' });

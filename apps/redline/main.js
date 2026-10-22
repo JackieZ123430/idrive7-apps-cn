@@ -12,7 +12,8 @@
  *   - cold-engine rev guard: until the oil is warm the shift point is pulled down
  *     and climbs with the oil temperature
  *
- * Pages: tach / shift log. Peaks reset with BTN_RESET.
+ * Pages: tach / shift log. The tach's peak marker drops back after "Peak hold" seconds;
+ * BTN_RESET clears it and the session stats.
  */
 const mgu = require('./kit/mgu');
 const { Canvas, withAlpha, ramp } = require('./kit/canvas');
@@ -47,7 +48,9 @@ mgu.run({
         }
 
         /* ---------- session state ---------- */
-        let peakRpm = 0, peakSpeed = 0, overShiftMs = 0, limiterHits = 0;
+        // peakRpm = the tach's peak marker: drops back to the current rpm "peakHold" s after the last
+        // new peak (0 = until Reset); the shift log's session peaks stay until Reset
+        let peakRpm = 0, peakRpmT = 0, sessionRpm = 0, peakSpeed = 0, overShiftMs = 0, limiterHits = 0;
         let shifts = [];                    // { at, from, to, rpm, target, verdict }
         const recent = [];                  // [t, rpm, speed] last ~1 s
         let lastGear = null, lastT = 0, onLimiter = false, lastShift = null;
@@ -71,7 +74,9 @@ mgu.run({
             lastT = t;
             recent.push([t, d.rpm, d.speed]);
             while (recent.length && t - recent[0][0] > 1200) recent.shift();
-            peakRpm = Math.max(peakRpm, d.rpm);
+            const now = Date.now(), hold = settings.get('peakHold') * 1000;
+            if (d.rpm >= peakRpm || (hold > 0 && now - peakRpmT > hold)) { peakRpm = d.rpm; peakRpmT = now; }
+            sessionRpm = Math.max(sessionRpm, d.rpm);
             if (G.isNum(d.speed)) peakSpeed = Math.max(peakSpeed, d.speed);
             const sp = shiftPoint(d.oil).rpm;
             if (d.rpm >= sp) overShiftMs += dt;
@@ -187,8 +192,8 @@ mgu.run({
 
             // ---- rev bar: left to right; theme colour -> red at the shift point, solid red above.
             // Each 500 rpm segment takes the colour of its position (stepped like the G20).
+            const hot = t.hotRamp || t.ramp;
             if (G.isNum(rpm) && rpm > 50) {
-                const hot = t.hotRamp || t.ramp;
                 const colOf = (r) => (shiftNow ? '#ff2a2a' : ramp(hot, G.clamp(r / sp.rpm, 0, 1)));
                 band(cv, 0, rpm, withAlpha(colOf(rpm), 0.14), 7);                               // glow
                 for (let r = 0; r < rpm; r += 500) band(cv, r, Math.min(rpm, r + 500), colOf(r + 250));
@@ -196,13 +201,20 @@ mgu.run({
                 const x = BAR.x0 + barX(rpm);
                 cv.line(x, BAR.y1 + 4, x + BAR.slant, BAR.y0 - 4, 6, '#ffffff');               // bright leading edge
             }
-            if (peakRpm > 0) { const x = BAR.x0 + barX(peakRpm) + BAR.slant; cv.fillRect(x - 1.5, BAR.y0 - 22, 3, 16, t.accent2); }
+            // peak: a slanted line across the bar at the highest rpm (no line along the top on the tach)
+            if (peakRpm > 0 && !(G.isNum(rpm) && rpm >= peakRpm)) {
+                const pk = Math.min(peakRpm, maxRpm()), px = BAR.x0 + barX(pk);
+                const pc = t.hang || (pk >= sp.rpm ? '#ff2a2a' : ramp(hot, G.clamp(pk / sp.rpm, 0, 1)));
+                cv.line(px + BAR.slant, BAR.y0, px, BAR.y1, 3, pc);
+            }
 
             // ---- centre: digital rpm above the bar, gear below it
             const rw = cv.text(G.isNum(rpm) ? String(Math.round(rpm / 10) * 10) : '----', GX - 30, 198, 80, G.isNum(rpm) ? (shiftNow ? '#ff4a4a' : t.text) : t.dim, { align: 'center', font: 'num' });
             cv.text('RPM', GX - 30 + rw / 2 + 12, 198, 22, t.dim, { font: 'bold', spacing: 2 });
-            const g = d.gear;
-            const gs = g === -1 ? 'R' : g === 0 ? 'N' : G.isNum(g) ? String(g) : '-';
+            // gear number when driving; the selector position (P / R / N, D while no gear is engaged)
+            // otherwise - the gear field alone reads "N" in park too
+            const g = d.gear, st = d.stage;
+            const gs = st === 'P' || st === 'R' || st === 'N' ? st : g === -1 ? 'R' : G.isNum(g) && g > 0 ? String(g) : st === 'D' ? 'D' : g === 0 ? 'N' : '-';
             cv.text(gs, GX, 500, 200, shiftNow && blink ? '#ff2a2a' : t.text, { align: 'center', font: 'gear' });
             if (d.gearGuessed && G.isNum(g) && g > 0) cv.text('EST.', GX + 90, 352, 16, t.dim, { font: 'bold', spacing: 1.5 });
             if (shiftNow) cv.text('SHIFT', GX + 150, 436, 30, blink ? '#ff2a2a' : withAlpha('#ff2a2a', 0.5), { font: 'bold', spacing: 3 });
@@ -275,7 +287,7 @@ mgu.run({
                 const ys = shifts.slice(0, 30).map((s) => s.rpm - s.target);
                 const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
                 cv.text('AVG ' + (avg >= 0 ? '+' : '') + Math.round(avg) + ' rpm vs shift point', 1240, 199, 24, t.text, { align: 'center', font: 'bold' });
-                cv.text('PEAK ' + Math.round(peakRpm) + ' RPM  ·  ' + G.fmt(mph() ? peakSpeed / MPH : peakSpeed, 0) + (mph() ? ' MPH' : ' KM/H'), 1240, 235, 20, t.dim, { align: 'center', font: 'bold', spacing: 1 });
+                cv.text('PEAK ' + Math.round(sessionRpm) + ' RPM  ·  ' + G.fmt(mph() ? peakSpeed / MPH : peakSpeed, 0) + (mph() ? ' MPH' : ' KM/H'), 1240, 235, 20, t.dim, { align: 'center', font: 'bold', spacing: 1 });
             }
         }
 
@@ -297,7 +309,7 @@ mgu.run({
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
         ui.onClick('BTN_RESET', () => {
-            peakRpm = 0; peakSpeed = 0; overShiftMs = 0; limiterHits = 0; shifts = []; lastShift = null;
+            peakRpm = 0; peakRpmT = 0; sessionRpm = 0; peakSpeed = 0; overShiftMs = 0; limiterHits = 0; shifts = []; lastShift = null;
             log.info('peaks reset'); return render();
         });
         let loop = ctx.loop('MAIN', settings.get('fps'), render);

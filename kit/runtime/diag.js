@@ -65,17 +65,27 @@ class Diag extends EventEmitter {
         this.emit('frame', { ecu: b[6], uds: b.slice(9) });
     }
 
-    /** Send one request; resolves with the transport's verdict ('NO_ERROR', 'REQUEST_PENDING', ...). */
+    /**
+     * Send one request; resolves with the transport's verdict ('NO_ERROR', 'REQUEST_PENDING', ...).
+     * The transport turns requests away while it is still busy with an earlier one (e.g. a second
+     * functional request a few seconds after the first: APP_REQUEST_TEMPORARILY_NOT_ACCEPTED), so
+     * such a verdict is retried a few times with a growing pause (1, 2, 3, 4 s).
+     */
     async send(target, sid, data) {
         if (!this.p) throw new Error(this.error || 'no diagnostic link');
         const d = data || [];
         if (!this.quiet) this.log.info('UDS -> ' + hex(target) + ': ' + hex(sid) + ' ' + d.map((x) => hex(x)).join(' '));
-        const r = await this.signals.call(this.p, 'sendTasuRequest', {
-            sourceAddress: TESTER, targetAddress: target, serviceID: sid, subroutineID: 0,
-            udsDataLength: d.length, udsData: Buffer.from(d), deadlockTime: 0,
-        }, 8000);
-        const verdict = r && typeof r === 'object' ? (r.TasuErrorEnum || Object.keys(r).map((k) => r[k]).find((x) => typeof x === 'string')) : r;
-        return verdict === undefined ? 'NO_ERROR' : String(verdict);
+        for (let attempt = 0; ; attempt++) {
+            const r = await this.signals.call(this.p, 'sendTasuRequest', {
+                sourceAddress: TESTER, targetAddress: target, serviceID: sid, subroutineID: 0,
+                udsDataLength: d.length, udsData: Buffer.from(d), deadlockTime: 0,
+            }, 8000);
+            const v = r && typeof r === 'object' ? (r.TasuErrorEnum || Object.keys(r).map((k) => r[k]).find((x) => typeof x === 'string')) : r;
+            const verdict = v === undefined ? 'NO_ERROR' : String(v);
+            if (!/TEMPORARILY_NOT_ACCEPTED|BUSY/i.test(verdict) || attempt >= 4) return verdict;
+            this.log.info('transport busy (' + verdict + '), retrying');
+            await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
+        }
     }
 
     _check(verdict) {
@@ -89,10 +99,10 @@ class Diag extends EventEmitter {
     async functional(sid, data, opts) {
         const idleMs = (opts && opts.idleMs) || 4000, maxMs = (opts && opts.maxMs) || 25000;
         const replies = new Map();
-        let idle, hard, onFrame, onErr, finish;
+        let idle, hard, onFrame, onErr, finish, kick;
         const done = new Promise((resolve) => {
             finish = () => { clearTimeout(idle); clearTimeout(hard); this.removeListener('frame', onFrame); this.removeListener('tasError', onErr); resolve(replies); };
-            const kick = (ms) => { clearTimeout(idle); idle = setTimeout(finish, ms); };
+            kick = (ms) => { clearTimeout(idle); idle = setTimeout(finish, ms); };
             onFrame = (f) => {
                 const pending = f.uds[0] === 0x7F && f.uds[2] === 0x78;
                 if (!pending || !replies.has(f.ecu)) replies.set(f.ecu, f.uds);
@@ -101,10 +111,11 @@ class Diag extends EventEmitter {
             };
             onErr = (e) => this.log.warn('TASU error during scan: ' + e);
             this.on('frame', onFrame); this.on('tasError', onErr);
-            kick(idleMs + 2000);          // first replies can take a moment
-            hard = setTimeout(finish, maxMs);
         });
         try { this._check(await this.send(ALL, sid, data)); } catch (e) { finish(); throw e; }
+        // timers from when the transport took the request (send() may have waited for it)
+        if (!idle) kick(idleMs + 2000);          // first replies can take a moment
+        hard = setTimeout(finish, maxMs);
         return done;
     }
 
@@ -124,9 +135,9 @@ class Diag extends EventEmitter {
                 finish(f.uds);
             };
             this.on('frame', onFrame);
-            t = setTimeout(() => finish(null), timeoutMs || 4000);
         });
         try { this._check(await this.send(target, sid, data)); } catch (e) { finish(null); throw e; }
+        if (!t) t = setTimeout(() => finish(null), timeoutMs || 4000);       // from when the transport took it
         return got;
     }
 }

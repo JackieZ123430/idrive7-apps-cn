@@ -53,7 +53,28 @@ function zoneColor(t, g, v, base) {
 function panel(cv, t, x, y, w, h, title) {
     x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
     const key = ['panel', w, h, title || '', t.name].join('|');
-    cv.blit(layer(key, w, h, (c) => drawPanel(c, t, 0, 0, w, h, title)), x, y);
+    const L = layer(key, w, h, (c) => drawPanel(c, t, 0, 0, w, h, title));
+    // the panel is a translucent overlay, blended pixel by pixel - a large part of every frame. Where
+    // its area is still plain background (panels are drawn first on a cleared page), copy whole rows
+    // of a cached copy blended onto that background instead: the same bytes, at memcpy speed.
+    if (isBackground(cv, x, y, w, h, t.bg)) {
+        cv.copyRows(layer(key + '|on|' + t.bg, w, h, (c) => c.clear(t.bg).blit(L, 0, 0)), x, y);
+    } else cv.blit(L, x, y);
+}
+/** Is the w x h area at (x, y) entirely the opaque colour bg? (row compares, native speed) */
+const bgRows = new Map();
+function isBackground(cv, x, y, w, h, bg) {
+    if (x < 0 || y < 0 || x + w > cv.w || y + h > cv.h) return false;
+    const k = bg + '|' + w;
+    let row = bgRows.get(k);
+    if (!row) { row = Buffer.from(new Canvas(w, 1).clear(bg).d.buffer); bgRows.set(k, row); }
+    if (row[3] !== 255) return false;
+    const buf = Buffer.from(cv.d.buffer, cv.d.byteOffset, cv.d.length);
+    for (let r = 0; r < h; r++) {
+        const o = ((y + r) * cv.w + x) * 4;
+        if (buf.compare(row, 0, row.length, o, o + row.length) !== 0) return false;
+    }
+    return true;
 }
 function drawPanel(cv, t, x, y, w, h, title) {
     // flat light grey overlay; top: a short bold bar in the theme's stripe colours (M tricolour:
@@ -134,32 +155,68 @@ function radialLive(cv, t, cx, cy, r, g, min, max, thick, v, f) {
     if (isNum(g.peak) && g.showPeak !== false) cv.text('PEAK ' + fmt(g.peak, g.decimals), cx, cy + r * 0.82 + 32, 22, t.accent2, { align: 'center', font: 'label', spacing: 1 });
 }
 
-/** Horizontal bar gauge with label / value header: a slim rounded track filled with the theme ramp. */
+/** Nice scale step (1, 2, 2.5, 5 x 10^n) for about n divisions of max. */
+function niceStep(max, n) {
+    const raw = max / n, e = Math.pow(10, Math.floor(Math.log10(raw)));
+    return [1, 2, 2.5, 5, 10].map((m) => m * e).find((v) => v >= raw * 0.999) || raw;
+}
+
+/** Slanted slab (OEM bar shape): x0..x1 measured on the bottom edge, top edge shifted right by sl. */
+function slab(cv, x0, x1, y, h, sl, c) {
+    if (x1 - x0 <= 0) return;
+    for (let r = 0; r < h; r++) cv.fillRect(x0 + sl * (h - r - 0.5) / h, y + r, x1 - x0, 1, c);
+}
+
+/**
+ * Bar gauge in the OEM (G20 sport display) style: label / value header, a slanted grey track,
+ * the fill in the theme's bar colour (lighter upper half) ending in a white stripe, a white
+ * scale line under it with numbers, and the peak ("hang") as an outline along the top edge.
+ * g.niceMax: extend the scale to the next round number (0-400 rather than 0-285).
+ * g.ramp = 'hot': fill in the tach colours along the scale (the theme's hotRamp) instead of one colour;
+ * g.color: fill colour (theme key or #hex) instead of the theme's bar colour.
+ */
 function bar(cv, t, x, y, w, h, g) {
-    const min = g.min || 0, max = g.max == null ? 100 : g.max, v = g.value;
+    const min = g.min || 0, v = g.value;
+    let max = g.max == null ? 100 : g.max;
+    const step = g.step || niceStep(max - min, 4);
+    if (g.niceMax) max = min + Math.ceil((max - min) / step - 1e-9) * step;       // scale ends on a round number (OEM)
     const f = isNum(v) ? clamp((v - min) / (max - min), 0, 1) : 0;
     cv.text(String(g.label || '').toUpperCase(), x, y + 26, 22, t.dim, { font: 'bold', spacing: 2 });
     const vs = fmt(v, g.decimals);
     const uw = g.unit ? cv.textWidth(' ' + g.unit, 26) : 0;
     cv.text(vs, x + w - uw, y + 30, 44, isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
     if (g.unit) cv.text(' ' + g.unit, x + w, y + 30, 26, t.dim, { align: 'right' });
-    const room = h - 44, bh = Math.max(8, Math.min(room, 18)), by = y + 44 + (room - bh) / 2;
-    cv.roundRect(x, by, w, bh, bh / 2, t.track);
+    const bh = 22, by = y + 44, SL = 18, bw = w - SL;
+    const X = (val) => x + clamp((val - min) / (max - min), 0, 1) * bw;
+    slab(cv, x, x + bw, by, bh, SL, withAlpha('#d4d8de', 0.34));               // track
+    const base = g.color ? t[g.color] || g.color : t.bar || t.accent, col = zoneColor(t, g, v, base);
+    const stops = g.ramp === 'hot' && col === base ? t.hotRamp || t.ramp : null;
+    // fill: lighter upper part, white stripe at the leading edge (gap in the background colour)
     if (f > 0) {
-        const col = zoneColor(t, g, v);
-        const fw = Math.max(bh, w * f);
-        // rounded start, square end, so the '|' marker sits on a straight edge
-        const sq = Math.min(fw, bh / 2 + 1);
-        if (col !== t.accent || !t.ramp) { cv.roundRect(x, by, fw, bh, bh / 2, col); cv.fillRect(x + fw - sq, by, sq, bh, col); }
-        else { cv.rampRect(x, by, fw, bh, bh / 2, t.ramp, x, w); cv.rampRect(x + fw - sq, by, sq, bh, 0, t.ramp, x, w); }
-        // marker: theme colour, white when the bar itself is red / warning-coloured (else it would vanish)
-        const mk = col === t.crit || col === t.warn || col === t.marker ? t.text : t.marker || t.text;
-        cv.roundRect(x + fw - 3, by - 11, 6, bh + 22, 2, mk);
+        const xe = X(v), cap = 7, hi = mix(col, '#ffffff', 0.28), top = Math.round(bh * 0.42);
+        if (stops) {                                 // colour of its position on the scale, lighter upper part
+            const lite = stops.map((c) => mix(c, '#ffffff', 0.28));
+            for (let r = 0; r < bh; r++) { const o = SL * (bh - r - 0.5) / bh; cv.rampRect(x + o, by + r, xe - x, 1, 0.5, r < top ? lite : stops, x + o, bw); }   // r 0.5: full cover on a 1 px row
+        } else {
+            slab(cv, x, xe, by, bh, SL, col);
+            for (let r = 0; r < top; r++) cv.fillRect(x + SL * (bh - r - 0.5) / bh, by + r, xe - x, 1, hi);
+        }
+        if (xe - x > cap + 4) { slab(cv, xe - cap - 3, xe - cap, by, bh, SL, t.bg); slab(cv, xe - cap, xe, by, bh, SL, '#ffffff'); }
     }
-    if (isNum(g.peak)) {
-        const px = x + clamp((g.peak - min) / (max - min), 0, 1) * w;
-        cv.roundRect(px - 1.5, by - 15, 3, 9, 1.5, t.accent2);              // peak: small tick above the bar
+    // peak hold ("hang"): line along the top edge (over the fill) to the peak, then down its slanted end
+    if (isNum(g.peak) && (g.peak - min) / (max - min) > 0.02) {          // (not for a peak at the very start)
+        const px = X(g.peak), hc = t.hang || (stops ? ramp(stops, (px - x) / bw) : col);
+        cv.fillRect(x + SL, by - 2, px - x, 5, hc);
+        if (!isNum(v) || g.peak > v) cv.line(px + SL, by, px, by + bh, 4, hc);
     }
+    // scale: white line under the bar, broken at each step, numbers below (when there is room)
+    const dec = g.scaleDecimals != null ? g.scaleDecimals : step % 1 ? 1 : 0;
+    const marks = [];
+    for (let a = min; a <= max + 1e-9; a += step) marks.push(a);
+    if (max - marks[marks.length - 1] > step * 0.45) marks.push(max);           // label the end too
+    cv.fillRect(x, by + bh + 2, bw, 2, withAlpha('#ffffff', 0.85));
+    marks.slice(1).forEach((a) => { if (a < max - 1e-9) cv.fillRect(X(a) - 2, by + bh + 2, 4, 2, t.bg); });
+    if (h >= 80) marks.forEach((a) => cv.text(fmt(a, dec), X(a), by + bh + 24, 17, withAlpha(t.text, 0.8), { align: 'center', font: 'bold' }));
 }
 
 /**
@@ -201,9 +258,14 @@ function segBar(cv, t, x, y, w, h, g) {
         cv.line(xe, y1 + 4, xe + SL, y0 - 4, 6, '#ffffff');                  // bright leading edge
     }
     for (let a = min + step; a < max - 1e-9; a += step) gapAt(a, t.bg);
-    // marks above the bar (shift point, warm, ...) + peak
+    // peak hold ("hang", OEM style): line along the top edge (over the fill) to the peak, then down its slanted end
+    if (isNum(g.peak) && (g.peak - min) / (max - min) > 0.02) {          // (not for a peak at the very start)
+        const pk = Math.min(g.peak, max), pc = t.hang || (hot && pk >= lim ? '#ff2a2a' : hot ? ramp(t.hotRamp || t.ramp, clamp((pk - min) / (lim - min), 0, 1)) : zoneColor(t, g, pk, base));
+        cv.fillRect(bx + SL, y0 - 2, X(pk) - bx, 5, pc);
+        if (!isNum(v) || g.peak > v) cv.line(X(pk) + SL, y0, X(pk), y1, 4, pc);
+    }
+    // marks above the bar (shift point, warm, ...)
     for (const m of g.marks || []) { const xx = X(m.value) + SL; cv.fillRect(xx - 2, y0 - 14, 4, 12, t[m.color] || m.color); }
-    if (isNum(g.peak) && g.peak > min) { const xx = X(g.peak) + SL; cv.fillRect(xx - 1.5, y0 - 20, 3, 14, t.accent2); }
     // scale
     const sc = g.scale || {};
     for (let a = min; a <= max + 1e-9; a += step) {

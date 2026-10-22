@@ -70,9 +70,28 @@ class Canvas {
                 const a = s[si + 3];
                 if (a === 0) continue;
                 if (a === 255) { d[di] = s[si]; d[di + 1] = s[si + 1]; d[di + 2] = s[si + 2]; d[di + 3] = 255; continue; }
+                // translucent over an opaque pixel (panels over the background - most of every frame):
+                // _blend's maths with da = 1, inlined - same result without a call per pixel
+                if (d[di + 3] === 255) {
+                    const sa = a / 255, k = 1 - sa;
+                    d[di] = s[si] * sa + d[di] * k; d[di + 1] = s[si + 1] * sa + d[di + 1] * k; d[di + 2] = s[si + 2] * sa + d[di + 2] * k;
+                    continue;
+                }
                 px[0] = s[si]; px[1] = s[si + 1]; px[2] = s[si + 2]; px[3] = a;
                 this._blend(qx, py, px, 1);
             }
+        }
+        return this;
+    }
+
+    /** Copy an opaque canvas to (x, y) row by row (no blending: memcpy per row), clipped. */
+    copyRows(src, x, y) {
+        x = Math.round(x); y = Math.round(y);
+        const x0 = Math.max(0, x), x1 = Math.min(this.w, x + src.w);
+        if (x1 <= x0) return this;
+        for (let py = Math.max(0, y); py < Math.min(this.h, y + src.h); py++) {
+            const s = ((py - y) * src.w + (x0 - x)) * 4;
+            this.d.set(src.d.subarray(s, s + (x1 - x0) * 4), (py * this.w + x0) * 4);
         }
         return this;
     }
@@ -392,29 +411,18 @@ class Canvas {
         }
     }
 
-    /** Encode as PNG (RGBA, 8 bit). */
     /**
-     * Encode as PNG. A fully opaque canvas (every screen frame) is written as RGB,
-     * which needs a quarter less data to compress; anything with transparency (app
-     * icons) keeps RGBA. Level 1 (default) is the fastest zlib setting: about half
-     * the encode time of level 4 for a slightly larger file.
+     * Encode as PNG (RGBA, 8 bit). Level 1 (default) is the fastest zlib setting: about
+     * half the encode time of level 4 for a slightly larger file.
      */
     png(level) {
         const w = this.w, h = this.h, d = this.d;
-        let opaque = true;
-        for (let i = 3; i < d.length; i += 4) if (d[i] !== 255) { opaque = false; break; }
-        const bpp = opaque ? 3 : 4, stride = w * bpp + 1;
-        const raw = Buffer.alloc(stride * h);
-        if (opaque) {
-            let o = 0, i = 0;
-            for (let y = 0; y < h; y++) {
-                raw[o++] = 0;                               // filter: none
-                for (let x = 0; x < w; x++, i += 4) { raw[o++] = d[i]; raw[o++] = d[i + 1]; raw[o++] = d[i + 2]; }
-            }
-        } else {
-            const src = Buffer.from(d.buffer, d.byteOffset, d.length);
-            for (let y = 0; y < h; y++) src.copy(raw, y * stride + 1, y * w * 4, (y + 1) * w * 4);
-        }
+        // RGBA rows as they are, copied natively. Packing opaque frames to RGB in a JS loop
+        // (832k pixels) took longer on the head unit than the extra quarter of data costs deflate:
+        // ~50 ms per frame there; on a PC 9.6 -> 6.1 ms for a 9 % larger file.
+        const stride = w * 4 + 1, raw = Buffer.allocUnsafe(stride * h);
+        const src = Buffer.from(d.buffer, d.byteOffset, d.length);
+        for (let y = 0; y < h; y++) { raw[y * stride] = 0; src.copy(raw, y * stride + 1, y * w * 4, (y + 1) * w * 4); }
         const chunk = (type, body) => {
             const len = Buffer.alloc(4); len.writeUInt32BE(body.length, 0);
             const tb = Buffer.concat([Buffer.from(type, 'ascii'), body]);
@@ -423,7 +431,7 @@ class Canvas {
         };
         const ihdr = Buffer.alloc(13);
         ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
-        ihdr[8] = 8; ihdr[9] = opaque ? 2 : 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+        ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;             // 8 bit RGBA
         return Buffer.concat([
             Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
             chunk('IHDR', ihdr),

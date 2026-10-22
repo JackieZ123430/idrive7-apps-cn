@@ -82,6 +82,9 @@ WIDGETS = {
     'button':    ('button', 'LT_Button_1Row', {2: 1, 3: 2}),
     'iconbutton': ('button', 'LT_Button_1Row_1IconLeft', {2: 1, 3: 2}),
     'twocol':    ('button', 'LT_Button_1Row_2Col7030_2Text', {2: 1, 3: 2}),
+    # settings: label on the 1st row, value on the 2nd, each the full width (BMW's parking app
+    # settings use it in an LT_State_Wide); the 70/30 one-row columns cut both off
+    'tworow':    ('button', 'LT_Button_2Row_2Text', {2: 1, 3: 2}),
     'checkbox':  ('checkBox', 'LT_CheckBox_1Row', {2: 1, 3: 2}),
     'scroll':    ('label', 'LT_ScrollLabel_UnlimitedRow_TextDyn', {2: 1, 3: 1}),
     'laptimer':  ('label', 'LT_Label_Laptimer', {3: 0}),
@@ -103,6 +106,21 @@ class Ids:
 
 def sid(app, key):
     return 'SID_' + re.sub(r'[^A-Z0-9]+', '_', (app + '_' + key).upper()).strip('_')
+
+
+def hmi_text(s):
+    """Text for the HMI's own components: it shows non-ASCII as mojibake ('deg C' -> 'A-circumflex deg C'),
+    so the degree sign is dropped and other non-ASCII characters removed (as mgu.js hmiText)."""
+    return re.sub(r'[^\x20-\x7e]', '', str(s).replace('°', ''))
+
+
+def setting_options(s):
+    """(values, labels) of a choice / number setting, in order - the drop-down's rows."""
+    if s['type'] == 'choice':
+        return [o[0] for o in s['options']], [o[1] for o in s['options']]
+    steps = s.get('steps') or []
+    unit = (' ' + s['unit']) if s.get('unit') else ''
+    return list(steps), [('%g' % v) + unit for v in steps]
 
 
 def build_ui(spec):
@@ -148,7 +166,8 @@ def build_ui(spec):
         kind = scr.get('kind', 'list')
         # canvas = M Laptimer's state; menus = the state BMW uses for its
         # clickable lists (LT_State_Wide only renders a single text block)
-        widget = 'LT_State_Laptimer' if kind == 'canvas' else 'LT_State_Regular_ContentHidden'
+        # settings: the wide state (full screen width), as BMW's own settings lists
+        widget = 'LT_State_Laptimer' if kind == 'canvas' else 'LT_State_Wide' if kind == 'settings' else 'LT_State_Regular_ContentHidden'
         cont = {'type': 'state', 'name': scr['name'], 'components': {}}
         x = [f'    <container id="{cid}" type="state" widget="{widget}">']
         if main_id is not None and scr.get('parent', True):
@@ -172,10 +191,21 @@ def build_ui(spec):
                 name = 'SET_' + s['key'].upper()
                 if s['type'] == 'bool':
                     items.append(comp('checkbox', name, rows=[text_row('SET_' + s['key'], s['label'])]))
+                elif s['type'] in ('choice', 'number'):
+                    # a drop-down with every value, as BMW's parking app settings: rows = options
+                    # (ItemText), HeaderText = the setting, SelectedItem = the chosen row (mgu.js sets it)
+                    values, labels = setting_options(s)
+                    did = nid()
+                    items.append((did, [f'            <component id="{did}" type="dropDownMenu"/>'], {
+                        'type': 'dropDownMenu', 'name': name,
+                        'rows': [{'ItemText': {'value': hmi_text(lb), 'type': 'Text'}} for lb in labels],
+                        'cells': {'HeaderText': {'value': hmi_text(s['label']), 'type': 'Text'},
+                                  'SelectedItem': {'value': values.index(s['default']) if s['default'] in values else 0, 'type': 'UInt'}},
+                    }))
                 else:
                     strings[sid(app, 'SET_' + s['key'])] = s['label']
-                    items.append(comp('twocol', name, rows=[{'Text1stCol': {'value': s['label'], 'type': 'Text'},
-                                                            'Text2ndCol': {'value': '', 'type': 'Text'}}]))
+                    items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
+                                                            'Text2ndRow': {'value': '', 'type': 'Text'}}]))
             groups.append(('List', items))
         else:   # list: components from "items"
             items = []
@@ -237,7 +267,7 @@ def make_icon(spec, out):
         shutil.copy(src, out)
         return
     # rendered by the kit's own canvas (node) so no extra tooling is needed
-    os.system(f'node {os.path.join(HERE, "make_icon.js")} "{spec.get("iconGlyph", spec["title"][:2])}" "{out}"')
+    os.system(f'node "{os.path.join(HERE, "make_icon.js")}" "{spec.get("iconGlyph", spec["title"][:2])}" "{out}"')
 
 
 def build(app_id):

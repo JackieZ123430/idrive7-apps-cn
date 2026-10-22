@@ -2,7 +2,7 @@
   "id": "draggy",
   "title": "Drag Timer",
   "description": "0-100, 100-200 and 1/4 mile timer with best times",
-  "version": "2.1.0",
+  "version": "2.1.4",
   "vendor": "custom",
   "loggingId": "OA94",
   "iconGlyph": "flag",

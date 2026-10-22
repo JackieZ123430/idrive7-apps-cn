@@ -2,7 +2,7 @@
   "id": "gforce",
   "title": "G-Force",
   "description": "Friction circle with grip envelope, peak g per direction and session records",
-  "version": "1.1.0",
+  "version": "1.2.3",
   "vendor": "custom",
   "loggingId": "OA9B",
   "iconGlyph": "gforce",

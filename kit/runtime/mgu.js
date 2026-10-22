@@ -102,6 +102,14 @@ class Settings {
     }
 }
 
+/**
+ * Text for the HMI's own lists / buttons. The HMI shows non-ASCII text from an app as mojibake
+ * ("°C" arrives as "Â°C"), so '°' is dropped there ("125 C"); drawn screens are not affected.
+ */
+function hmiText(s) {
+    return String(s).replace(/°/g, '').replace(/[^\x20-\x7e]/g, '');
+}
+
 /* ---------------- UI wrapper ---------------- */
 class Ui {
     constructor(app) {
@@ -110,6 +118,7 @@ class Ui {
         this._img = Object.create(null);      // per-component dynamic image state
         this._visible = Object.create(null);  // stateName -> bool
         this._visHandlers = [];
+        this.timing = { png: 0, push: 0 };    // ms spent encoding / handing images to the HMI
     }
     comp(name) {
         const c = this.rhmi && this.rhmi.getByName(name);
@@ -124,13 +133,18 @@ class Ui {
 
     text(name, text, row, cell) {
         const c = this.comp(name);
-        return c ? this._try('text ' + name, c.setValue(row || 0, cell || 'Text', String(text), 'Text')) : Promise.resolve();
+        return c ? this._try('text ' + name, c.setValue(row || 0, cell || 'Text', hmiText(text), 'Text')) : Promise.resolve();
     }
     /** Set several cells of one row: ui.cells('LIST', 3, { Text1stCol: 'a', Text2ndCol: 'b' }) */
     cells(name, row, obj) {
         const c = this.comp(name);
         if (!c) return Promise.resolve();
-        return Promise.all(Object.keys(obj).map((k) => this._try('cell ' + name + '.' + k, c.setValue(row, k, String(obj[k]), 'Text'))));
+        return Promise.all(Object.keys(obj).map((k) => this._try('cell ' + name + '.' + k, c.setValue(row, k, hmiText(obj[k]), 'Text'))));
+    }
+    /** Selected row of a drop-down menu. */
+    selected(name, row) {
+        const c = this.comp(name);
+        return c ? this._try('selected ' + name, c.setValue('SelectedItem', row, 'UInt')) : Promise.resolve();
     }
     rows(name, n) { const c = this.comp(name); return c ? this._try('rows ' + name, c.setRowCount(n)) : Promise.resolve(); }
     visible(name, on) { const c = this.comp(name); return c ? this._try('visible ' + name, c.setProperty('Visible', on ? 1 : 0, 'UInt')) : Promise.resolve(); }
@@ -154,6 +168,7 @@ class Ui {
     _setVisible(stateName, on) {
         if (this._visible[stateName] === on) return;
         this._visible[stateName] = on;
+        if (on) Object.keys(this._img).forEach((k) => { this._img[k].lastPx = null; });      // push the next frame for sure
         log.debug('state ' + stateName + (on ? ' visible' : ' hidden'));
         this._visHandlers.forEach((fn) => { try { fn(stateName, on); } catch (e) { log.error(e); } });
     }
@@ -162,33 +177,51 @@ class Ui {
      * Show a drawn image (canvas.js Canvas or PNG Buffer) in a graphic cell.
      * The PNG goes to rhmiData/resources (readable by the HMI through the
      * install ACLs), gets a resource handle from the app's ResourceBundle, and
-     * the old handle is released. Two alternating files avoid the HMI reading
-     * a file while it is rewritten.
+     * an older handle is released.
+     *
+     * The HMI loads a new image after setValue has already returned. Releasing the previous
+     * image right then made the screen blink black (~0.5 s) whenever loading was slow - mostly
+     * the first minutes after the head unit starts. So the previous image stays until the next
+     * frame is set (handles released two frames late), four files rotate so none is rewritten
+     * while it may still be on screen or loading, and each file is written under a temporary
+     * name and renamed into place, so the HMI never reads half a file.
      */
     image(name, img, cell) {
-        const st = this._img[name] || (this._img[name] = { n: 0, prev: null, busy: null, next: null });
+        const st = this._img[name] || (this._img[name] = { n: 0, live: [], busy: null, next: null });
         // coalesce: if a push is in flight, remember only the newest frame
         if (st.busy) { st.next = img; return st.busy; }
         const run = async (frame) => {
             const c = this.comp(name);
             if (!c) return;
+            // a frame identical to the one on screen (parked car, steady values) is not encoded and
+            // pushed again - that is most of a frame's cost. Re-sent every 5 s anyway, and after the
+            // screen is opened again (_setVisible), in case the HMI dropped it.
+            const px = Buffer.isBuffer(frame) ? null : Buffer.from(frame.d.buffer, frame.d.byteOffset, frame.d.length);
+            if (px && st.shown && st.lastPx && Date.now() - st.lastPush < 5000 && px.equals(st.lastPx)) return;
             const rb = this.rhmi.getResourceBundle();
             // per-run file names: the HMI keeps state per resource path, so
             // names reused from an earlier run of the app get rejected
-            const file = path.join(RHMI_RES, 'dyn_' + RUN_TAG + '_' + name.toLowerCase() + '_' + (st.n++ % 3) + '.png');
+            const file = path.join(RHMI_RES, 'dyn_' + RUN_TAG + '_' + name.toLowerCase() + '_' + (st.n++ % 4) + '.png');
             const t0 = Date.now(), first = !st.shown;
-            fs.writeFileSync(file, Buffer.isBuffer(frame) ? frame : frame.png());
+            const png = Buffer.isBuffer(frame) ? frame : frame.png();
+            const t1 = Date.now();
+            fs.writeFileSync(file + '.tmp', png);
+            fs.renameSync(file + '.tmp', file);
             if (first) log.info('image ' + name + ': png written ' + (Date.now() - t0) + ' ms');
             await rb.createResourceHandles([file]);
             const handle = rb.getResourceHandle(file);
             if (first) log.info('image ' + name + ': handle ' + JSON.stringify(handle));
             await c.setValue(0, cell || 'Graphic', handle, 'Asset');
+            this.timing.png += t1 - t0; this.timing.push += Date.now() - t1;       // for the loop's log line
+            if (px) { st.lastPx = Buffer.from(px); st.lastPush = Date.now(); }       // a copy: the canvas may be drawn on again
             if (first) { st.shown = true; log.info('image ' + name + ': shown after ' + (Date.now() - t0) + ' ms'); }
-            if (st.prev && st.prev !== file) {
-                const old = st.prev;
+            // keep the image on screen and the one before it (the HMI may still show it while it
+            // loads this one); release anything older
+            st.live = st.live.filter((f) => f !== file).concat([file]);
+            while (st.live.length > 2) {
+                const old = st.live.shift();
                 rb.destroyResourceHandles([old]).catch((e) => { if (!st.destroyWarned) { st.destroyWarned = true; log.warn('destroy handle: ' + e); } });
             }
-            st.prev = file;
         };
         st.busy = run(img).catch((e) => log.warn('image ' + name + ': ' + e)).then(() => {
             st.busy = null;
@@ -203,13 +236,24 @@ function wireSettings(ctx) {
     const { ui, settings } = ctx;
     const schema = settings.schema;
     if (!schema.length || !ui.comp('SETTINGS')) return;
+    // choice / number settings are drop-downs (kit/tools/build.py): their rows are the values in this order
+    const values = (s) => (s.type === 'choice' ? (s.options || []).map((o) => o[0]) : s.type === 'number' ? s.steps || [] : null);
     const refresh = () => Promise.all(schema.map((s) => {
         const comp = 'SET_' + s.key.toUpperCase();
         if (s.type === 'bool') return Promise.all([ui.text(comp, s.label), ui.checked(comp, !!settings.get(s.key))]);
-        return ui.cells(comp, 0, { Text1stCol: s.label, Text2ndCol: settings.display(s.key) });
+        if (values(s)) return ui.selected(comp, Math.max(0, values(s).indexOf(settings.get(s.key))));
+        // other types: two-row buttons in the wide settings state, label above, value below
+        return ui.cells(comp, 0, { Text1stRow: s.label, Text2ndRow: settings.display(s.key) });
     }));
     schema.forEach((s) => {
-        ui.onClick('SET_' + s.key.toUpperCase(), () => { settings.cycle(s.key); return refresh(); });
+        const comp = 'SET_' + s.key.toUpperCase();
+        if (values(s)) {
+            // the chosen row of the drop-down (the HMI shows the selection itself)
+            ui.onClick(comp, (ev) => {
+                const v = values(s)[ev && ev.row];
+                if (v !== undefined && v !== settings.get(s.key)) settings.set(s.key, v);
+            });
+        } else ui.onClick(comp, () => { settings.cycle(s.key); return refresh(); });
     });
     if (ui.comp('BTN_SETTINGS')) ui.onClick('BTN_SETTINGS', () => refresh().then(() => ui.open('SETTINGS')));
     return refresh();
@@ -239,7 +283,7 @@ async function runInner(impl) {
         theme: () => themes.theme(settings.get('theme')),
         /** Run fn about `fps` times a second while screen `stateName` is visible. */
         loop(stateName, fps, fn) {
-            let timer = null, running = false, frames = 0;
+            let timer = null, running = false, frames = 0, spent = 0;
             const tick = async () => {
                 if (running) return;
                 running = true;
@@ -250,6 +294,13 @@ async function runInner(impl) {
                 if (++frames % 3 === 0 && typeof global.gc === 'function') { try { global.gc(); } catch (e) { /* ignore */ } }
                 running = false;
                 const dt = Date.now() - t0;
+                // what a frame really costs on the unit (draw + PNG + HMI), to tune the refresh rate by
+                spent += dt;
+                if (frames % 100 === 0) {
+                    const tm = ui.timing, png = Math.round(tm.png / 100), push = Math.round(tm.push / 100), all = Math.round(spent / 100);
+                    log.info('loop ' + stateName + ': ' + all + ' ms per frame (draw ' + Math.max(0, all - png - push) + ', png ' + png + ', hmi ' + push + '; asked for ' + fps + ' fps)');
+                    spent = 0; tm.png = 0; tm.push = 0;
+                }
                 // at least 15 ms between frames so car data and HMI events get handled
                 if (timer !== null) timer = setTimeout(tick, Math.max(15, 1000 / fps - dt));
             };

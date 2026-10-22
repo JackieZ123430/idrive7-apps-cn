@@ -2,7 +2,7 @@
   "id": "redline",
   "title": "Redline",
   "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard",
-  "version": "1.4.0",
+  "version": "1.6.3",
   "vendor": "custom",
   "loggingId": "OA97",
   "iconGlyph": "rpm",
@@ -15,7 +15,8 @@
       "statusCarSpeed2": "rs"
     },
     "de.bmw.infrastructure.VehicleInformation": {
-      "statusGearboxDrive": "s"
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
     }
   },
   "screens": [
@@ -48,7 +49,9 @@
      "steps": [60, 70, 80, 90]},
     {"key": "speedUnit", "label": "Units", "type": "choice", "default": "kmh",
      "options": [["kmh", "km/h"], ["mph", "mph"]]},
-    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 10, "steps": [6, 8, 10, 12, 15]},
+    {"key": "peakHold", "label": "Peak hold (0 = until reset)", "type": "number", "unit": "s", "default": 15,
+     "steps": [0, 5, 10, 15, 30, 60]},
+    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 15, "steps": [6, 8, 10, 12, 15]},
     {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
      "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
   ]

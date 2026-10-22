@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "1.5.0",
+  "version": "1.6.3",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -214,11 +214,11 @@
       "options": [
         [
           "c",
-          "°C"
+          "Celsius"
         ],
         [
           "f",
-          "°F"
+          "Fahrenheit"
         ]
       ]
     },
@@ -247,6 +247,12 @@
         7,
         30
       ]
+    },
+    {
+      "key": "diagPage",
+      "label": "Diagnostics page (UDS replies)",
+      "type": "bool",
+      "default": false
     },
     {
       "key": "fps",
@@ -336,6 +342,17 @@
           "offset": 0,
           "min": 5,
           "max": 18
+        },
+        {
+          "ecu": 18,
+          "obd": "42",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "the same PID with OBD service 01, for engine units that refuse F442 with NRC 31"
         }
       ],
       "chargeMinPct": 3
