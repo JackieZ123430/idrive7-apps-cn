@@ -66,6 +66,12 @@ class Settings {
         this.listeners = [];
         for (const s of this.schema) this.values[s.key] = s.default;
         try { Object.assign(this.values, JSON.parse(fs.readFileSync(this.file, 'utf8'))); } catch (e) {}
+        // one-time move of saved settings to the new default theme (M Tricolour); later choices are kept
+        const th = this.item('theme');
+        if (th && fs.existsSync(this.file) && this.values._themeV !== 2) {
+            this.values.theme = th.default; this.values._themeV = 2;
+            try { fs.writeFileSync(this.file, JSON.stringify(this.values, null, 1)); } catch (e) { /* read-only */ }
+        }
     }
     get(key) { return this.values[key]; }
     set(key, value) {

@@ -26,7 +26,7 @@
     }
   ],
   "settings": [
-    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_red",
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
      "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
     {"key": "warmOil", "label": "Oil is warm at", "type": "number", "unit": "°C", "default": 80, "steps": [60, 70, 75, 80, 85, 90, 100]},
     {"key": "coldLimit", "label": "Rev limit when cold", "type": "number", "unit": "rpm", "default": 3500, "steps": [2500, 3000, 3500, 4000, 4500]},

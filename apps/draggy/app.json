@@ -30,7 +30,7 @@
     }
   ],
   "settings": [
-    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_red",
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
      "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
     {"key": "speedUnit", "label": "Units", "type": "choice", "default": "kmh",
      "options": [["kmh", "km/h"], ["mph", "mph"]]},

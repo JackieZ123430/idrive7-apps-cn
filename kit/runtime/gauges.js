@@ -24,14 +24,23 @@ function zoneColor(t, g, v, base) {
     return c;
 }
 
-/** HMI-style panel: vertical gradient, hairline edge, slanted tab, title. */
+/** Panel card: rounded, soft vertical gradient, hairline edge, accent pill + title. */
 function panel(cv, t, x, y, w, h, title) {
-    cv.gradientRect(x, y, w, h, [[0, t.panelTop], [1, t.panelBottom]]);
-    cv.fillRect(x, y, w, 2, t.panelEdge);
-    // slanted tab like the HMI's home-screen cards
-    const tw = Math.min(110, w * 0.3);
-    for (let r = 0; r < 6; r++) cv.fillRect(x, y + r, tw - r * 1.6, 1, t.tab);
-    if (title) cv.text(String(title).toUpperCase(), x + 18, y + 40, 24, t.dim, { font: 'bold', spacing: 1.5 });
+    const R = 16, E = 1.5, lo = mix(t.panelEdge, t.panelBottom, 0.6);
+    cv.card(x, y, w, h, R, [[0, t.panelTop], [1, t.panelBottom]]);
+    // hairline edge, fading towards the bottom: straight runs + quarter-circle corners
+    cv.fillRect(x + R, y, w - 2 * R, E, t.panelEdge);
+    cv.fillRect(x + R, y + h - E, w - 2 * R, E, lo);
+    cv.gradientRect(x, y + R, E, h - 2 * R, [[0, t.panelEdge], [1, lo]]);
+    cv.gradientRect(x + w - E, y + R, E, h - 2 * R, [[0, t.panelEdge], [1, lo]]);
+    cv.arc(x + R, y + R, R - E, R, -90, 0, t.panelEdge);
+    cv.arc(x + w - R, y + R, R - E, R, 0, 90, t.panelEdge);
+    cv.arc(x + w - R, y + h - R, R - E, R, 90, 180, lo);
+    cv.arc(x + R, y + h - R, R - E, R, 180, 270, lo);
+    if (title) {
+        cv.roundRect(x + 18, y + 21, 4, 24, 2, t.accent);
+        cv.text(String(title).toUpperCase(), x + 32, y + 40, 22, t.dim, { font: 'bold', spacing: 2 });
+    }
 }
 
 /** 270-degree radial gauge centred at (cx, cy). */
@@ -61,13 +70,15 @@ function radial(cv, t, cx, cy, r, g) {
         }
     }
     // live arc with soft glow
+    // live arc: the theme's colour ramp along the scale (a zone's colour when inside one), soft glow, bright tip
     const col = zoneColor(t, g, v);
     if (isNum(v) && f > 0.002) {
-        const ae = a0 + f * 270;
-        cv.arc(cx, cy, r - thick - 6, r + 6, a0, ae, withAlpha(col, 0.18));
-        cv.arc(cx, cy, r - thick, r, a0, ae, col, { round: true });
-        const a = ae * Math.PI / 180;
-        cv.line(cx + Math.sin(a) * (r - thick - 22), cy - Math.cos(a) * (r - thick - 22), cx + Math.sin(a) * (r + 4), cy - Math.cos(a) * (r + 4), 5, t.text);
+        const ae = a0 + f * 270, inZone = col !== t.accent;
+        cv.arc(cx, cy, r - thick - 6, r + 6, a0, ae, withAlpha(col, 0.14));
+        cv.arc(cx, cy, r - thick, r, a0, ae, col, inZone || !t.ramp ? { round: true } : { round: true, ramp: t.ramp, rampFrom: a0, rampTo: a1 });
+        const a = ae * Math.PI / 180, rm = r - thick / 2;
+        cv.circle(cx + Math.sin(a) * rm, cy - Math.cos(a) * rm, thick * 0.5 + 4, withAlpha(t.text, 0.25));
+        cv.circle(cx + Math.sin(a) * rm, cy - Math.cos(a) * rm, thick * 0.5 + 1, t.text);
     }
     // peak marker
     if (isNum(g.peak) && g.peak > min) {
@@ -82,26 +93,27 @@ function radial(cv, t, cx, cy, r, g) {
     if (isNum(g.peak) && g.showPeak !== false) cv.text('PEAK ' + fmt(g.peak, g.decimals), cx, cy + r * 0.82 + 32, 22, t.accent2, { align: 'center', font: 'label', spacing: 1 });
 }
 
-/** Segmented horizontal bar gauge with label / value header. */
+/** Horizontal bar gauge with label / value header: a slim rounded track filled with the theme ramp. */
 function bar(cv, t, x, y, w, h, g) {
     const min = g.min || 0, max = g.max == null ? 100 : g.max, v = g.value;
     const f = isNum(v) ? clamp((v - min) / (max - min), 0, 1) : 0;
-    cv.text(String(g.label || '').toUpperCase(), x, y + 26, 24, t.dim, { font: 'bold', spacing: 1.5 });
+    cv.text(String(g.label || '').toUpperCase(), x, y + 26, 22, t.dim, { font: 'bold', spacing: 2 });
     const vs = fmt(v, g.decimals);
     const uw = g.unit ? cv.textWidth(' ' + g.unit, 26) : 0;
     cv.text(vs, x + w - uw, y + 30, 44, isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
     if (g.unit) cv.text(' ' + g.unit, x + w, y + 30, 26, t.dim, { align: 'right' });
-    const by = y + 44, bh = h - 44, segs = g.segments || 24, gap = 4;
-    const sw = (w - gap * (segs - 1)) / segs;
-    for (let i = 0; i < segs; i++) {
-        const mid = min + ((i + 0.5) / segs) * (max - min);
-        const on = (i + 1) / segs <= f + 1e-6 || (i / segs < f);
-        const c = on ? zoneColor(t, g, mid) : t.track;
-        cv.fillRect(x + i * (sw + gap), by, sw, bh, c);
+    const room = h - 44, bh = Math.max(8, Math.min(room, 18)), by = y + 44 + (room - bh) / 2;
+    cv.roundRect(x, by, w, bh, bh / 2, t.track);
+    if (f > 0) {
+        const col = zoneColor(t, g, v);
+        const fw = Math.max(bh, w * f);
+        if (col !== t.accent || !t.ramp) cv.roundRect(x, by, fw, bh, bh / 2, col);
+        else cv.rampRect(x, by, fw, bh, bh / 2, t.ramp, x, w);
+        cv.roundRect(x + fw - bh, by - 3, bh, bh + 6, bh / 2, withAlpha(t.text, 0.9));
     }
     if (isNum(g.peak)) {
         const px = x + clamp((g.peak - min) / (max - min), 0, 1) * w;
-        cv.fillRect(px - 2, by - 6, 4, bh + 12, t.accent2);
+        cv.roundRect(px - 2, by - 8, 4, bh + 16, 2, t.accent2);
     }
 }
 
@@ -205,7 +217,7 @@ function gmeter(cv, t, cx, cy, r, g) {
 function stripes(cv, t, x, y, w) {
     const s = t.stripes || [t.accent];
     const sw = w / s.length;
-    s.forEach((c, i) => cv.fillRect(x + i * sw, y, sw - (i < s.length - 1 ? 3 : 0), 4, c));
+    s.forEach((c, i) => cv.roundRect(x + i * sw, y, sw - (i < s.length - 1 ? 4 : 0), 4, 2, c));
 }
 
 module.exports = { panel, radial, bar, stat, tyres, gmeter, stripes, fmt, isNum, clamp, mix, zoneColor };

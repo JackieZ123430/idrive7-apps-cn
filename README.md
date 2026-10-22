@@ -42,8 +42,8 @@ Ice White and Night Amber. In the car the same screens show live data.)*
 
 ## 1. The apps
 
-Every app has a settings screen in the HMI's own style: four colour themes (M Red, M Tricolour,
-Ice White, Night Amber), units, refresh rate, and a demo mode. Results and records are saved on
+Every app has a settings screen in the HMI's own style: four colour themes (M Tricolour, the
+default, M Red, Ice White, Night Amber), units, refresh rate, and a demo mode. Results and records are saved on
 the unit and kept across reboots.
 
 | App | What it does |
@@ -56,7 +56,7 @@ the unit and kept across reboots.
 | **Warm-Up** | Oil and coolant gauges, a safe rev limit that rises with oil temperature, an estimate of minutes until the engine is ready, a temperature trend graph, and a turbo cool-down countdown after hard driving. |
 | **M Vitals** | A sport cluster: rpm, boost, speed, power and torque output, coolant and oil temperature, g-forces and more, over several pages, with peak values. |
 | **Fault Scanner** | Scans every control unit for stored fault codes (UDS over the head unit's diagnostic gateway), shows them per module with status, shows live Check Control messages, and can clear fault memories (two-press confirm). |
-| **eDrive** | For plug-in hybrids / EVs: real electric range from the battery's charge and the outside temperature (your own km per full charge for cold / mild / hot, e.g. 40 km below 10 °C, 50 km at 10-25 °C), battery health (SOH, capacity vs. new) and design capacity left (charge × SOH, in % and kWh). Also shows the last HV battery charge (+%, kWh, km added; a charge done while the head unit slept shows at the next start) and the 12 V battery voltage. Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
+| **eDrive** | For plug-in hybrids / EVs: real electric range from the battery's charge and the outside temperature (your own km per full charge for cold / mild / hot, e.g. 40 km below 10 °C, 50 km at 10-25 °C), battery health (SOH, capacity vs. new) and design capacity left (charge × SOH, in % and kWh). Also shows the last HV battery charge (+%, kWh, km added; a charge done while the head unit slept shows at the next start) and the 12 V battery voltage. A charge log page lists every charge (date, % and kWh added, range added, optional cost from your electricity price) with monthly / all-time totals and a 14-day chart. Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
 
 On the VM or a bench unit without vehicle data, every app switches to a built-in demo drive
 after 5 seconds (launch, pull through the gears, a hard stop, corners, an engine warming up from

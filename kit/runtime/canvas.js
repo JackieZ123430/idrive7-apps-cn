@@ -29,6 +29,13 @@ function mix(a, b, t) {
 function withAlpha(c, a) { const v = rgba(c); return [v[0], v[1], v[2], Math.round(a * 255)]; }
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+/** Colour at position f (0..1) of a ramp [c0, c1, ...] (evenly spaced stops). */
+function ramp(stops, f) {
+    if (stops.length === 1) return rgba(stops[0]);
+    const x = clamp01(f) * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x));
+    return mix(stops[i], stops[i + 1], x - i);
+}
 const RAD = Math.PI / 180;
 
 class Canvas {
@@ -126,15 +133,80 @@ class Canvas {
         return this;
     }
 
+    /**
+     * Rounded card with a vertical gradient (stops as gradientRect). Only the
+     * corner squares are shaded per pixel, so it costs about as much as a fillRect.
+     */
+    card(x, y, w, h, r, stops) {
+        const st = stops.map((v) => [v[0], rgba(v[1])]);
+        r = Math.min(r, w / 2, h / 2);
+        const y0 = Math.max(0, Math.floor(y)), y1 = Math.min(this.h, Math.ceil(y + h));
+        for (let py = y0; py < y1; py++) {
+            const t = (py - y) / Math.max(1, h - 1);
+            let k = 0;
+            while (k < st.length - 2 && t > st[k + 1][0]) k++;
+            const a = st[k], b = st[Math.min(k + 1, st.length - 1)];
+            const c = mix(a[1], b[1], b[0] === a[0] ? 0 : clamp01((t - a[0]) / (b[0] - a[0])));
+            const cy = py + 0.5;
+            const inCorner = cy < y + r || cy > y + h - r;
+            if (!inCorner) { this.fillRect(x, py, w, 1, c); continue; }
+            const qy = Math.max(Math.abs(cy - (y + h / 2)) - (h / 2 - r), 0);
+            const covY = clamp01(Math.min(py + 1, y + h) - Math.max(py, y));
+            this.fillRect(x + r, py, w - 2 * r, covY, c);
+            for (const [ex0, ex1] of [[x, x + r], [x + w - r, x + w]]) {
+                for (let px = Math.max(0, Math.floor(ex0)); px < Math.min(this.w, Math.ceil(ex1)); px++) {
+                    const qx = Math.max(Math.abs(px + 0.5 - (x + w / 2)) - (w / 2 - r), 0);
+                    const cov = clamp01(0.5 - (Math.sqrt(qx * qx + qy * qy) - r)) * covY;
+                    if (cov > 0) this._blend(px, py, rgba(c), cov);
+                }
+            }
+        }
+        return this;
+    }
+
+    /**
+     * Rounded bar filled with a horizontal colour ramp. The ramp spans
+     * spanX..spanX+spanW (default the bar itself), so a partly filled bar
+     * keeps the colours of its position on the scale.
+     */
+    rampRect(x, y, w, h, r, stops, spanX, spanW) {
+        if (w <= 0 || h <= 0) return this;
+        r = Math.min(r, w / 2, h / 2);
+        const sx = spanX == null ? x : spanX, sw = Math.max(1, spanW == null ? w : spanW);
+        const x0 = Math.max(0, Math.floor(x)), y0 = Math.max(0, Math.floor(y));
+        const x1 = Math.min(this.w, Math.ceil(x + w)), y1 = Math.min(this.h, Math.ceil(y + h));
+        const col = [];
+        for (let px = x0; px < x1; px++) col.push(ramp(stops, (px + 0.5 - sx) / sw));
+        for (let py = y0; py < y1; py++) {
+            for (let px = x0; px < x1; px++) {
+                const qx = Math.max(Math.abs(px + 0.5 - (x + w / 2)) - (w / 2 - r), 0);
+                const qy = Math.max(Math.abs(py + 0.5 - (y + h / 2)) - (h / 2 - r), 0);
+                const cov = clamp01(0.5 - (Math.sqrt(qx * qx + qy * qy) - r));
+                if (cov > 0) this._blend(px, py, col[px - x0], cov);
+            }
+        }
+        return this;
+    }
+
     /** Filled circle. */
     circle(cx, cy, r, c) { return this.arc(cx, cy, 0, r, 0, 360, c); }
 
     /**
      * Annulus sector (ring segment) from angle a0 to a1 (degrees, clockwise
      * from 12 o'clock), radii r0..r1. opts.round = round end caps.
+     * opts.ramp = [c0, c1, ...] colours the ring by angle instead of c, spread
+     * over opts.rampFrom..opts.rampTo (default a0..a1), so a value arc keeps the
+     * colour of its position on the scale.
      */
     arc(cx, cy, r0, r1, a0, a1, c, opts) {
         c = rgba(c);
+        let lut = null, rf = 0, rs = 1;
+        if (opts && opts.ramp) {
+            rf = opts.rampFrom == null ? Math.min(a0, a1) : opts.rampFrom;
+            rs = Math.max(1e-6, (opts.rampTo == null ? Math.max(a0, a1) : opts.rampTo) - rf);
+            lut = [];
+            for (let i = 0; i <= 64; i++) lut.push(ramp(opts.ramp, i / 64));
+        }
         if (a1 < a0) { const t = a0; a0 = a1; a1 = t; }
         const full = a1 - a0 >= 360;
         const round = opts && opts.round && !full;
@@ -167,7 +239,14 @@ class Canvas {
                     }
                     cov = v;
                 }
-                if (cov > 0) this._blend(px, py, c, cov);
+                if (cov > 0) {
+                    if (lut) {
+                        let deg = Math.atan2(dx, -dy) / RAD;
+                        if (deg < rf - 180) deg += 360;
+                        c = lut[Math.round(clamp01((deg - rf) / rs) * 64)];
+                    }
+                    this._blend(px, py, c, cov);
+                }
             }
         }
         return this;
@@ -301,4 +380,4 @@ function crc32(buf) {
     return c ^ -1;
 }
 
-module.exports = { Canvas, rgba, mix, withAlpha, RAD };
+module.exports = { Canvas, rgba, mix, ramp, withAlpha, RAD };

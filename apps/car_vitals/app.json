@@ -68,7 +68,7 @@
       "key": "theme",
       "label": "Colour theme",
       "type": "choice",
-      "default": "m_red",
+      "default": "m_tricolour",
       "options": [
         [
           "m_red",
