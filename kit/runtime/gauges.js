@@ -6,7 +6,8 @@
  *
  * Value objects: { value, min, max, label, unit, decimals, peak, zones }
  *   zones = [{ from, to, color: 'warn'|'crit'|'cold'|'#hex' }] colour the
- *   live arc/bar when the value is inside them.
+ *   live arc/bar when the value is inside them; tintOnly: true only marks the
+ *   zone on the gauge rim. g.color = base colour (theme key or #hex) instead of accent.
  * Radial gauges colour their arc with the theme's hotRamp instead: from the theme
  * colour to red at g.limit (default max). g.hot = false turns that off.
  * value === null/undefined renders as "--" (no data).
@@ -43,7 +44,7 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 function zoneColor(t, g, v, base) {
     let c = base || t.accent;
     for (const z of g.zones || []) {
-        if (isNum(v) && v >= z.from && v <= z.to) c = t[z.color] || z.color;
+        if (!z.tintOnly && isNum(v) && v >= z.from && v <= z.to) c = t[z.color] || z.color;
     }
     return c;
 }
@@ -113,7 +114,7 @@ function radialLive(cv, t, cx, cy, r, g, min, max, thick, v, f) {
     const a0 = -135, a1 = 135;
     // live arc: the theme's colour ramp along the scale (a zone's colour when inside one), soft glow, bright tip
     // (or, by default, the hot ramp: theme colour -> red at the limit)
-    let col = zoneColor(t, g, v);
+    let col = zoneColor(t, g, v, g.color ? t[g.color] || g.color : undefined);
     const hot = g.hot !== false && (t.hotRamp || t.ramp);
     const limA = a0 + clamp(((g.limit == null ? max : g.limit) - min) / (max - min), 0.05, 1) * 270;
     if (isNum(v) && f > 0.002) {
@@ -164,7 +165,7 @@ function bar(cv, t, x, y, w, h, g) {
 /** Stat tile: label, big value + unit, optional history trace. */
 function stat(cv, t, x, y, w, h, g) {
     panel(cv, t, x, y, w, h, g.label);
-    const v = g.value, col = zoneColor(t, g, v, t.accent), vcol = zoneColor(t, g, v, t.text);
+    const v = g.value, col = zoneColor(t, g, v, g.color ? t[g.color] || g.color : t.accent), vcol = zoneColor(t, g, v, t.text);
     // history trace first, so the big value stays readable on top of it
     const hist = (g.history || []).filter(isNum);
     if (hist.length > 2 && h > 150) {

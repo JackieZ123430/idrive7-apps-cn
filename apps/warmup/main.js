@@ -101,11 +101,13 @@ mgu.run({
         }
 
         /* ---------- drawing ---------- */
-        function gauge(cv, t, cx, cy, r, val, label, warm) {
+        /** Temperature dial; oil = the theme's oil colour throughout (cold only marked on the rim). */
+        function gauge(cv, t, cx, cy, r, val, label, warm, oil) {
             G.radial(cv, t, cx, cy, r, {
                 value: T(val), min: T(0), max: T(150), label, unit: tU(), decimals: 0, ticks: 6, majorEvery: 1,
-                zones: [{ from: T(0), to: T(warm - 0.01), color: 'cold' }, { from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(150), color: 'crit' }],
+                zones: [{ from: T(0), to: T(warm - 0.01), color: 'cold', tintOnly: !!oil }, { from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(150), color: 'crit' }],
                 tickLabels: true, hot: false,       // temperature: cold = blue, warm = theme colour, hot = warn / crit zones
+                color: oil ? 'oil' : undefined,
             });
         }
 
@@ -138,7 +140,7 @@ mgu.run({
             }
             const warm = settings.get('warmOil'), warmC = settings.get('warmCoolant');
             G.panel(cv, t, 24, 64, 880, 440, null);
-            gauge(cv, t, 240, 300, 196, d.oil, 'Oil', warm);
+            gauge(cv, t, 240, 300, 196, d.oil, 'Oil', warm, true);
             gauge(cv, t, 688, 300, 196, d.coolant, 'Coolant', warmC);
 
             // ---- status panel
@@ -194,12 +196,12 @@ mgu.run({
             const lo = 0, hi = 140;
             const X = (ts) => gx + (gw - 90) - ((now0 - ts) / span) * (gw - 90), Y = (c) => gy + gh - (G.clamp(c, lo, hi) - lo) / (hi - lo) * gh;
             cv.text('LAST ' + Math.round(span / 60000) + ' MIN + NEXT 5', gx, gy - 6, 14, t.dim, { font: 'bold', spacing: 1.5 });
-            cv.fillRect(gx + 240, gy - 14, 18, 3, t.accent); cv.text('OIL', gx + 262, gy - 6, 14, t.dim, { font: 'bold' });
+            cv.fillRect(gx + 240, gy - 14, 18, 3, t.oil || t.accent); cv.text('OIL', gx + 262, gy - 6, 14, t.dim, { font: 'bold' });
             cv.fillRect(gx + 310, gy - 14, 18, 3, t.cold); cv.text('COOLANT', gx + 332, gy - 6, 14, t.dim, { font: 'bold' });
             cv.fillRect(gx, Y(warm), gw, 1, withAlpha(GO, 0.5));
             cv.text(String(Math.round(T(warm))), gx + gw + 6, Y(warm) + 6, 14, GO);
             cv.fillRect(gx + gw - 90, gy, 1, gh, withAlpha(t.tick, 0.5));       // "now"
-            [[1, t.accent, 'oil', warm, d.oil], [2, t.cold, 'coolant', warmC, d.coolant]].forEach(([i, c, key, target, cur]) => {
+            [[1, t.oil || t.accent, 'oil', warm, d.oil], [2, t.cold, 'coolant', warmC, d.coolant]].forEach(([i, c, key, target, cur]) => {
                 const pts = hist.filter((h) => G.isNum(h[i])).map((h) => [X(h[0]), Y(h[i])]);
                 if (pts.length > 1) cv.polyline(pts, 3, c);
                 // projection to the target, dashed

@@ -294,14 +294,14 @@ mgu.run({
             const unit = tU();
             const tiles = [
                 ['Coolant', d.coolant, hist.coolant, [{ from: T(112), to: 999, color: 'crit' }, { from: -99, to: T(60), color: 'cold' }]],
-                ['Engine oil', d.oil, hist.oil, [{ from: T(oilWarn), to: 999, color: 'crit' }, { from: -99, to: T(70), color: 'cold' }]],
+                ['Engine oil', d.oil, hist.oil, [{ from: T(oilWarn), to: 999, color: 'crit' }, { from: -99, to: T(70), color: 'cold', tintOnly: true }], 'oil'],
                 ['Gearbox oil', d.gearbox, hist.gearbox, [{ from: T(120), to: 999, color: 'warn' }, { from: -99, to: T(50), color: 'cold' }]],
                 ['Ambient', d.ambient, hist.ambient, [{ from: -99, to: T(3), color: 'cold' }]],
             ];
-            tiles.forEach(([label, v, h, zones], i) => {
+            tiles.forEach(([label, v, h, zones, color], i) => {
                 const x = 24 + (i % 2) * 784, y = 64 + Math.floor(i / 2) * 226;
                 G.stat(cv, t, x, y, 760, 210, {
-                    label, value: T(v), unit, zones, size: 100, history: h.map(T),
+                    label, value: T(v), unit, zones, color, size: 100, history: h.map(T),
                     sub: v == null ? 'no data' : 'last 5 min  ·  min ' + G.fmt(T(Math.min.apply(null, h.filter(G.isNum))), 0) + '  max ' + G.fmt(T(Math.max.apply(null, h.filter(G.isNum))), 0),
                 });
             });
