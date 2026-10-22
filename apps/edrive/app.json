@@ -1,8 +1,8 @@
 {
   "id": "edrive",
   "title": "eDrive",
-  "description": "Real electric range, HV battery health (SOH), design capacity left, last charge, charge log and 12 V battery voltage",
-  "version": "1.3.2",
+  "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
+  "version": "1.4.0",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -112,7 +112,7 @@
     },
     {
       "key": "designKwh",
-      "label": "Battery design capacity",
+      "label": "Battery size when new (gross)",
       "type": "number",
       "unit": "kWh",
       "default": 12,
@@ -125,6 +125,7 @@
         14.1,
         17.7,
         19.4,
+        24,
         25.7,
         42.2
       ]

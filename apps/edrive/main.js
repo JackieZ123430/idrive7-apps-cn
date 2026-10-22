@@ -6,8 +6,7 @@
  *     the outside temperature (RANGE_CURVE, scaled to your "range at 20 °C"),
  *     with a low-high spread
  *   - battery health (SOH): usable capacity compared to a new battery
- *   - design capacity left: charge x SOH, i.e. how much of a NEW battery's
- *     full energy is still in the pack right now (also in kWh)
+ *   - energy in the battery now: charge x SOH x size when new (kWh)
  *   - last charge: how much the HV battery gained on the last charge (also a
  *     charge done while the head unit was asleep: the charge at switch-off is
  *     kept and compared at the next start)
@@ -379,19 +378,26 @@ mgu.run({
                 cv.text('shows after the next charge', 792, 484, 20, t.dim);
             }
 
-            // ---- health + design capacity left
-            const soh = d.soh, left = G.isNum(d.soc) && G.isNum(soh) ? d.soc * soh / 100 : null;
-            const kwh = settings.get('designKwh');
-            G.stat(cv, t, 1172, 64, 404, 212, {
-                label: 'Battery health (SOH)', value: soh, unit: '%', decimals: 1, size: 88,
-                sub: G.isNum(soh) ? 'holds ' + G.fmt(kwh * soh / 100, 1) + ' of ' + kwh + ' kWh' + (d.demo ? '' : '  ·  read ' + ago(d.sohAge)) : 'not readable - see Diagnostics',
-                zones: [{ from: 0, to: 70, color: 'crit' }, { from: 70, to: 80, color: 'warn' }],
+            // ---- battery: health (capacity vs. new) + energy in it now
+            const soh = d.soh, kwh = settings.get('designKwh');
+            const cap = G.isNum(soh) ? kwh * soh / 100 : null;                     // what a full charge holds today
+            const now = G.isNum(cap) && G.isNum(d.soc) ? cap * d.soc / 100 : null;  // energy in the pack right now
+            const bx = 1172, bw = 404;
+            G.panel(cv, t, bx, 64, bw, 440, 'Battery health (SOH)');
+            const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
+            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', bx + 24, 190, 96, hc, { font: 'num' });
+            cv.text('%', bx + 32 + hw, 190, 32, t.dim, { font: 'bold' });
+            cv.text(G.isNum(soh) ? 'of the capacity it had new' : 'not readable - see Diagnostics', bx + 24, 224, 20, t.dim);
+            G.bar(cv, t, bx + 24, 236, bw - 48, 64, {
+                label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh,
+                zones: [{ from: 0, to: kwh * 0.7, color: 'crit' }, { from: kwh * 0.7, to: kwh * 0.8, color: 'warn' }],
             });
-            G.stat(cv, t, 1172, 292, 404, 212, {
-                label: 'Design capacity left', value: left, unit: '%', decimals: 0, size: 88,
-                sub: G.isNum(left) ? G.fmt(kwh * left / 100, 1) + ' kWh of ' + kwh + ' kWh (new, full)' : 'needs charge + SOH',
-                zones: [{ from: 0, to: 10, color: 'crit' }, { from: 10, to: 25, color: 'warn' }],
-            });
+            cv.text('of ' + kwh + ' kWh new', bx + bw - 24, 326, 18, t.dim, { align: 'right' });
+            cv.fillRect(bx + 24, 344, bw - 48, 1, t.panelEdge);
+            cv.text('ENERGY IN BATTERY NOW', bx + 24, 376, 18, t.dim, { font: 'bold', spacing: 1.5 });
+            const ew = cv.text(G.isNum(now) ? G.fmt(now, 1) : '--', bx + 24, 440, 64, G.isNum(now) ? t.text : t.dim, { font: 'num' });
+            cv.text('kWh', bx + 34 + ew, 440, 26, t.dim);
+            cv.text(d.demo ? 'demo data' : G.isNum(soh) ? 'health read ' + ago(d.sohAge) : '', bx + 24, 482, 18, t.dim);
         }
 
         const pad = (n) => (n < 10 ? '0' : '') + n;
@@ -479,7 +485,7 @@ mgu.run({
                 y += 36;
             }));
             cv.text('DIDs differ between models. If a value is n/a or wrong, edit config.battery in apps/edrive/app.json', 48, 440, 20, t.dim);
-            cv.text('(ECU, DID, byte position, factor) and rebuild. Range at 20 °C, design capacity and hybrid system are in Settings.', 48, 468, 20, t.dim);
+            cv.text('(ECU, DID, byte position, factor) and rebuild. Range at 20 °C, battery size and hybrid system are in Settings.', 48, 468, 20, t.dim);
             if (d.demo) cv.text('Demo data is shown on the main page until the diagnostic link answers.', 1552, 468, 20, t.warn, { align: 'right' });
         }
 

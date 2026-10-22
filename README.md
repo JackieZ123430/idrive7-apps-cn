@@ -2,21 +2,24 @@
 
 **Custom apps for the BMW MGU head unit (iDrive 7 / ID7), plus a complete kit to build your own.**
 
-Shift lights and a full-screen tach, a virtual dyno, brake and drag timers, a G-meter, an
-oil warm-up guide, and a fault-code scanner/cleaner. They run on the car's own app platform,
+Real electric range, battery health and a charge log for plug-in hybrids, a sport cluster
+with intake / fuel pressure and tyre data, shift lights and a full-screen tach, a virtual dyno,
+brake and drag timers, a G-meter, an oil warm-up guide, and a fault-code scanner/cleaner. They run on the car's own app platform,
 use the HMI's real screens and settings menus, read live vehicle data, and survive reboots.
 Everything can be removed again with one command.
 
 | | |
 |---|---|
-| ![Redline](docs/gifs/redline.gif)<br>**Redline**: M Red theme | ![G-Force](docs/gifs/gforce.gif)<br>**G-Force**: M Tricolour theme |
-| ![Virtual Dyno](docs/gifs/dyno.gif)<br>**Virtual Dyno**: Ice White theme | ![Brake Test](docs/gifs/brake_test.gif)<br>**Brake Test**: M Tricolour theme |
-| ![Drag Timer](docs/gifs/draggy.gif)<br>**Drag Timer**: Night Amber theme | ![M Vitals](docs/gifs/car_vitals.gif)<br>**M Vitals**: Ice White theme |
-| ![Warm-Up](docs/gifs/warmup.gif)<br>**Warm-Up**: Night Amber theme | ![Fault Scanner](docs/gifs/dtc_scanner.gif)<br>**Fault Scanner**: M Red theme |
+| ![eDrive](docs/screens/edrive.png)<br>**eDrive**: real electric range, battery health, last charge, 12 V | ![eDrive charge log](docs/screens/edrive_log.png)<br>**eDrive**: charge log with cost and totals |
+| ![M Vitals engine](docs/screens/m_vitals_engine.png)<br>**M Vitals**: rpm, boost, speed + gear, power, torque | ![M Vitals intake and fuel](docs/screens/m_vitals_fuel.png)<br>**M Vitals**: intake air, HPFP / LPFP fuel pressure |
+| ![M Vitals chassis](docs/screens/m_vitals_chassis.png)<br>**M Vitals**: g-force, tyre pressures + temperatures, xDrive | ![Redline](docs/screens/redline.png)<br>**Redline**: shift lights, gear, shift scoring |
+| ![G-Force](docs/screens/gforce.png)<br>**G-Force**: friction circle, peaks, records | ![Virtual Dyno](docs/screens/dyno.png)<br>**Virtual Dyno**: power and torque curve |
+| ![Brake Test](docs/screens/brake_test.png)<br>**Brake Test**: 100-0 distance, deceleration, fade | ![Drag Timer](docs/screens/draggy.png)<br>**Drag Timer**: splits, ¼ mile, speed trace |
+| ![Warm-Up](docs/screens/warmup.png)<br>**Warm-Up**: oil / coolant, safe rev limit | ![Fault Scanner](docs/screens/dtc_scanner.png)<br>**Fault Scanner**: fault codes of every control unit |
 
-*(Recorded on the real MGU firmware running in a VM, with each app's built-in demo drive.
-Every app has the same four themes, picked from its Settings page: M Red, M Tricolour,
-Ice White and Night Amber. In the car the same screens show live data.)*
+*(Screenshots from the PC preview (`kit/tools/preview.js`) with each app's built-in demo data, in
+the default M Tricolour theme. Every app also has M Red, Ice White and Night Amber, picked from
+its Settings page. In the car the same screens show live data.)*
 
 > **Disclaimer.** This is an unofficial hobby project. It is not affiliated with, endorsed by
 > or supported by BMW AG. You modify your own head unit at your own risk. Use the apps parked
@@ -56,7 +59,7 @@ the unit and kept across reboots.
 | **Warm-Up** | Oil and coolant gauges, a safe rev limit that rises with oil temperature, an estimate of minutes until the engine is ready, a temperature trend graph, and a turbo cool-down countdown after hard driving. |
 | **M Vitals** | A sport cluster: rpm, boost, speed with the gear (D / S / M + number), power from the iDrive sport display (its % × your car's max power, so stock or tuned engines both read right; kW, hp or PS) and torque, coolant and oil temperature, g-forces and more, over several pages, with peak values.  An Intake & fuel page shows intake air temperature (IAT), high-pressure fuel (HPFP / rail) and low-pressure fuel (LPFP) pressure, read from the DME over UDS (standard OBD data IDs, adjustable in `app.json` config.dme), plus how much warmer the intake air is than outside. Tyre pressures (against the car's target) and temperatures are shown large on the Chassis page; its xDrive card can be set to Auto (shown once the car reports all-wheel drive), Show or Hide for rear-wheel-drive cars. Dials run from blue to red as they near the redline / boost limit. |
 | **Fault Scanner** | Scans every control unit for stored fault codes (UDS over the head unit's diagnostic gateway), shows them per module with status, shows live Check Control messages, and can clear fault memories (two-press confirm). |
-| **eDrive** | For plug-in hybrids / EVs: real electric range from the battery's charge and the outside temperature (a full battery gives 50 km at 20 °C, 40-45 km at 10 °C, 30-38 km at 0 °C, 20-30 km at -10 °C, scaled to your own 20 °C range), shown with its low-high spread, battery health (SOH, capacity vs. new) and design capacity left (charge × SOH, in % and kWh). Also shows the last HV battery charge (+%, kWh, km added; a charge done while the head unit slept shows at the next start) and the 12 V battery voltage. A charge log page lists every charge (date, % and kWh added, range added, cost from your electricity price, 0.25 €/kWh by default) with monthly / all-time totals and a 14-day chart. On a car without a hybrid system it detects that the battery unit never answers and shows only the 12 V battery (or set Hybrid system = No). Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
+| **eDrive** | For plug-in hybrids / EVs: real electric range from the battery's charge and the outside temperature (a full battery gives 50 km at 20 °C, 40-45 km at 10 °C, 30-38 km at 0 °C, 20-30 km at -10 °C, scaled to your own 20 °C range), shown with its low-high spread, battery health (SOH: how much a full charge holds compared to new, in % and kWh) and the energy in the battery now (kWh; the battery size when new is a setting, e.g. 12 kWh for a 330e / 530e, 24 kWh for an X5 45e). Also shows the last HV battery charge (+%, kWh, km added; a charge done while the head unit slept shows at the next start) and the 12 V battery voltage. A charge log page lists every charge (date, % and kWh added, range added, cost from your electricity price, 0.25 €/kWh by default) with monthly / all-time totals and a 14-day chart. On a car without a hybrid system it detects that the battery unit never answers and shows only the 12 V battery (or set Hybrid system = No). Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
 
 On the VM or a bench unit without vehicle data, every app switches to a built-in demo drive
 after 5 seconds (launch, pull through the gears, a hard stop, corners, an engine warming up from
@@ -491,7 +494,7 @@ kit/tools/            build.py, preview.js, make_icon.js, bake_fonts.py,
                       extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
 deploy/               make-car-kit.sh, push-to-car.sh, mgu-app-install.sh, mainapp-patch.js
 deploy/car/           deploy-car.sh (runs on the unit) + its README
-docs/                 RHMI widget reference, demo GIFs
+docs/                 RHMI widget reference, screenshots (docs/screens)
 ```
 
 Not in the repository, on purpose:
