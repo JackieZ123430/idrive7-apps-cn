@@ -75,7 +75,7 @@ class Demo {
 mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
-        const cfg = Object.assign({ ecu: 7, soc: [], soh: [], v12: [], sohEverySec: 300, chargeMinPct: 3 },
+        const cfg = Object.assign({ ecu: 7, soc: [], soh: [], v12: [], chargeMinPct: 3 },
             (ctx.spec.config && ctx.spec.config.battery) || {});
         const S = (ctx.spec.config && ctx.spec.config.scaling) || {};
         const sc = (k, raw) => {
@@ -176,13 +176,19 @@ mgu.run({
         setInterval(sample12, 30000);
 
         let busy = false, pollTimer = null;
+        let v12Fail = 0, v12Try = 0, sohFailT = 0;
         async function poll(forceSoh) {
             if (busy) return;
             busy = true;
             try {
                 if (diag.available) {
-                    const v12 = await readValue('v12');
-                    if (v12 !== null) { live.v12 = v12; live.v12T = Date.now(); }
+                    // 12 V: every poll; after 3 failures in a row only every 5 minutes
+                    let v12 = null;
+                    if (v12Fail < 3 || forceSoh || Date.now() - v12Try > 300000) {
+                        v12Try = Date.now();
+                        v12 = await readValue('v12');
+                        if (v12 !== null) { live.v12 = v12; live.v12T = Date.now(); v12Fail = 0; } else v12Fail++;
+                    }
                     // without a hybrid system only re-check the battery unit every 5 minutes
                     const noHy = st.noHybrid && settings.get('hybrid') !== 'yes';
                     if (!noHy || forceSoh || Date.now() - lastSocTry > 300000) {
@@ -190,9 +196,13 @@ mgu.run({
                         const soc = await readValue('soc');
                         if (soc !== null) { live.soc = soc; live.socT = Date.now(); onSoc(soc, live.socT); }
                         detectHybrid(v12 !== null);
-                        if (!st.noHybrid && (forceSoh || live.soh === null || Date.now() - live.sohT > cfg.sohEverySec * 1000)) {
+                        // health changes over months: read it once every "sohDays" (kept across restarts),
+                        // on "Read battery now", and after a failed read at most once an hour
+                        const sohDue = live.soh === null || Date.now() - live.sohT > settings.get('sohDays') * 86400000;
+                        if (!st.noHybrid && (forceSoh || (sohDue && Date.now() - sohFailT > 3600000))) {
                             const soh = await readValue('soh');
                             if (soh !== null) { live.soh = soh; live.sohT = Date.now(); st.soh = soh; st.sohT = live.sohT; save(); }
+                            else sohFailT = Date.now();
                         }
                     }
                 }
@@ -204,14 +214,14 @@ mgu.run({
             pollTimer = setTimeout(() => poll(false).then(schedule), settings.get('poll') * 1000);
         }
         diag.on('available', (a) => { if (a) poll(false); });
-        poll(true).then(schedule);
+        poll(false).then(schedule);
 
         /* ---------- derived values ---------- */
         function data() {
             if (usingDemo()) return Object.assign(demo.sample(), { demo: true, socAge: 0 });
             const maxAge = Math.max(60, settings.get('poll') * 4) * 1000, now = Date.now();
             return {
-                soc: live.soc, soh: live.soh, ambient: live.ambient, demo: false,
+                soc: live.soc, soh: live.soh, sohAge: live.sohT ? now - live.sohT : null, ambient: live.ambient, demo: false,
                 socAge: live.socT ? now - live.socT : null, stale: !(live.socT && now - live.socT < maxAge),
                 v12: live.v12T && now - live.v12T < maxAge ? live.v12 : null, charge: lastCharge(),
             };
@@ -374,7 +384,7 @@ mgu.run({
             const kwh = settings.get('designKwh');
             G.stat(cv, t, 1172, 64, 404, 212, {
                 label: 'Battery health (SOH)', value: soh, unit: '%', decimals: 1, size: 88,
-                sub: G.isNum(soh) ? 'holds ' + G.fmt(kwh * soh / 100, 1) + ' of ' + kwh + ' kWh new' : 'not readable - see Diagnostics',
+                sub: G.isNum(soh) ? 'holds ' + G.fmt(kwh * soh / 100, 1) + ' of ' + kwh + ' kWh' + (d.demo ? '' : '  ·  read ' + ago(d.sohAge)) : 'not readable - see Diagnostics',
                 zones: [{ from: 0, to: 70, color: 'crit' }, { from: 70, to: 80, color: 'warn' }],
             });
             G.stat(cv, t, 1172, 292, 404, 212, {
