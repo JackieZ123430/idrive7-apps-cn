@@ -82,6 +82,9 @@ WIDGETS = {
     'button':    ('button', 'LT_Button_1Row', {2: 1, 3: 2}),
     'iconbutton': ('button', 'LT_Button_1Row_1IconLeft', {2: 1, 3: 2}),
     'twocol':    ('button', 'LT_Button_1Row_2Col7030_2Text', {2: 1, 3: 2}),
+    # settings: label on the 1st row, value on the 2nd, each the full width (BMW's parking app
+    # settings use it in an LT_State_Wide); the 70/30 one-row columns cut both off
+    'tworow':    ('button', 'LT_Button_2Row_2Text', {2: 1, 3: 2}),
     'checkbox':  ('checkBox', 'LT_CheckBox_1Row', {2: 1, 3: 2}),
     'scroll':    ('label', 'LT_ScrollLabel_UnlimitedRow_TextDyn', {2: 1, 3: 1}),
     'laptimer':  ('label', 'LT_Label_Laptimer', {3: 0}),
@@ -148,7 +151,8 @@ def build_ui(spec):
         kind = scr.get('kind', 'list')
         # canvas = M Laptimer's state; menus = the state BMW uses for its
         # clickable lists (LT_State_Wide only renders a single text block)
-        widget = 'LT_State_Laptimer' if kind == 'canvas' else 'LT_State_Regular_ContentHidden'
+        # settings: the wide state (full screen width), as BMW's own settings lists
+        widget = 'LT_State_Laptimer' if kind == 'canvas' else 'LT_State_Wide' if kind == 'settings' else 'LT_State_Regular_ContentHidden'
         cont = {'type': 'state', 'name': scr['name'], 'components': {}}
         x = [f'    <container id="{cid}" type="state" widget="{widget}">']
         if main_id is not None and scr.get('parent', True):
@@ -174,8 +178,8 @@ def build_ui(spec):
                     items.append(comp('checkbox', name, rows=[text_row('SET_' + s['key'], s['label'])]))
                 else:
                     strings[sid(app, 'SET_' + s['key'])] = s['label']
-                    items.append(comp('twocol', name, rows=[{'Text1stCol': {'value': s['label'], 'type': 'Text'},
-                                                            'Text2ndCol': {'value': '', 'type': 'Text'}}]))
+                    items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
+                                                            'Text2ndRow': {'value': '', 'type': 'Text'}}]))
             groups.append(('List', items))
         else:   # list: components from "items"
             items = []

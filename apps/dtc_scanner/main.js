@@ -102,14 +102,19 @@ mgu.run({
                         });
                     };
                     await read([0x02, mask], 'fault');
-                    if (settings.get('info')) { msg = 'Reading info memory...'; changed(); await read([0x17, mask, 0x01], 'info'); }
-                    scan = { at: Date.now(), demo: false, ecus: Array.from(byEcu.values()) };
+                    // the info memory is extra: if it can't be read, keep the fault memory scan
+                    let infoFailed = false;
+                    if (settings.get('info')) {
+                        msg = 'Reading info memory...'; changed();
+                        try { await read([0x17, mask, 0x01], 'info'); } catch (e) { infoFailed = true; log.warn('info memory: ' + e); }
+                    }
+                    scan = { at: Date.now(), demo: false, ecus: Array.from(byEcu.values()), infoFailed };
                     try { fs.writeFileSync(FILE, JSON.stringify(scan)); } catch (e) { log.warn('save scan: ' + e); }
                 }
                 scan.ecus.sort((a, b) => b.dtcs.length - a.dtcs.length || a.addr - b.addr);
                 const n = scan.ecus.reduce((s, e) => s + e.dtcs.length, 0);
                 log.info('scan: ' + scan.ecus.length + ' control units, ' + n + ' faults');
-                msg = scan.ecus.length ? '' : 'No control unit answered - ignition on?';
+                msg = !scan.ecus.length ? 'No control unit answered - ignition on?' : scan.infoFailed ? 'Info memory not read this time (unit busy) - scan again for it' : '';
                 phase = 'done';
             } catch (e) {
                 log.warn('scan failed: ' + e);

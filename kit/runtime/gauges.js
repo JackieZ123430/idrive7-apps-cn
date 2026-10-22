@@ -53,7 +53,28 @@ function zoneColor(t, g, v, base) {
 function panel(cv, t, x, y, w, h, title) {
     x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
     const key = ['panel', w, h, title || '', t.name].join('|');
-    cv.blit(layer(key, w, h, (c) => drawPanel(c, t, 0, 0, w, h, title)), x, y);
+    const L = layer(key, w, h, (c) => drawPanel(c, t, 0, 0, w, h, title));
+    // the panel is a translucent overlay, blended pixel by pixel - a large part of every frame. Where
+    // its area is still plain background (panels are drawn first on a cleared page), copy whole rows
+    // of a cached copy blended onto that background instead: the same bytes, at memcpy speed.
+    if (isBackground(cv, x, y, w, h, t.bg)) {
+        cv.copyRows(layer(key + '|on|' + t.bg, w, h, (c) => c.clear(t.bg).blit(L, 0, 0)), x, y);
+    } else cv.blit(L, x, y);
+}
+/** Is the w x h area at (x, y) entirely the opaque colour bg? (row compares, native speed) */
+const bgRows = new Map();
+function isBackground(cv, x, y, w, h, bg) {
+    if (x < 0 || y < 0 || x + w > cv.w || y + h > cv.h) return false;
+    const k = bg + '|' + w;
+    let row = bgRows.get(k);
+    if (!row) { row = Buffer.from(new Canvas(w, 1).clear(bg).d.buffer); bgRows.set(k, row); }
+    if (row[3] !== 255) return false;
+    const buf = Buffer.from(cv.d.buffer, cv.d.byteOffset, cv.d.length);
+    for (let r = 0; r < h; r++) {
+        const o = ((y + r) * cv.w + x) * 4;
+        if (buf.compare(row, 0, row.length, o, o + row.length) !== 0) return false;
+    }
+    return true;
 }
 function drawPanel(cv, t, x, y, w, h, title) {
     // flat light grey overlay; top: a short bold bar in the theme's stripe colours (M tricolour:

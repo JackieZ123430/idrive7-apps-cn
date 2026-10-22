@@ -102,6 +102,14 @@ class Settings {
     }
 }
 
+/**
+ * Text for the HMI's own lists / buttons. The HMI shows non-ASCII text from an app as mojibake
+ * ("°C" arrives as "Â°C"), so '°' is dropped there ("125 C"); drawn screens are not affected.
+ */
+function hmiText(s) {
+    return String(s).replace(/°/g, '').replace(/[^\x20-\x7e]/g, '');
+}
+
 /* ---------------- UI wrapper ---------------- */
 class Ui {
     constructor(app) {
@@ -110,6 +118,7 @@ class Ui {
         this._img = Object.create(null);      // per-component dynamic image state
         this._visible = Object.create(null);  // stateName -> bool
         this._visHandlers = [];
+        this.timing = { png: 0, push: 0 };    // ms spent encoding / handing images to the HMI
     }
     comp(name) {
         const c = this.rhmi && this.rhmi.getByName(name);
@@ -124,13 +133,13 @@ class Ui {
 
     text(name, text, row, cell) {
         const c = this.comp(name);
-        return c ? this._try('text ' + name, c.setValue(row || 0, cell || 'Text', String(text), 'Text')) : Promise.resolve();
+        return c ? this._try('text ' + name, c.setValue(row || 0, cell || 'Text', hmiText(text), 'Text')) : Promise.resolve();
     }
     /** Set several cells of one row: ui.cells('LIST', 3, { Text1stCol: 'a', Text2ndCol: 'b' }) */
     cells(name, row, obj) {
         const c = this.comp(name);
         if (!c) return Promise.resolve();
-        return Promise.all(Object.keys(obj).map((k) => this._try('cell ' + name + '.' + k, c.setValue(row, k, String(obj[k]), 'Text'))));
+        return Promise.all(Object.keys(obj).map((k) => this._try('cell ' + name + '.' + k, c.setValue(row, k, hmiText(obj[k]), 'Text'))));
     }
     rows(name, n) { const c = this.comp(name); return c ? this._try('rows ' + name, c.setRowCount(n)) : Promise.resolve(); }
     visible(name, on) { const c = this.comp(name); return c ? this._try('visible ' + name, c.setProperty('Visible', on ? 1 : 0, 'UInt')) : Promise.resolve(); }
@@ -189,13 +198,16 @@ class Ui {
             // names reused from an earlier run of the app get rejected
             const file = path.join(RHMI_RES, 'dyn_' + RUN_TAG + '_' + name.toLowerCase() + '_' + (st.n++ % 4) + '.png');
             const t0 = Date.now(), first = !st.shown;
-            fs.writeFileSync(file + '.tmp', Buffer.isBuffer(frame) ? frame : frame.png());
+            const png = Buffer.isBuffer(frame) ? frame : frame.png();
+            const t1 = Date.now();
+            fs.writeFileSync(file + '.tmp', png);
             fs.renameSync(file + '.tmp', file);
             if (first) log.info('image ' + name + ': png written ' + (Date.now() - t0) + ' ms');
             await rb.createResourceHandles([file]);
             const handle = rb.getResourceHandle(file);
             if (first) log.info('image ' + name + ': handle ' + JSON.stringify(handle));
             await c.setValue(0, cell || 'Graphic', handle, 'Asset');
+            this.timing.png += t1 - t0; this.timing.push += Date.now() - t1;       // for the loop's log line
             if (px) { st.lastPx = Buffer.from(px); st.lastPush = Date.now(); }       // a copy: the canvas may be drawn on again
             if (first) { st.shown = true; log.info('image ' + name + ': shown after ' + (Date.now() - t0) + ' ms'); }
             // keep the image on screen and the one before it (the HMI may still show it while it
@@ -222,7 +234,8 @@ function wireSettings(ctx) {
     const refresh = () => Promise.all(schema.map((s) => {
         const comp = 'SET_' + s.key.toUpperCase();
         if (s.type === 'bool') return Promise.all([ui.text(comp, s.label), ui.checked(comp, !!settings.get(s.key))]);
-        return ui.cells(comp, 0, { Text1stCol: s.label, Text2ndCol: settings.display(s.key) });
+        // two-row buttons in the wide settings state (kit/tools/build.py): label above, value below
+        return ui.cells(comp, 0, { Text1stRow: s.label, Text2ndRow: settings.display(s.key) });
     }));
     schema.forEach((s) => {
         ui.onClick('SET_' + s.key.toUpperCase(), () => { settings.cycle(s.key); return refresh(); });
@@ -268,7 +281,11 @@ async function runInner(impl) {
                 const dt = Date.now() - t0;
                 // what a frame really costs on the unit (draw + PNG + HMI), to tune the refresh rate by
                 spent += dt;
-                if (frames % 100 === 0) { log.info('loop ' + stateName + ': ' + Math.round(spent / 100) + ' ms per frame (asked for ' + fps + ' fps)'); spent = 0; }
+                if (frames % 100 === 0) {
+                    const tm = ui.timing, png = Math.round(tm.png / 100), push = Math.round(tm.push / 100), all = Math.round(spent / 100);
+                    log.info('loop ' + stateName + ': ' + all + ' ms per frame (draw ' + Math.max(0, all - png - push) + ', png ' + png + ', hmi ' + push + '; asked for ' + fps + ' fps)');
+                    spent = 0; tm.png = 0; tm.push = 0;
+                }
                 // at least 15 ms between frames so car data and HMI events get handled
                 if (timer !== null) timer = setTimeout(tick, Math.max(15, 1000 / fps - dt));
             };

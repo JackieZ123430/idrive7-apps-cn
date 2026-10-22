@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel pressure, tyre and chassis gauges",
-  "version": "2.9.1",
+  "version": "2.9.2",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -36,7 +36,8 @@
       "statusTargetTyrePressure": "rs"
     },
     "de.bmw.infotainment.misc.MDrive": {
-      "statusMSystem": "rs"
+      "statusMSystem": "rs",
+      "dataDisplayGearbox": "s"
     },
     "de.bmw.infrastructure.VehicleInformation": {
       "statusGearboxDrive": "s",
@@ -65,10 +66,6 @@
         [
           "BTN_PREV",
           "Previous page"
-        ],
-        [
-          "BTN_PEAKS",
-          "Reset peaks"
         ],
         [
           "BTN_SETTINGS",
@@ -134,11 +131,11 @@
       "options": [
         [
           "C",
-          "°C"
+          "Celsius"
         ],
         [
           "F",
-          "°F"
+          "Fahrenheit"
         ]
       ]
     },
@@ -287,7 +284,7 @@
       "label": "Refresh rate",
       "type": "number",
       "unit": "fps",
-      "default": 4,
+      "default": 10,
       "steps": [
         2,
         4,
@@ -323,12 +320,11 @@
     },
     {
       "key": "peakHold",
-      "label": "Peak hold (0 = until reset)",
+      "label": "Peak hold",
       "type": "number",
       "unit": "s",
       "default": 15,
       "steps": [
-        0,
         5,
         10,
         15,
@@ -624,6 +620,37 @@
           "min": 0.5,
           "max": 8,
           "note": "OBD service 01 PID 0x0A (same as F40A)"
+        },
+        {
+          "obd": "22",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.00079,
+          "offset": 0,
+          "min": 0.5,
+          "max": 15,
+          "note": "OBD service 01 PID 0x22 (same as F422)"
+        }
+      ],
+      "oil": [
+        {
+          "obd": "5C",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 170,
+          "note": "engine oil temperature, OBD service 01 PID 0x5C - only read while the car's own signal (CDS) sends none"
+        },
+        {
+          "did": "F45C",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 170
         }
       ],
       "boost": [

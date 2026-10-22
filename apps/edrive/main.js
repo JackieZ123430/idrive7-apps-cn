@@ -167,7 +167,9 @@ mgu.run({
             }
         }
         const isHybrid = () => (settings.get('hybrid') === 'yes' ? true : settings.get('hybrid') === 'no' ? false : !st.noHybrid);
-        const pages = () => (isHybrid() ? PAGES_HYBRID : PAGES_12V);
+        // the Diagnostics page (UDS replies per value) only when switched on in Settings: it is for tuning DIDs
+        const pages = () => (isHybrid() ? PAGES_HYBRID : PAGES_12V).filter((p) => p !== 'diag' || settings.get('diagPage'));
+        const diagHint = (s) => (settings.get('diagPage') ? s + ' - see Diagnostics page' : s);
 
         // 12 V history (one sample per 30 s)
         const v12hist = [];
@@ -284,7 +286,7 @@ mgu.run({
         /** Cars without a hybrid system: the 12 V battery only. */
         function render12V(cv, t, d) {
             const v = d.v12;
-            let state = 'no reading - see Diagnostics page', col = t.dim;
+            let state = diagHint('no reading yet'), col = t.dim;
             if (G.isNum(v)) {
                 if (v >= 13.2) { state = 'CHARGING  (engine / DC-DC running)'; col = GO; }
                 else if (v >= 12.6) { state = 'FULL'; col = GO; }
@@ -347,7 +349,7 @@ mgu.run({
                 cv.text(G.fmt(d.soc, 0) + ' % of ' + Math.round(D(r.mid)) + ' ' + dU() + ' (full battery at '
                     + (G.isNum(d.ambient) ? G.fmt(T(d.ambient), 0) + tU() : '10' + tU() + ', assumed') + ')', 300, 195, 20, t.dim);
             } else {
-                cv.text('no charge reading - see Diagnostics page', 300, 195, 22, t.dim);
+                cv.text(diagHint('no charge reading yet'), 300, 195, 22, t.dim);
             }
             cv.text('FULL BATTERY RANGE BY OUTSIDE TEMPERATURE', 48, 255, 16, t.dim, { font: 'bold', spacing: 1.5 });
             rangeChart(cv, t, 64, 278, 640, 145, d.ambient);
@@ -388,7 +390,7 @@ mgu.run({
             const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
             const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', bx + 24, 178, 96, hc, { font: 'num' });
             cv.text('%', bx + 32 + hw, 178, 32, t.dim, { font: 'bold' });
-            cv.text(G.isNum(soh) ? 'of the capacity it had new' : 'not readable - see Diagnostics', bx + 24, 214, 20, t.dim);
+            cv.text(G.isNum(soh) ? 'of the capacity it had new' : diagHint('not read yet'), bx + 24, 214, 20, t.dim);
             G.bar(cv, t, bx + 24, 227, bw - 48, 68, {
                 label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh, ramp: 'hot',     // tach colours; amber / red when worn
                 zones: [{ from: 0, to: kwh * 0.7, color: 'crit' }, { from: kwh * 0.7, to: kwh * 0.8, color: 'warn' }],
@@ -418,7 +420,7 @@ mgu.run({
             if (!all.length) {
                 cv.text('No charges logged yet.', 544, 284, 32, t.dim, { align: 'center', font: 'bold' });
                 cv.text('Every charge of at least ' + cfg.chargeMinPct + ' % is added here, also overnight charges', 544, 327, 22, t.dim, { align: 'center' });
-                cv.text('(seen at the next start). Needs charge readings - see the Diagnostics page.', 544, 357, 22, t.dim, { align: 'center' });
+                cv.text('(seen at the next start). Needs charge readings' + (settings.get('diagPage') ? ' - see the Diagnostics page.' : '.'), 544, 357, 22, t.dim, { align: 'center' });
             }
             all.slice(-8).reverse().forEach((c, i) => {
                 const y = 174 + i * 43;

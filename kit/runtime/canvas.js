@@ -84,6 +84,18 @@ class Canvas {
         return this;
     }
 
+    /** Copy an opaque canvas to (x, y) row by row (no blending: memcpy per row), clipped. */
+    copyRows(src, x, y) {
+        x = Math.round(x); y = Math.round(y);
+        const x0 = Math.max(0, x), x1 = Math.min(this.w, x + src.w);
+        if (x1 <= x0) return this;
+        for (let py = Math.max(0, y); py < Math.min(this.h, y + src.h); py++) {
+            const s = ((py - y) * src.w + (x0 - x)) * 4;
+            this.d.set(src.d.subarray(s, s + (x1 - x0) * 4), (py * this.w + x0) * 4);
+        }
+        return this;
+    }
+
     /** src-over blend of colour c with coverage cov (0..1) at integer pixel. */
     _blend(x, y, c, cov) {
         if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;

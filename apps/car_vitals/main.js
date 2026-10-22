@@ -42,7 +42,8 @@ const RANGE = {
  * they have changed by this much. Once seen working the car is remembered (seen.json), so the
  * next start shows them straight away.
  */
-const MOVE = { gearbox: 1, boostFes: 0.03, boostDme: 0.03, tFL: 1, tFR: 1, tRL: 1, tRR: 1 };
+// (tyre temperatures are not doubtful any more: with the right scaling a car's "no data" is 65535)
+const MOVE = { gearbox: 1, boostFes: 0.03, boostDme: 0.03 };
 /** Remembered per car: which groups sent real data (the "Auto" setting shows only those). */
 const GROUP = { gearbox: 'gearbox', boostFes: 'boost', boostDme: 'boost', tFL: 'tyreTemp', tFR: 'tyreTemp', tRL: 'tyreTemp', tRR: 'tyreTemp',
     pFL: 'tyres', pFR: 'tyres', pRL: 'tyres', pRR: 'tyres' };
@@ -54,6 +55,8 @@ const GEARS = { G1: 1, G2: 2, G3: 3, G4: 4, G5: 5, G6: 6, G7: 7, G8: 8, G9: 9, G
 const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x === 1 ? -1 : x === 2 ? 0 : undefined) : GEARS[x]);
 // selector position (statusActualStageDrive), names or wire numbers (P = 1, R = 2, N = 3, D = 4), as in kit/car.js
 const STAGES = { P: 'P', R: 'R', N: 'N', D: 'D', 1: 'P', 2: 'R', 3: 'N', 4: 'D' };
+// MDrive.dataDisplayGearbox: the programme the cluster shows next to the gear (names or wire numbers)
+const PROGRAMS = { S_MINUS_PROGRAMM: 'S', M_MINUS_PROGRAMM: 'M', 1: 'S', 2: 'M' };
 
 /**
  * Selector programme (D / S / M / P / R / N) from the gearbox status. Field names differ
@@ -131,7 +134,7 @@ mgu.run({
             if (l.length >= 12 || l.indexOf(key) >= 0) return;
             l.push(key); log.info('raw ' + name + ': ' + key);
         };
-        let lastCar = 0;
+        let lastCar = 0, oilCarT = 0;          // oilCarT: last valid oil temperature from the car's own signal
         const guess = new GearGuess();
         let gearLogs = 0, lastModeKey = '';
         const put = (k, v) => {
@@ -160,7 +163,12 @@ mgu.run({
         const watches = [
             ['de.bmw.infotainment.vehicle.CDS', {
                 statusEngineSpeed2: (v) => put('rpm', sc('rpm', v.actualValueRPMEngineCrankshaft)),
-                statusEngineTemperature: (v) => { put('coolant', sc('engineTemp', v.temperatureEngineDrive)); put('oil', sc('engineTemp', v.temperatureEngineOilDrive)); },
+                statusEngineTemperature: (v) => {
+                    logRaw('engine temperatures', [v.temperatureEngineDrive, v.temperatureEngineOilDrive]);
+                    put('coolant', sc('engineTemp', v.temperatureEngineDrive));
+                    const oil = sc('engineTemp', v.temperatureEngineOilDrive);
+                    if (oil !== null) { oilCarT = Date.now(); put('oil', oil); }
+                },
             }],
             ['de.bmw.infotainment.vehicle.CDS2', {
                 statusLongitudinalAccelerationMassCenter: (v) => put('gLong', sc('accel', v.longitudinalAccelerationCentreOfGravity) / 9.80665),
@@ -171,7 +179,8 @@ mgu.run({
                 statusSwitchDriveDynamicSport2: (v) => { logRaw('FES boost', v.displayBoostPressure); put('boostFes', sc('boost', v.displayBoostPressure)); },
                 // the HMI's sport display: power / torque in % of the car's maximum
                 statusVehicleDynamicEngine: (v) => { put('powerPct', sc('sportPct', v.displaySportEnginePower)); put('torquePct', sc('sportPct', v.displaySportEngineTorque)); },
-                statusActualValueTorque2: (v) => { logRaw('torque', v.actualValueTorqueCrankshaft); put('torque', sc('torque', v.actualValueTorqueCrankshaft)); },
+                // negative = engine braking (falling rpm): shown as 0
+                statusActualValueTorque2: (v) => { const tq = sc('torque', v.actualValueTorqueCrankshaft); put('torque', tq === null ? null : Math.max(0, tq)); },
             }],
             ['de.bmw.infrastructure.VehicleInformation', {
                 statusGearboxDrive: (v) => {
@@ -223,6 +232,11 @@ mgu.run({
                 statusMSystem: (v) => {
                     live.awd = v.statusAllWheelSetup; live.awdQual = v.qualifierFunctionAllWheel;
                     if (/^_4WD|SAND/.test(String(live.awd))) markAwd();
+                },
+                // S / M next to the gear: this car sends no selector programme with the gearbox status
+                dataDisplayGearbox: (v) => {
+                    logRaw('gear programme', v && v.displayProgramGearbox);
+                    live.program = PROGRAMS[v && v.displayProgramGearbox] || null;
                 },
             }],
         ];
@@ -293,13 +307,16 @@ mgu.run({
         async function pollFuel() {
             fuelBusy = true; fuelLast = Date.now();
             const now = Date.now(), needBoost = boostFromDme();
+            // oil temperature from the engine unit while the car's own signal has none (a 330e sends none)
+            const needOil = (dme.oil || []).length > 0 && now - oilCarT > 15000;
             const fast = now - fuelSeen < 1500 ? FUEL : now - engineSeen < 1500 && needBoost ? ['boost'] : null;
             try {
                 if (link.available) {
-                    for (const k of fast || FUEL.concat(needBoost ? ['boost'] : [])) {
+                    for (const k of fast || FUEL.concat(needBoost ? ['boost'] : [], needOil ? ['oil'] : [])) {
                         if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
                         fuelTry[k] = Date.now();
                         const v = k === 'boost' ? await readBoost() : await rd.value(k, dme[k]);
+                        if (k === 'oil' && v !== null && Date.now() - oilCarT < 15000) continue;      // the car's own value came meanwhile
                         if (v !== null) { put(k === 'boost' ? 'boostDme' : k, v); fuelT[k] = Date.now(); fuelFail[k] = 0; } else fuelFail[k] = (fuelFail[k] || 0) + 1;
                     }
                 }
@@ -316,8 +333,9 @@ mgu.run({
             if (!link.available) return 'diagnostic link down';
             const r = (dme[k] || []).map((c) => rd.raws[rd.key(c)]).filter(Boolean);
             if (!r.length) return 'reading...';
-            if (r.every((x) => /NRC 31|NRC 11|NRC 12/.test(x.why))) return 'not available from this DME (' + r.map((x) => x.why.split(' ').slice(0, 2).join(' ')).join(', ') + ')';
-            return r[0].why || 'no data';
+            // plain words on the tile; the reply codes are in the log
+            if (r.every((x) => /NRC 31|NRC 11|NRC 12/.test(x.why))) return 'not available on this car';
+            return /NRC|refused|reply/.test(r[0].why) ? 'no reading from the engine unit' : r[0].why || 'no data';
         }
 
         // 1 Hz history sampler for the thermal traces
@@ -366,7 +384,7 @@ mgu.run({
          * and while stopped in D (no gear engaged yet) it says N_OR_P too - that shows as D.
          */
         function gearText(d) {
-            const st = d.stage, m = d.gearMode;
+            const st = d.stage, m = d.gearMode || d.program;
             if (st === 'P' || st === 'R' || st === 'N') return { letter: st, num: '', est: false };
             let g = d.gear, est = false;
             if (!G.isNum(g)) { g = d.gearGuess; est = true; }
@@ -565,7 +583,6 @@ mgu.run({
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
         ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
-        ui.onClick('BTN_PEAKS', () => { [peak, demoPeak].forEach((o) => Object.keys(o).forEach((k) => delete o[k])); trail.length = 0; return render(); });
         let loop = ctx.loop('MAIN', settings.get('fps'), render);
         settings.onChange((k) => {
             if (k === 'maxPower' || k === 'powerSource') { delete peak.power; delete demoPeak.power; }

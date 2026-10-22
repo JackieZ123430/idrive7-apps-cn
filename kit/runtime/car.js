@@ -117,7 +117,8 @@ class Car {
                 put('gear', sel.gear);
             });
         }
-        if (groups.includes('torque')) add('de.bmw.infotainment.drivingexcitement.FES', 'statusActualValueTorque2', (v) => put('torque', sc('torque', v.actualValueTorqueCrankshaft)));
+        // negative torque (engine braking while the rpm falls) counts as 0
+        if (groups.includes('torque')) add('de.bmw.infotainment.drivingexcitement.FES', 'statusActualValueTorque2', (v) => { const tq = sc('torque', v.actualValueTorqueCrankshaft); put('torque', tq === null ? null : Math.max(0, tq)); });
         // a parked car sends nothing new for minutes (fields are notified on change), so "no data for
         // a while" doesn't mean "no car": once a signal's provider is there, stay on live data
         this.subs = [];

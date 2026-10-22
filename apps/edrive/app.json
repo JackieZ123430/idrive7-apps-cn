@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -214,11 +214,11 @@
       "options": [
         [
           "c",
-          "°C"
+          "Celsius"
         ],
         [
           "f",
-          "°F"
+          "Fahrenheit"
         ]
       ]
     },
@@ -247,6 +247,12 @@
         7,
         30
       ]
+    },
+    {
+      "key": "diagPage",
+      "label": "Diagnostics page (UDS replies)",
+      "type": "bool",
+      "default": false
     },
     {
       "key": "fps",

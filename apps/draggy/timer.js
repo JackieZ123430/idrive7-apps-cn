@@ -7,11 +7,12 @@
  * States: wait  - moving, waiting for the car to stop
  *         ready - stopped >= 1 s (by the clock, see idle()), launch arms automatically
  *         run   - timing
- *         done  - finished (slowed down, all splits done, or 90 s); results kept
+ * A run ends when the car slows down, every split is done, or after 40 s; it then goes straight
+ * back to arming (wait / ready) and keeps its results and time on screen until the next launch.
  */
 const LAUNCH_KMH = 0.5;      // speed that counts as "moving"
 const ROLLOUT_M = 0.3048;    // one-foot rollout (drag strip staging beam)
-const MAX_RUN_MS = 90000;
+const MAX_RUN_MS = 40000;    // a run stops counting after 40 s
 
 /** splits: [{ key, label, from, to } speeds in km/h]  or  { key, label, dist } metres */
 class RunTimer {
@@ -26,7 +27,7 @@ class RunTimer {
     }
 
     clear() {
-        this.t0 = null; this.dist = 0; this.vmax = 0; this.trace = [];
+        this.t0 = null; this.dist = 0; this.vmax = 0; this.trace = []; this.endAt = undefined;
         this.cross = {};             // km/h or 'd<metres>' -> run time (s)
         this.result = {};            // split key -> seconds
         this.trapSpeed = {};         // distance split key -> km/h at the line
@@ -37,7 +38,7 @@ class RunTimer {
 
     elapsed(now) {
         if (this.state === 'run' && this.t0 !== null) return (now - this.t0) / 1000;
-        if (this.state === 'done' && this.trace.length) return this.trace[this.trace.length - 1][0];
+        if (this.endAt !== undefined) return this.endAt;           // the last run's time while arming
         return 0;
     }
 
@@ -130,8 +131,10 @@ class RunTimer {
     }
 
     _finish(t) {
-        this.state = 'done';
+        // straight back to arming: 'wait' until the car stands, then 'ready' (see feed / idle)
+        this.state = 'wait';
         this.stopSince = null;
+        this.endAt = Math.min(MAX_RUN_MS, t - this.t0) / 1000;
         if (Object.keys(this.result).length) this.onDone({ at: Date.now(), result: Object.assign({}, this.result), trap: Object.assign({}, this.trapSpeed), vmax: this.vmax, rollout: this.rollout });
     }
 }

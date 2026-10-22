@@ -154,7 +154,7 @@ mgu.run({
             cv.text(vU(), 476, 227, 28, t.dim);
             cv.fillRect(44, 255, 480, 2, t.panelEdge);
             const el = timer.elapsed(now);
-            cv.text(secs(el), 400, 384, 96, timer.state === 'run' ? t.text : timer.state === 'done' ? t.accent2 : t.dim, { align: 'right', font: 'num' });
+            cv.text(secs(el), 400, 384, 96, timer.state === 'run' ? t.text : timer.endAt !== undefined ? t.accent2 : t.dim, { align: 'right', font: 'num' });
             cv.text('s', 412, 384, 32, t.dim);
             cv.roundRect(44, 412, 480, 44, 8, withAlpha(col, 0.18));
             if (timer.state === 'ready') cv.roundRect(44, 412, 480, 44, 8, withAlpha(GO, 0.35 + 0.25 * Math.sin(now / 160)));
