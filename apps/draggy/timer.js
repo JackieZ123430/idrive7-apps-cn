@@ -67,7 +67,13 @@ class RunTimer {
      */
     idle(now) {
         const p = this.prev;
-        if (this.state === 'run' || !p || typeof p.v !== 'number' || !isFinite(p.v) || p.v >= LAUNCH_KMH || now <= p.t) return;
+        // the 40 s limit by the clock too: at a steady speed (or stopped) the car sends no new samples,
+        // so a check only in _step never fired and the run counted on
+        if (this.state === 'run') {
+            if (this.t0 !== null && now - this.t0 > MAX_RUN_MS) this._finish(now);
+            return;
+        }
+        if (!p || typeof p.v !== 'number' || !isFinite(p.v) || p.v >= LAUNCH_KMH || now <= p.t) return;
         if (this.stopSince === null) this.stopSince = p.t;
         if (now - this.stopSince >= 1000) this.state = 'ready';
         this.prev = { t: now, v: p.v };

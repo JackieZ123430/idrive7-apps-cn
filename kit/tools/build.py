@@ -108,6 +108,21 @@ def sid(app, key):
     return 'SID_' + re.sub(r'[^A-Z0-9]+', '_', (app + '_' + key).upper()).strip('_')
 
 
+def hmi_text(s):
+    """Text for the HMI's own components: it shows non-ASCII as mojibake ('deg C' -> 'A-circumflex deg C'),
+    so the degree sign is dropped and other non-ASCII characters removed (as mgu.js hmiText)."""
+    return re.sub(r'[^\x20-\x7e]', '', str(s).replace('°', ''))
+
+
+def setting_options(s):
+    """(values, labels) of a choice / number setting, in order - the drop-down's rows."""
+    if s['type'] == 'choice':
+        return [o[0] for o in s['options']], [o[1] for o in s['options']]
+    steps = s.get('steps') or []
+    unit = (' ' + s['unit']) if s.get('unit') else ''
+    return list(steps), [('%g' % v) + unit for v in steps]
+
+
 def build_ui(spec):
     """screens/settings -> (application.xml, uiDescription.json, strings, screen meta)"""
     app = spec['id']
@@ -176,6 +191,17 @@ def build_ui(spec):
                 name = 'SET_' + s['key'].upper()
                 if s['type'] == 'bool':
                     items.append(comp('checkbox', name, rows=[text_row('SET_' + s['key'], s['label'])]))
+                elif s['type'] in ('choice', 'number'):
+                    # a drop-down with every value, as BMW's parking app settings: rows = options
+                    # (ItemText), HeaderText = the setting, SelectedItem = the chosen row (mgu.js sets it)
+                    values, labels = setting_options(s)
+                    did = nid()
+                    items.append((did, [f'            <component id="{did}" type="dropDownMenu"/>'], {
+                        'type': 'dropDownMenu', 'name': name,
+                        'rows': [{'ItemText': {'value': hmi_text(lb), 'type': 'Text'}} for lb in labels],
+                        'cells': {'HeaderText': {'value': hmi_text(s['label']), 'type': 'Text'},
+                                  'SelectedItem': {'value': values.index(s['default']) if s['default'] in values else 0, 'type': 'UInt'}},
+                    }))
                 else:
                     strings[sid(app, 'SET_' + s['key'])] = s['label']
                     items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},

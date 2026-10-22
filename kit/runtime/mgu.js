@@ -141,6 +141,11 @@ class Ui {
         if (!c) return Promise.resolve();
         return Promise.all(Object.keys(obj).map((k) => this._try('cell ' + name + '.' + k, c.setValue(row, k, hmiText(obj[k]), 'Text'))));
     }
+    /** Selected row of a drop-down menu. */
+    selected(name, row) {
+        const c = this.comp(name);
+        return c ? this._try('selected ' + name, c.setValue('SelectedItem', row, 'UInt')) : Promise.resolve();
+    }
     rows(name, n) { const c = this.comp(name); return c ? this._try('rows ' + name, c.setRowCount(n)) : Promise.resolve(); }
     visible(name, on) { const c = this.comp(name); return c ? this._try('visible ' + name, c.setProperty('Visible', on ? 1 : 0, 'UInt')) : Promise.resolve(); }
     enabled(name, on) { const c = this.comp(name); return c ? this._try('enabled ' + name, c.setProperty('Enabled', on ? 1 : 0, 'UInt')) : Promise.resolve(); }
@@ -231,14 +236,24 @@ function wireSettings(ctx) {
     const { ui, settings } = ctx;
     const schema = settings.schema;
     if (!schema.length || !ui.comp('SETTINGS')) return;
+    // choice / number settings are drop-downs (kit/tools/build.py): their rows are the values in this order
+    const values = (s) => (s.type === 'choice' ? (s.options || []).map((o) => o[0]) : s.type === 'number' ? s.steps || [] : null);
     const refresh = () => Promise.all(schema.map((s) => {
         const comp = 'SET_' + s.key.toUpperCase();
         if (s.type === 'bool') return Promise.all([ui.text(comp, s.label), ui.checked(comp, !!settings.get(s.key))]);
-        // two-row buttons in the wide settings state (kit/tools/build.py): label above, value below
+        if (values(s)) return ui.selected(comp, Math.max(0, values(s).indexOf(settings.get(s.key))));
+        // other types: two-row buttons in the wide settings state, label above, value below
         return ui.cells(comp, 0, { Text1stRow: s.label, Text2ndRow: settings.display(s.key) });
     }));
     schema.forEach((s) => {
-        ui.onClick('SET_' + s.key.toUpperCase(), () => { settings.cycle(s.key); return refresh(); });
+        const comp = 'SET_' + s.key.toUpperCase();
+        if (values(s)) {
+            // the chosen row of the drop-down (the HMI shows the selection itself)
+            ui.onClick(comp, (ev) => {
+                const v = values(s)[ev && ev.row];
+                if (v !== undefined && v !== settings.get(s.key)) settings.set(s.key, v);
+            });
+        } else ui.onClick(comp, () => { settings.cycle(s.key); return refresh(); });
     });
     if (ui.comp('BTN_SETTINGS')) ui.onClick('BTN_SETTINGS', () => refresh().then(() => ui.open('SETTINGS')));
     return refresh();
