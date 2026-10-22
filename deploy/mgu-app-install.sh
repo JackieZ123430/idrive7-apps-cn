@@ -293,7 +293,7 @@ list_apps() {
     hook=off; patch_active && hook=active; [ -f "$DROPIN" ] && hook="$hook (persistent)"
     echo "provisioning hook: $hook"
     printf '%-6s %-24s %-10s %-11s %s\n' UID APP VERSION SOURCE STATE
-    sed 's/\r//' "$UIDS" | while IFS='=' read -r u id; do
+    sed 's/\r//' "$UIDS" | while IFS='=' read -r u id || [ -n "$u" ]; do
         [ -n "$u" ] || continue
         v=$(sed -n 's/.*"version"[^"]*"\([^"]*\)".*/\1/p' "$OAP/oap_$u/source/package.json" 2>/dev/null | head -1)
         src=$(sed -n 's/.*"installationSource":"\([A-Z]*\)".*/\1/p' "$REG/$id.json" 2>/dev/null)
@@ -322,7 +322,7 @@ restore() {
     [ -n "$B" ] && [ -f "$B/uids.txt" ] || die "no backup found (looked in $BACKUP_ROOT)"
     say "restoring registry from $B"
     # remove app dirs that the backup did not know about (installed after it)
-    sed 's/\r//' "$UIDS" | while IFS='=' read -r u id; do
+    sed 's/\r//' "$UIDS" | while IFS='=' read -r u id || [ -n "$u" ]; do
         [ -n "$u" ] || continue
         if ! grep -q "^$u=$id\$" "$B/uids.txt" && is_ours "$id" "$u"; then
             say "  removing $id (uid $u)"; rm -rf "$OAP/oap_$u"
