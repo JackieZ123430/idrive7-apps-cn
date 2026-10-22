@@ -195,7 +195,8 @@ class Canvas {
      * Annulus sector (ring segment) from angle a0 to a1 (degrees, clockwise
      * from 12 o'clock), radii r0..r1. opts.round = round end caps.
      * opts.ramp = [c0, c1, ...] colours the ring by angle instead of c, spread
-     * over opts.rampFrom..opts.rampTo (default a0..a1), so a value arc keeps the
+     * over opts.rampFrom..opts.rampTo (default a0..a1; rampTo < rampFrom runs it
+     * anticlockwise), so a value arc keeps the
      * colour of its position on the scale.
      */
     arc(cx, cy, r0, r1, a0, a1, c, opts) {
@@ -203,7 +204,8 @@ class Canvas {
         let lut = null, rf = 0, rs = 1;
         if (opts && opts.ramp) {
             rf = opts.rampFrom == null ? Math.min(a0, a1) : opts.rampFrom;
-            rs = Math.max(1e-6, (opts.rampTo == null ? Math.max(a0, a1) : opts.rampTo) - rf);
+            rs = (opts.rampTo == null ? Math.max(a0, a1) : opts.rampTo) - rf;      // signed span
+            if (Math.abs(rs) < 1e-6) rs = 1e-6;
             lut = [];
             for (let i = 0; i <= 64; i++) lut.push(ramp(opts.ramp, i / 64));
         }
@@ -241,9 +243,12 @@ class Canvas {
                 }
                 if (cov > 0) {
                     if (lut) {
-                        let deg = Math.atan2(dx, -dy) / RAD;
-                        if (deg < rf - 180) deg += 360;
-                        c = lut[Math.round(clamp01((deg - rf) / rs) * 64)];
+                        // angle travelled from rampFrom in the ramp's direction (0..360)
+                        const span = Math.abs(rs);
+                        let da = (Math.atan2(dx, -dy) / RAD - rf) * (rs < 0 ? -1 : 1);
+                        da = ((da % 360) + 360) % 360;
+                        if (da > span + (360 - span) / 2) da -= 360;            // just before the start
+                        c = lut[Math.round(clamp01(da / span) * 64)];
                     }
                     this._blend(px, py, c, cov);
                 }

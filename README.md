@@ -12,7 +12,7 @@ Everything can be removed again with one command.
 |---|---|
 | ![eDrive](docs/screens/edrive.png)<br>**eDrive**: real electric range, battery health, last charge, 12 V | ![eDrive charge log](docs/screens/edrive_log.png)<br>**eDrive**: charge log with cost and totals |
 | ![M Vitals engine](docs/screens/m_vitals_engine.png)<br>**M Vitals**: rpm, boost, speed + gear, power, torque | ![M Vitals intake and fuel](docs/screens/m_vitals_fuel.png)<br>**M Vitals**: intake air, HPFP / LPFP fuel pressure |
-| ![M Vitals chassis](docs/screens/m_vitals_chassis.png)<br>**M Vitals**: g-force, tyre pressures + temperatures, xDrive | ![Redline](docs/screens/redline.png)<br>**Redline**: shift lights, gear, shift scoring |
+| ![M Vitals chassis](docs/screens/m_vitals_chassis.png)<br>**M Vitals**: g-force, tyre pressures + temperatures, xDrive | ![Redline](docs/screens/redline.png)<br>**Redline**: G20-style cluster, shift lights, shift scoring |
 | ![G-Force](docs/screens/gforce.png)<br>**G-Force**: friction circle, peaks, records | ![Virtual Dyno](docs/screens/dyno.png)<br>**Virtual Dyno**: power and torque curve |
 | ![Brake Test](docs/screens/brake_test.png)<br>**Brake Test**: 100-0 distance, deceleration, fade | ![Drag Timer](docs/screens/draggy.png)<br>**Drag Timer**: splits, ¼ mile, speed trace |
 | ![Warm-Up](docs/screens/warmup.png)<br>**Warm-Up**: time to working temperature, safe rev limit, turbo cool-down | ![Fault Scanner](docs/screens/dtc_scanner.png)<br>**Fault Scanner**: fault codes of every control unit |
@@ -51,7 +51,7 @@ the unit and kept across reboots.
 
 | App | What it does |
 |---|---|
-| **Redline** | Full-screen rev tach with a 12-LED shift-light bar that strobes at your shift point (optionally flashing the whole screen red). Huge gear indicator, read from the gearbox or learned from rpm/speed. Every upshift is scored (EARLY / SPOT ON / LATE / LIMITER), with a shift log and accuracy stats. A cold-engine guard lowers the shift point until the oil is warm. |
+| **Redline** | A G20-style cluster: speed and rev gauges side by side that fill from the outer corners (the rev bar runs blue to red towards your shift point), a huge gear in the middle and a 12-LED shift-light bar that strobes at your shift point (optionally flashing the whole screen red). Gear read from the gearbox or learned from rpm/speed. Every upshift is scored (EARLY / SPOT ON / LATE / LIMITER), with a shift log and accuracy stats. A cold-engine guard lowers the shift point until the oil is warm. |
 | **Virtual Dyno** | Do a full-throttle pull in one gear and get a power and torque curve, calculated from acceleration, car weight, air drag and rolling resistance. Settings for weight, body shape, drivetrain loss, hp/PS/kW and Nm/lb-ft. Runs are saved; pin one as a baseline to see ± on every new pull. Optional overlay of the engine computer's own torque reading. |
 | **Brake Test** | 100-0 and 200-0 km/h (or 60-0 and 100-0 mph): distance, time, peak deceleration and a deceleration trace. The start crossing is interpolated between samples, so results don't depend on the sample rate. A brake-fade chart compares your last stops and warns when distances grow. Bests plus full history. |
 | **Drag Timer** | 0-50, 0-100, 100-200, 0-200 km/h and ¼ mile (or mph equivalents), with interpolated splits, optional one-foot rollout, a live speed trace and saved best times. |
