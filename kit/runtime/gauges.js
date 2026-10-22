@@ -11,7 +11,29 @@
  * colour to red at g.limit (default max). g.hot = false turns that off.
  * value === null/undefined renders as "--" (no data).
  */
-const { mix, ramp, withAlpha } = require('./canvas');
+const { Canvas, mix, ramp, withAlpha } = require('./canvas');
+
+/*
+ * Layer cache: the parts of a widget that don't change between frames (card
+ * background, gauge track / ticks / numbers) are drawn once into their own
+ * transparent canvas and blitted every frame, which is several times cheaper
+ * than drawing them again. Least recently used layers go first, ~24 MB max.
+ */
+const layers = new Map();
+let layerBytes = 0;
+const LAYER_MAX = 24 * 1024 * 1024;
+function layer(key, w, h, draw) {
+    let c = layers.get(key);
+    if (c) { layers.delete(key); layers.set(key, c); return c; }        // most recent last
+    c = new Canvas(Math.ceil(w), Math.ceil(h));
+    draw(c);
+    layers.set(key, c); layerBytes += c.d.length;
+    while (layerBytes > LAYER_MAX && layers.size > 1) {
+        const k = layers.keys().next().value;
+        layerBytes -= layers.get(k).d.length; layers.delete(k);
+    }
+    return c;
+}
 
 const isNum = (x) => typeof x === 'number' && isFinite(x);
 const fmt = (v, d) => (isNum(v) ? v.toFixed(d || 0) : '--');
@@ -28,6 +50,11 @@ function zoneColor(t, g, v, base) {
 
 /** Panel card: rounded, soft vertical gradient, hairline edge, accent pill + title. */
 function panel(cv, t, x, y, w, h, title) {
+    x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+    const key = ['panel', w, h, title || '', t.name].join('|');
+    cv.blit(layer(key, w, h, (c) => drawPanel(c, t, 0, 0, w, h, title)), x, y);
+}
+function drawPanel(cv, t, x, y, w, h, title) {
     const R = 16, E = 1.5, lo = mix(t.panelEdge, t.panelBottom, 0.6);
     cv.card(x, y, w, h, R, [[0, t.panelTop], [1, t.panelBottom]]);
     // hairline edge, fading towards the bottom: straight runs + quarter-circle corners
@@ -51,6 +78,14 @@ function radial(cv, t, cx, cy, r, g) {
     const min = g.min || 0, max = g.max == null ? 100 : g.max;
     const v = g.value, f = isNum(v) ? clamp((v - min) / (max - min), 0, 1) : 0;
     const thick = Math.max(8, r * 0.11);
+    // static part (track, zone tints, ticks, numbers, unit, label) from the layer cache
+    const S = Math.ceil(r + 16), key = ['radial', r, min, max, g.ticks, g.majorEvery, g.tickLabels, g.tickDiv, g.tickDecimals,
+        JSON.stringify(g.zones || []), g.unit || '', g.label || '', t.name].join('|');
+    cv.blit(layer(key, 2 * S, 2 * S, (c) => radialStatic(c, t, S, S, r, g, min, max, thick)), Math.round(cx) - S, Math.round(cy) - S);
+    radialLive(cv, t, cx, cy, r, g, min, max, thick, v, f);
+}
+function radialStatic(cv, t, cx, cy, r, g, min, max, thick) {
+    const a0 = -135, a1 = 135;
     // track + zone tints
     cv.arc(cx, cy, r - thick, r, a0, a1, t.track, { round: true });
     for (const z of g.zones || []) {
@@ -71,7 +106,11 @@ function radial(cv, t, cx, cy, r, g) {
             cv.text(fmt(val / (g.tickDiv || 1), g.tickDecimals || 0), cx + Math.sin(a) * lr, cy - Math.cos(a) * lr + 9, 24, t.dim, { align: 'center', font: 'label' });
         }
     }
-    // live arc with soft glow
+    if (g.unit) cv.text(g.unit, cx, cy + Math.round(r * 0.62) * 0.32 + 36, 28, t.dim, { align: 'center', font: 'label' });
+    if (g.label) cv.text(String(g.label).toUpperCase(), cx, cy + r * 0.82, 26, t.text, { align: 'center', font: 'bold', spacing: 1.5 });
+}
+function radialLive(cv, t, cx, cy, r, g, min, max, thick, v, f) {
+    const a0 = -135, a1 = 135;
     // live arc: the theme's colour ramp along the scale (a zone's colour when inside one), soft glow, bright tip
     // (or, by default, the hot ramp: theme colour -> red at the limit)
     let col = zoneColor(t, g, v);
@@ -95,8 +134,6 @@ function radial(cv, t, cx, cy, r, g) {
     // centre readout
     const big = Math.round(r * 0.62);
     cv.text(fmt(v, g.decimals), cx, cy + big * 0.32, big, isNum(v) ? t.text : t.dim, { align: 'center', font: 'num' });
-    if (g.unit) cv.text(g.unit, cx, cy + big * 0.32 + 36, 28, t.dim, { align: 'center', font: 'label' });
-    if (g.label) cv.text(String(g.label).toUpperCase(), cx, cy + r * 0.82, 26, t.text, { align: 'center', font: 'bold', spacing: 1.5 });
     if (isNum(g.peak) && g.showPeak !== false) cv.text('PEAK ' + fmt(g.peak, g.decimals), cx, cy + r * 0.82 + 32, 22, t.accent2, { align: 'center', font: 'label', spacing: 1 });
 }
 
@@ -228,4 +265,4 @@ function stripes(cv, t, x, y, w) {
     s.forEach((c, i) => cv.roundRect(x + i * sw, y, sw - (i < s.length - 1 ? 4 : 0), 4, 2, c));
 }
 
-module.exports = { panel, radial, bar, stat, tyres, gmeter, stripes, fmt, isNum, clamp, mix, zoneColor };
+module.exports = { layer, panel, radial, bar, stat, tyres, gmeter, stripes, fmt, isNum, clamp, mix, zoneColor };

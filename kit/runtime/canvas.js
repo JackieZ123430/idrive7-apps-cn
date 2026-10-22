@@ -45,9 +45,35 @@ class Canvas {
     }
 
     clear(c) {
-        const [r, g, b, a] = rgba(c || [0, 0, 0, 0]);
-        const d = this.d;
-        for (let i = 0; i < d.length; i += 4) { d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = a; }
+        const v = rgba(c || [0, 0, 0, 0]);
+        // one pixel, then doubling copies: a few memcpys instead of 4 writes per pixel
+        const d = this.d, n = d.length;
+        if (!n) return this;
+        d[0] = v[0]; d[1] = v[1]; d[2] = v[2]; d[3] = v[3];
+        for (let len = 4; len < n; len *= 2) d.copyWithin(len, 0, Math.min(len, n - len));
+        return this;
+    }
+
+    /**
+     * Draw another canvas (a pre-drawn layer) at (x, y), alpha-blended. Fully
+     * transparent pixels are skipped and opaque ones copied, so blitting a cached
+     * layer costs far less than drawing it again.
+     */
+    blit(src, x, y) {
+        x = Math.round(x); y = Math.round(y);
+        const sw = src.w, d = this.d, s = src.d;
+        const x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(this.w, x + sw), y1 = Math.min(this.h, y + src.h);
+        const px = [0, 0, 0, 255];
+        for (let py = y0; py < y1; py++) {
+            let si = ((py - y) * sw + (x0 - x)) * 4, di = (py * this.w + x0) * 4;
+            for (let qx = x0; qx < x1; qx++, si += 4, di += 4) {
+                const a = s[si + 3];
+                if (a === 0) continue;
+                if (a === 255) { d[di] = s[si]; d[di + 1] = s[si + 1]; d[di + 2] = s[si + 2]; d[di + 3] = 255; continue; }
+                px[0] = s[si]; px[1] = s[si + 1]; px[2] = s[si + 2]; px[3] = a;
+                this._blend(qx, py, px, 1);
+            }
+        }
         return this;
     }
 
@@ -71,11 +97,22 @@ class Canvas {
         c = rgba(c);
         const x0 = Math.max(0, Math.floor(x)), y0 = Math.max(0, Math.floor(y));
         const x1 = Math.min(this.w, Math.ceil(x + w)), y1 = Math.min(this.h, Math.ceil(y + h));
+        if (x1 <= x0 || y1 <= y0 || c[3] === 0) return this;
+        const d = this.d, W4 = this.w * 4, r = c[0], g = c[1], b = c[2], ca = c[3] / 255;
+        // the pixel loop is inlined (no call per pixel); edge pixels get fractional coverage
         for (let py = y0; py < y1; py++) {
             const cy = clamp01(Math.min(py + 1, y + h) - Math.max(py, y));
-            for (let px = x0; px < x1; px++) {
-                const cx = clamp01(Math.min(px + 1, x + w) - Math.max(px, x));
-                this._blend(px, py, c, cx * cy);
+            let i = py * W4 + x0 * 4;
+            for (let px = x0; px < x1; px++, i += 4) {
+                const cov = (px === x0 || px === x1 - 1) ? cy * clamp01(Math.min(px + 1, x + w) - Math.max(px, x)) : cy;
+                const sa = ca * cov;
+                if (sa >= 1) { d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255; continue; }
+                if (sa <= 0) continue;
+                const da = d[i + 3] / 255, oa = sa + da * (1 - sa), k = da * (1 - sa);
+                d[i] = (r * sa + d[i] * k) / oa;
+                d[i + 1] = (g * sa + d[i + 1] * k) / oa;
+                d[i + 2] = (b * sa + d[i + 2] * k) / oa;
+                d[i + 3] = oa * 255;
             }
         }
         return this;
@@ -215,8 +252,19 @@ class Canvas {
         const rm = (r0 + r1) / 2, hw = (r1 - r0) / 2;
         const capA = [a0 * RAD, a1 * RAD];
         const caps = round ? capA.map((a) => [cx + Math.sin(a) * rm, cy - Math.cos(a) * rm]) : null;
-        const x0 = Math.max(0, Math.floor(cx - r1 - 1)), x1 = Math.min(this.w, Math.ceil(cx + r1 + 1));
-        const y0 = Math.max(0, Math.floor(cy - r1 - 1)), y1 = Math.min(this.h, Math.ceil(cy + r1 + 1));
+        // bounding box of the sector only (end points + any 90-degree extremes inside it),
+        // not the whole circle: a short arc scans a small area
+        let bx0 = cx - r1, bx1 = cx + r1, by0 = cy - r1, by1 = cy + r1;
+        if (!full) {
+            const pts = [];
+            [a0, a1].forEach((a) => { const t = a * RAD; [r0, r1].forEach((r) => pts.push([cx + Math.sin(t) * r, cy - Math.cos(t) * r])); });
+            for (let k = Math.ceil(a0 / 90) * 90; k <= a1; k += 90) { const t = k * RAD; pts.push([cx + Math.sin(t) * r1, cy - Math.cos(t) * r1]); }
+            const pad = round ? (r1 - r0) / 2 + 1 : 1;
+            bx0 = Math.min.apply(null, pts.map((p) => p[0])) - pad; bx1 = Math.max.apply(null, pts.map((p) => p[0])) + pad;
+            by0 = Math.min.apply(null, pts.map((p) => p[1])) - pad; by1 = Math.max.apply(null, pts.map((p) => p[1])) + pad;
+        }
+        const x0 = Math.max(0, Math.floor(bx0 - 1)), x1 = Math.min(this.w, Math.ceil(bx1 + 1));
+        const y0 = Math.max(0, Math.floor(by0 - 1)), y1 = Math.min(this.h, Math.ceil(by1 + 1));
         const mid = ((a0 + a1) / 2) * RAD, half = ((a1 - a0) / 2) * RAD;
         for (let py = y0; py < y1; py++) {
             const dy = py + 0.5 - cy;
@@ -345,12 +393,27 @@ class Canvas {
     }
 
     /** Encode as PNG (RGBA, 8 bit). */
+    /**
+     * Encode as PNG. A fully opaque canvas (every screen frame) is written as RGB,
+     * which needs a quarter less data to compress; anything with transparency (app
+     * icons) keeps RGBA. Level 1 (default) is the fastest zlib setting: about half
+     * the encode time of level 4 for a slightly larger file.
+     */
     png(level) {
         const w = this.w, h = this.h, d = this.d;
-        const raw = Buffer.alloc((w * 4 + 1) * h);
-        for (let y = 0; y < h; y++) {
-            raw[y * (w * 4 + 1)] = 0;
-            Buffer.from(d.buffer, d.byteOffset + y * w * 4, w * 4).copy(raw, y * (w * 4 + 1) + 1);
+        let opaque = true;
+        for (let i = 3; i < d.length; i += 4) if (d[i] !== 255) { opaque = false; break; }
+        const bpp = opaque ? 3 : 4, stride = w * bpp + 1;
+        const raw = Buffer.alloc(stride * h);
+        if (opaque) {
+            let o = 0, i = 0;
+            for (let y = 0; y < h; y++) {
+                raw[o++] = 0;                               // filter: none
+                for (let x = 0; x < w; x++, i += 4) { raw[o++] = d[i]; raw[o++] = d[i + 1]; raw[o++] = d[i + 2]; }
+            }
+        } else {
+            const src = Buffer.from(d.buffer, d.byteOffset, d.length);
+            for (let y = 0; y < h; y++) src.copy(raw, y * stride + 1, y * w * 4, (y + 1) * w * 4);
         }
         const chunk = (type, body) => {
             const len = Buffer.alloc(4); len.writeUInt32BE(body.length, 0);
@@ -360,11 +423,11 @@ class Canvas {
         };
         const ihdr = Buffer.alloc(13);
         ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
-        ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+        ihdr[8] = 8; ihdr[9] = opaque ? 2 : 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
         return Buffer.concat([
             Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
             chunk('IHDR', ihdr),
-            chunk('IDAT', zlib.deflateSync(raw, { level: level == null ? 4 : level })),
+            chunk('IDAT', zlib.deflateSync(raw, { level: level == null ? 1 : level })),
             chunk('IEND', Buffer.alloc(0)),
         ]);
     }

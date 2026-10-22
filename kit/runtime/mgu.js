@@ -250,7 +250,8 @@ async function runInner(impl) {
                 if (++frames % 3 === 0 && typeof global.gc === 'function') { try { global.gc(); } catch (e) { /* ignore */ } }
                 running = false;
                 const dt = Date.now() - t0;
-                if (timer !== null) timer = setTimeout(tick, Math.max(30, 1000 / fps - dt));
+                // at least 15 ms between frames so car data and HMI events get handled
+                if (timer !== null) timer = setTimeout(tick, Math.max(15, 1000 / fps - dt));
             };
             const set = (on) => {
                 if (on && timer === null) { timer = setTimeout(tick, 0); }
