@@ -5,7 +5,7 @@
  * Pages (button "Next page"):
  *   engine  - RPM + boost dials, power/torque bars, speed
  *   thermal - coolant / engine oil / gearbox / ambient with 5-minute traces
- *   chassis - friction circle (g-g diagram), steering, tyre temps, xDrive split
+ *   chassis - friction circle (g-g diagram), tyre pressures + temperatures, xDrive split
  *
  * Signals come straight from the car over SOME/IP (see app.json "signals").
  * With no car attached (the VM, or the unit on the bench) demo data can drive
@@ -17,10 +17,35 @@ const mgu = require('./kit/mgu');
 const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Demo = require('./demo');
+const { GearGuess } = require('./kit/car');
 
 const W = 1600, H = 520;
 const PAGES = ['engine', 'thermal', 'chassis'];
 const HIST_SEC = 300;
+// gearbox enum: names or wire numbers (G1 = 3 ... G10 = 12, R = 1, N_OR_P = 2), as in kit/car.js
+const GEARS = { G1: 1, G2: 2, G3: 3, G4: 4, G5: 5, G6: 6, G7: 7, G8: 8, G9: 9, G10: 10, R: -1, N_OR_P: 0 };
+const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x === 1 ? -1 : x === 2 ? 0 : undefined) : GEARS[x]);
+
+/**
+ * Selector programme (D / S / M / P / R / N) from the gearbox status. Field names differ
+ * between cars, so look at every selector-like field: enum names or on/off flags.
+ */
+function modeOf(o) {
+    for (const k of Object.keys(o || {})) {
+        if (k === 'statusActualGearDrive' || !/select|lever|position|program|mode|range|manual|sport|tip/i.test(k)) continue;
+        const v = o[k];
+        if (v === true || v === 1) { if (/manual|tip/i.test(k)) return 'M'; if (/sport/i.test(k)) return 'S'; continue; }
+        const x = String(v).toUpperCase();
+        if (/NOT|INACTIVE|INVALID|SIGNAL|UNKNOWN|OFF|NO_/.test(x)) continue;
+        if (/MANU|TIPP|^M$|^M_|_M$|^M\d/.test(x)) return 'M';
+        if (/SPORT|^S$|_S$|^DS$/.test(x)) return 'S';
+        if (/PARK|^P$/.test(x)) return 'P';
+        if (/REVERSE|^R$/.test(x)) return 'R';
+        if (/NEUTRAL|^N$/.test(x)) return 'N';
+        if (/DRIVE|^D$|^D_|_D$/.test(x)) return 'D';
+    }
+    return null;
+}
 
 mgu.run({
     async start(ctx) {
@@ -46,10 +71,20 @@ mgu.run({
             try { fs.writeFileSync(AWD_FILE, JSON.stringify({ seen: true })); } catch (e) { log.warn('awd save: ' + e); }
         };
         let lastCar = 0;
+        const guess = new GearGuess();
+        let gearLogs = 0, lastModeKey = '';
         const put = (k, v) => {
             if (v === null || v === undefined || !isFinite(v)) return;
             live[k] = v; lastCar = Date.now();
             if (peak[k] === undefined || v > peak[k]) peak[k] = v;
+            if (k === 'rpm' || k === 'torque') {
+                // crankshaft power from torque x speed (engine only; electric motor not included)
+                if (G.isNum(live.torque) && G.isNum(live.rpm)) put('powerKw', Math.max(0, live.torque * live.rpm / 9549));
+            }
+            if ((k === 'rpm' || k === 'speed') && G.isNum(live.rpm) && G.isNum(live.speed)) {
+                const g = guess.feed(live.rpm, live.speed);
+                live.gearGuess = live.speed < 3 ? 0 : g;
+            }
         };
         const watches = [
             ['de.bmw.infotainment.vehicle.CDS', {
@@ -66,7 +101,16 @@ mgu.run({
                 statusVehicleDynamicEngine: (v) => { put('powerPct', v.displaySportEnginePower); put('torquePct', v.displaySportEngineTorque); },
                 statusActualValueTorque2: (v) => put('torque', sc('torque', v.actualValueTorqueCrankshaft)),
             }],
-            ['de.bmw.infotainment.drivingexcitement.XView', { statusSteeringAngleDriver: (v) => put('steer', sc('steering', v.actualValueSteeringAngleDriver)) }],
+            ['de.bmw.infrastructure.VehicleInformation', {
+                statusGearboxDrive: (v) => {
+                    const g = gearOf(v && v.statusActualGearDrive);
+                    if (g !== undefined) { live.gear = g; lastCar = Date.now(); }
+                    live.gearMode = modeOf(v);
+                    // field names / values differ per car: log them so the D/S/M detection can be checked
+                    const key = JSON.stringify(Object.keys(v || {}).filter((x) => x !== 'statusActualGearDrive').map((x) => [x, v[x]]));
+                    if (key !== lastModeKey && gearLogs < 40) { gearLogs++; lastModeKey = key; log.info('gearbox: ' + JSON.stringify(v) + ' -> ' + (live.gearMode || '?')); }
+                },
+            }],
             ['de.bmw.infrastructure.analytics.BasicDataSet', {
                 basicDataSet: (v) => {
                     put('gearbox', sc('gearboxTemp', v.valueTemperatureTransmissionOil));
@@ -124,6 +168,8 @@ mgu.run({
         if (page < 0) page = 0;
         const trail = [];
 
+        const GO = '#2fd27a';
+
         function header(cv, t, title, d) {
             cv.text(title.toUpperCase(), 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
             G.stripes(cv, t, 24, 44, 120);
@@ -132,6 +178,17 @@ mgu.run({
                 cv.roundRect(W - 230, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
                 cv.text('DEMO', W - 180, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
             }
+        }
+
+        /** { letter, num, est } for the gear readout, or null without any gear information. */
+        function gearText(d) {
+            let g = d.gear, est = false;
+            if (!G.isNum(g)) { g = d.gearGuess; est = true; }
+            if (!G.isNum(g)) return null;
+            if (g < 0) return { letter: 'R', num: '', est };
+            const m = d.gearMode;
+            if (g === 0) return { letter: m === 'P' ? 'P' : 'N', num: '', est };
+            return { letter: m === 'S' || m === 'M' ? m : 'D', num: String(g), est };
         }
 
         function drawEngine(cv, t, d) {
@@ -151,9 +208,17 @@ mgu.run({
             const x = 1110, w = 466;
             G.panel(cv, t, x, 70, w, 160, 'Speed');
             const sp = V(d.speed);
-            cv.text(G.fmt(sp, 0), x + 22, 212, 96, sp == null ? t.dim : t.text, { font: 'num' });
-            cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + w - 24, 212, 30, t.dim, { align: 'right' });
-            G.bar(cv, t, x, 262, w, 92, { label: 'Power', value: d.powerPct, unit: '%', zones: [{ from: 90, to: 100, color: 'crit' }], peak: showPk ? peak.powerPct : null });
+            const sw = cv.text(G.fmt(sp, 0), x + 22, 212, 96, sp == null ? t.dim : t.text, { font: 'num' });
+            cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + 30 + sw, 212, 26, t.dim);
+            // gear: D / S / M + number (R, N, P alone)
+            const gr = gearText(d);
+            if (gr) {
+                const nw = gr.num ? cv.text(gr.num, x + w - 24, 214, 120, t.text, { align: 'right', font: 'gear' }) : 0;
+                cv.text(gr.letter, x + w - 28 - nw, 214, 120, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
+                if (gr.est) cv.text('EST.', x + w - 24, 104, 16, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
+            }
+            const pmaxKw = settings.get('maxPower');
+            G.bar(cv, t, x, 262, w, 92, { label: 'Engine power', value: d.powerKw, unit: 'kW', max: pmaxKw, zones: [{ from: pmaxKw * 0.9, to: pmaxKw * 2, color: 'crit' }], peak: showPk ? peak.powerKw : null });
             G.bar(cv, t, x, 380, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, peak: showPk ? peak.torque : null });
         }
 
@@ -177,49 +242,57 @@ mgu.run({
 
         function drawChassis(cv, t, d) {
             if (G.isNum(d.gLat) && G.isNum(d.gLong)) { trail.push([d.gLat, d.gLong]); if (trail.length > 60) trail.shift(); }
-            G.panel(cv, t, 24, 64, 520, 440, 'G-force');
-            G.gmeter(cv, t, 284, 260, 160, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
-            // steering + xDrive (steering takes the full height when the xDrive card is hidden)
+            G.panel(cv, t, 24, 64, 480, 440, 'G-force');
+            G.gmeter(cv, t, 264, 262, 156, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
+            // xDrive column (when shown), tyres take the rest
             const xd = settings.get('xdrive');
-            const showAwd = xd === 'on' || (xd !== 'off' && (awdSeen || d.demo));
-            const st = d.steer;
+            const showAwd = xd === 'on' || (xd !== 'off' && (awdSeen || usingDemo()));
+            const tx = 528, tw = showAwd ? 668 : 1048;
+            drawTyres(cv, t, tx, 64, tw, 440, d);
             if (showAwd) {
-                G.panel(cv, t, 568, 64, 460, 200, 'Steering');
-                cv.arc(798, 230, 110, 122, -90, 90, t.track);
-                if (G.isNum(st)) {
-                    const a = G.clamp(st / 540, -1, 1) * 90;
-                    cv.arc(798, 230, 108, 124, Math.min(0, a), Math.max(0, a), t.accent);
-                }
-                cv.text(G.fmt(st, 0) + '°', 798, 220, 64, G.isNum(st) ? t.text : t.dim, { align: 'center', font: 'num' });
-                G.panel(cv, t, 568, 288, 460, 216, 'xDrive');
+                const ax = 1220, aw = 356;
+                G.panel(cv, t, ax, 64, aw, 440, 'xDrive');
                 const AWD = { _4WD_STANDARD: '4WD', _4WD_ALTERNATIV: '4WD Sport', _2WD: '2WD', AWDSAND: 'Sand' };
                 const mode = AWD[d.awd] || '--';
                 const hot = d.awdQual === 'FUNKTION_NICHT_VERFUEGBAR_FEHLER';
-                cv.text(mode, 592, 392, 56, hot ? t.crit : t.text, { font: 'bold' });
-                if (hot) cv.text('DERATED / OFF', 800, 392, 22, t.crit, { font: 'bold', spacing: 1.5 });
-                G.bar(cv, t, 592, 424, 412, 64, { label: 'Rear torque', value: d.splitRear, unit: '%' });
-            } else {
-                G.panel(cv, t, 568, 64, 460, 440, 'Steering');
-                cv.arc(798, 360, 170, 186, -90, 90, t.track, { round: true });
-                if (G.isNum(st)) {
-                    const a = G.clamp(st / 540, -1, 1) * 90;
-                    cv.arc(798, 360, 168, 188, Math.min(0, a), Math.max(0, a), t.accent, { round: true });
-                }
-                cv.line(798, 166, 798, 182, 3, t.tick);
-                cv.text(G.fmt(st, 0) + '°', 798, 350, 96, G.isNum(st) ? t.text : t.dim, { align: 'center', font: 'num' });
-                cv.text('LEFT', 628, 400, 18, t.dim, { font: 'bold', spacing: 1.5, align: 'center' });
-                cv.text('RIGHT', 968, 400, 18, t.dim, { font: 'bold', spacing: 1.5, align: 'center' });
-                cv.text('steering wheel angle', 798, 470, 20, t.dim, { align: 'center' });
+                cv.text(mode, ax + 24, 170, 52, hot ? t.crit : t.text, { font: 'bold' });
+                if (hot) cv.text('DERATED / OFF', ax + 24, 206, 22, t.crit, { font: 'bold', spacing: 1.5 });
+                const rear = d.splitRear;
+                G.bar(cv, t, ax + 24, 250, aw - 48, 80, { label: 'Rear', value: rear, unit: '%' });
+                G.bar(cv, t, ax + 24, 360, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%' });
             }
-            G.tyres(cv, t, 1052, 64, 524, 440, {
-                label: 'Tyres', fl: T(d.tFL), fr: T(d.tFR), rl: T(d.tRL), rr: T(d.tRR), unit: tU(),
-                coldBelow: T(20), warnAbove: T(90), hotAbove: T(105),
-                pressure: {
-                    fl: Pt(d.pFL), fr: Pt(d.pFR), rl: Pt(d.pRL), rr: Pt(d.pRR),
-                    target: { fl: Pt(d.ptFL), fr: Pt(d.ptFR), rl: Pt(d.ptRL), rr: Pt(d.ptRR) },
-                    unit: settings.get('pressUnit'), decimals: settings.get('pressUnit') === 'psi' ? 0 : 1,
-                },
-            });
+        }
+
+        /** Top-down car with each tyre's pressure (against the car's target) and temperature. */
+        function drawTyres(cv, t, x, y, w, h, d) {
+            G.panel(cv, t, x, y, w, h, 'Tyres');
+            const unitP = settings.get('pressUnit'), dec = unitP === 'psi' ? 0 : 1;
+            const cx = x + w / 2, top = y + 70, bh = h - 100, bw = 150;
+            // body: rounded shell, windscreen + rear window, FRONT marker
+            cv.roundRect(cx - bw / 2, top, bw, bh, 52, withAlpha(t.track, 0.9));
+            cv.strokeRoundRect(cx - bw / 2, top, bw, bh, 52, 3, t.tick);
+            cv.roundRect(cx - bw / 2 + 18, top + bh * 0.24, bw - 36, 34, 12, withAlpha(t.tick, 0.45));
+            cv.roundRect(cx - bw / 2 + 22, top + bh * 0.70, bw - 44, 26, 10, withAlpha(t.tick, 0.35));
+            cv.text('FRONT', cx, top + 34, 16, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+            const tyw = 34, tyh = 84, big = w > 900;
+            const corners = [['FL', -1, top + 30], ['FR', 1, top + 30], ['RL', -1, top + bh - 30 - tyh], ['RR', 1, top + bh - 30 - tyh]];
+            for (const [k, side, ty] of corners) {
+                const temp = d['t' + k], pr = Pt(d['p' + k]), tgt = Pt(d['pt' + k]);
+                // tyre colour: temperature
+                const tc = !G.isNum(temp) ? t.tick : temp < 20 ? t.cold : temp > 105 ? t.crit : temp > 90 ? t.warn : t.accent;
+                const tx0 = side < 0 ? cx - bw / 2 - tyw - 8 : cx + bw / 2 + 8;
+                cv.roundRect(tx0, ty, tyw, tyh, 10, tc);
+                for (let i = 1; i < 4; i++) cv.fillRect(tx0 + 6, ty + i * tyh / 4, tyw - 12, 2, withAlpha(t.bg, 0.35));
+                // pressure: big, coloured against the target
+                let pc = G.isNum(pr) ? t.text : t.dim;
+                if (G.isNum(pr) && G.isNum(tgt) && tgt > 0) { const r = pr / tgt; pc = r < 0.85 ? t.crit : r < 0.93 || r > 1.15 ? t.warn : GO; }
+                const al = side < 0 ? 'right' : 'left', lx = side < 0 ? tx0 - 26 : tx0 + tyw + 26;
+                const ps = G.fmt(pr, dec), size = big ? 72 : 56;
+                const pw = cv.text(ps, lx + (side < 0 ? -cv.textWidth(' ' + unitP, 24) : 0), ty + 52, size, pc, { align: al, font: 'num' });
+                cv.text(' ' + unitP, side < 0 ? lx : lx + pw, ty + 52, 24, t.dim, { align: al });
+                cv.text(G.isNum(tgt) ? 'target ' + G.fmt(tgt, dec) : 'no target', lx, ty + 80, 18, t.dim, { align: al });
+                cv.text(G.isNum(temp) ? G.fmt(T(temp), 0) + tU() : '--' + tU(), lx, ty + 118, 30, G.isNum(temp) ? tc : t.dim, { align: al, font: 'bold' });
+            }
         }
 
         async function render() {

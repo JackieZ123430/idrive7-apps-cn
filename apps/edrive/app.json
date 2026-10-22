@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH), design capacity left, last charge, charge log and 12 V battery voltage",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -70,8 +70,8 @@
       ]
     },
     {
-      "key": "rangeMild",
-      "label": "Range at 100%, 10-25 °C",
+      "key": "range20",
+      "label": "Range at 100%, 20 °C",
       "type": "number",
       "unit": "km",
       "default": 50,
@@ -91,74 +91,23 @@
       ]
     },
     {
-      "key": "rangeCold",
-      "label": "Range at 100%, cold",
-      "type": "number",
-      "unit": "km",
-      "default": 40,
-      "steps": [
-        20,
-        25,
-        30,
-        35,
-        40,
-        45,
-        50,
-        55,
-        60,
-        70,
-        80
-      ]
-    },
-    {
-      "key": "rangeHot",
-      "label": "Range at 100%, above 25 °C",
-      "type": "number",
-      "unit": "km",
-      "default": 50,
-      "steps": [
-        30,
-        35,
-        40,
-        45,
-        50,
-        55,
-        60,
-        65,
-        70,
-        80,
-        90,
-        100
-      ]
-    },
-    {
-      "key": "coldBelow",
-      "label": "Cold below",
-      "type": "number",
-      "unit": "°C",
-      "default": 10,
-      "steps": [
-        0,
-        3,
-        5,
-        8,
-        10,
-        12,
-        15
-      ]
-    },
-    {
-      "key": "hotAbove",
-      "label": "Hot above",
-      "type": "number",
-      "unit": "°C",
-      "default": 25,
-      "steps": [
-        20,
-        25,
-        28,
-        30,
-        35
+      "key": "hybrid",
+      "label": "Hybrid system",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "yes",
+          "Yes"
+        ],
+        [
+          "no",
+          "No (12 V only)"
+        ]
       ]
     },
     {
@@ -185,8 +134,23 @@
       "label": "Electricity price (charge log)",
       "type": "number",
       "unit": "€/kWh",
-      "default": 0,
-      "steps": [0, 0.1, 0.12, 0.15, 0.18, 0.2, 0.22, 0.25, 0.28, 0.3, 0.35, 0.4, 0.5, 0.6]
+      "default": 0.27,
+      "steps": [
+        0,
+        0.1,
+        0.12,
+        0.15,
+        0.18,
+        0.2,
+        0.22,
+        0.25,
+        0.27,
+        0.3,
+        0.35,
+        0.4,
+        0.5,
+        0.6
+      ]
     },
     {
       "key": "distUnit",

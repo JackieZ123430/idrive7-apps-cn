@@ -2,8 +2,9 @@
 /**
  * eDrive - what the high-voltage battery really gives you.
  *
- *   - real electric range: displayed charge x your own "range at 100%" for the
- *     outside temperature (cold / mild / hot bands, set in Settings)
+ *   - real electric range: displayed charge x the range a full battery gives at
+ *     the outside temperature (RANGE_CURVE, scaled to your "range at 20 °C"),
+ *     with a low-high spread
  *   - battery health (SOH): usable capacity compared to a new battery
  *   - design capacity left: charge x SOH, i.e. how much of a NEW battery's
  *     full energy is still in the pack right now (also in kWh)
@@ -13,6 +14,8 @@
  *   - 12 V battery voltage
  *   - charge log page: every charge with energy, range and (optional) cost,
  *     monthly / all-time totals and a 14-day chart
+ *   - cars without a hybrid system: when the battery unit never answers but the
+ *     rest of the car does, only the 12 V battery is shown (setting "Hybrid system")
  *
  * Charge, SOH and 12 V are read with UDS ReadDataByIdentifier over the head
  * unit's diagnostic link (kit/diag.js); the DIDs and scalings live in app.json
@@ -28,11 +31,20 @@ const { Diag, hex, NRC } = require('./kit/diag');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
-const PAGES = ['main', 'log', 'diag'];
+const PAGES_HYBRID = ['main', 'log', 'diag'], PAGES_12V = ['main', 'diag'];
 const LOG_MAX = 200;             // charges kept in the log
 const LOSS = 1.1;                // grid energy per kWh stored (charger + battery losses, estimate)
 const KM_MI = 0.621371;
 const VALUES = ['soc', 'soh', 'v12'];
+const V12_HIST = 120;            // 12 V samples kept (one per 30 s = 1 h)
+
+/**
+ * Range of a full battery by outside temperature, for a car doing 50 km at 20 °C:
+ * [°C, low km, high km]. Linear in between; warmer than 20 °C counts as 20 °C, colder
+ * than -10 °C continues the -10..0 slope (never below 30 % of the 20 °C range).
+ * Scaled by the "range at 20 °C" setting.
+ */
+const RANGE_CURVE = [[-10, 20, 30], [0, 30, 38], [10, 40, 45], [20, 50, 50]];
 
 /** Demo: charge drains, outside temperature swings across the cold threshold. */
 class Demo {
@@ -40,7 +52,7 @@ class Demo {
     sample() {
         const s = (Date.now() - this.t0) / 1000;
         return {
-            soc: 100 - (s * 0.8) % 95, soh: 91.5, ambient: 11 + 9 * Math.sin(s / 12), v12: 12.45 + 0.05 * Math.sin(s / 5),
+            soc: 100 - (s * 0.8) % 95, soh: 91.5, ambient: 6 + 14 * Math.sin(s / 12), v12: 12.45 + 0.05 * Math.sin(s / 5),
             charge: { from: 28, to: 97, toT: this.t0 - 3 * 3600000, kwh: 7.6 },
         };
     }
@@ -167,20 +179,52 @@ mgu.run({
             return st.lastCharge || null;
         }
 
+        /* ---------- hybrid system or not ----------
+         * Any reply from the battery unit (even a refusal) = there is a hybrid system.
+         * No reply 3 times in a row while another unit answers = no hybrid system:
+         * remembered, so the next start shows the 12 V page straight away. */
+        let smeMiss = 0, lastSocTry = 0;
+        function detectHybrid(otherUnitAnswered) {
+            const rs = (cfg.soc || []).map((c) => raws[(c.ecu == null ? cfg.ecu : c.ecu) + ':' + c.did]);
+            if (rs.some((r) => r && r.bytes)) {
+                smeMiss = 0;
+                if (st.noHybrid || !st.hybrid) { st.noHybrid = false; st.hybrid = true; save(); log.info('hybrid battery unit answers'); }
+            } else if (rs.some((r) => r && r.why === 'no reply') && otherUnitAnswered && !st.hybrid) {
+                if (++smeMiss >= 3 && !st.noHybrid) { st.noHybrid = true; save(); log.info('no hybrid battery unit: 12 V only'); }
+            }
+        }
+        const isHybrid = () => (settings.get('hybrid') === 'yes' ? true : settings.get('hybrid') === 'no' ? false : !st.noHybrid);
+        const pages = () => (isHybrid() ? PAGES_HYBRID : PAGES_12V);
+
+        // 12 V history (one sample per 30 s)
+        const v12hist = [];
+        const sample12 = () => {
+            const v = usingDemo() ? demo.sample().v12 : (live.v12T && Date.now() - live.v12T < 120000 ? live.v12 : null);
+            v12hist.push(v); if (v12hist.length > V12_HIST) v12hist.shift();
+        };
+        setTimeout(sample12, 8000);
+        setInterval(sample12, 30000);
+
         let busy = false, pollTimer = null;
         async function poll(forceSoh) {
             if (busy) return;
             busy = true;
             try {
                 if (diag.available) {
-                    const soc = await readValue('soc');
-                    if (soc !== null) { live.soc = soc; live.socT = Date.now(); onSoc(soc, live.socT); }
-                    if (forceSoh || live.soh === null || Date.now() - live.sohT > cfg.sohEverySec * 1000) {
-                        const soh = await readValue('soh');
-                        if (soh !== null) { live.soh = soh; live.sohT = Date.now(); st.soh = soh; st.sohT = live.sohT; save(); }
-                    }
                     const v12 = await readValue('v12');
                     if (v12 !== null) { live.v12 = v12; live.v12T = Date.now(); }
+                    // without a hybrid system only re-check the battery unit every 5 minutes
+                    const noHy = st.noHybrid && settings.get('hybrid') !== 'yes';
+                    if (!noHy || forceSoh || Date.now() - lastSocTry > 300000) {
+                        lastSocTry = Date.now();
+                        const soc = await readValue('soc');
+                        if (soc !== null) { live.soc = soc; live.socT = Date.now(); onSoc(soc, live.socT); }
+                        detectHybrid(v12 !== null);
+                        if (!st.noHybrid && (forceSoh || live.soh === null || Date.now() - live.sohT > cfg.sohEverySec * 1000)) {
+                            const soh = await readValue('soh');
+                            if (soh !== null) { live.soh = soh; live.sohT = Date.now(); st.soh = soh; st.sohT = live.sohT; save(); }
+                        }
+                    }
                 }
             } catch (e) { log.warn('poll: ' + e); }
             busy = false;
@@ -202,13 +246,24 @@ mgu.run({
                 v12: live.v12T && now - live.v12T < maxAge ? live.v12 : null, charge: lastCharge(),
             };
         }
-        function band(tC) {
-            if (!G.isNum(tC)) return 'mild';
-            if (tC < settings.get('coldBelow')) return 'cold';
-            if (tC > settings.get('hotAbove')) return 'hot';
-            return 'mild';
+        /** Range of a full battery at tC: { lo, hi, mid } in km (no temperature: 10 °C assumed). */
+        function rangeAt(tC) {
+            const k = settings.get('range20') / 50, c = RANGE_CURVE;
+            const t = G.isNum(tC) ? tC : 10;
+            let lo, hi;
+            if (t >= c[c.length - 1][0]) { lo = c[c.length - 1][1]; hi = c[c.length - 1][2]; }
+            else if (t <= c[0][0]) {
+                const d = c[0][0] - t, sl = (c[1][1] - c[0][1]) / (c[1][0] - c[0][0]), sh = (c[1][2] - c[0][2]) / (c[1][0] - c[0][0]);
+                lo = Math.max(15, c[0][1] - sl * d); hi = Math.max(18, c[0][2] - sh * d);
+            } else {
+                let i = 0;
+                while (t > c[i + 1][0]) i++;
+                const f = (t - c[i][0]) / (c[i + 1][0] - c[i][0]);
+                lo = c[i][1] + (c[i + 1][1] - c[i][1]) * f; hi = c[i][2] + (c[i + 1][2] - c[i][2]) * f;
+            }
+            return { lo: lo * k, hi: hi * k, mid: (lo + hi) / 2 * k };
         }
-        const fullRange = (b) => settings.get({ cold: 'rangeCold', mild: 'rangeMild', hot: 'rangeHot' }[b]);
+        const warmRange = () => settings.get('range20');
 
         /* ---------- units ---------- */
         const MI = () => settings.get('distUnit') === 'mi';
@@ -222,13 +277,13 @@ mgu.run({
 
         /* ---------- drawing ---------- */
         let page = 0;
-        ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
+        ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; return render(); });
         ui.onClick('BTN_READ', () => poll(true).then(render));
 
         function header(cv, t, title, d) {
             cv.text(title, 24, 34, 24, t.dim, { font: 'bold', spacing: 3 });
             G.stripes(cv, t, 24, 44, 120);
-            PAGES.forEach((p, i) => cv.circle(W - 196 + i * 22, 26, i === page ? 6 : 4, i === page ? t.accent : t.tick));
+            pages().forEach((p, i) => cv.circle(W - 196 + i * 22, 26, i === page ? 6 : 4, i === page ? t.accent : t.tick));
             if (d.demo) {
                 cv.roundRect(W - 124, 12, 100, 30, 6, withAlpha(t.warn, 0.2));
                 cv.text('DEMO', W - 74, 35, 22, t.warn, { align: 'center', font: 'bold', spacing: 2 });
@@ -246,31 +301,77 @@ mgu.run({
             if (i < 10 && part > 0.05) cv.roundRect(x + 12 + i * seg, y + 12, (seg - 6) * part, ih, 5, withAlpha(col, 0.55));
         }
 
+        /** Cars without a hybrid system: the 12 V battery only. */
+        function render12V(cv, t, d) {
+            const v = d.v12;
+            let state = 'no reading - see Diagnostics page', col = t.dim;
+            if (G.isNum(v)) {
+                if (v >= 13.2) { state = 'CHARGING  (engine / DC-DC running)'; col = GO; }
+                else if (v >= 12.6) { state = 'FULL'; col = GO; }
+                else if (v >= 12.4) { state = 'GOOD  (about 75 %)'; col = t.text; }
+                else if (v >= 12.2) { state = 'HALF  (about 50 %) - drive or charge soon'; col = t.warn; }
+                else { state = 'LOW - charge the battery'; col = t.crit; }
+            }
+            G.stat(cv, t, 24, 64, 1040, 440, {
+                label: '12 V battery', value: v, unit: 'V', decimals: 2, size: 150, history: v12hist,
+                zones: [{ from: 0, to: 12.2, color: 'crit' }, { from: 12.2, to: 12.4, color: 'warn' }],
+                sub: 'last hour  ·  resting 12.4-12.8 V is healthy, 13.5-14.8 V while charging',
+            });
+            cv.text(state, 1040, 130, 24, col, { font: 'bold', spacing: 1, align: 'right' });
+            G.panel(cv, t, 1088, 64, 488, 212, 'Outside');
+            cv.text(G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) : '--', 1112, 210, 96, G.isNum(d.ambient) ? t.text : t.dim, { font: 'num' });
+            cv.text(tU(), 1552, 210, 32, t.dim, { align: 'right' });
+            G.panel(cv, t, 1088, 292, 488, 212, 'No hybrid system');
+            ['No high-voltage battery answered, so', 'eDrive shows the 12 V battery only.', 'Hybrid car? Settings > Hybrid system > Yes'].forEach((l, i) =>
+                cv.text(l, 1112, 376 + i * 34, 22, i === 2 ? t.dim : t.text));
+        }
+
+        /** Range of a full battery against outside temperature: low-high band, mid line, now marker. */
+        function rangeChart(cv, t, x, y, w, h, tNow) {
+            const T0 = -15, T1 = 25, top = settings.get('range20') * 1.08;
+            const X = (c) => x + (c - T0) / (T1 - T0) * w, Y = (km) => y + h - km / top * h;
+            for (let px = 0; px <= w; px += 2) {
+                const r = rangeAt(T0 + px / w * (T1 - T0));
+                cv.fillRect(x + px, Y(r.hi), 2, Math.max(1, Y(r.lo) - Y(r.hi)), withAlpha(t.accent, 0.22));
+            }
+            const mid = [];
+            for (let px = 0; px <= w; px += 8) mid.push([x + px, Y(rangeAt(T0 + px / w * (T1 - T0)).mid)]);
+            cv.polyline(mid, 2.5, t.accent);
+            cv.fillRect(x, y + h, w, 1, t.tick);
+            [-10, 0, 10, 20].forEach((c) => {
+                cv.fillRect(X(c), y + h, 1, 6, t.tick);
+                cv.text(Math.round(T(c)) + '°', X(c), y + h + 22, 16, t.dim, { align: 'center' });
+                const r = rangeAt(c);
+                cv.text(Math.round(D(r.lo)) + (r.hi - r.lo >= 1 ? '-' + Math.round(D(r.hi)) : ''), X(c), Y(r.hi) - 8, 16, t.dim, { align: 'center' });
+            });
+            if (G.isNum(tNow)) {
+                const tx = X(G.clamp(tNow, T0, T1)), r = rangeAt(tNow);
+                cv.fillRect(tx - 1, Y(r.mid), 2, y + h - Y(r.mid), withAlpha(t.text, 0.5));
+                cv.circle(tx, Y(r.mid), 7, t.text);
+                cv.circle(tx, Y(r.mid), 4, t.accent);
+            }
+        }
+
         function renderMain(cv, t, d) {
-            const b = band(d.ambient), full = fullRange(b);
-            const range = G.isNum(d.soc) ? d.soc / 100 * full : null;
+            const r = rangeAt(d.ambient), has = G.isNum(d.soc);
+            const f = has ? d.soc / 100 : 0;
 
             // ---- range
             G.panel(cv, t, 24, 64, 720, 440, 'Real electric range');
-            const rs = G.isNum(range) ? String(Math.round(D(range))) : '--';
-            const rw = cv.text(rs, 48, 268, 150, G.isNum(range) ? t.text : t.dim, { font: 'num' });
-            cv.text(dU(), 62 + rw, 268, 44, t.dim, { font: 'bold' });
-            if (d.stale && G.isNum(d.soc)) cv.text('charge read ' + ago(d.socAge), 720, 130, 20, t.warn, { align: 'right' });
-            cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' % × ' + Math.round(D(full)) + ' ' + dU() + ' per full charge' : 'no charge reading - see Diagnostics page',
-                48, 316, 24, t.dim);
-            const bands = [
-                ['cold', 'COLD', '< ' + Math.round(T(settings.get('coldBelow'))) + tU(), t.cold],
-                ['mild', 'MILD', Math.round(T(settings.get('coldBelow'))) + '-' + Math.round(T(settings.get('hotAbove'))) + tU(), GO],
-                ['hot', 'HOT', '> ' + Math.round(T(settings.get('hotAbove'))) + tU(), t.warn],
-            ];
-            bands.forEach(([k, name, span, col], i) => {
-                const bx = 48 + i * 228, by = 344, on = k === b;
-                cv.roundRect(bx, by, 212, 84, 10, on ? withAlpha(col, 0.25) : t.track);
-                if (on) cv.fillRect(bx, by + 78, 212, 6, col);
-                cv.text(name + '  ' + span, bx + 14, by + 32, 22, on ? col : t.dim, { font: 'bold', spacing: 1 });
-                cv.text(Math.round(D(fullRange(k))) + ' ' + dU() + ' / 100%', bx + 14, by + 66, 24, on ? t.text : t.dim, { font: 'label' });
-            });
-            const amb = G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) + ' ' + tU() : 'n/a (mild assumed)';
+            const rs = has ? String(Math.round(D(r.mid * f))) : '--';
+            const rw = cv.text(rs, 48, 214, 130, has ? t.text : t.dim, { font: 'num' });
+            cv.text(dU(), 62 + rw, 214, 40, t.dim, { font: 'bold' });
+            if (d.stale && has) cv.text('charge read ' + ago(d.socAge), 720, 130, 20, t.warn, { align: 'right' });
+            if (has) {
+                cv.text('between ' + Math.round(D(r.lo * f)) + ' and ' + Math.round(D(r.hi * f)) + ' ' + dU(), 300, 172, 26, t.text, { font: 'bold' });
+                cv.text(G.fmt(d.soc, 0) + ' % of ' + Math.round(D(r.mid)) + ' ' + dU() + ' (full battery at '
+                    + (G.isNum(d.ambient) ? G.fmt(T(d.ambient), 0) + tU() : '10' + tU() + ', assumed') + ')', 300, 206, 20, t.dim);
+            } else {
+                cv.text('no charge reading - see Diagnostics page', 300, 206, 22, t.dim);
+            }
+            cv.text('FULL BATTERY RANGE BY OUTSIDE TEMPERATURE', 48, 262, 16, t.dim, { font: 'bold', spacing: 1.5 });
+            rangeChart(cv, t, 64, 284, 640, 136, d.ambient);
+            const amb = G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) + ' ' + tU() : 'n/a';
             cv.text('OUTSIDE  ' + amb, 48, 480, 22, t.dim, { font: 'bold', spacing: 1.5 });
             // 12 V battery: resting ~12.4-12.8 V, 13.5-14.8 V while the DC/DC or alternator charges it
             const v = d.v12, vcol = !G.isNum(v) ? t.dim : v < 11.8 ? t.crit : v < 12.2 || v > 15.2 ? t.warn : t.text;
@@ -290,7 +391,7 @@ mgu.run({
             if (c) {
                 const add = c.to - c.from;
                 const aw = cv.text('+' + add.toFixed(0) + ' %', 792, 446, 44, GO, { font: 'bold' });
-                const extra = [G.isNum(c.kwh) ? c.kwh.toFixed(1) + ' kWh' : null, '+' + Math.round(D(add / 100 * fullRange('mild'))) + ' ' + dU()].filter(Boolean).join('  ·  ');
+                const extra = [G.isNum(c.kwh) ? c.kwh.toFixed(1) + ' kWh' : null, '+' + Math.round(D(add / 100 * warmRange())) + ' ' + dU()].filter(Boolean).join('  ·  ');
                 cv.text(extra, 806 + aw, 444, 24, t.text, { font: 'label' });
                 cv.text('from ' + Math.round(c.from) + ' to ' + Math.round(c.to) + ' %  ·  ' + (c.open ? 'now' : ago(Date.now() - c.toT)), 792, 484, 22, t.dim);
             } else {
@@ -340,7 +441,7 @@ mgu.run({
                 cv.text('+' + add.toFixed(0) + ' %', cols[1], y, 26, GO, { font: 'bold' });
                 cv.text(Math.round(c.from) + ' - ' + Math.round(c.to) + ' %', cols[2], y, 24, t.dim, { font: 'label' });
                 cv.text(G.isNum(c.kwh) ? c.kwh.toFixed(1) + ' kWh' : '-', cols[3], y, 24, t.text, { font: 'label' });
-                cv.text('+' + Math.round(D(add / 100 * fullRange('mild'))) + ' ' + dU(), cols[4], y, 24, t.text, { font: 'label' });
+                cv.text('+' + Math.round(D(add / 100 * warmRange())) + ' ' + dU(), cols[4], y, 24, t.text, { font: 'label' });
                 const m = money(c.kwh);
                 if (m) cv.text(m, cols[5], y, 24, t.text, { font: 'label' });
             });
@@ -354,7 +455,7 @@ mgu.run({
                 cv.text(label, 1112, y, 18, t.dim, { font: 'bold', spacing: 1.5 });
                 const kw = cv.text(sum(list).toFixed(1), 1112, y + 50, 48, t.text, { font: 'num' });
                 cv.text('kWh', 1120 + kw, y + 50, 22, t.dim);
-                const extra = [list.length + (list.length === 1 ? ' charge' : ' charges'), '+' + Math.round(D(list.reduce((a, c) => a + (c.to - c.from), 0) / 100 * fullRange('mild'))) + ' ' + dU(), money(sum(list))].filter(Boolean).join('  ·  ');
+                const extra = [list.length + (list.length === 1 ? ' charge' : ' charges'), '+' + Math.round(D(list.reduce((a, c) => a + (c.to - c.from), 0) / 100 * warmRange())) + ' ' + dU(), money(sum(list))].filter(Boolean).join('  ·  ');
                 cv.text(extra, 1552, y + 50, 20, t.dim, { align: 'right' });
             };
             block(132, 'THIS MONTH', month);
@@ -398,17 +499,20 @@ mgu.run({
                 y += 36;
             }));
             cv.text('DIDs differ between models. If a value is n/a or wrong, edit config.battery in apps/edrive/app.json', 48, 440, 20, t.dim);
-            cv.text('(ECU, DID, byte position, factor) and rebuild. Range bands and design capacity are in Settings.', 48, 468, 20, t.dim);
+            cv.text('(ECU, DID, byte position, factor) and rebuild. Range at 20 °C, design capacity and hybrid system are in Settings.', 48, 468, 20, t.dim);
             if (d.demo) cv.text('Demo data is shown on the main page until the diagnostic link answers.', 1552, 468, 20, t.warn, { align: 'right' });
         }
 
         function render() {
             const t = ctx.theme(), d = data();
             const cv = new Canvas(W, H).clear(t.bg);
-            header(cv, t, { main: 'EDRIVE', log: 'EDRIVE · CHARGE LOG', diag: 'EDRIVE · DIAGNOSTICS' }[PAGES[page]], d);
-            if (PAGES[page] === 'diag') renderDiag(cv, t, d);
-            else if (PAGES[page] === 'log') renderLog(cv, t, d);
-            else renderMain(cv, t, d);
+            const pg = pages();
+            if (page >= pg.length) page = 0;
+            header(cv, t, { main: isHybrid() ? 'EDRIVE' : 'EDRIVE · 12 V BATTERY', log: 'EDRIVE · CHARGE LOG', diag: 'EDRIVE · DIAGNOSTICS' }[pg[page]], d);
+            if (pg[page] === 'diag') renderDiag(cv, t, d);
+            else if (pg[page] === 'log') renderLog(cv, t, d);
+            else if (isHybrid()) renderMain(cv, t, d);
+            else render12V(cv, t, d);
             return ui.image('MAIN_GFX', cv);
         }
 

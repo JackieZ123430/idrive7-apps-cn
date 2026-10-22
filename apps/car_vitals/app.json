@@ -1,8 +1,8 @@
 {
   "id": "car_vitals",
   "title": "M Vitals",
-  "description": "Live engine, thermal and chassis gauges",
-  "version": "2.2.0",
+  "description": "Live engine, thermal, tyre and chassis gauges",
+  "version": "2.3.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -23,9 +23,6 @@
       "statusVehicleDynamicEngine": "rs",
       "statusActualValueTorque2": "rs"
     },
-    "de.bmw.infotainment.drivingexcitement.XView": {
-      "statusSteeringAngleDriver": "rs"
-    },
     "de.bmw.infrastructure.analytics.BasicDataSet": {
       "basicDataSet": "s"
     },
@@ -40,6 +37,9 @@
     },
     "de.bmw.infotainment.misc.MDrive": {
       "statusMSystem": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "statusGearboxDrive": "s"
     }
   },
   "screens": [
@@ -173,6 +173,30 @@
       ]
     },
     {
+      "key": "maxPower",
+      "label": "Max engine power",
+      "type": "number",
+      "unit": "kW",
+      "default": 250,
+      "steps": [
+        100,
+        120,
+        140,
+        160,
+        180,
+        200,
+        220,
+        250,
+        280,
+        300,
+        350,
+        400,
+        450,
+        500,
+        600
+      ]
+    },
+    {
       "key": "oilWarn",
       "label": "Oil temp warning",
       "type": "number",
@@ -248,7 +272,7 @@
     }
   ],
   "config": {
-    "comment": "raw -> value*factor + offset. CDS/CDS2/Vehicle2/XView/ambient factors are BMW's own (M Laptimer's TypeConverters). FES boost and BasicDataSet scalings are best guesses: calibrate here against a known reading.",
+    "comment": "raw -> value*factor + offset. CDS/CDS2/Vehicle2/ambient factors are BMW's own (M Laptimer's TypeConverters). FES boost and BasicDataSet scalings are best guesses: calibrate here against a known reading.",
     "scaling": {
       "rpm": {
         "factor": 0.25,
@@ -263,11 +287,6 @@
       "accel": {
         "factor": 0.002,
         "offset": -65,
-        "invalid": 65535
-      },
-      "steering": {
-        "factor": 0.04395,
-        "offset": -1440.11,
         "invalid": 65535
       },
       "ambient": {
