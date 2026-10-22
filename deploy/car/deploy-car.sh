@@ -27,7 +27,7 @@
 #   /var/opt/public/oap/oap_12201/data/custom_apps.json      (new) hook list
 #   /var/opt/public/oap/_mgu_custom/                         (new) patched main.js
 #   /etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf  (new)
-#   /var/opt/public/oap/oap_<12221..12299>/                  (new) the apps
+#   /var/opt/public/oap/oap_<12450 downwards>/               (new) the apps
 # MainApp's own /usr/lib/oap-mainapp/src/main.js is never written: the patched
 # copy is bind-mounted over it at boot, and only while that file is unchanged
 # (after a firmware update the hook switches itself off).
@@ -48,7 +48,7 @@ PATCH_DIR=$OAP/_mgu_custom
 NODE=${NODE:-/usr/bin/node}
 BK_LOCAL=$SELF_DIR/backups
 BK_UNIT=/var/opt/public/mgu_custom_backup
-FIRST_UID=12221
+APP_UID_MIN=12203      # MainApp's app uid range starts here (ours are told apart below)
 LOG=$SELF_DIR/deploy-car.log
 
 # every path we may create or change (relative to /, for tar)
@@ -236,7 +236,7 @@ cmd_restore() {
     for d in "$OAP"/oap_*; do
         n=$(basename "$d"); u=${n#oap_}
         case "$u" in *[!0-9]*|'') continue;; esac
-        [ "$u" -ge $FIRST_UID ] || continue
+        [ "$u" -ge $APP_UID_MIN ] || continue
         grep -qx "$n" "$B/oap-dirs.txt" && continue
         name=$(sed -n "s/^$u=//p" "$UIDS" 2>/dev/null | head -1)
         if [ -f "$d/source/javascript/kit/app-spec.json" ] || { [ -n "$name" ] && grep -q "\"$name\"" "$CUSTOM" 2>/dev/null; }; then

@@ -19,7 +19,10 @@
 # What "install" does - the same layout MainApp creates for BMW's own apps
 # (checked against M Laptimer on this firmware, /var/opt/public/oap/oap_12219):
 #   1. backs up the app registry (uids.txt + data/apps/*.json) first
-#   2. picks a free service uid (12221+), or reuses the app's uid on update
+#   2. picks a free service uid from the TOP of MainApp's range (12450 down),
+#      or reuses the app's uid on update. MainApp gives its own apps the LOWEST
+#      free uid (12203 up) from a list it only reloads on restart, so counting
+#      up from the bottom could hand both the same uid (BMW app overwrites ours)
 #   3. unpacks to /var/opt/public/oap/oap_<uid>/{source,rhmiData}, links the
 #      platform's native node modules, creates data/kvs/share/security
 #   4. generates someipInterfaces/ + acl.json from the app's manifest.json with
@@ -53,8 +56,10 @@ MAINJS=/usr/lib/oap-mainapp/src/main.js
 PATCH_DIR=$OAP/_mgu_custom
 DROPIN=/etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf
 NODE=${NODE:-/usr/bin/node}
-FIRST_UID=12221
-LAST_UID=12299
+# MainApp's usableUidsAndGids is 12203..12450 and it allocates from the bottom;
+# custom apps are allocated from the top so the two never meet.
+FIRST_UID=12450
+LAST_UID=12351
 SELF_DIR=$(cd "$(dirname "$0")" && pwd)
 BACKUP_ROOT=${BACKUP_ROOT:-$SELF_DIR/backups}
 TMP=${TMPDIR:-/tmp}/mgu-app-install.$$
@@ -76,11 +81,17 @@ uid_of() {      # app id -> uid from uids.txt
 app_of() {      # uid -> app id
     sed -n "s/^$1=\(.*\)\$/\1/p" "$UIDS" | head -1
 }
+# is_ours <id> <uid>: an app this tool installed (listed in custom_apps.json or built with
+# the kit). Not decided by uid: MainApp can give its own apps any uid in the range too.
+is_ours() {
+    [ -f "$OAP/oap_$2/source/javascript/kit/app-spec.json" ] && return 0
+    [ -f "$CUSTOM" ] && grep -q "\"$1\"" "$CUSTOM"
+}
 free_uid() {
     u=$FIRST_UID
-    while [ $u -le $LAST_UID ]; do
+    while [ $u -ge $LAST_UID ]; do
         if [ -z "$(app_of $u)" ] && [ ! -e "$OAP/oap_$u" ]; then echo $u; return 0; fi
-        u=$((u + 1))
+        u=$((u - 1))
     done
     return 1
 }
@@ -202,10 +213,10 @@ install_one() {
     u=$(uid_of "$id")
     if [ -n "$u" ]; then
         say "updating $id -> $ver (uid $u)"
-        [ "$u" -ge $FIRST_UID ] 2>/dev/null || die "$id is a BMW app (uid $u); refusing to overwrite it"
+        is_ours "$id" "$u" || die "$id is a BMW app (uid $u); refusing to overwrite it"
         update=1
     else
-        u=$(free_uid) || die "no free uid in $FIRST_UID..$LAST_UID"
+        u=$(free_uid) || die "no free uid in $LAST_UID..$FIRST_UID"
         say "installing $id $ver as uid $u"
         update=0
     fi
@@ -266,7 +277,7 @@ uninstall_one() {
     id=$1
     u=$(uid_of "$id")
     [ -n "$u" ] || die "$id is not installed"
-    [ "$u" -ge $FIRST_UID ] 2>/dev/null || die "$id is a BMW app (uid $u); this tool only removes apps it installed"
+    is_ours "$id" "$u" || die "$id is a BMW app (uid $u); this tool only removes apps it installed"
     sed -i "/^$u=$id\$/d" "$UIDS"
     rm -f "$REG/$id.json"
     custom_list del "$id"
@@ -310,7 +321,7 @@ restore() {
     # remove app dirs that the backup did not know about (installed after it)
     sed 's/\r//' "$UIDS" | while IFS='=' read -r u id; do
         [ -n "$u" ] || continue
-        if ! grep -q "^$u=$id\$" "$B/uids.txt" && [ "$u" -ge $FIRST_UID ] 2>/dev/null; then
+        if ! grep -q "^$u=$id\$" "$B/uids.txt" && is_ours "$id" "$u"; then
             say "  removing $id (uid $u)"; rm -rf "$OAP/oap_$u"
         fi
     done
