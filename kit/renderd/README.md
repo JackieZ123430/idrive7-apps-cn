@@ -42,8 +42,8 @@ Build in Ubuntu 18.04 (glibc 2.27, like the unit):
 
 ```sh
 cd kit/renderd
-docker build -t mgu-renderd-build docker
-docker run --rm -u $(id -u):$(id -g) -v $PWD:/src mgu-renderd-build make
+docker build --platform linux/amd64 -t mgu-renderd-build docker      # x86-64 like the head unit, also on ARM machines
+docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v $PWD:/src mgu-renderd-build make
 # build/mgu-renderd, build/ivi-probe
 ```
 

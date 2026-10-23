@@ -33,10 +33,11 @@ renderd_ask() {
     fi
 }
 if command -v docker >/dev/null; then
-    # make rebuilds only when the source changed, so a pulled update is never shipped stale
+    # make rebuilds only when the source changed, so a pulled update is never shipped stale.
+    # Always x86-64 (the head unit's CPU), also on ARM machines (Apple Silicon: emulated)
     log=$(mktemp)
-    if ! (cd "$KIT/kit/renderd" && { docker image inspect mgu-renderd-build >/dev/null 2>&1 || docker build -t mgu-renderd-build docker; } \
-            && docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" mgu-renderd-build make) > "$log" 2>&1; then
+    if ! (cd "$KIT/kit/renderd" && { docker image inspect mgu-renderd-build >/dev/null 2>&1 || docker build --platform linux/amd64 -t mgu-renderd-build docker; } \
+            && docker run --rm --platform linux/amd64 -u "$(id -u):$(id -g)" -v "$PWD:/src" mgu-renderd-build make) > "$log" 2>&1; then
         tail -n 15 "$log"; rm -f "$log"
         renderd_ask "The mgu-renderd build failed (output above)."
     fi

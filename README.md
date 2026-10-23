@@ -159,6 +159,8 @@ cold). A **DEMO** badge shows when the data isn't from the car.
 
 ## 2. What you need
 
+**In the car**
+
 - **A BMW with the MGU head unit** (iDrive 7, "ID7"). Developed and tested on firmware
   `P18_23w44.2`. Other MGU versions very likely work; the installer's `check` step tells you
   before it changes anything.
@@ -169,8 +171,50 @@ cold). A **DEMO** badge shows when the data isn't from the car.
   isn't in this repository. It is inside every BMW app on your head unit, and
   [`kit/tools/extract_sdk.js`](kit/tools/extract_sdk.js) rebuilds it from one of them in a
   second (see Quick start).
-- **A PC with Node.js 14+ and Python 3.** Linux, macOS, or Windows with WSL. Pillow is needed
-  only if you want to re-bake the fonts.
+
+**On your PC**
+
+Linux, or Windows with WSL 2 (Ubuntu), or macOS. Everything runs from a `bash` shell.
+
+| Tool | Needed for | Required? |
+|---|---|---|
+| **Python 3.6+** | `build.py` (packages the apps), `make-car-kit.sh` | yes |
+| **Node.js 14+** | the build (draws the app icons), `extract_sdk.js`, `preview.js` | yes |
+| **Docker** | compiling the GPU renderer `mgu-renderd` (inside an Ubuntu 18.04 image, so it matches the head unit's libraries) | strongly recommended: without it the apps fall back to PNG drawing at a few fps |
+| **ssh, scp, tar, gzip, md5sum** | `push-to-car.sh`: copying the kit to the car and installing it | yes (standard on Linux / WSL / macOS) |
+| **ffmpeg** | `make_gif.sh`: recording animations like the ones above | optional |
+| **Pillow** (`pip install pillow`) | `bake_fonts.py`: re-baking the fonts | optional |
+
+No npm packages and no C compiler on the PC: the build uses only Node's and Python's standard
+libraries, and the renderer is compiled inside Docker.
+
+Ubuntu / WSL:
+
+```sh
+sudo apt install python3 nodejs openssh-client ffmpeg       # ffmpeg is optional
+# Node.js 14+: Ubuntu 24.04 ships 18; on 22.04 and older the packaged one is too old: use https://nodejs.org or nvm
+# Docker: https://docs.docker.com/engine/install/ubuntu/ (or Docker Desktop with WSL integration on Windows)
+sudo usermod -aG docker $USER                               # use docker without sudo; log out and in again
+```
+
+macOS (Homebrew): `brew install python node ffmpeg` plus [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+Check that everything is there:
+
+```sh
+python3 --version && node --version && docker run --rm hello-world
+```
+
+Notes:
+
+- The first renderer build downloads the Ubuntu 18.04 image and compilers (the image ends up
+  about 550 MB, a few minutes). After that `make-car-kit.sh` only recompiles when the renderer's source changed.
+- The head unit has an Intel (x86-64) CPU. On an ARM computer (Apple Silicon Mac, ARM Linux)
+  Docker builds the renderer for x86-64 in emulation; that's slower, but it works.
+- If the renderer can't be built, `make-car-kit.sh` tells you and asks before packing a kit
+  without it.
+- **Windows without WSL:** you can't build there, but `deploy/push-to-car.ps1` can install a kit
+  built elsewhere (`mgu-custom-apps.tar.gz`), using Windows' own OpenSSH (see 3.3).
 
 ---
 
