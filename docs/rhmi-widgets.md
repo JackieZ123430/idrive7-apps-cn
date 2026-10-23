@@ -100,6 +100,11 @@ these are all the app side can instantiate):
 focusable, `3` = focusable + clickable (buttons). `Speedlockable` = may be blocked
 while driving.
 
+Focus events: the HMI sends a component's `focus` event (`{ value: true }` when the iDrive
+controller lands on it, `{ value: false }` when it leaves, plus `{ row }` events) only for
+`Focusable=3`. With `1` or `2` the controller still moves over the buttons, but the app hears
+nothing. The kit builds its bar buttons with `3`, so its own slim bar can light the focused one.
+
 ---
 
 ## 5. The data-model update (`setValue` and friends)

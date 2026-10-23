@@ -12,7 +12,7 @@
  *     time (30 s - 3 min) that counts down while driving gently or idling
  */
 const mgu = require('./kit/mgu');
-const { Canvas, withAlpha } = require('./kit/canvas');
+const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
 
@@ -135,7 +135,7 @@ mgu.run({
 
         function render() {
             const t = ctx.theme(), d = car.data(), now = Date.now();
-            const cv = new Canvas(W, H).clear(t.bg);
+            const cv = ctx.canvas(W, H).clear(t.bg);
             const warm = settings.get('warmOil'), warmC = settings.get('warmCoolant');
             gauge(cv, t, G.TOP, d.oil, 'Oil', warm);
             gauge(cv, t, G.TOP + 242, d.coolant, 'Coolant', warmC);

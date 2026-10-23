@@ -6,6 +6,7 @@ Real electric range, battery health and a charge log for plug-in hybrids, a spor
 with intake / fuel pressure and tyre data, shift lights and a full-screen tach, a virtual dyno,
 brake and drag timers, a G-meter, an oil warm-up guide, and a fault-code scanner/cleaner. They run on the car's own app platform,
 use the HMI's real screens and settings menus, read live vehicle data, and survive reboots.
+A small GPU renderer service draws them full-screen at up to 60 fps.
 Everything can be removed again with one command.
 
 | | |
@@ -17,8 +18,9 @@ Everything can be removed again with one command.
 | ![Brake Test](docs/screens/brake_test.png)<br>**Brake Test**: 100-0 distance, deceleration, fade | ![Drag Timer](docs/screens/draggy.png)<br>**Drag Timer**: splits, ¼ mile, speed trace |
 | ![Warm-Up](docs/screens/warmup.png)<br>**Warm-Up**: time to working temperature, safe rev limit, turbo cool-down | ![Fault Scanner](docs/screens/dtc_scanner.png)<br>**Fault Scanner**: fault codes of every control unit |
 
-*(Screenshots from the PC preview (`kit/tools/preview.js`) with each app's built-in demo data, in
-the default M Tricolour theme. Every app also has M Red, Ice White and Night Amber, picked from
+*(Screenshots: each app's built-in demo data drawn by the GPU renderer (`mgu-renderd --replay`)
+in the full-screen layout, over the HMI's own back arrow and status icons, in the default M
+Tricolour theme. Every app also has M Red, Ice White and Night Amber, picked from
 its Settings page. In the car the same screens show live data.)*
 
 > **Disclaimer.** This is an unofficial hobby project. It is not affiliated with, endorsed by
@@ -243,12 +245,47 @@ The HMI doesn't run app code. An app ships a **description** of its screens:
   templates** (`LT_State_*`, `LT_Label_*`, `LT_Button_*`, ...).
 - At runtime the app pushes values: text, visibility, enabled state, list rows and **images**.
 
-The kit's trick for rich graphics: each app's main screen is a single large image component.
-The app renders every frame itself in pure JavaScript (`kit/runtime/canvas.js`: shapes,
-anti-aliased arcs, gradients, baked fonts), encodes it as PNG and hands it to the HMI. That's fast enough for smooth
-gauges at 6-15 fps.
-Buttons under the image and the settings screens are normal RHMI widgets, so they look and
-behave like BMW's own (rotary controller, touch, back button).
+The kit's trick for rich graphics: each app's main screen is a single large image component,
+and the app draws it itself. Two ways to get the drawing on screen, chosen automatically:
+
+- **GPU renderer, 60 fps** ([`kit/renderd`](kit/renderd/README.md)). The app records its drawing
+  commands (`kit/runtime/record.js`) and sends them to `mgu-renderd`, a small system service.
+  `mgu-renderd` draws them with OpenGL ES on its own compositor surface over the HMI, in step
+  with the display. Static parts (cards, dial faces, scales) are cached on the GPU. Gauges glide
+  between values instead of jumping.
+- **Software fallback.** Without the service (or with the app setting *Renderer = Software*), the
+  same recording is drawn in pure JavaScript (`kit/runtime/canvas.js`), encoded as PNG and handed
+  to the HMI's image component at 6-15 fps. Same code, same look, the HMI's own title and bar.
+
+With the renderer, apps use the whole screen (app setting *Screen layout = Full screen*,
+the default):
+
+```
+ ┌──┬──────────────────────────────────────────────────────┬───────────────────────┐
+ │H │ M Vitals   ENGINE  THERMALS  INTAKE & FUEL  CHASSIS  │  HMI status icons     │  header: app name + page tabs
+ ├──┼──────────────────────────────────────────────────────┴───────────────────────┤
+ │  │                                                                              │
+ │ <│                       page content, scaled up to fill                        │
+ │  │                                                                              │
+ │  ├──────────────────────────────────────────────────────────────────────────────┤
+ │  │   NEXT PAGE          PREVIOUS PAGE          SETTINGS                          │  slim 48 px bar
+ └──┴──────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Header** in the HMI's title strip: the app's name and its page tabs. The HMI's status icons
+  (notifications, volume, voice, profile, clock) show through a see-through corner and work as
+  usual.
+- **Slim button bar**, 48 px instead of the HMI's 120 px, drawn by the kit. Each label sits over
+  the HMI button underneath, so touch and controller presses still go to the HMI as before.
+  The bar buttons report focus to the app (`Focusable=3`), so the button the iDrive controller
+  is on lights up like BMW's own.
+- The HMI's back arrow and home button stay visible. HMI popups (options, warnings, calls) hide
+  the renderer's surface while they're open.
+- *Screen layout = Standard* keeps the HMI's own title and 120 px bar; the renderer then only
+  covers the image area.
+
+Buttons and the settings screens are normal RHMI widgets, so they behave like BMW's own (rotary
+controller, touch, back button).
 
 See [`docs/rhmi-widgets.md`](docs/rhmi-widgets.md) for the widget vocabulary, ids and update
 format.
@@ -304,7 +341,10 @@ the internet.
    touching BMW's apps), generates the SOME/IP configs and ACL with **BMW's own generator, loaded
    from the unit's firmware**, registers the app as preinstalled, and fixes ownership and
    permissions.
-5. **Restarts the app platform** once. The HMI reloads the Apps list in about 1-2 minutes.
+5. **Installs the GPU renderer** `mgu-renderd` (kit/renderd) as a systemd service that starts
+   with the app platform. It runs as a throwaway user with only the compositor, GPU and app
+   groups. If it can't be installed the apps still work, drawn in software.
+6. **Restarts the app platform** once. The HMI reloads the Apps list in about 1-2 minutes.
 
 Files it touches:
 
@@ -315,6 +355,8 @@ Files it touches:
 /var/opt/public/oap/_mgu_custom/                         (new) patched main.js + boot script
 /etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf   (new)
 /var/opt/public/oap/oap_12221 ... oap_12299/              (new) the apps
+/var/opt/mgu-renderd/                                    (new) the GPU renderer
+/etc/systemd/system/mgu-renderd.service                  (new) its service (+ oapcontroller.service.wants link)
 ```
 
 ### 5.2 The provisioning hook
@@ -387,7 +429,6 @@ python3 kit/tools/sigdoc.py de.bmw.infotainment.vehicle.CDS2   # fields, getters
 ```js
 'use strict';
 const mgu = require('./kit/mgu');
-const { Canvas } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
 
@@ -398,10 +439,13 @@ mgu.run({
         car.onSample((d) => { if (G.isNum(d.rpm)) peak = Math.max(peak, d.rpm); }, () => { peak = 0; });
         ctx.ui.onClick('BTN_RESET', () => { peak = 0; });
 
-        ctx.loop('MAIN', 10, () => {                   // 10 fps while the screen is visible
+        // while the screen is visible: every display refresh (60 fps) with the GPU renderer,
+        // else 10 fps
+        ctx.loop('MAIN', 10, () => {
             const t = ctx.theme(), d = car.data();
-            const cv = new Canvas(1600, 520).clear(t.bg);
-            G.radial(cv, t, 800, 300, 220, { value: d.rpm, min: 0, max: 8000, label: 'RPM', ticks: 8 });
+            const cv = ctx.canvas(1600, 520).clear(t.bg);
+            G.frame(cv, t, ['Boost'], 0, [d.demo && { text: 'DEMO' }]);   // page tabs (header)
+            G.radial(cv, t, 800, 290, 210, { value: d.rpm, min: 0, max: 8000, label: 'RPM', ticks: 8 });
             cv.text('PEAK ' + peak, 800, 500, 32, t.dim, { align: 'center', font: 'bold' });
             return ctx.ui.image('MAIN_GFX', cv);
         });
@@ -415,16 +459,26 @@ mgu.run({
 |---|---|
 | `ctx.ui` | `image(name, canvas)`, `text(name, str)`, `visible(name, on)`, `checked(name, on)`, `rows(name, n)`, `onClick(name, fn)` |
 | `ctx.settings` | `get(key)`, `onChange(fn)` |
-| `ctx.loop(screen, fps, fn)` | render loop that runs only while that screen is shown; returns `{stop()}` |
+| `ctx.canvas(w, h)` | the surface to draw one frame on (reused; pass it to `ui.image`). Use 1600 x 520: page tabs via `G.frame`, page content between `G.TOP` (44) and `G.BOTTOM` (512) |
+| `ctx.loop(screen, fps, fn)` | render loop that runs only while that screen is shown: once per display refresh with the GPU renderer, `fps` times a second without; returns `{stop()}` |
 | `ctx.theme()` | current colour theme (`bg`, `text`, `dim`, `accent`, `warn`, `crit`, `cold`, ...) |
 | `ctx.signals` | raw SOME/IP access: `watch(iface, instance, handlers)`, `proxy`, `call` |
 | `ctx.log` | `info/warn/error` → system log + `data/<id>.log` |
 | `ctx.dataDir` | the app's writable folder (persistent) |
 
-**`Canvas`**: `fillRect`, `gradientRect`, `roundRect`, `strokeRoundRect`,
-`arc(cx, cy, r0, r1, a0, a1, color, {round})`, `circle`, `line`, `polyline`, `fillUnder`,
+**Drawing** (`ctx.canvas()`): `fillRect`, `gradientRect`, `roundRect`, `strokeRoundRect`,
+`arc(cx, cy, r0, r1, a0, a1, color, {round, ramp})`, `circle`, `line`, `polyline`, `quad`,
+`fillUnder`, `rampRect`, `clip`/`noclip`, `alpha`,
 `text(str, x, baselineY, size, color, {font, align, spacing})` (returns its width),
-`textWidth`. Fonts: `label`, `bold`, `num`, `light`, `gear`. Large sizes contain digits and a
+`textWidth`, `blit(layer, x, y)`. No pixel reads: draw static parts once with
+`G.layer(key, w, h, (c) => ...)` and blit them each frame (cached on the GPU).
+
+**Templates** (`kit/runtime/gauges.js`, all take the theme `t`): `panel`, `radial`, `needle`,
+`ring`, `bar`, `segBar`, `stat`, `readout`, `shiftLights`, `gear`, `chart`, `table`, `pill`,
+`tyres`, `gmeter`, `frame` (page tabs: in the header on the full-screen layout, a slim tab
+bar otherwise), `header`, `menuBar` (`slim` / `standard`). Dials, bars
+and the g-meter glide to new values on their own; `G.smooth(key, value)` does the same for your
+own drawings. Fonts: `label`, `bold`, `num`, `light`, `gear`. Large sizes contain digits and a
 few letters only; re-bake with `kit/tools/bake_fonts.py` (Ubuntu font family) if you need more.
 
 **`Car`** (`kit/runtime/car.js`): groups `rpm`, `speed`, `temps`, `accel`, `gear`, `torque`.
@@ -441,7 +495,13 @@ deploy/make-car-kit.sh boost && HU=root@<unit> KEY=~/.ssh/id_mgu deploy/push-to-
 ```
 
 `preview.js` runs the built app on your PC with a stubbed head unit and demo data, and saves
-every frame the app pushes as a PNG. It's the fastest way to iterate on visuals.
+every frame the app pushes as a PNG (the software path). To see the full-screen GPU layout,
+record what the renderer would get and replay it in `mgu-renderd`
+(see [`kit/renderd`](kit/renderd/README.md#test-without-a-car)):
+
+```sh
+node kit/tools/preview.js dist/boost out wait=8 render --gpu out/stream.bin
+```
 
 ---
 
@@ -503,9 +563,11 @@ explore it.
 
 ```
 apps/<id>/            app.json + main.js (+ helpers) per app
-kit/runtime/          app runtime: mgu.js (platform glue), canvas.js, gauges.js, themes.js,
+kit/runtime/          app runtime: mgu.js (platform glue), record.js + display.js + renderd.js
+                      (GPU path), canvas.js (software path), gauges.js, themes.js,
                       car.js (signals + demo), sim.js (demo drive), signals.js (SOME/IP),
                       diag.js (UDS over TASU), fonts/
+kit/renderd/          mgu-renderd: the GPU renderer service (C, GLES2, Wayland/ivi)
 kit/platform/         permissions template used by build.py
 kit/tools/            build.py, preview.js, make_icon.js, bake_fonts.py,
                       extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js

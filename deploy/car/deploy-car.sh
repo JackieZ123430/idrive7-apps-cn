@@ -28,6 +28,9 @@
 #   /var/opt/public/oap/_mgu_custom/                         (new) patched main.js
 #   /etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf  (new)
 #   /var/opt/public/oap/oap_<12450 downwards>/               (new) the apps
+#   /var/opt/mgu-renderd/                               (new) GPU renderer (mgu-renderd)
+#   /etc/systemd/system/mgu-renderd.service                  (new) its unit, started with
+#   /etc/systemd/system/oapcontroller.service.wants/mgu-renderd.service   oapcontroller
 # MainApp's own /usr/lib/oap-mainapp/src/main.js is never written: the patched
 # copy is bind-mounted over it at boot, and only while that file is unchanged
 # (after a firmware update the hook switches itself off).
@@ -56,7 +59,10 @@ TOUCHED="var/opt/public/oap/oap_12201/security/uids.txt
 var/opt/public/oap/oap_12201/data/apps
 var/opt/public/oap/oap_12201/data/custom_apps.json
 var/opt/public/oap/_mgu_custom
-etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf"
+etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf
+var/opt/mgu-renderd
+etc/systemd/system/mgu-renderd.service
+etc/systemd/system/oapcontroller.service.wants/mgu-renderd.service"
 
 say()  { echo "[deploy-car] $*"; echo "$(date '+%F %T') $*" >> "$LOG" 2>/dev/null; }
 warn() { say "WARNING: $*"; }
@@ -192,6 +198,10 @@ cmd_install() {
         [ -f "$f" ] || continue
         sh "$INSTALLER" install "$f" || die "installing $(basename "$f") failed - run: sh $0 restore"
     done
+    # GPU renderer: optional - without it the apps draw in software (slower, still fine)
+    if [ -f "$SELF_DIR/mgu-renderd" ]; then
+        sh "$INSTALLER" renderd --persist || warn "GPU renderer not installed - apps use software rendering"
+    fi
     say "restarting the app platform (screen reloads, ~1-2 min)"
     systemctl restart oapcontroller.service
     sleep 5
@@ -248,6 +258,7 @@ cmd_restore() {
         fi
     done
     systemctl stop oapcontroller.service
+    systemctl stop mgu-renderd.service 2>/dev/null
     while grep -q " $MAINJS " /proc/mounts; do umount "$MAINJS" || die "umount failed"; done
     for d in $RMDIRS; do say "  removing $(basename "$d")"; rm -rf "$d"; done
     while read -r p state own sum; do
@@ -275,6 +286,17 @@ cmd_restore() {
         say "  re-registered ${kv#*=}"
     done
     rm -rf "$X"
+    # backups made before the renderer existed don't list its files: remove them too
+    if ! grep -q "mgu-renderd" "$B/manifest.txt"; then
+        for p in etc/systemd/system/mgu-renderd.service etc/systemd/system/oapcontroller.service.wants/mgu-renderd.service var/opt/mgu-renderd; do
+            if [ -e "/$p" ] || [ -L "/$p" ]; then
+                case "$p" in etc/*) rootfs_rw || die "cannot remount / rw";; esac
+                rm -rf "/${p:?}"; say "  removed /$p"
+            fi
+        done
+        rmdir /etc/systemd/system/oapcontroller.service.wants 2>/dev/null
+    fi
+    rm -f /run/systemd/system/mgu-renderd.service
     systemctl daemon-reload
     rootfs_ro
     [ "$(md5sum "$MAINJS" | cut -d' ' -f1)" = "$(cat "$B/mainjs.md5")" ] || warn "MainApp main.js differs from backup time (firmware update?)"
@@ -291,6 +313,7 @@ cmd_restore() {
 cmd_status() {
     grep -q " $MAINJS " /proc/mounts && echo "hook: active" || echo "hook: off"
     [ -f "$DROPIN" ] && echo "hook: persistent" || echo "hook: not persistent"
+    echo "renderer: $(systemctl is-active mgu-renderd.service 2>/dev/null)$([ -f /etc/systemd/system/mgu-renderd.service ] && echo ', persistent')"
     [ -f "$INSTALLER" ] && sh "$INSTALLER" list
     b=$(find_backup stock) && echo "stock backup: $b" || echo "stock backup: none"
 }

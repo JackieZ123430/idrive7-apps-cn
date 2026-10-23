@@ -39,6 +39,10 @@
     {"key": "flipLat", "label": "Swap left / right", "type": "bool", "default": false},
     {"key": "speedUnit", "label": "Units", "type": "choice", "default": "kmh", "options": [["kmh", "km/h"], ["mph", "mph"]]},
     {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 10, "steps": [6, 8, 10, 12, 15]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU (60 fps)"], ["software", "Software"]]},
     {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
      "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
   ]

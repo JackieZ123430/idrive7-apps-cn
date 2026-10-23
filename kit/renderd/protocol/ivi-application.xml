@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GENIVI ivi-application (weston protocol/ivi-application.xml, v1): give a wl_surface an ivi id -->
+<protocol name="ivi_application">
+  <interface name="ivi_surface" version="1">
+    <request name="destroy" type="destructor"/>
+    <event name="configure">
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
+  </interface>
+  <interface name="ivi_application" version="1">
+    <enum name="error">
+      <entry name="role" value="0"/>
+      <entry name="ivi_id" value="1"/>
+    </enum>
+    <request name="surface_create">
+      <arg name="ivi_id" type="uint"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="id" type="new_id" interface="ivi_surface"/>
+    </request>
+  </interface>
+</protocol>

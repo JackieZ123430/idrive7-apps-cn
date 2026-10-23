@@ -24,7 +24,7 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
-const { Canvas, withAlpha } = require('./kit/canvas');
+const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { Diag, hex } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
@@ -494,7 +494,7 @@ mgu.run({
 
         function render() {
             const t = ctx.theme(), d = data();
-            const cv = new Canvas(W, H).clear(t.bg);
+            const cv = ctx.canvas(W, H).clear(t.bg);
             const pg = pages();
             if (page >= pg.length) page = 0;
             if (pg[page] === 'diag') renderDiag(cv, t, d);

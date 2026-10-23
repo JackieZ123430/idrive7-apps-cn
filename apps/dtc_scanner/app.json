@@ -41,6 +41,10 @@
     {"key": "info", "label": "Also read info memory", "type": "bool", "default": false},
     {"key": "autoScan", "label": "Scan when opened", "type": "bool", "default": true},
     {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
-     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU (60 fps)"], ["software", "Software"]]}
   ]
 }

@@ -266,6 +266,10 @@
         4
       ]
     },
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU (60 fps)"], ["software", "Software"]]},
     {
       "key": "demo",
       "label": "Demo data",

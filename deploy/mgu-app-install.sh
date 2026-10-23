@@ -12,6 +12,9 @@
 #   sh mgu-app-install.sh patch [--persist]             enable the custom-app
 #                                                       provisioning hook (see below)
 #   sh mgu-app-install.sh unpatch                       back to stock MainApp
+#   sh mgu-app-install.sh renderd [--persist]           install / start the GPU renderer
+#                                                       (mgu-renderd next to this script)
+#   sh mgu-app-install.sh renderd-remove                stop and remove it
 #
 # Options (env):  NO_RESTART=1  don't restart oapcontroller after changes
 #                 BACKUP_ROOT=<dir>   where backups go (default next to script)
@@ -56,6 +59,10 @@ MAINJS=/usr/lib/oap-mainapp/src/main.js
 PATCH_DIR=$OAP/_mgu_custom
 DROPIN=/etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf
 NODE=${NODE:-/usr/bin/node}
+# GPU renderer (kit/renderd): apps draw through it at 60 fps when it runs, else in software
+RENDERD_DIR=/var/opt/mgu-renderd
+RENDERD_UNIT=mgu-renderd.service
+APP_GID=12202          # tm_oap_app: every app has it, so they may use the renderer's socket
 # MainApp's usableUidsAndGids is 12203..12450 and it allocates from the bottom;
 # custom apps are allocated from the top so the two never meet.
 FIRST_UID=12450
@@ -334,6 +341,72 @@ restore() {
     CHANGED=1
 }
 
+renderd_unit() {   # the unit file text
+    cat <<UNIT
+# added by mgu-app-install.sh - GPU renderer for the custom apps (remove: sh mgu-app-install.sh renderd-remove)
+[Unit]
+Description=mgu-renderd (GPU renderer for custom apps)
+After=winston.service
+StartLimitIntervalSec=0
+
+[Service]
+# its own throwaway user: only the compositor (mgu_wayland), the GPU (video) and the apps' group
+DynamicUser=yes
+SupplementaryGroups=mgu_wayland video tm_oap_app
+Environment=XDG_RUNTIME_DIR=/run/wayland
+RuntimeDirectory=mgu-renderd
+RuntimeDirectoryMode=0755
+ExecStart=$RENDERD_DIR/mgu-renderd --group $APP_GID
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=oapcontroller.service
+UNIT
+}
+
+rootfs_rw_do() {   # run "$@" with / writable (remounts rw only if it has to)
+    if "$@" 2>/dev/null; then return 0; fi
+    mount -o remount,rw / || return 1
+    "$@"; r=$?
+    sync; mount -o remount,ro / 2>/dev/null
+    return $r
+}
+
+install_renderd() {
+    src=$SELF_DIR/mgu-renderd
+    [ -f "$src" ] || die "mgu-renderd not found next to $0"
+    systemctl stop "$RENDERD_UNIT" 2>/dev/null
+    mkdir -p "$RENDERD_DIR" && cp "$src" "$RENDERD_DIR/mgu-renderd.new" && mv "$RENDERD_DIR/mgu-renderd.new" "$RENDERD_DIR/mgu-renderd" || die "copy failed"
+    chown -R 0:0 "$RENDERD_DIR"; chmod 755 "$RENDERD_DIR" "$RENDERD_DIR/mgu-renderd"
+    if [ "${1:-}" = "--persist" ]; then
+        rm -f "/run/systemd/system/$RENDERD_UNIT"
+        renderd_unit > "$TMP.unit" || die "tmp"
+        rootfs_rw_do sh -c "cp '$TMP.unit' '/etc/systemd/system/$RENDERD_UNIT' && mkdir -p /etc/systemd/system/oapcontroller.service.wants && ln -sf '../$RENDERD_UNIT' '/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT'" || die "cannot write /etc/systemd/system/$RENDERD_UNIT"
+        rm -f "$TMP.unit"
+        say "renderer persisted (starts with the app platform)"
+    else
+        # runtime unit: gone after a reboot
+        renderd_unit > "/run/systemd/system/$RENDERD_UNIT" || die "cannot write the runtime unit"
+    fi
+    systemctl daemon-reload
+    systemctl start "$RENDERD_UNIT" || die "renderer did not start: journalctl -u $RENDERD_UNIT"
+    i=0; while [ $i -lt 10 ] && [ ! -S /run/mgu-renderd/renderd.sock ]; do sleep 1; i=$((i+1)); done
+    if [ -S /run/mgu-renderd/renderd.sock ]; then say "renderer running - apps switch to it within a few seconds"
+    else warn "renderer socket not up yet - see: journalctl -u $RENDERD_UNIT"; fi
+}
+
+remove_renderd() {
+    systemctl stop "$RENDERD_UNIT" 2>/dev/null
+    rm -f "/run/systemd/system/$RENDERD_UNIT"
+    if [ -e "/etc/systemd/system/$RENDERD_UNIT" ] || [ -L "/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT" ]; then
+        rootfs_rw_do sh -c "rm -f '/etc/systemd/system/$RENDERD_UNIT' '/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT'; rmdir /etc/systemd/system/oapcontroller.service.wants 2>/dev/null; true"
+    fi
+    systemctl daemon-reload
+    rm -rf "$RENDERD_DIR"
+    say "renderer removed (apps draw in software again)"
+}
+
 apply() {
     if [ "${NO_RESTART:-0}" = 1 ]; then say "NO_RESTART=1: run 'systemctl restart oapcontroller' later"; return; fi
     say "restarting the app platform (the HMI app list reloads, ~1-2 min)..."
@@ -358,5 +431,7 @@ case "$cmd" in
     apply)     CHANGED=1; apply ;;
     patch)     patch_mainapp "${1:-}"; apply ;;
     unpatch)   unpatch_mainapp; apply ;;
+    renderd)   install_renderd "${1:-}" ;;
+    renderd-remove) remove_renderd ;;
     *) sed -n '2,19p' "$0"; exit 2 ;;
 esac

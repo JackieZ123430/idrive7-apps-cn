@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
-const { Canvas, withAlpha } = require('./kit/canvas');
+const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { Diag, parseDtcReply, statusInfo, hex, NRC } = require('./kit/diag');
 const DEMO = require('./demo');
@@ -268,7 +268,7 @@ mgu.run({
             if (!force && drawn === version && phase !== 'scanning' && phase !== 'clearing') return;
             drawn = version;
             const t = ctx.theme();
-            const cv = new Canvas(W, H).clear(t.bg);
+            const cv = ctx.canvas(W, H).clear(t.bg);
             const fp = pageCount() - 2;
             page = Math.min(page, pageCount() - 1);
             tiles(cv, t);

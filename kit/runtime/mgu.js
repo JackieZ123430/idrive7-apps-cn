@@ -22,6 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const { OnlineApp, logging } = require('oap-sdk');
 const themes = require('./themes');
+const { Display } = require('./display');
 
 const sdkLog = logging.getSDKLogger();
 const SPEC = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-spec.json'), 'utf8'));
@@ -118,6 +119,8 @@ class Ui {
         this._img = Object.create(null);      // per-component dynamic image state
         this._visible = Object.create(null);  // stateName -> bool
         this._visHandlers = [];
+        this._focus = Object.create(null);    // stateName -> false while a popup covers it
+        this._focusHandlers = [];
         this.timing = { png: 0, push: 0 };    // ms spent encoding / handing images to the HMI
     }
     comp(name) {
@@ -164,10 +167,22 @@ class Ui {
     open(stateName) { return this._try('open ' + stateName, this.rhmi.openState(stateName)); }
     close(stateName) { return this._try('close ' + stateName, this.rhmi.closeState(stateName)); }
     isVisible(stateName) { return !!this._visible[stateName]; }
+    /** false while an HMI popup covers the (visible) screen */
+    hasFocus(stateName) { return this._focus[stateName] !== false; }
+    onFocus(fn) { this._focusHandlers.push(fn); }
+    _setFocus(stateName, on) {
+        if (this.hasFocus(stateName) === on) return;
+        this._focus[stateName] = on;
+        log.info('state ' + stateName + (on ? ' has focus again' : ' covered by an HMI popup'));
+        this._focusHandlers.forEach((fn) => { try { fn(stateName, on); } catch (e) { log.error(e); } });
+    }
+    /** forget what the HMI shows (the next image is pushed for sure) */
+    _invalidate() { Object.keys(this._img).forEach((k) => { this._img[k].lastPx = null; }); }
     onVisible(fn) { this._visHandlers.push(fn); }
     _setVisible(stateName, on) {
         if (this._visible[stateName] === on) return;
         this._visible[stateName] = on;
+        if (on) this._focus[stateName] = true;
         if (on) Object.keys(this._img).forEach((k) => { this._img[k].lastPx = null; });      // push the next frame for sure
         log.debug('state ' + stateName + (on ? ' visible' : ' hidden'));
         this._visHandlers.forEach((fn) => { try { fn(stateName, on); } catch (e) { log.error(e); } });
@@ -187,6 +202,10 @@ class Ui {
      * name and renamed into place, so the HMI never reads half a file.
      */
     image(name, img, cell) {
+        if (this.display) return this.display.present(name, img, (n, cv) => this._image(n, cv, cell));
+        return this._image(name, img, cell);
+    }
+    _image(name, img, cell) {
         const st = this._img[name] || (this._img[name] = { n: 0, live: [], busy: null, next: null });
         // coalesce: if a push is in flight, remember only the newest frame
         if (st.busy) { st.next = img; return st.busy; }
@@ -225,7 +244,7 @@ class Ui {
         };
         st.busy = run(img).catch((e) => log.warn('image ' + name + ': ' + e)).then(() => {
             st.busy = null;
-            if (st.next) { const n = st.next; st.next = null; return this.image(name, n, cell); }
+            if (st.next) { const n = st.next; st.next = null; return this._image(name, n, cell); }
         });
         return st.busy;
     }
@@ -277,40 +296,66 @@ async function runInner(impl) {
     active();
     const ui = new Ui(app);
     const settings = new Settings(SPEC.settings);
+    const display = new Display(ui, log, SPEC, settings, () => themes.theme(settings.get('theme')));
+    ui.display = display;
     const ctx = {
-        app, ui, settings, log, spec: SPEC, dataDir: DATA_DIR,
+        app, ui, settings, log, spec: SPEC, dataDir: DATA_DIR, display,
         signals: require('./signals'),
         theme: () => themes.theme(settings.get('theme')),
-        /** Run fn about `fps` times a second while screen `stateName` is visible. */
+        /** The surface to draw one frame on (record.js Recorder, reused): pass it to ui.image. */
+        canvas(w, h) { return display.canvas(w, h); },
+        /**
+         * Run fn while screen `stateName` is visible: once per screen refresh (up to 60 fps)
+         * when the GPU renderer shows it, else about `fps` times a second.
+         */
         loop(stateName, fps, fn) {
-            let timer = null, running = false, frames = 0, spent = 0;
+            let timer = null, on = false, running = false, frames = 0, spent = 0;
+            const gpuOn = () => display.active(stateName);
             const tick = async () => {
-                if (running) return;
+                timer = null;
+                if (!on || running) return;
                 running = true;
                 const t0 = Date.now();
                 try { await fn(); } catch (e) { log.error('loop ' + stateName, e); }
-                // every frame allocates image and PNG buffers; Node 8 frees them lazily, which lets
-                // memory float up to the platform's limit (the app is then killed). Collect regularly.
-                if (++frames % 3 === 0 && typeof global.gc === 'function') { try { global.gc(); } catch (e) { /* ignore */ } }
                 running = false;
                 const dt = Date.now() - t0;
-                // what a frame really costs on the unit (draw + PNG + HMI), to tune the refresh rate by
-                spent += dt;
-                if (frames % 100 === 0) {
-                    const tm = ui.timing, png = Math.round(tm.png / 100), push = Math.round(tm.push / 100), all = Math.round(spent / 100);
-                    log.info('loop ' + stateName + ': ' + all + ' ms per frame (draw ' + Math.max(0, all - png - push) + ', png ' + png + ', hmi ' + push + '; asked for ' + fps + ' fps)');
+                frames++; spent += dt;
+                // software frames allocate image and PNG buffers; Node 8 frees them lazily, which lets
+                // memory float up to the platform's limit (the app is then killed). Collect regularly.
+                if (!gpuOn() && frames % 3 === 0 && typeof global.gc === 'function') { try { global.gc(); } catch (e) { /* ignore */ } }
+                if (frames % (gpuOn() ? 600 : 100) === 0) {
+                    const n = gpuOn() ? 600 : 100, tm = ui.timing, png = Math.round(tm.png / n), push = Math.round(tm.push / n), all = (spent / n).toFixed(1);
+                    log.info('loop ' + stateName + ': ' + all + ' ms per frame in JS' + (gpuOn() ? ' (GPU renderer)' : ' (draw ' + Math.max(0, all - png - push) + ', png ' + png + ', hmi ' + push + '; asked for ' + fps + ' fps)'));
                     spent = 0; tm.png = 0; tm.push = 0;
                 }
-                // at least 15 ms between frames so car data and HMI events get handled
-                if (timer !== null) timer = setTimeout(tick, Math.max(15, 1000 / fps - dt));
+                schedule(dt);
             };
-            const set = (on) => {
-                if (on && timer === null) { timer = setTimeout(tick, 0); }
+            const schedule = (dt) => {
+                if (!on || timer !== null || running) return;
+                if (gpuOn()) {
+                    // the renderer sends a tick when it can take the next frame; if this frame was
+                    // not sent (unchanged), look again shortly
+                    // (a tick normally follows a sent frame; 250 ms is the safety net if none comes)
+                    timer = setTimeout(tick, display.gpu.waiting ? 250 : 16);
+                } else timer = setTimeout(tick, Math.max(15, 1000 / fps - (dt || 0)));
+            };
+            display.onTick(() => {
+                // a tick from the renderer, or the renderer went away (then back to the timer)
+                if (!on || running) return;
+                if (timer !== null) { clearTimeout(timer); timer = null; }
+                if (gpuOn()) tick(); else schedule(0);
+            });
+            const set = (v) => {
+                on = v;
+                if (on && timer === null && !running) timer = setTimeout(tick, 0);
                 if (!on && timer !== null) { clearTimeout(timer); timer = null; }
             };
-            ui.onVisible((name, on) => { if (name === stateName) set(on); });
+            ui.onVisible((name, v) => { if (name === stateName) set(v); });
             if (ui.isVisible(stateName)) set(true);
-            return { stop: () => set(false), kick: () => { if (timer !== null) { clearTimeout(timer); timer = setTimeout(tick, 0); } } };
+            return {
+                stop: () => set(false),
+                kick: () => { if (on && !running) { if (timer !== null) clearTimeout(timer); timer = setTimeout(tick, 0); } },
+            };
         },
     };
 
@@ -318,6 +363,9 @@ async function runInner(impl) {
     (SPEC.screens || []).forEach((s) => {
         const st = ui.comp(s.name);
         if (st && st.on) st.on('visible', (ev) => ui._setVisible(s.name, !!(ev && ev.visible)));
+        // a popup over the screen (options, warnings, calls) takes its focus: the display hides
+        // the GPU overlay meanwhile, so the popup is never covered
+        if (st && st.on) st.on('focus', (ev) => ui._setFocus(s.name, !(ev && ev.focus === false)));
     });
     ui.rhmi.on('applicationStackChanged', (stack) => {
         const shown = stack && Object.keys(stack).length > 0 && ('ROOT_APP' in stack);

@@ -21,8 +21,16 @@ for id in "${APPS[@]}"; do
     cp "$KIT/dist/$id@$ver.mgu" "$OUT/apps/"
 done
 cp "$HERE/car/deploy-car.sh" "$HERE/mgu-app-install.sh" "$HERE/mainapp-patch.js" "$HERE/car/README.txt" "$OUT/"
+# GPU renderer (kit/renderd, built in Docker: see kit/renderd/README.md)
+RD=$KIT/kit/renderd/build/mgu-renderd
+if [ ! -f "$RD" ] && command -v docker >/dev/null; then
+    (cd "$KIT/kit/renderd" && { docker image inspect mgu-renderd-build >/dev/null 2>&1 || docker build -t mgu-renderd-build docker; } \
+        && docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" mgu-renderd-build make) || true
+fi
+if [ -f "$RD" ]; then cp "$RD" "$OUT/mgu-renderd"; chmod 755 "$OUT/mgu-renderd"
+else echo "note: no mgu-renderd build (needs Docker) - the kit installs the apps with software rendering only"; fi
 chmod +x "$OUT"/*.sh
-(cd "$OUT" && md5sum deploy-car.sh mgu-app-install.sh mainapp-patch.js apps/*.mgu > KIT_SUMS)
+(cd "$OUT" && md5sum deploy-car.sh mgu-app-install.sh mainapp-patch.js apps/*.mgu $( [ -f mgu-renderd ] && echo mgu-renderd ) > KIT_SUMS)
 tar czf "$KIT/dist/mgu-custom-apps.tar.gz" -C "$KIT/dist" mgu-custom-apps
 echo "kit: $OUT  ($(ls "$OUT/apps" | tr '\n' ' '))"
 echo "     $KIT/dist/mgu-custom-apps.tar.gz"

@@ -16,7 +16,7 @@
  * BTN_RESET clears it and the session stats.
  */
 const mgu = require('./kit/mgu');
-const { Canvas, withAlpha, ramp } = require('./kit/canvas');
+const { withAlpha, ramp } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
 
@@ -99,26 +99,25 @@ mgu.run({
         const BW = BAR.x1 - BAR.x0 - BAR.slant, BH = BAR.y1 - BAR.y0;
         const barX = (rpm) => G.clamp(rpm / maxRpm(), 0, 1) * BW;                          // along the bar
         const off = (y) => BAR.slant * (BAR.y1 - y) / BH;                                   // slant at height y
-        /** Fill the slanted band between rpm a and b, row by row (anti-aliased slant). */
+        /** Fill the slanted band between rpm a and b (one anti-aliased quad). */
         function band(cv, a, b, col, pad) {
             pad = pad || 0;
-            const xa = barX(a), xb = barX(b);
+            const xa = BAR.x0 + barX(a), xb = BAR.x0 + barX(b), y0 = BAR.y0 - pad, y1 = BAR.y1 + pad;
             if (xb - xa <= 0) return;
-            for (let y = BAR.y0 - pad; y < BAR.y1 + pad; y++) {
-                const o = BAR.x0 + off(Math.min(BAR.y1, Math.max(BAR.y0, y + 0.5)));
-                cv.fillRect(o + xa - pad, y, xb - xa + 2 * pad, 1, col);
-            }
+            cv.quad([[xa + off(BAR.y0) - pad, y0], [xb + off(BAR.y0) + pad, y0], [xb + off(BAR.y1) + pad, y1], [xa + off(BAR.y1) - pad, y1]], col);
         }
         /** Slanted 3 px gap at rpm r (segment separator). */
         function gapAt(cv, r, col) {
-            const x = barX(r);
-            for (let y = BAR.y0; y < BAR.y1; y++) cv.fillRect(BAR.x0 + off(y + 0.5) + x - 1.5, y, 3, 1, col);
+            const x = BAR.x0 + barX(r);
+            cv.quad([[x + off(BAR.y0) - 1.5, BAR.y0], [x + off(BAR.y0) + 1.5, BAR.y0], [x + off(BAR.y1) + 1.5, BAR.y1], [x + off(BAR.y1) - 1.5, BAR.y1]], col);
         }
-        let bg = null, bgKey = '';
-        function background(t, sp) {
-            const key = [settings.get('theme'), maxRpm(), redline(), sp.rpm].join('|');
-            if (bg && key === bgKey) return bg;
-            const cv = new Canvas(W, H).clear(t.bg);
+        /** Static part of the tach page (cached layer; redrawn when the theme / limits change). */
+        function background(cv, t, sp) {
+            const key = ['redline-bg', settings.get('theme'), maxRpm(), redline(), sp.rpm].join('|');
+            cv.blit(G.layer(key, W, H, (c) => drawBackground(c, t, sp), cv.textScale), 0, 0);
+        }
+        function drawBackground(cv, t, sp) {
+            cv.clear(t.bg);
             // angular frame lines (the G20's outline) around the centre
             const fl = withAlpha(t.tick, 0.55);
             cv.polyline([[24, 92], [330, 92], [370, 122], [1230, 122], [1270, 92], [1576, 92]], 2, fl);
@@ -138,8 +137,6 @@ mgu.run({
                 const x = BAR.x0 + barX(r);
                 cv.fillRect(x + BAR.slant - 2, BAR.y0 - 14, 4, 12, c);
             });
-            bg = cv; bgKey = key;
-            return cv;
         }
 
         /* ---------- drawing ---------- */
@@ -179,10 +176,11 @@ mgu.run({
 
         function drawTach(cv, t, d, now) {
             const sp = shiftPoint(d.oil);
-            cv.d.set(background(t, sp).d);
+            background(cv, t, sp);
             const rpm = d.rpm;
             const shiftNow = G.isNum(rpm) && rpm >= sp.rpm;
-            blink = shiftNow ? !blink : false;
+            // GPU renderer (60 fps): 8 Hz clock phase; software (few fps): alternate every frame
+            blink = shiftNow ? (ctx.display.active() ? Math.floor(now / 62) % 2 === 0 : !blink) : false;
             shiftLights(cv, t, rpm, sp.rpm, blink);
             if (shiftNow && settings.get('flash') && blink) {
                 cv.gradientRect(0, 0, W, H, [[0, withAlpha(t.crit, 0.55)], [0.5, withAlpha(t.crit, 0.22)], [1, withAlpha(t.crit, 0.5)]]);
@@ -299,7 +297,8 @@ mgu.run({
         async function render() {
             const t = ctx.theme(), d = car.data(), now = Date.now();
             let cv;
-            if (page === 0) { cv = new Canvas(W, H); drawTach(cv, t, d, now); } else { cv = new Canvas(W, H).clear(t.bg); drawLog(cv, t); }
+            cv = ctx.canvas(W, H).clear(t.bg);
+            if (page === 0) drawTach(cv, t, d, now); else drawLog(cv, t);
             header(cv, t, d);
             await ui.image('MAIN_GFX', cv);
         }
@@ -315,7 +314,6 @@ mgu.run({
         let loop = ctx.loop('MAIN', settings.get('fps'), render);
         settings.onChange((k) => {
             if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
-            bg = null;
         });
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
     },

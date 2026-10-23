@@ -30,6 +30,13 @@ function withAlpha(c, a) { const v = rgba(c); return [v[0], v[1], v[2], Math.rou
 
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
+/** Signed distance from (dx, dy) (relative to the centre) to a rounded rect of half size hw, hh, radius r. */
+function rrDist(dx, dy, hw, hh, r) {
+    const qx = Math.abs(dx) - (hw - r), qy = Math.abs(dy) - (hh - r);
+    const ox = Math.max(qx, 0), oy = Math.max(qy, 0);
+    return Math.sqrt(ox * ox + oy * oy) + Math.min(Math.max(qx, qy), 0) - r;
+}
+
 /** Colour at position f (0..1) of a ramp [c0, c1, ...] (evenly spaced stops). */
 function ramp(stops, f) {
     if (stops.length === 1) return rgba(stops[0]);
@@ -160,9 +167,7 @@ class Canvas {
         for (let py = y0; py < y1; py++) {
             for (let px = x0; px < x1; px++) {
                 const cx = px + 0.5, cy = py + 0.5;
-                const qx = Math.max(Math.abs(cx - (x + w / 2)) - (w / 2 - r), 0);
-                const qy = Math.max(Math.abs(cy - (y + h / 2)) - (h / 2 - r), 0);
-                const dist = Math.sqrt(qx * qx + qy * qy) - r;
+                const dist = rrDist(cx - (x + w / 2), cy - (y + h / 2), w / 2, h / 2, r);
                 const cov = clamp01(0.5 - dist);
                 if (cov > 0) this._blend(px, py, c, cov);
             }
@@ -179,9 +184,7 @@ class Canvas {
         for (let py = y0; py < y1; py++) {
             for (let px = x0; px < x1; px++) {
                 const cx = px + 0.5, cy = py + 0.5;
-                const qx = Math.max(Math.abs(cx - (x + w / 2)) - (w / 2 - r), 0);
-                const qy = Math.max(Math.abs(cy - (y + h / 2)) - (h / 2 - r), 0);
-                const dist = Math.sqrt(qx * qx + qy * qy) - r;      // <0 inside
+                const dist = rrDist(cx - (x + w / 2), cy - (y + h / 2), w / 2, h / 2, r);      // <0 inside
                 const cov = clamp01(0.5 - dist) * clamp01(dist + width + 0.5);
                 if (cov > 0) this._blend(px, py, c, cov);
             }
@@ -235,9 +238,7 @@ class Canvas {
         for (let px = x0; px < x1; px++) col.push(ramp(stops, (px + 0.5 - sx) / sw));
         for (let py = y0; py < y1; py++) {
             for (let px = x0; px < x1; px++) {
-                const qx = Math.max(Math.abs(px + 0.5 - (x + w / 2)) - (w / 2 - r), 0);
-                const qy = Math.max(Math.abs(py + 0.5 - (y + h / 2)) - (h / 2 - r), 0);
-                const cov = clamp01(0.5 - (Math.sqrt(qx * qx + qy * qy) - r));
+                const cov = clamp01(0.5 - rrDist(px + 0.5 - (x + w / 2), py + 0.5 - (y + h / 2), w / 2, h / 2, r));
                 if (cov > 0) this._blend(px, py, col[px - x0], cov);
             }
         }
@@ -342,6 +343,36 @@ class Canvas {
         }
         return this;
     }
+
+    /**
+     * Filled convex polygon (quad / triangle), anti-aliased: coverage is the product of each
+     * edge's distance ramp (as the GPU renderer does it). pts = [[x,y],...] in either order.
+     */
+    convex(pts, c) {
+        c = rgba(c);
+        const n = pts.length;
+        let area = 0;
+        for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; area += a[0] * b[1] - b[0] * a[1]; }
+        if (Math.abs(area) < 1e-6) return this;
+        const s = area > 0 ? 1 : -1, E = [];
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let i = 0; i < n; i++) {
+            const a = pts[i], b = pts[(i + 1) % n], ex = b[0] - a[0], ey = b[1] - a[1], l = Math.sqrt(ex * ex + ey * ey);
+            if (l > 1e-6) { const nx = -ey / l * s, ny = ex / l * s; E.push([nx, ny, -(nx * a[0] + ny * a[1])]); }
+            x0 = Math.min(x0, a[0]); x1 = Math.max(x1, a[0]); y0 = Math.min(y0, a[1]); y1 = Math.max(y1, a[1]);
+        }
+        for (let py = Math.max(0, Math.floor(y0) - 1); py < Math.min(this.h, Math.ceil(y1) + 1); py++) {
+            for (let px = Math.max(0, Math.floor(x0) - 1); px < Math.min(this.w, Math.ceil(x1) + 1); px++) {
+                const qx = px + 0.5, qy = py + 0.5;
+                let cov = 1;
+                for (let k = 0; k < E.length && cov > 0; k++) cov *= clamp01(E[k][0] * qx + E[k][1] * qy + E[k][2] + 0.5);
+                if (cov > 0) this._blend(px, py, c, cov);
+            }
+        }
+        return this;
+    }
+    quad(pts, c) { return this.convex(pts, c); }
+    triangle(pts, c) { return this.convex(pts, c); }
 
     /** Polyline (e.g. a history trace). pts = [[x,y],...] */
     polyline(pts, width, c) {

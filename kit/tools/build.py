@@ -74,7 +74,8 @@ PLATFORM_SERVICES = {
 # property ids (RhmiConstants): Enabled=1 Visible=2 Focusable=3 ParentState=9
 WIDGETS = {
     'graphic':   ('label', 'LT_Label_1Graphic_Scalable', {2: 1, 3: 0}),
-    'barbutton': ('button', 'LT_Button_1Row_Laptimer', {3: 1}),
+    # Focusable=3: the HMI then reports focus changes (the kit's slim bar shows the focused button)
+    'barbutton': ('button', 'LT_Button_1Row_Laptimer', {3: 3}),
     'header':    ('label', 'LT_Label_Header_1Row', {2: 1, 3: 0}),
     'text':      ('label', 'LT_Label_1Row', {2: 1, 3: 0}),
     'text3':     ('label', 'LT_Label_3Row_1TextDyn', {2: 1, 3: 0}),

@@ -16,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
-const { Canvas, withAlpha } = require('./kit/canvas');
+const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Demo = require('./demo');
 const { GearGuess, selectionOf } = require('./kit/car');
@@ -574,7 +574,7 @@ mgu.run({
 
         async function render() {
             const t = ctx.theme(), d = data();
-            const cv = new Canvas(W, H).clear(t.bg);
+            const cv = ctx.canvas(W, H).clear(t.bg);
             [drawEngine, drawThermal, drawFuel, drawChassis][page](cv, t, d);
             header(cv, t);
             if (!render.n) { render.n = 1; log.info('first frame drawn'); }

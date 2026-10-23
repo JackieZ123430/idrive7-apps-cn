@@ -39,6 +39,10 @@
      "options": [["qm", "1/4 mile"], ["em", "1/8 mile"], ["m1000", "1000 m"]]},
     {"key": "rollout", "label": "One-foot rollout", "type": "bool", "default": false},
     {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 8, "steps": [4, 6, 8, 12]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU (60 fps)"], ["software", "Software"]]},
     {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
      "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
   ],

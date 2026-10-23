@@ -14,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
-const { Canvas, withAlpha } = require('./kit/canvas');
+const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
 
@@ -176,7 +176,7 @@ mgu.run({
         }
 
         async function render() {
-            const t = ctx.theme(), cv = new Canvas(W, H).clear(t.bg);
+            const t = ctx.theme(), cv = ctx.canvas(W, H).clear(t.bg);
             (page === 0 ? drawLive : drawRecords)(cv, t);
             header(cv, t);
             await ui.image('MAIN_GFX', cv);

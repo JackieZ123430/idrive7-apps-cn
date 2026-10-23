@@ -3,12 +3,14 @@
  * preview.js - run a built app on the PC with a stubbed head unit and save
  * what it draws as PNGs (no VM needed for visual work).
  *
- *   node kit/tools/preview.js dist/car_vitals [outDir] [clicks...] [--set key=value ...]
+ *   node kit/tools/preview.js dist/car_vitals [outDir] [clicks...] [--set key=value ...] [--gpu FILE]
  *
  * clicks = component names to "press" between frames, e.g. BTN_PAGE BTN_PAGE;
  * also wait=<seconds> and render (draw a frame now).
  * Demo data is forced on. Each image the app pushes is written as
  * <outDir>/<component>-<n>.png.
+ * --gpu FILE: also write what the GPU renderer would get (full-screen layout: header, slim bar) to FILE;
+ * render it with  mgu-renderd --replay FILE --out frame.pam  (last frame).
  */
 const fs = require('fs');
 const path = require('path');
@@ -20,7 +22,8 @@ const out = path.resolve(args[0] && !args[0].startsWith('BTN') && !args[0].start
 const sets = {};
 const clicks = [];
 for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--set') { const [k, v] = args[++i].split('='); sets[k] = isNaN(Number(v)) ? (v === 'true' ? true : v === 'false' ? false : v) : Number(v); }
+    if (args[i] === '--gpu') process.env.MGU_RENDERD_FILE = path.resolve(args[++i]);
+    else if (args[i] === '--set') { const [k, v] = args[++i].split('='); sets[k] = isNaN(Number(v)) ? (v === 'true' ? true : v === 'false' ? false : v) : Number(v); }
     else clicks.push(args[i]);
 }
 fs.mkdirSync(out, { recursive: true });
@@ -45,7 +48,8 @@ for (const s of spec.settings || []) settings.values[s.key] = s.default;
 Object.assign(settings.values, { demo: 'on' }, sets);
 
 const ui = {
-    image: async (name, cv) => {
+    image: (name, cv) => display.present(name, cv, softImage),
+    _image: async (name, cv) => {
         const f = path.join(out, `${name.toLowerCase()}-${frame++}.png`);
         fs.writeFileSync(f, Buffer.isBuffer(cv) ? cv : cv.png());
         console.log('frame', f);
@@ -56,13 +60,19 @@ const ui = {
     visible: async () => {}, enabled: async () => {}, checked: async () => {},
     onClick: (n, fn) => { handlers[n] = fn; },
     open: async (n) => console.log('open', n), close: async () => {},
-    isVisible: () => false, onVisible: () => {}, comp: () => ({}),
+    isVisible: () => !!process.env.MGU_RENDERD_FILE, onVisible: () => {}, comp: () => ({}),
 };
+const softImage = (n, cv) => ui._image(n, cv);
+const log = { info: console.log, warn: console.warn, error: console.error, debug: () => {} };
+const themeFn = () => require(path.join(kitDir, 'themes')).theme(settings.get('theme'));
+const { Display } = require(path.join(kitDir, 'display'));
+settings.onChange = settings.onChange || (() => {});
+const display = new Display(ui, log, spec, settings, themeFn);
 const ctx = {
-    ui, settings, spec, dataDir: out,
-    log: { info: console.log, warn: console.warn, error: console.error, debug: () => {} },
+    ui, settings, spec, dataDir: out, log, display,
+    canvas: (w, h) => display.canvas(w, h),
     signals: { watch: async (iface) => ({ iface, error: 'preview' }), proxy: async () => { throw new Error('preview'); } },
-    theme: () => require(path.join(kitDir, 'themes')).theme(settings.get('theme')),
+    theme: themeFn,
     loop: (n, fps, fn) => { loopFn = fn; return { stop() {}, kick() {} }; },
 };
 
