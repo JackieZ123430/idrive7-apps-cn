@@ -3,10 +3,10 @@
  * Redline - full-screen rev display in the style of the G20 Live Cockpit (Sport):
  * a wide rev bar across the middle that fills left to right in slanted 500 rpm
  * segments (theme colour to red at the shift point), digital rpm above it, a big
- * gear below it, digital speed, angular frame lines. The screen blinks red while
- * it's time to shift.
+ * gear below it, digital speed, angular frame lines. At the shift point the lights,
+ * gear and a SHIFT prompt turn red (setting "flash": they blink and the screen flashes).
  *
- *   - shift-light bar that fills over the last 2000 rpm and strobes at the shift point
+ *   - shift-light bar that fills over the last 2000 rpm, all red at the shift point
  *   - huge gear number (from the gearbox, or learned from rpm/speed ratios)
  *   - every upshift is scored against your shift point (EARLY / SPOT ON / LATE / LIMITER)
  *   - cold-engine rev guard: until the oil is warm the shift point is pulled down
@@ -166,8 +166,8 @@ mgu.run({
             return strobe;
         }
 
-        // shift blink: alternates every frame while at / above the shift point, so it
-        // always shows (a clock-based phase could land on 'off' frame after frame)
+        // shift blink (setting "flash"): in software it alternates every frame, so it always
+        // shows (a clock-based phase could land on 'off' frame after frame)
         let blink = false;
 
         function drawTach(cv, t, d, now) {
@@ -175,10 +175,14 @@ mgu.run({
             background(cv, t, sp);
             const rpm = d.rpm;
             const shiftNow = G.isNum(rpm) && rpm >= sp.rpm;
-            // GPU renderer (60 fps): 8 Hz clock phase; software (few fps): alternate every frame
-            blink = shiftNow ? (ctx.display.active() ? Math.floor(now / 62) % 2 === 0 : !blink) : false;
-            shiftLights(cv, t, rpm, sp.rpm, blink);
-            if (shiftNow && settings.get('flash') && blink) {
+            // setting "flash" on: lights, gear and SHIFT blink (GPU renderer: 8 Hz clock phase;
+            // software, few fps: alternate every frame) and the screen flashes red. Off: they
+            // just turn solid red at the shift point, nothing blinks.
+            const flash = settings.get('flash');
+            blink = shiftNow && flash ? (ctx.display.active() ? Math.floor(now / 62) % 2 === 0 : !blink) : false;
+            const redNow = shiftNow && (!flash || blink);
+            shiftLights(cv, t, rpm, sp.rpm, redNow);
+            if (shiftNow && flash && blink) {
                 cv.gradientRect(0, 0, W, H, [[0, withAlpha(t.crit, 0.55)], [0.5, withAlpha(t.crit, 0.22)], [1, withAlpha(t.crit, 0.5)]]);
                 const fr = withAlpha('#ff2a2a', 0.9);                                            // red frame
                 cv.fillRect(0, 0, W, 8, fr); cv.fillRect(0, H - 8, W, 8, fr); cv.fillRect(0, 8, 8, H - 16, fr); cv.fillRect(W - 8, 8, 8, H - 16, fr);
@@ -210,9 +214,9 @@ mgu.run({
             // otherwise - the gear field alone reads "N" in park too
             const g = d.gear, st = d.stage;
             const gs = st === 'P' || st === 'R' || st === 'N' ? st : g === -1 ? 'R' : G.isNum(g) && g > 0 ? String(g) : st === 'D' ? 'D' : g === 0 ? 'N' : '-';
-            cv.text(gs, GX, 500, 200, shiftNow && blink ? '#ff2a2a' : t.text, { align: 'center', font: 'gear' });
+            cv.text(gs, GX, 500, 200, redNow ? '#ff2a2a' : t.text, { align: 'center', font: 'gear' });
             if (d.gearGuessed && G.isNum(g) && g > 0) cv.text('EST.', GX + 90, 352, 22, t.dim, { font: 'bold', spacing: 1 });
-            if (shiftNow) cv.text('SHIFT', GX + 150, 436, 30, blink ? '#ff2a2a' : withAlpha('#ff2a2a', 0.5), { font: 'bold', spacing: 3 });
+            if (shiftNow) cv.text('SHIFT', GX + 150, 436, 30, redNow ? '#ff2a2a' : withAlpha('#ff2a2a', 0.5), { font: 'bold', spacing: 3 });
 
             // ---- left: digital speed, temperatures, cold oil, stats
             const spd = G.hold('speed', d.speed, 1000 / settings.get('speedRate'));     // setting: 5/s like the cluster .. 60

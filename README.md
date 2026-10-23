@@ -141,7 +141,7 @@ the unit and kept across reboots.
 
 | App | What it does |
 |---|---|
-| **Redline** | A G20 Live Cockpit style rev display: a wide rev bar across the middle that fills left to right in slanted segments (theme colour to red at your shift point), digital rpm above it and a big gear below it, digital speed, and a 12-LED shift-light bar. At the shift point the screen blinks red (every frame, with a red frame and a SHIFT prompt; can be turned off). Gear read from the gearbox or learned from rpm/speed. Every upshift is scored (EARLY / SPOT ON / LATE / LIMITER), with a shift log and accuracy stats. Cold oil is always flagged; the cold-engine guard (on by default) also lowers the shift point until the oil is warm. |
+| **Redline** | A G20 Live Cockpit style rev display: a wide rev bar across the middle that fills left to right in slanted segments (theme colour to red at your shift point), digital rpm above it and a big gear below it, digital speed, and a 12-LED shift-light bar. At the shift point the shift lights, the gear and a SHIFT prompt turn solid red; the *Blink and flash* setting (off by default) makes them strobe and flashes the whole screen red. Gear read from the gearbox or learned from rpm/speed. Every upshift is scored (EARLY / SPOT ON / LATE / LIMITER), with a shift log and accuracy stats. Cold oil is always flagged; the cold-engine guard (on by default) also lowers the shift point until the oil is warm. |
 | **Virtual Dyno** | Do a full-throttle pull in one gear and get a power and torque curve, calculated from acceleration, car weight, air drag and rolling resistance. Settings for weight, body shape, drivetrain loss, hp/PS/kW and Nm/lb-ft. Runs are saved; pin one as a baseline to see ± on every new pull. Optional overlay of the engine computer's own torque reading. |
 | **Brake Test** | 100-0 and 200-0 km/h (or 60-0 and 100-0 mph): distance, time, peak deceleration and a deceleration trace. The start crossing is interpolated between samples, so results don't depend on the sample rate. A brake-fade chart compares your last stops and warns when distances grow. Bests plus full history. |
 | **Drag Timer** | 0-50, 0-100, 100-200, 0-200 km/h and ¼ mile (or mph equivalents), with interpolated splits, optional one-foot rollout, a live speed trace and saved best times. |
@@ -612,7 +612,7 @@ real time, and `mgu-renderd --replay ... --raw` writes every one of them. `make_
 all and encodes a GIF (needs Docker and ffmpeg):
 
 ```sh
-kit/tools/make_gif.sh docs/media/redline.gif redline 6 6     # 6 s, after 6 s of demo drive
+kit/tools/make_gif.sh docs/media/redline.gif redline 6 6 --set coldGuard=false   # 6 s, after 6 s of demo drive
 ```
 
 ---
