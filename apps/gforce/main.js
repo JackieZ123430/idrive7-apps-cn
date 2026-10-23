@@ -88,7 +88,7 @@ mgu.run({
             for (let ring = 0.25; ring <= max + 1e-6; ring += 0.25) {
                 const rr = (ring / max) * r, major = Math.abs(ring % 0.5) < 1e-6;
                 cv.arc(cx, cy, rr - (major ? 1.5 : 0.75), rr + (major ? 1.5 : 0.75), 0, 360, major ? t.tick : withAlpha(t.tick, 0.35));
-                if (major) cv.text(ring.toFixed(1), cx + rr * 0.7071 + 6, cy - rr * 0.7071 - 4, 18, t.dim);
+                if (major) cv.text(ring.toFixed(1), cx + rr * 0.7071 + 6, cy - rr * 0.7071 - 4, 20, t.dim);
             }
             cv.line(cx - r, cy, cx + r, cy, 2, withAlpha(t.tick, 0.5));
             cv.line(cx, cy - r, cx, cy + r, 2, withAlpha(t.tick, 0.5));
@@ -110,17 +110,17 @@ mgu.run({
                 cv.circle(x, y, 12, t.accent);
                 cv.circle(x, y, 5, t.text);
             }
-            cv.text('ACCEL', cx, cy - r - 20, 18, t.dim, { align: 'center', font: 'bold', spacing: 2 });
-            cv.text('BRAKE', cx, cy + r + 36, 18, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+            cv.text('ACCEL', cx, cy - r - 20, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+            cv.text('BRAKE', cx, cy + r + 38, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
             cv.text('L', cx - r - 30, cy + 8, 22, t.dim, { align: 'center', font: 'bold' });
             cv.text('R', cx + r + 30, cy + 8, 22, t.dim, { align: 'center', font: 'bold' });
         }
 
         function peakBox(cv, t, x, y, label, v, rec) {
-            cv.text(label, x, y, 20, t.dim, { font: 'bold', spacing: 2 });
+            cv.text(label, x, y, 22, t.dim, { font: 'bold', spacing: 1.5 });
             const w = cv.text(v > 0.005 ? v.toFixed(2) : '-.--', x, y + 58, 64, v > 0.005 ? t.text : t.dim, { font: 'num' });
             cv.text('g', x + w + 6, y + 58, 24, t.dim);
-            if (rec && rec.v > 0) cv.text('record ' + rec.v.toFixed(2), x, y + 86, 18, Math.abs(rec.v - v) < 1e-3 && v > 0.05 ? GO : t.dim, { font: 'bold' });
+            if (rec && rec.v > 0) cv.text('record ' + rec.v.toFixed(2), x, y + 88, 22, Math.abs(rec.v - v) < 1e-3 && v > 0.05 ? GO : t.dim, { font: 'bold' });
         }
 
         function drawLive(cv, t) {
@@ -137,7 +137,7 @@ mgu.run({
             // OEM-style bars; the hang is this session's peak on the side it is pulling to now
             const pk = [cur.lat >= 0 ? S.peak.left : S.peak.right, cur.long >= 0 ? S.peak.acc : S.peak.brk];
             bars.forEach(([l, v, side], i) => {
-                G.bar(cv, t, 672, 235 + i * 98, 372, 92, { label: l + '  ' + side, value: v, decimals: 2, max: settings.get('scale'), ramp: 'hot', peak: pk[i] });
+                G.bar(cv, t, 672, 233 + i * 108, 372, 92, { label: l + '  ' + side, value: v, decimals: 2, max: settings.get('scale'), ramp: 'hot', peak: pk[i] });
             });
             const d = car.data();
             cv.text(G.fmt(V(d.speed), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });
@@ -152,7 +152,7 @@ mgu.run({
             cv.text('COMBINED  ' + (S.peak.comb ? S.peak.comb.toFixed(2) + ' g' : '--'), 1116, 421, 22, t.accent2, { font: 'bold', spacing: 1 });
             cv.text('> 0.5 g  ' + S.over05.toFixed(0) + ' s', 1552, 421, 22, t.text, { align: 'right', font: 'bold' });
             const mins = Math.floor((Date.now() - S.start) / 60000);
-            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  MAX ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 472, 18, t.dim, { font: 'bold', spacing: 1 });
+            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 474, 22, t.dim, { font: 'bold', spacing: 0.5 });
         }
 
         function drawRecords(cv, t) {
@@ -167,7 +167,6 @@ mgu.run({
                 cv.text(u, x + w + 8, y + 66, 26, t.dim);
                 if (r) { const d = new Date(r.at), p = (n) => String(n).padStart(2, '0'); cv.text(p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear(), x + 300, y + 66, 22, t.dim); }
             });
-            cv.text('Records are kept until you clear them (press "Clear records" twice).', 48, 495, 18, t.dim);
         }
 
         /** G20-style frame: tab bar with the page names along the top. */

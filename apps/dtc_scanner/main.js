@@ -226,19 +226,16 @@ mgu.run({
                 const y = 231 + i * 47;
                 const s = statusInfo(d.status), col = t[s.sev] || t.dim;
                 cv.roundRect(48, y, 170, 34, 6, withAlpha(col, 0.22));
-                cv.text(s.label, 133, y + 24, 18, col, { align: 'center', font: 'bold', spacing: 1 });
+                cv.text(s.label, 133, y + 25, 20, col, { align: 'center', font: 'bold', spacing: 0.5 });
                 cv.text(d.code, 246, y + 28, 32, t.text, { font: 'bold', spacing: 1 });
                 cv.text(ecuName(d.addr), 420, y + 27, 26, t.text);
-                // the fault's text when known (cut to fit), else status + address
+                // the fault's text when known (cut to fit)
                 const desc = describe(d.addr, d.code);
-                if (desc) {
+                let txt = desc ? (d.mem === 'info' ? 'INFO: ' : '') + desc : d.mem === 'info' ? 'INFO MEMORY' : '';
+                if (txt) {
                     const max = 1552 - 680;
-                    let s = (d.mem === 'info' ? 'INFO: ' : '') + desc;
-                    if (cv.textWidth(s, 20) > max) { while (s.length > 4 && cv.textWidth(s + '...', 20) > max) s = s.slice(0, -1); s = s.trim() + '...'; }
-                    cv.text(s, 680, y + 26, 20, t.dim);
-                } else {
-                    if (d.mem === 'info') cv.text('INFO MEMORY', 760, y + 26, 18, t.dim, { font: 'bold', spacing: 1 });
-                    cv.text('status ' + hex(d.status) + '   addr 0x' + hex(d.addr), 1552, y + 26, 20, t.dim, { align: 'right' });
+                    if (cv.textWidth(txt, 22) > max) { while (txt.length > 4 && cv.textWidth(txt + '...', 22) > max) txt = txt.slice(0, -1); txt = txt.trim() + '...'; }
+                    cv.text(txt, 680, y + 27, 22, t.dim);
                 }
                 if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
@@ -253,10 +250,10 @@ mgu.run({
                 const y = 231 + i * 47;
                 cv.circle(66, y + 18, 9, COL[m.color] || t.dim);
                 cv.text(m.name || 'Message ' + m.id, 92, y + 27, 28, t.text, { font: 'bold' });
-                cv.text((m.ecu !== undefined ? ecuName(m.ecu) + '   ' : '') + 'id ' + m.id + (String(m.reason).indexOf('DTC') === 0 ? '   from fault memory' : ''), 1552, y + 26, 20, t.dim, { align: 'right' });
+                if (m.ecu !== undefined) cv.text(ecuName(m.ecu), 1552, y + 27, 22, t.dim, { align: 'right' });
                 if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
-            if (l.length > PER_PAGE) cv.text('+ ' + (l.length - PER_PAGE) + ' more', 1552, 506, 20, t.dim, { align: 'right' });
+            if (l.length > PER_PAGE) cv.text('+ ' + (l.length - PER_PAGE) + ' more', 1552, 506, 22, t.dim, { align: 'right' });
         }
 
         function drawEcus(cv, t) {
@@ -270,8 +267,8 @@ mgu.run({
                 const col = act ? t.crit : n ? t.warn : GO;
                 cv.roundRect(x, y, cw, ch - 6, 6, withAlpha(col, 0.12));
                 cv.fillRect(x, y, 5, ch - 6, col);
-                cv.text(ecuName(e.addr), x + 18, y + 22, 20, t.text, { font: 'bold' });
-                cv.text('0x' + hex(e.addr) + (e.nrc ? '  ' + (NRC[e.nrc] || 'NRC ' + hex(e.nrc)) : ''), x + 18, y + 41, 18, t.dim);
+                cv.text(ecuName(e.addr), x + 18, y + (e.nrc ? 23 : 32), 22, t.text, { font: 'bold' });
+                if (e.nrc) cv.text(NRC[e.nrc] || 'NRC ' + hex(e.nrc), x + 18, y + 44, 20, t.dim);
                 cv.text(n ? n + (n === 1 ? ' fault' : ' faults') : 'OK', x + cw - 12, y + 32, 22, col, { align: 'right', font: 'bold' });
             });
         }

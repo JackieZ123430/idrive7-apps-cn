@@ -139,7 +139,7 @@ mgu.run({
             const col = state === 'ready' ? GO : state === 'braking' ? t.crit : t.dim;
             cv.roundRect(48, 412, 422, 44, 8, withAlpha(col, state === 'ready' ? 0.25 + 0.2 * Math.sin(now / 160) : 0.18));
             cv.text(msg && now < msgUntil ? msg.toUpperCase() : st, 259, 445, msg && now < msgUntil ? 18 : 24, col, { align: 'center', font: 'bold', spacing: 2 });
-            cv.text('SPEED ' + G.fmt(V(d.speed), 0) + '   ·   ' + G.fmt(d.gLong, 2) + ' g', 48, 495, 20, t.dim, { font: 'bold', spacing: 1 });
+            cv.text('SPEED ' + G.fmt(V(d.speed), 0) + '   ·   ' + G.fmt(d.gLong, 2) + ' g', 48, 495, 22, t.dim, { font: 'bold', spacing: 0.5 });
 
             // ---- decel trace (g over distance)
             G.panel(cv, t, 518, 44, 620, 468, 'Deceleration');
@@ -151,24 +151,24 @@ mgu.run({
             for (let i = 0; i <= 3; i++) {
                 const gg = gMax * (1 - i / 3), yy = Y(gg);
                 cv.fillRect(px, yy, pw, 1, withAlpha(t.tick, 0.35));
-                cv.text(gg.toFixed(1), px - 10, yy + 7, 18, t.dim, { align: 'right' });
+                cv.text(gg.toFixed(1), px - 10, yy + 7, 20, t.dim, { align: 'right' });
             }
-            for (let m = 0; m <= dMax; m += dMax > 100 ? 40 : 20) cv.text(String(Math.round(D(m))), X(m), py + ph + 26, 18, t.dim, { align: 'center' });
-            cv.text(dU(), px + pw + 10, py + ph + 26, 18, t.dim);
+            for (let m = 0; m <= dMax; m += dMax > 100 ? 40 : 20) cv.text(String(Math.round(D(m))), X(m), py + ph + 26, 20, t.dim, { align: 'center' });
+            cv.text(dU(), px + pw + 10, py + ph + 26, 20, t.dim);
             const gp = tr.filter((p) => G.isNum(p[2])).map((p) => [X(p[0]), Y(p[2])]);
             if (gp.length > 1) { cv.fillUnder(gp, py + ph, withAlpha(t.accent, 0.16)); cv.polyline(gp, 3, t.accent); }
             const vp = tr.map((p) => [X(p[0]), py + ph - (p[1] / Math.max(1, tr[0] ? tr[0][1] : 1)) * ph]);
             if (vp.length > 1) cv.polyline(vp, 2, withAlpha(t.text, 0.5));
             if (!tr.length) cv.text('Brake hard from above ' + Math.round(V(low.v)) + (mph() ? ' mph' : ' km/h'), px + pw / 2, py + ph / 2, 26, t.dim, { align: 'center' });
             else {
-                cv.fillRect(px + pw - 250, 76, 22, 3, t.accent); cv.text('DECEL g', px + pw - 222, 84, 16, t.dim, { font: 'bold', spacing: 1 });
-                cv.fillRect(px + pw - 110, 76, 22, 2, withAlpha(t.text, 0.5)); cv.text('SPEED', px + pw - 82, 84, 16, t.dim, { font: 'bold', spacing: 1 });
+                cv.fillRect(px + pw - 262, 76, 22, 3, t.accent); cv.text('DECEL g', px + pw - 234, 85, 20, t.dim, { font: 'bold', spacing: 0.5 });
+                cv.fillRect(px + pw - 110, 76, 22, 2, withAlpha(t.text, 0.5)); cv.text('SPEED', px + pw - 82, 85, 20, t.dim, { font: 'bold', spacing: 0.5 });
             }
 
             // ---- fade chart + bests
             G.panel(cv, t, 1162, 44, 414, 468, 'Brake fade');
             const runs = store.runs.filter((x) => x.unit === settings.get('speedUnit') && x.result[low.key]).slice(0, 8).reverse();
-            cv.text(low.label.toUpperCase() + ', LAST ' + runs.length, 1186, 112, 18, t.dim, { font: 'bold', spacing: 1 });
+            cv.text(low.label.toUpperCase() + ', LAST ' + runs.length, 1186, 114, 22, t.dim, { font: 'bold', spacing: 0.5 });
             if (runs.length) {
                 const ms = runs.map((x) => x.result[low.key].m), lo = Math.min.apply(null, ms), hi = Math.max.apply(null, ms);
                 const bw = 40, gap = 8, base = 327;
@@ -176,7 +176,7 @@ mgu.run({
                     const m = x.result[low.key].m, f = hi > lo ? (m - lo) / (hi - lo) : 0.5;
                     const h = 60 + f * 120, col = m - lo > lo * 0.08 ? t.crit : m - lo > lo * 0.04 ? t.warn : GO;
                     cv.roundRect(1186 + i * (bw + gap), base - h, bw, h, 5, col);
-                    cv.text(D(m).toFixed(0), 1186 + i * (bw + gap) + bw / 2, base + 24, 16, t.dim, { align: 'center' });
+                    cv.text(D(m).toFixed(0), 1186 + i * (bw + gap) + bw / 2, base + 26, 20, t.dim, { align: 'center' });
                 });
                 const n = ms.length, fade = n >= 3 ? (ms[n - 1] - Math.min.apply(null, ms.slice(0, n - 1))) / Math.min.apply(null, ms.slice(0, n - 1)) : 0;
                 const fc = fade > 0.08 ? t.crit : fade > 0.04 ? t.warn : GO;
@@ -184,7 +184,7 @@ mgu.run({
             } else cv.text('no stops yet', 1186, 242, 24, t.dim);
             tests().forEach((x, i) => {
                 const b = store.best[x.key];
-                cv.text('BEST ' + x.label, 1186, 444 + i * 34, 20, t.dim, { font: 'bold' });
+                cv.text('BEST ' + x.label, 1186, 444 + i * 34, 22, t.dim, { font: 'bold' });
                 cv.text(b ? D(b.m).toFixed(1) + ' ' + dU() : '--', 1552, 444 + i * 34, 24, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
             });
         }
@@ -193,7 +193,7 @@ mgu.run({
             G.panel(cv, t, 24, 44, 1552, 468, 'All stops');
             const ts = tests();
             const cols = [48, 330, 640, 950, 1180, 1400];
-            ['WHEN', ts[1].label.toUpperCase(), ts[0].label.toUpperCase(), 'PEAK DECEL', 'FROM', ''].forEach((h, i) => cv.text(h, cols[i], 127, 18, t.dim, { font: 'bold', spacing: 1 }));
+            ['WHEN', ts[1].label.toUpperCase(), ts[0].label.toUpperCase(), 'PEAK DECEL', 'FROM', ''].forEach((h, i) => cv.text(h, cols[i], 127, 22, t.dim, { font: 'bold', spacing: 1 }));
             const runs = store.runs.filter((x) => x.unit === settings.get('speedUnit')).slice(0, 8);
             if (!runs.length) cv.text('No stops yet.', 48, 210, 26, t.dim);
             runs.forEach((r, i) => {

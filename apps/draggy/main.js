@@ -172,10 +172,10 @@ mgu.run({
             for (let i = 0; i <= 4; i++) {
                 const yy = py + (i / 4) * ph;
                 cv.fillRect(px, yy, pw, 1, withAlpha(t.tick, 0.35));
-                cv.text(String(Math.round(vMax * (1 - i / 4))), px - 10, yy + 8, 18, t.dim, { align: 'right' });
+                cv.text(String(Math.round(vMax * (1 - i / 4))), px - 10, yy + 8, 20, t.dim, { align: 'right' });
             }
             const step = tMax > 30 ? 10 : tMax > 12 ? 4 : 2;
-            for (let s = 0; s <= tMax; s += step) cv.text(s + 's', X(s), py + ph + 26, 18, t.dim, { align: 'center' });
+            for (let s = 0; s <= tMax; s += step) cv.text(s + 's', X(s), py + ph + 26, 20, t.dim, { align: 'center' });
             if (tr.length > 1) {
                 const pts = tr.map(([s, v]) => [X(s), Y(V(v))]);
                 cv.fillUnder(pts, py + ph, withAlpha(t.accent, 0.16));
@@ -203,7 +203,7 @@ mgu.run({
                     const d = r - b.s; sub = (d >= 0 ? '+' : '') + d.toFixed(2) + '  vs best ' + secs(b.s); subCol = d <= 0 ? GO : t.dim;
                 }
                 if (s.dist && G.isNum(timer.trapSpeed[s.key])) sub = '@ ' + Math.round(V(timer.trapSpeed[s.key])) + ' ' + vU() + '   ' + sub;
-                cv.text(sub, 1136, y + 50, 20, subCol, { font: 'label' });
+                cv.text(sub, 1136, y + 52, 22, subCol, { font: 'label' });
                 if (i < 4) cv.fillRect(1136, y + 64, 416, 1, withAlpha(t.tick, 0.35));
             });
         }
@@ -216,15 +216,15 @@ mgu.run({
                 cv.text(s.label, 48, y + 34, 28, t.text, { font: 'bold' });
                 cv.text(b ? secs(b.s) : '--.--', 560, y + 40, 52, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
                 cv.text('s', 568, y + 40, 24, t.dim);
-                if (b) cv.text(when(b.at) + (b.trap ? '  ·  ' + Math.round(V(b.trap)) + ' ' + vU() : ''), 48, y + 62, 20, t.dim);
+                if (b) cv.text(when(b.at) + (b.trap ? '  ·  ' + Math.round(V(b.trap)) + ' ' + vU() : ''), 48, y + 63, 22, t.dim);
                 if (i < 4) cv.fillRect(48, y + 70, 592, 1, withAlpha(t.tick, 0.35));
             });
 
             G.panel(cv, t, 688, 44, 888, 468, 'Recent runs');
             const cols = [sp[1], sp[2], sp[4]];
             const cx = [920, 1140, 1360];
-            cv.text('WHEN', 712, 127, 20, t.dim, { font: 'bold', spacing: 1 });
-            cols.forEach((c, i) => cv.text(c.label.toUpperCase(), cx[i] + 150, 127, 20, t.dim, { align: 'right', font: 'bold', spacing: 1 }));
+            cv.text('WHEN', 712, 127, 22, t.dim, { font: 'bold', spacing: 1 });
+            cols.forEach((c, i) => cv.text(c.label.toUpperCase(), cx[i] + 150, 127, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 }));
             const runs = store.runs.filter((r) => (r.unit || 'kmh') === settings.get('speedUnit')).slice(0, 8);
             if (!runs.length) cv.text('No runs yet - stop, launch, and they show up here.', 712, 221, 26, t.dim);
             runs.forEach((r, i) => {

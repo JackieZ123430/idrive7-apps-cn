@@ -2,7 +2,7 @@
   "id": "brake_test",
   "title": "Brake Test",
   "description": "100-0 and 200-0 braking distance, peak decel and brake-fade tracking",
-  "version": "1.1.5",
+  "version": "1.2.0",
   "vendor": "custom",
   "loggingId": "OA99",
   "iconGlyph": "brake",

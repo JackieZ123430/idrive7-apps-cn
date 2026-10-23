@@ -407,7 +407,7 @@ mgu.run({
             if (gr) {
                 const nw = gr.num ? cv.text(gr.num, x + w - 24, gy, gz, t.text, { align: 'right', font: 'gear' }) : 0;
                 cv.text(gr.letter, x + w - 28 - nw, gy, gz, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
-                if (gr.est) cv.text('EST.', x + w - 24, y + 34, 16, t.dim, { align: 'right', font: 'bold', spacing: 1.5 });
+                if (gr.est) cv.text('EST.', x + w - 24, y + 36, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
             }
         }
 
@@ -445,7 +445,7 @@ mgu.run({
                     step: psi ? 2 : 0.125, scale: { every: psi ? 6 : 0.5, decimals: psi ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
                     marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(pk.boost) : null,
                 });
-                if (!G.isNum(d.boost) && !usingDemo()) cv.text(boostWhy(), 48, G.TOP + 242 + 210, 18, t.dim);
+                if (!G.isNum(d.boost) && !usingDemo()) cv.text(boostWhy(), 48, G.TOP + 242 + 212, 22, t.dim);
                 speedCard(cv, t, d, 1110, G.TOP, 466, 190);
                 bars(1110, 272, 466, 132);
             } else {
@@ -550,7 +550,7 @@ mgu.run({
             cv.strokeRoundRect(cx - bw / 2, top, bw, bh, 52, 3, t.tick);
             cv.roundRect(cx - bw / 2 + 18, top + bh * 0.24, bw - 36, 34, 12, withAlpha(t.tick, 0.45));
             cv.roundRect(cx - bw / 2 + 22, top + bh * 0.70, bw - 44, 26, 10, withAlpha(t.tick, 0.35));
-            cv.text('FRONT', cx, top + 34, 16, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+            cv.text('FRONT', cx, top + 36, 20, t.dim, { align: 'center', font: 'bold', spacing: 1 });
             const tyw = 34, tyh = 84, big = w > 900;
             const corners = [['FL', -1, top + 30], ['FR', 1, top + 30], ['RL', -1, top + bh - 30 - tyh], ['RR', 1, top + bh - 30 - tyh]];
             for (const [k, side, ty] of corners) {
@@ -567,7 +567,7 @@ mgu.run({
                 const ps = G.fmt(pr, dec), size = (big ? 72 : 56) + (temps ? 0 : 16), py = ty + (temps ? 52 : 62);
                 const pw = cv.text(ps, lx + (side < 0 ? -cv.textWidth(' ' + unitP, 24) : 0), py, size, pc, { align: al, font: 'num' });
                 cv.text(' ' + unitP, side < 0 ? lx : lx + pw, py, 24, t.dim, { align: al });
-                cv.text(G.isNum(tgt) ? 'target ' + G.fmt(tgt, dec) : 'no target', lx, py + 28, 18, t.dim, { align: al });
+                cv.text(G.isNum(tgt) ? 'target ' + G.fmt(tgt, dec) : 'no target', lx, py + 30, 22, t.dim, { align: al });
                 if (temps) cv.text(G.isNum(temp) ? G.fmt(T(temp), 0) + tU() : '--' + tU(), lx, ty + 118, 30, G.isNum(temp) ? tc : t.dim, { align: al, font: 'bold' });
             }
         }
