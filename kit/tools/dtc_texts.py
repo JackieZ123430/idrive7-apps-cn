@@ -2,6 +2,8 @@
 
     dtc_texts.py <DTC export .txt> [out.js]      texts for the faults in a coding tool's export
     dtc_texts.py --db <zip | .tgz | folder> [out_dir]   a fault text database for every control unit
+    dtc_texts.py --codes <.csv> [out_dir]        an OBD fault code list (code,description) - engine
+                                                 and transmission only, run after --db
 
 Export: coding tools (e.g. a BimmerCode / E-Sys style backup) write the car's fault memory with texts:
 
@@ -17,6 +19,12 @@ texts of every control unit type: sgbd_index.json ("<address> <SGBD index>" -> S
 texts/<SGBD>.json (code -> text), unit_names.json (SGBD -> name) and dtc_texts.json
 ("<address>:<code>" -> text). Only those data files are copied, to apps/dtc_scanner/dtc_db/; the
 scanner asks each unit with faults for its SGBD index (UDS 22 F1 50) and looks its texts up there.
+
+OBD code list (--codes): a CSV of code + description (BMW_Fault_Codes.csv) holds the OBD (SAE)
+description of each code, with no control unit. Its codes mean other things in other units, so the
+scanner uses it only for the engine and transmission units (DME/DDE, EGS) and only where the
+database has no English text; it shows them as "OBD: ...". Codes with more than one description in
+the list, and placeholders (DUMMY_SAE), are left out. Written to <out_dir>/obd_texts.json.
 
 Only English texts are imported: one with German in it (german_words.txt) is left out, and the
 scanner shows no text for that fault. The texts are BMW's: they stay out of git (.gitignore).
@@ -137,6 +145,32 @@ def from_db(src, out):
     print('%d English texts imported, %d German ones left out (no text shown for those)' % tuple(n))
 
 
+def from_codes(src, out):
+    import csv
+    seen = {}
+    with open(src, encoding='utf-8-sig', errors='replace', newline='') as f:
+        for row in csv.reader(f):
+            if len(row) < 2 or not re.fullmatch(r'[0-9A-Fa-f]{6}', row[0].strip()):
+                continue                                    # header, blank lines
+            t = re.sub(r'\s+', ' ', row[1].split('\n')[0].replace('"', "'")).strip()
+            if t and 'DUMMY' not in t:
+                seen.setdefault(row[0].strip().upper(), {}).setdefault(t.lower(), t)
+    texts, n = {}, [0, 0]
+    for code, ts in seen.items():
+        if len(ts) == 1:                                    # one meaning only
+            t = re.sub(r'[^\x20-\x7e]', '', next(iter(ts.values())))
+            if is_english(t):
+                texts[code] = t
+                n[0] += 1
+            else:
+                n[1] += 1
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, 'obd_texts.json'), 'w', encoding='utf-8') as f:
+        json.dump(texts, f, ensure_ascii=False, separators=(',', ':'))
+    print('%d OBD codes -> %s (%d with more than one description and %d German ones left out)'
+          % (len(texts), os.path.join(os.path.normpath(out), 'obd_texts.json'), len(seen) - len(texts) - n[1], n[1]))
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         sys.exit(__doc__)
@@ -144,5 +178,9 @@ if __name__ == '__main__':
         if len(sys.argv) < 3:
             sys.exit(__doc__)
         from_db(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else os.path.join(APP, 'dtc_db'))
+    elif sys.argv[1] == '--codes':
+        if len(sys.argv) < 3:
+            sys.exit(__doc__)
+        from_codes(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else os.path.join(APP, 'dtc_db'))
     else:
         from_export(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else os.path.join(APP, 'dtc_texts.js'))
