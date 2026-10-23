@@ -78,11 +78,16 @@ class Display {
         (this.screen.buttons || []).forEach((b) => {
             const c = ui.rhmi && ui.rhmi.getByName(b[0]);
             if (!c || !c.on) return;
-            c.on('action', () => { this.pressed = b[0]; this.pressedT = Date.now(); this.lastWords = null; });
+            // the bar is redrawn here at once: apps that draw only when their data changes
+            // (Fault Scanner) would otherwise leave the highlight behind
+            c.on('action', () => {
+                this.pressed = b[0]; this.pressedT = Date.now(); this._repaint();
+                setTimeout(() => this._repaint(), 320);              // end of the press flash
+            });
             c.on('focus', (ev) => {
                 if (!ev || typeof ev.value !== 'boolean') return;          // (row-only events)
                 if (ev.value) this.focused = b[0]; else if (this.focused === b[0]) this.focused = null;
-                this.lastWords = null;
+                this._repaint();
             });
         });
     }
@@ -156,6 +161,7 @@ class Display {
         this.place = pl;
         this.gpu.place(pl);
         this.recorders.clear();             // text sizes depend on the scale
+        this.app = null; this.outRec = null;
         this.log.info('display: renderer placement ' + JSON.stringify(pl) + ' (layout ' + v + ')');
     }
 
@@ -193,17 +199,16 @@ class Display {
     present(name, r, softImage) {
         if (!(r instanceof Recorder)) return softImage(name, r);
         if (this.active()) {
-            if (this.place.full && r.chrome) this._drawChrome(r);
-            const w = r.words();
-            // unchanged frame (parked car, steady values): nothing to send - but at least one a
-            // second, the renderer hides an app that goes quiet for 3 s (hung app over the HMI)
-            const now = Date.now();
-            if (this.lastWords && now - this.lastSent < 1000 && this.lastWords.length === w.length && Buffer.from(w.buffer, w.byteOffset, w.byteLength).equals(this.lastWords)) return Promise.resolve();
-            this.lastSent = now;
-            this.gpu.frame(r);
-            this.lastWords = Buffer.from(Buffer.from(w.buffer, w.byteOffset, w.byteLength));
-            this._keep(name, r, softImage);
-            this._stats();
+            let out = r;
+            if (this.place.full && r.chrome) {
+                // keep the app's own part: the display redraws the header and bar over it by itself
+                this.app = {
+                    name, softImage, w: r.w, h: r.h, textScale: r.textScale, words: new Uint32Array(r.words()),
+                    atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), tabs: r.chrome.tabs,
+                };
+                out = this._compose();
+            } else this.app = null;
+            this._send(name, out, softImage, false);
             // the HMI's own image under the renderer's surface: a plain background, once
             const t = this.theme();
             if (this.bgShown !== t.bg) {
@@ -212,10 +217,45 @@ class Display {
             }
             return Promise.resolve();
         }
+        this.app = null;
         this._keep(name, r, softImage);
         const cv = new Canvas(r.w, r.h);
         play(r.words(), cv);
         return softImage(name, cv);
+    }
+
+    /** Send a frame to the renderer (skipped when identical to the last one, within a second). */
+    _send(name, out, softImage, force) {
+        const w = out.words();
+        // unchanged frame (parked car, steady values): nothing to send - but at least one a
+        // second, the renderer hides an app that goes quiet for 3 s (hung app over the HMI)
+        const now = Date.now();
+        if (!force && this.lastWords && now - this.lastSent < 1000 && this.lastWords.length === w.length && Buffer.from(w.buffer, w.byteOffset, w.byteLength).equals(this.lastWords)) return;
+        this.lastSent = now;
+        this.gpu.frame(out);
+        this.lastWords = Buffer.from(Buffer.from(w.buffer, w.byteOffset, w.byteLength));
+        this._keep(name, out, softImage);
+        this._stats();
+    }
+
+    /** The app's last frame with the current header and bar. */
+    _compose() {
+        const a = this.app;
+        const o = this.outRec && this.outRec.w === a.w && this.outRec.h === a.h ? this.outRec : (this.outRec = new Recorder(a.w, a.h, { textScale: a.textScale }));
+        o.reset();
+        o._grow(a.words.length); o.u.set(a.words, 0); o.n = a.words.length;
+        a.atlases.forEach((x) => o.atlases.add(x)); a.ramps.forEach((x) => o.ramps.add(x));
+        if (a.layersUsed.size) { o.layersUsed = o.layersUsed || new Set(); a.layersUsed.forEach((x) => o.layersUsed.add(x)); }
+        o.chrome = { tabs: a.tabs };
+        this._drawChrome(o);
+        return o;
+    }
+
+    /** Header / bar changed (focus, press): show it now, without waiting for the app's next frame. */
+    _repaint() {
+        this.lastWords = null;
+        if (!this.app || !this.active() || !this.place.full) return;
+        try { this._send(this.app.name, this._compose(), this.app.softImage, true); } catch (e) { this.log.warn('display: repaint ' + e); }
     }
 
     /** Remember the last frame: resent as keepalive, or drawn in software when the GPU goes. */
