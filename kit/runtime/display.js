@@ -37,10 +37,12 @@ const HMI = {
     // font = our 'label' font at 40 px x 1.465 (measured: "Next page" 412, "Previous page" 507,
     // "Settings" 370 px wide)
     btn: { x: 132, pad: 180, size: 40, k: 1.465 },
-    left: 84,                                   // keep the HMI's back arrow column (x 0..84) visible
+    left: 84,                                   // the HMI's back arrow column (x 0..84): kept see-through
+    barTop: 600,                                // top of the HMI's own 120 px button bar
+    headBg: '#000000',                          // the HMI's title / status strip
     status: { x: 1340, h: 76 },                 // status icons top right (notifications .. clock)
 };
-/* full-screen layout, in the surface's pixels (it starts at HMI.left) */
+/* full-screen layout, in the surface's pixels (it covers the whole screen) */
 const FULL = {
     headH: 80,                                  // header in the HMI's title strip
     barH: 48,                                   // slim button bar
@@ -154,13 +156,15 @@ class Display {
         if (v === 'standard' || scr.w !== HMI.screen.w || scr.h !== HMI.screen.h) {
             pl = { x: HMI.img.x, y: HMI.img.y, w: HMI.img.w, h: HMI.img.h, scale: 1, ox: 0, oy: 0, full: false };
         } else {
+            // the surface covers the whole screen, so the HMI's own bar can't show under the back
+            // arrow column; the page content goes right of that column
             const w = scr.w - HMI.left, h = scr.h, src = FULL.src;
             const ah = h - FULL.headH - FULL.barH;
             const s = Math.floor(Math.min(w / src.w, ah / src.h) * 1000) / 1000;
             pl = {
-                x: HMI.left, y: 0, w, h, full: true,
+                x: 0, y: 0, w: scr.w, h, full: true,
                 scale: s,
-                ox: Math.round((w - src.w * s) / 2 - src.x * s),
+                ox: HMI.left + Math.round((w - src.w * s) / 2 - src.x * s),
                 oy: Math.round(FULL.headH + (ah - src.h * s) / 2 - src.y * s),
             };
         }
@@ -301,18 +305,22 @@ class Display {
         c.reset();
         const tb = r.chrome.tabs || { tabs: [], sel: -1, badges: [] };
         const sx = HMI.status.x - pl.x;                       // status icons start here
-        // header across the top; the strip under the status icons gets its bottom edge too
-        c.fillRect(sx, 0, W - sx, FULL.headH, t.bg);
+        // header across the top in the HMI strip's own black; the strip under the status icons gets
+        // its bottom edge too
+        const hx = HMI.left - pl.x;
+        c.fillRect(sx, 0, W - sx, FULL.headH, HMI.headBg);
         c.fillRect(sx, FULL.headH - 2, W - sx, 2, G.withAlpha('#ffffff', 0.22));
-        G.header(c, t, 0, 0, sx, FULL.headH, this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges);
+        G.header(c, Object.assign({}, t, { bg: HMI.headBg }), hx, 0, sx - hx, FULL.headH, this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges, true);
         // slim bar: each label over its HMI button
         const by = H - FULL.barH;
         const btns = this.buttons().map((b) => ({ id: b.id, label: b.label, x: b.x - this.barOff - pl.x, w: b.w }));
         const flash = this.pressed && Date.now() - this.pressedT < 300 ? btns.findIndex((b) => b.id === this.pressed) : -1;
         const focus = btns.findIndex((b) => b.id === this.focused);
         if (btns.length) G.menuBar(c, t, 0, by, W, FULL.barH, btns, focus, 'slim', flash);
-        // the HMI's status icons show through
+        // the HMI's status icons and its back arrow column (home button, back arrow) show through;
+        // the column under them is covered, so the HMI's own bar doesn't show at the bottom left
         c.clip(sx, 0, W - sx, HMI.status.h).clear(0).noclip();
+        if (hx > 0) c.clip(0, 0, hx, HMI.barTop - pl.y).clear(0).noclip();
         r.xf(1, 0, 0).append(c).xf();
     }
 

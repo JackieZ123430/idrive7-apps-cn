@@ -2,7 +2,7 @@
   "id": "gforce",
   "title": "G-Force",
   "description": "Friction circle with grip envelope, peak g per direction and session records",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "vendor": "custom",
   "loggingId": "OA9B",
   "iconGlyph": "gforce",
@@ -24,7 +24,7 @@
       "kind": "canvas",
       "title": "G-Force",
       "buttons": [
-        ["BTN_ACTION", "New session"],
+        ["BTN_ACTION", "Reset max"],
         ["BTN_PAGE", "Next page"],
         ["BTN_PREV", "Previous page"],
         ["BTN_SETTINGS", "Settings"]
@@ -38,7 +38,7 @@
     {"key": "trail", "label": "Trail length", "type": "number", "unit": "s", "default": 4, "steps": [2, 4, 8, 15]},
     {"key": "flipLat", "label": "Swap left / right", "type": "bool", "default": false},
     {"key": "speedUnit", "label": "Units", "type": "choice", "default": "kmh", "options": [["kmh", "km/h"], ["mph", "mph"]]},
-    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 10, "steps": [6, 8, 10, 12, 15]},
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 5, "steps": [5, 10, 15, 30, 60]},
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
      "options": [["full", "Full screen"], ["standard", "Standard"]]},
     {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",

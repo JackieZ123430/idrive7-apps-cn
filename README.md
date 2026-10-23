@@ -48,7 +48,8 @@ its Settings page. In the car the same screens show live data.)*
 ## 1. The apps
 
 Every app has a settings screen in the HMI's own style: four colour themes (M Tricolour, the
-default, M Red, Ice White, Night Amber), units, refresh rate, and a demo mode. Results and records are saved on
+default, M Red, Ice White, Night Amber), units, how often the speed readout changes (5 times a
+second like BMW's cluster, up to 60), and a demo mode. Results and records are saved on
 the unit and kept across reboots.
 
 | App | What it does |
@@ -273,25 +274,26 @@ the default):
 
 ```
  ┌──┬──────────────────────────────────────────────────────┬───────────────────────┐
- │H │ M Vitals   ENGINE  THERMALS  INTAKE & FUEL  CHASSIS  │  HMI status icons     │  header: app name + page tabs
+ │H │ M Vitals   ENGINE  THERMALS  FUEL & IGN.    CHASSIS  │  HMI status icons     │  header: app name + page tabs
  ├──┼──────────────────────────────────────────────────────┴───────────────────────┤
  │  │                                                                              │
  │ <│                       page content, scaled up to fill                        │
  │  │                                                                              │
- │  ├──────────────────────────────────────────────────────────────────────────────┤
- │  │   NEXT PAGE          PREVIOUS PAGE          SETTINGS                          │  slim 48 px bar
- └──┴──────────────────────────────────────────────────────────────────────────────┘
+ ├──┴──────────────────────────────────────────────────────────────────────────────┤
+ │      NEXT PAGE          PREVIOUS PAGE          SETTINGS                          │  slim 48 px bar
+ └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Header** in the HMI's title strip: the app's name and its page tabs. The HMI's status icons
-  (notifications, volume, voice, profile, clock) show through a see-through corner and work as
-  usual.
+- **Header** in the HMI's title strip, in the strip's own black: the app's name and its page
+  tabs. The HMI's status icons (notifications, volume, voice, profile, clock) show through a
+  see-through corner and work as usual.
 - **Slim button bar**, 48 px instead of the HMI's 120 px, drawn by the kit. Each label sits over
   the HMI button underneath, so touch and controller presses still go to the HMI as before.
   The bar buttons report focus to the app (`Focusable=3`), so the button the iDrive controller
   is on lights up like BMW's own.
-- The HMI's back arrow and home button stay visible. HMI popups (options, warnings, calls) hide
-  the renderer's surface while they're open.
+- The HMI's back arrow and home button stay visible: that column is see-through down to the
+  bar; below it the app covers the HMI's own bar, so it doesn't show at the bottom left. HMI
+  popups (options, warnings, calls) hide the renderer's surface while they're open.
 - *Screen layout = Standard* keeps the HMI's own title and 120 px bar; the renderer then only
   covers the image area.
 

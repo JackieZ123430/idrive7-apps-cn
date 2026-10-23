@@ -2,7 +2,7 @@
   "id": "dyno",
   "title": "Virtual Dyno",
   "description": "Power and torque curves from a full-throttle pull, saved and compared",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "vendor": "custom",
   "loggingId": "OA98",
   "iconGlyph": "dyno",
@@ -26,7 +26,7 @@
       "kind": "canvas",
       "title": "Virtual Dyno",
       "buttons": [
-        ["BTN_ACTION", "Pin as baseline"],
+        ["BTN_ACTION", "Baseline"],
         ["BTN_PAGE", "Next page"],
         ["BTN_PREV", "Previous page"],
         ["BTN_SETTINGS", "Settings"]
@@ -47,7 +47,6 @@
      "options": [["nm", "Nm"], ["lbft", "lb-ft"]]},
     {"key": "maxRpm", "label": "Graph up to", "type": "number", "unit": "rpm", "default": 7500, "steps": [6000, 6500, 7000, 7500, 8000, 9000]},
     {"key": "ecuTorque", "label": "Overlay ECU torque", "type": "bool", "default": true},
-    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 6, "steps": [4, 6, 8, 10]},
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
      "options": [["full", "Full screen"], ["standard", "Standard"]]},
     {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",

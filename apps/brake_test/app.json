@@ -2,7 +2,7 @@
   "id": "brake_test",
   "title": "Brake Test",
   "description": "100-0 and 200-0 braking distance, peak decel and brake-fade tracking",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "vendor": "custom",
   "loggingId": "OA99",
   "iconGlyph": "brake",
@@ -20,7 +20,7 @@
       "kind": "canvas",
       "title": "Brake Test",
       "buttons": [
-        ["BTN_ACTION", "Cancel stop"],
+        ["BTN_ACTION", "Cancel run"],
         ["BTN_PAGE", "Next page"],
         ["BTN_PREV", "Previous page"],
         ["BTN_SETTINGS", "Settings"]
@@ -36,7 +36,7 @@
      "steps": [0.2, 0.3, 0.4, 0.5, 0.6]},
     {"key": "distUnit", "label": "Distance unit", "type": "choice", "default": "m",
      "options": [["m", "metres"], ["ft", "feet"]]},
-    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 8, "steps": [4, 6, 8, 12]},
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 5, "steps": [5, 10, 15, 30, 60]},
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
      "options": [["full", "Full screen"], ["standard", "Standard"]]},
     {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",

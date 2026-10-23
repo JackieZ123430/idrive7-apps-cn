@@ -149,7 +149,7 @@ mgu.run({
             const col = stCol === 'go' ? GO : t[stCol];
             // --- speed + clock ---
             G.panel(cv, t, 24, 44, 520, 468, 'Speed');
-            const sp = V(live.speed);
+            const sp = V(G.hold('speed', live.speed, 1000 / settings.get('speedRate')));   // setting: 5/s like the cluster .. 60
             cv.text(G.fmt(sp, 0), 460, 227, 150, G.isNum(sp) ? t.text : t.dim, { align: 'right', font: 'num' });
             cv.text(vU(), 476, 227, 28, t.dim);
             cv.fillRect(44, 255, 480, 2, t.panelEdge);
@@ -248,7 +248,7 @@ mgu.run({
 
         /* ---------- buttons ---------- */
         let clearArmed = null;
-        const actionLabel = () => ui.text('BTN_ACTION', page === 0 ? 'Reset run' : clearArmed ? 'Press again to clear' : 'Clear best times');
+        const actionLabel = () => ui.text('BTN_ACTION', page === 0 ? 'Reset run' : clearArmed ? 'Yes, clear' : 'Reset best');
         const flip = () => { page = 1 - page; actionLabel(); return render(); };
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
@@ -265,9 +265,9 @@ mgu.run({
             return render();
         });
 
-        let loop = ctx.loop('MAIN', settings.get('fps'), render);
+        // every screen refresh (60 fps) with the GPU renderer; 8 fps in software (PNG frames)
+        ctx.loop('MAIN', 8, render);
         settings.onChange((k) => {
-            if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
             if (k === 'speedUnit' || k === 'distance' || k === 'rollout') { newTimer(); peakG = 0; }
         });
         // the timer state machine needs launch detection even while the screen is hidden;

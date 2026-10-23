@@ -239,7 +239,7 @@ mgu.run({
 
         /* ---------- buttons ---------- */
         let sel = 0;
-        const labels = () => ui.text('BTN_ACTION', page ? 'Next run' : 'Pin as baseline');
+        const labels = () => ui.text('BTN_ACTION', page ? 'Next run' : 'Baseline');
         const flip = () => { page = 1 - page; sel = 0; labels(); return render(); };
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
@@ -253,8 +253,8 @@ mgu.run({
             log.info(st.baseline ? 'baseline pinned' : 'baseline cleared');
             return render();
         });
-        let loop = ctx.loop('MAIN', settings.get('fps'), render);
-        settings.onChange((k) => { if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); } });
+        // every screen refresh (60 fps) with the GPU renderer; 6 fps in software (PNG frames)
+        ctx.loop('MAIN', 6, render);
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
     },
 });

@@ -216,8 +216,8 @@ mgu.run({
             return ui.image('MAIN_GFX', cv);
         }
 
-        let loop = ctx.loop('MAIN', settings.get('fps'), render);
-        settings.onChange((k) => { if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); } });
+        // every screen refresh (60 fps) with the GPU renderer; 4 fps in software (PNG frames)
+        ctx.loop('MAIN', 4, render);
         render().then(() => ctx.log.info('first frame done')).catch((e) => ctx.log.warn('first render: ' + e));
     },
 });

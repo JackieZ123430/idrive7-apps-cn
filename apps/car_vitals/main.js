@@ -452,7 +452,7 @@ mgu.run({
         function speedCard(cv, t, d, x, y, w, h) {
             const tall = h > 300, sz = tall ? 150 : 96, gz = tall ? 230 : 120;
             G.panel(cv, t, x, y, w, h, 'Speed');
-            const sp = V(d.speed), sy = tall ? y + 220 : y + 160;
+            const sp = V(G.hold('speed', d.speed, 1000 / settings.get('speedRate'))), sy = tall ? y + 220 : y + 160;
             const sw = cv.text(G.fmt(sp, 0), x + 22, sy, sz, sp == null ? t.dim : t.text, { font: 'num' });
             cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + 30 + sw, sy, tall ? 34 : 26, t.dim);
             // gear: D / S / M + number (R, N, P alone)
@@ -679,11 +679,11 @@ mgu.run({
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
         ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
-        let loop = ctx.loop('MAIN', settings.get('fps'), render);
+        // every screen refresh (60 fps) with the GPU renderer; 10 fps in software (PNG frames)
+        ctx.loop('MAIN', 10, render);
         settings.onChange((k) => {
             if (k === 'maxPower' || k === 'powerSource') { delete peak.power; delete demoPeak.power; }
             if (k === 'boostSource') { delete peak.boost; updBoost(); }
-            if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
             if (k === 'page') page = Math.max(0, PAGES.indexOf(settings.get('page')));
         });
         log.info('first render');

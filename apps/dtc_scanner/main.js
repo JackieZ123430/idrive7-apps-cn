@@ -130,7 +130,7 @@ mgu.run({
         }
 
         let clearArmed = null;
-        const clearLabel = () => ui.text('BTN_CLEAR', clearArmed ? 'Press again to clear' : 'Clear fault memory');
+        const clearLabel = () => ui.text('BTN_CLEAR', clearArmed ? 'Yes, clear' : 'Clear all');
         async function doClear() {
             if (busy) return;
             const targets = scan ? scan.ecus.filter((e) => e.dtcs.some((d) => d.mem === 'fault')) : [];
@@ -213,7 +213,7 @@ mgu.run({
             const f = faults(), pages = Math.max(1, Math.ceil(f.length / PER_PAGE));
             listPanel(cv, t, 'Faults' + (pages > 1 ? '  ' + (page + 1) + '/' + pages : ''));
             if (!scan) {
-                cv.text(phase === 'scanning' ? 'Scanning...' : 'Press "Scan all control units" (ignition on)', 800, 369, 32, t.dim, { align: 'center' });
+                cv.text(phase === 'scanning' ? 'Scanning...' : 'Press "Scan now" (ignition on)', 800, 369, 32, t.dim, { align: 'center' });
                 return;
             }
             if (!f.length && phase !== 'scanning') {

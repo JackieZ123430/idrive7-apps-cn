@@ -190,8 +190,9 @@ mgu.run({
             if (G.isNum(rpm) && rpm > 50) {
                 const colOf = (r) => (shiftNow ? '#ff2a2a' : ramp(hot, G.clamp(r / sp.rpm, 0, 1)));
                 band(cv, 0, rpm, withAlpha(colOf(rpm), 0.14), 7);                               // glow
-                for (let r = 0; r < rpm; r += 500) band(cv, r, Math.min(rpm, r + 500), colOf(r + 250));
-                for (let r = 500; r < rpm; r += 500) gapAt(cv, r, t.bg);
+                const top = Math.min(rpm, maxRpm());                                           // a garbage rpm stays one bar
+                for (let r = 0; r < top; r += 500) band(cv, r, Math.min(top, r + 500), colOf(r + 250));
+                for (let r = 500; r < top; r += 500) gapAt(cv, r, t.bg);
                 const x = BAR.x0 + barX(rpm);
                 cv.line(x, BAR.y1 + 4, x + BAR.slant, BAR.y0 - 4, 6, '#ffffff');               // bright leading edge
             }
@@ -214,7 +215,8 @@ mgu.run({
             if (shiftNow) cv.text('SHIFT', GX + 150, 436, 30, blink ? '#ff2a2a' : withAlpha('#ff2a2a', 0.5), { font: 'bold', spacing: 3 });
 
             // ---- left: digital speed, temperatures, cold oil, stats
-            const v = G.isNum(d.speed) ? (mph() ? d.speed / MPH : d.speed) : null;
+            const spd = G.hold('speed', d.speed, 1000 / settings.get('speedRate'));     // setting: 5/s like the cluster .. 60
+            const v = G.isNum(spd) ? (mph() ? spd / MPH : spd) : null;
             cv.text('SPEED', 40, 156, 22, t.dim, { font: 'bold', spacing: 1.5 });
             const vw = cv.text(G.fmt(v, 0), 36, 276, 116, G.isNum(v) ? t.text : t.dim, { font: 'num' });
             cv.text(mph() ? 'mph' : 'km/h', 46 + vw, 276, 26, t.dim);
@@ -306,10 +308,8 @@ mgu.run({
             peakRpm = 0; peakRpmT = 0; sessionRpm = 0; peakSpeed = 0; limiterHits = 0; shifts = []; lastShift = null;
             log.info('peaks reset'); return render();
         });
-        let loop = ctx.loop('MAIN', settings.get('fps'), render);
-        settings.onChange((k) => {
-            if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
-        });
+        // every screen refresh (60 fps) with the GPU renderer; 15 fps in software (PNG frames)
+        ctx.loop('MAIN', 15, render);
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
     },
 });
