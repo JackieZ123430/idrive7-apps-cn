@@ -67,9 +67,9 @@ function describe(addr, code) {
     const own = TEXTS[hex(addr) + ':' + code];
     if (own) return ascii(own);
     const v = variant(addr);
-    if (!v) return null;
-    if (!variantTexts[v]) variantTexts[v] = readJson(path.join(DB, 'texts', v + '.json'));
-    return variantTexts[v][code] ? ascii(variantTexts[v][code]) : null;
+    if (v && !variantTexts[v]) variantTexts[v] = readJson(path.join(DB, 'texts', v + '.json'));
+    const t = (v && variantTexts[v][code]) || TEXTS['*:' + code];       // "*:<code>": any unit
+    return t ? ascii(t) : null;
 }
 // a unit the database identified is named by what it is (same on every model); else the address table
 const ecuName = (a) => {
