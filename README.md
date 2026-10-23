@@ -174,47 +174,45 @@ cold). A **DEMO** badge shows when the data isn't from the car.
 
 **On your PC**
 
-Linux, or Windows with WSL 2 (Ubuntu), or macOS. Everything runs from a `bash` shell.
+Windows, macOS or Linux. You need just **Python** and **Node.js**: no Linux, no compiler, no
+Docker. The GPU renderer comes **prebuilt** in the repository
+([`kit/renderd/prebuilt/`](kit/renderd/prebuilt)), and the kit builder checks that it matches
+the renderer's source.
 
 | Tool | Needed for | Required? |
 |---|---|---|
-| **Python 3.6+** | `build.py` (packages the apps), `make-car-kit.sh` | yes |
+| **Python 3.6+** | `build.py` (packages the apps), `make_kit.py` (packs the car kit) | yes |
 | **Node.js 14+** | the build (draws the app icons), `extract_sdk.js`, `preview.js` | yes |
-| **Docker** | compiling the GPU renderer `mgu-renderd` (inside an Ubuntu 18.04 image, so it matches the head unit's libraries) | strongly recommended: without it the apps fall back to PNG drawing at a few fps |
-| **ssh, scp, tar, gzip, md5sum** | `push-to-car.sh`: copying the kit to the car and installing it | yes (standard on Linux / WSL / macOS) |
-| **ffmpeg** | `make_gif.sh`: recording animations like the ones above | optional |
+| **ssh / scp** (OpenSSH) | installing on the car (`push-to-car.sh` / `push-to-car.ps1`) | yes: built into Windows 10/11, macOS and Linux |
+| **Docker** | recompiling the GPU renderer `mgu-renderd` yourself | only if you change the renderer's C code |
+| **ffmpeg**, **bash** | `make_gif.sh`: recording animations like the ones above | optional |
 | **Pillow** (`pip install pillow`) | `bake_fonts.py`: re-baking the fonts | optional |
 
-No npm packages and no C compiler on the PC: the build uses only Node's and Python's standard
-libraries, and the renderer is compiled inside Docker.
+No npm packages: the build uses only Node's and Python's standard libraries.
 
-Ubuntu / WSL:
+**Windows:** install Python from [python.org](https://www.python.org/downloads/) (tick *Add
+python.exe to PATH*) and Node.js LTS from [nodejs.org](https://nodejs.org/). That's all.
 
-```sh
-sudo apt install python3 nodejs openssh-client ffmpeg       # ffmpeg is optional
-# Node.js 14+: Ubuntu 24.04 ships 18; on 22.04 and older the packaged one is too old: use https://nodejs.org or nvm
-# Docker: https://docs.docker.com/engine/install/ubuntu/ (or Docker Desktop with WSL integration on Windows)
-sudo usermod -aG docker $USER                               # use docker without sudo; log out and in again
-```
+**macOS:** `brew install python node` (Homebrew), or the installers from the same two sites.
 
-macOS (Homebrew): `brew install python node ffmpeg` plus [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+**Ubuntu / WSL:** `sudo apt install python3 nodejs openssh-client`. Node.js must be 14 or newer:
+Ubuntu 24.04 ships 18; on 22.04 and older the packaged one is too old, so use
+[nodejs.org](https://nodejs.org/) or nvm.
 
-Check that everything is there:
+Check (any OS, in a terminal):
 
 ```sh
-python3 --version && node --version && docker run --rm hello-world
+python3 --version     # Windows: python --version
+node --version
 ```
 
-Notes:
-
-- The first renderer build downloads the Ubuntu 18.04 image and compilers (the image ends up
-  about 550 MB, a few minutes). After that `make-car-kit.sh` only recompiles when the renderer's source changed.
-- The head unit has an Intel (x86-64) CPU. On an ARM computer (Apple Silicon Mac, ARM Linux)
-  Docker builds the renderer for x86-64 in emulation; that's slower, but it works.
-- If the renderer can't be built, `make-car-kit.sh` tells you and asks before packing a kit
-  without it.
-- **Windows without WSL:** you can't build there, but `deploy/push-to-car.ps1` can install a kit
-  built elsewhere (`mgu-custom-apps.tar.gz`), using Windows' own OpenSSH (see 3.3).
+**Changing the renderer** (`kit/renderd/src`): then you need Docker
+([Docker Desktop](https://www.docker.com/products/docker-desktop/) on Windows / macOS,
+[Docker Engine](https://docs.docker.com/engine/install/) on Linux). The kit builder compiles it
+in an Ubuntu 18.04 image, so it matches the head unit's libraries (first time: ~550 MB download,
+a few minutes), always for x86-64 like the head unit's CPU, also on ARM machines like Apple
+Silicon Macs. It then updates the prebuilt copy for you to commit. If the source has changed and
+it can't compile it, it says so and asks before packing a kit with the older renderer.
 
 ---
 
@@ -229,6 +227,9 @@ scp root@<unit>:'/usr/lib/oap-mainapp/preinstalled_apps/x_call@*.tgz' .
 mkdir x_call && tar xzf x_call@*.tgz -C x_call
 node kit/tools/extract_sdk.js x_call/javascript/app.js     # writes ./oap-sdk/
 ```
+
+On Windows the same commands work in PowerShell (scp and tar are built in), with the real file
+name instead of `x_call@*.tgz`.
 Or download it from a public website:
 https://bedrive.ru/da77
 
@@ -255,27 +256,33 @@ python3 kit/tools/build.py redline    # just one
 node kit/tools/preview.js dist/redline preview wait=10   # render it on the PC -> preview/*.png
 ```
 
+(On Windows type `python` instead of `python3`.)
+
 The `.mgu` files contain BMW's SDK, so keep them for your own car and don't publish them.
 
 ### 3.3 Install on the car
 
-Car parked, ignition on, ideally with a battery charger connected. Pack the kit and push it
-over SSH:
+Car parked, ignition on, ideally with a battery charger connected. First pack the kit (the
+apps, the installer and the GPU renderer) into `dist/mgu-custom-apps.tar.gz`:
 
 ```sh
-deploy/make-car-kit.sh                                                  # -> dist/mgu-custom-apps(.tar.gz)
+deploy/make-car-kit.sh                 # macOS / Linux / WSL
+deploy\make-car-kit.cmd                # Windows (cmd or PowerShell)
+python3 kit/tools/make_kit.py redline  # any OS; just some apps
+```
+
+Then push it over SSH. macOS / Linux / WSL:
+
+```sh
 HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh check    # read-only: checks the unit, lists what it would touch
 HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh install  # backup -> install -> restart the app platform
 HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh restore  # undo: back to the backup
 ```
 
-`make-car-kit.sh` also builds the GPU renderer (in Docker). If it can't (no Docker, or the
-build fails), it says so and asks before packing a kit with an older renderer or none.
-
 `KEY` is the SSH private key for the unit (`chmod 600` it). Every command needs it, unless
 the key is already in your `~/.ssh/config` or ssh-agent.
 
-**Windows (no WSL):** `deploy/push-to-car.ps1` does the same with Windows' own OpenSSH client,
+**Windows:** `deploy/push-to-car.ps1` does the same with Windows' own OpenSSH client,
 using the SSH key the [idrive7-8-ssh-root](https://github.com/cauliflowermossgrape/idrive7-8-ssh-root)
 tool writes (`data\enrollments\<VIN>\id_rsa`, the unit's IP is in `connect.txt` next to it):
 
@@ -284,7 +291,7 @@ powershell -ExecutionPolicy Bypass -File deploy\push-to-car.ps1 check   -Key <pa
 powershell -ExecutionPolicy Bypass -File deploy\push-to-car.ps1 install -Key <path>\id_rsa -Ip <unit-ip>
 ```
 
-It takes `dist\mgu-custom-apps.tar.gz` (or `-Kit <path>`), so the kit can also be built elsewhere.
+It takes `dist\mgu-custom-apps.tar.gz` (or `-Kit <path>`).
 
 No network? Copy `dist/mgu-custom-apps/` to a USB stick and on the unit run
 `sh deploy-car.sh check`, then `sh deploy-car.sh install`.
@@ -726,11 +733,12 @@ kit/runtime/          app runtime: mgu.js (platform glue), record.js + display.j
                       (GPU path), canvas.js (software path), gauges.js, themes.js,
                       car.js (signals + demo), sim.js (demo drive), signals.js (SOME/IP),
                       diag.js (UDS over TASU), fonts/
-kit/renderd/          mgu-renderd: the GPU renderer service (C, GLES2, Wayland/ivi)
+kit/renderd/          mgu-renderd: the GPU renderer service (C, GLES2, Wayland/ivi);
+                      prebuilt/ = the ready binary + the source fingerprint it was built from
 kit/platform/         permissions template used by build.py
-kit/tools/            build.py, preview.js, make_gif.sh, make_icon.js, bake_fonts.py,
+kit/tools/            build.py, make_kit.py, preview.js, make_gif.sh, make_icon.js, bake_fonts.py,
                       extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
-deploy/               make-car-kit.sh, push-to-car.sh, mgu-app-install.sh, mainapp-patch.js
+deploy/               make-car-kit.sh/.cmd, push-to-car.sh/.ps1, mgu-app-install.sh, mainapp-patch.js
 deploy/car/           deploy-car.sh (runs on the unit) + its README
 docs/                 RHMI widget reference, screenshots (docs/screens), animations (docs/media)
 ```

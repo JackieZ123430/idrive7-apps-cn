@@ -47,7 +47,22 @@ docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v $PWD:/src mgu-ren
 # build/mgu-renderd, build/ivi-probe
 ```
 
-`deploy/make-car-kit.sh` does this automatically when Docker is available, and puts the binary in the kit.
+`deploy/make-car-kit.sh` (`kit/tools/make_kit.py`) does this automatically when Docker is
+available, and puts the binary in the kit.
+
+### Prebuilt binary
+
+So nobody needs Linux or Docker just to install the apps, the binary is committed in
+`prebuilt/mgu-renderd`, with `prebuilt/SOURCE_SHA256`: a fingerprint of `src/`,
+`protocol/*.xml`, `docker/` and the `Makefile` it was built from (line endings ignored, so a
+Windows checkout matches). The kit builder:
+
+- **with Docker:** compiles the source (`make` skips it when nothing changed). If the source
+  differs from the prebuilt's fingerprint, it copies the new binary to `prebuilt/` and updates
+  the fingerprint: **commit both along with your source change**.
+- **without Docker:** takes `prebuilt/` when its fingerprint matches the source. If it doesn't
+  (the C code was changed but the prebuilt wasn't updated), it says so and asks before packing
+  the older binary.
 
 ## Install
 

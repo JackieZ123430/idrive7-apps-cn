@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """sigdoc.py <iface> [field...] : print fields (getter/notifier) and their struct members from the master catalog."""
 import json, sys, os
-db = json.load(open(os.path.join(os.path.dirname(__file__), '..', '..', 'reference', 'someip-interfaces.json')))
+db = json.load(open(os.path.join(os.path.dirname(__file__), '..', '..', 'reference', 'someip-interfaces.json'), encoding='utf-8'))
 def typ(ref, depth=0):
     d = db['datatypes'].get(ref)
     if not d: return ref

@@ -85,7 +85,7 @@ def main():
     for fam, (fname, var, sizes) in FAMILIES.items():
         data = {'family': fam, 'source': fname, 'sizes': [bake(fname, var, s, cs) for s, cs in sizes]}
         p = os.path.join(OUT, fam + '.json')
-        json.dump(data, open(p, 'w'), separators=(',', ':'))
+        json.dump(data, open(p, 'w', encoding='utf-8', newline='\n'), separators=(',', ':'))
         print(f'{fam}: {[s for s, _ in sizes]} -> {os.path.getsize(p) // 1024} KiB')
 
 

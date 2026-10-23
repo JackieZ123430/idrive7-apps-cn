@@ -272,7 +272,7 @@ def make_icon(spec, out):
 
 
 def build(app_id):
-    spec = json.load(open(os.path.join(APPS, app_id, 'app.json')))
+    spec = json.load(open(os.path.join(APPS, app_id, 'app.json'), encoding='utf-8'))
     spec.setdefault('id', app_id)
     ver = spec['version']
     stage = os.path.join(DIST, app_id)
@@ -299,11 +299,11 @@ def build(app_id):
             'userLoginRequired': False, 'backgroundPriority': 200, 'someipManifest': 'manifest.json',
         },
     }
-    json.dump(pkg, open(os.path.join(src, 'package.json'), 'w'), indent=2)
-    json.dump(manifest, open(os.path.join(src, 'manifest.json'), 'w'), indent=2)
+    json.dump(pkg, open(os.path.join(src, 'package.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
+    json.dump(manifest, open(os.path.join(src, 'manifest.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
     shutil.copy(os.path.join(KIT, 'platform', 'permissions.json'), os.path.join(src, 'permissions.json'))
-    json.dump({'name': app_id, 'version': ver, 'lockfileVersion': 1}, open(os.path.join(src, 'npm-shrinkwrap.json'), 'w'))
-    json.dump({'settings': {app_id: spec.get('config', {})}}, open(os.path.join(src, 'config', 'base.json'), 'w'), indent=2)
+    json.dump({'name': app_id, 'version': ver, 'lockfileVersion': 1}, open(os.path.join(src, 'npm-shrinkwrap.json'), 'w', encoding='utf-8', newline='\n'))
+    json.dump({'settings': {app_id: spec.get('config', {})}}, open(os.path.join(src, 'config', 'base.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
     # app code
     adir = os.path.join(APPS, app_id)
     for f in os.listdir(adir):
@@ -319,7 +319,7 @@ def build(app_id):
             shutil.copy(p, os.path.join(src, 'javascript', 'kit', f))
     rt_spec = {k: spec.get(k) for k in ('id', 'title', 'version', 'screens', 'settings', 'config')}
     rt_spec['stateIds'] = state_ids
-    json.dump(rt_spec, open(os.path.join(src, 'javascript', 'kit', 'app-spec.json'), 'w'), indent=1)
+    json.dump(rt_spec, open(os.path.join(src, 'javascript', 'kit', 'app-spec.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
     shutil.copy(os.path.join(SDK, 'index.js'), os.path.join(src, 'node_modules', 'oap-sdk', 'index.js'))
     shutil.copy(os.path.join(SDK, 'package.json'), os.path.join(src, 'node_modules', 'oap-sdk', 'package.json'))
 
@@ -348,11 +348,11 @@ def build(app_id):
                                             'uiDescriptionFilePath': './uiDescriptions/ID7/uiDescription.json', 'hmi': ['ID7']}]
     pj['application']['variantGroups'] = [{'stringsPath': './variantGroups/Common/texts',
                                            'resourcesPath': './variantGroups/Common/images', 'hmi': ['ID7'], 'brands': ['BMW']}]
-    json.dump(pj, open(os.path.join(pr, 'application.json'), 'w'), indent=2)
-    open(os.path.join(pr, 'uiDescriptions', 'ID7', 'application.xml'), 'w').write(xml)
-    json.dump(uidesc, open(os.path.join(pr, 'uiDescriptions', 'ID7', 'uiDescription.json'), 'w'), indent=1)
+    json.dump(pj, open(os.path.join(pr, 'application.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
+    open(os.path.join(pr, 'uiDescriptions', 'ID7', 'application.xml'), 'w', encoding='utf-8', newline='\n').write(xml)
+    json.dump(uidesc, open(os.path.join(pr, 'uiDescriptions', 'ID7', 'uiDescription.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
     for lang in ('en_GB', 'en_US', 'de_DE'):
-        json.dump(strings, open(os.path.join(pr, 'variantGroups', 'Common', 'texts', lang + '.json'), 'w'), ensure_ascii=False)
+        json.dump(strings, open(os.path.join(pr, 'variantGroups', 'Common', 'texts', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     make_icon(spec, os.path.join(pr, 'variantGroups', 'Common', 'images', icon))
 
     ir = os.path.join(stage, 'rhmiData')
@@ -365,17 +365,17 @@ def build(app_id):
         'externalDialogStringBundleUuid': u(app_id, 'ed-strings'),
         'bookmarkUuidPool': [u(app_id, 'bookmarks'), 1, 2, 3, 4, 5, 6, 7],
     })
-    json.dump(ij, open(os.path.join(ir, 'application.json'), 'w'), separators=(',', ':'))
-    open(os.path.join(ir, 'uiDescription', 'application.xml'), 'w').write(xml)
-    json.dump(uidesc, open(os.path.join(ir, 'uiDescription', 'uiDescription.json'), 'w'), indent=1)
+    json.dump(ij, open(os.path.join(ir, 'application.json'), 'w', encoding='utf-8', newline='\n'), separators=(',', ':'))
+    open(os.path.join(ir, 'uiDescription', 'application.xml'), 'w', encoding='utf-8', newline='\n').write(xml)
+    json.dump(uidesc, open(os.path.join(ir, 'uiDescription', 'uiDescription.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
     for lang in LANGS:
-        json.dump(strings, open(os.path.join(ir, 'strings', lang + '.json'), 'w'), ensure_ascii=False)
+        json.dump(strings, open(os.path.join(ir, 'strings', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(os.path.join(pr, 'variantGroups', 'Common', 'images', icon), os.path.join(ir, 'resources', icon))
 
     # --- installer helpers + metadata ---
     shutil.copytree(os.path.join(KIT, 'tools', 'oapgen'), os.path.join(stage, 'oapgen'))
     meta = {'id': app_id, 'version': ver, 'title': spec['title'], 'native': NATIVE, 'kit': 1}
-    json.dump(meta, open(os.path.join(stage, 'meta.json'), 'w'), indent=1)
+    json.dump(meta, open(os.path.join(stage, 'meta.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
 
     # --- archives ---
     os.makedirs(DIST, exist_ok=True)

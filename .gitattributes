@@ -1,0 +1,7 @@
+# Unix line endings in the working tree on every OS: the scripts run on the head unit
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.png binary
+*.gif binary
+*.mgu binary
+kit/renderd/prebuilt/mgu-renderd binary
