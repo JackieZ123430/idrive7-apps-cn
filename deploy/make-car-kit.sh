@@ -14,6 +14,38 @@ APPS=("$@")
 if [ ${#APPS[@]} -eq 0 ]; then
     for d in "$KIT"/apps/*/; do [ -f "$d/app.json" ] && APPS+=("$(basename "$d")"); done
 fi
+# GPU renderer (kit/renderd, built in Docker: see kit/renderd/README.md)
+RD=$KIT/kit/renderd/build/mgu-renderd
+# can't build a current renderer: say why and what the kit would ship instead, then ask.
+# Not on a terminal (scripts, CI): no question, it goes on with the warning.
+renderd_ask() {
+    echo
+    echo "!! $1"
+    if [ -f "$RD" ] && [ -n "$(find "$KIT/kit/renderd/src" -newer "$RD" -type f)" ]; then
+        echo "!! The kit would ship the existing build/mgu-renderd, which is OLDER than the source."
+    elif [ -f "$RD" ]; then echo "!! The kit would ship the existing build/mgu-renderd (it matches the source)."
+    else echo "!! The kit would ship no renderer: the apps then draw in software (PNG, a few fps)."; fi
+    if [ -t 0 ]; then
+        read -r -p "Continue anyway? [y/N] " a
+        case "$a" in y|Y|yes|YES) ;; *) echo "stopped - nothing was built or packed"; exit 1 ;; esac
+    else
+        echo "!! (not a terminal: continuing)"
+    fi
+}
+if command -v docker >/dev/null; then
+    # make rebuilds only when the source changed, so a pulled update is never shipped stale
+    log=$(mktemp)
+    if ! (cd "$KIT/kit/renderd" && { docker image inspect mgu-renderd-build >/dev/null 2>&1 || docker build -t mgu-renderd-build docker; } \
+            && docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" mgu-renderd-build make) > "$log" 2>&1; then
+        tail -n 15 "$log"; rm -f "$log"
+        renderd_ask "The mgu-renderd build failed (output above)."
+    fi
+    rm -f "$log"
+elif [ ! -f "$RD" ]; then
+    renderd_ask "Docker isn't installed, so mgu-renderd can't be built (see kit/renderd/README.md)."
+elif [ -n "$(find "$KIT/kit/renderd/src" -newer "$RD" -type f)" ]; then
+    renderd_ask "kit/renderd/src is newer than build/mgu-renderd, and Docker isn't installed to rebuild it."
+fi
 rm -rf "$OUT"; mkdir -p "$OUT/apps"
 for id in "${APPS[@]}"; do
     python3 "$KIT/kit/tools/build.py" "$id"
@@ -21,16 +53,6 @@ for id in "${APPS[@]}"; do
     cp "$KIT/dist/$id@$ver.mgu" "$OUT/apps/"
 done
 cp "$HERE/car/deploy-car.sh" "$HERE/mgu-app-install.sh" "$HERE/mainapp-patch.js" "$HERE/car/README.txt" "$OUT/"
-# GPU renderer (kit/renderd, built in Docker: see kit/renderd/README.md)
-RD=$KIT/kit/renderd/build/mgu-renderd
-if command -v docker >/dev/null; then
-    # make rebuilds only when the source changed, so a pulled update is never shipped stale
-    (cd "$KIT/kit/renderd" && { docker image inspect mgu-renderd-build >/dev/null 2>&1 || docker build -t mgu-renderd-build docker; } \
-        && docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" mgu-renderd-build make >/dev/null) \
-        || echo "note: mgu-renderd build failed - using the existing binary, if any"
-elif [ -f "$RD" ] && [ -n "$(find "$KIT/kit/renderd/src" -newer "$RD" -type f)" ]; then
-    echo "warning: kit/renderd/src is newer than build/mgu-renderd and there's no Docker to rebuild it: shipping the old renderer"
-fi
 if [ -f "$RD" ]; then cp "$RD" "$OUT/mgu-renderd"; chmod 755 "$OUT/mgu-renderd"
 else echo "note: no mgu-renderd build (needs Docker) - the kit installs the apps with software rendering only"; fi
 chmod +x "$OUT"/*.sh

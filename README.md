@@ -225,6 +225,9 @@ HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh install  # bac
 HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh restore  # undo: back to the backup
 ```
 
+`make-car-kit.sh` also builds the GPU renderer (in Docker). If it can't (no Docker, or the
+build fails), it says so and asks before packing a kit with an older renderer or none.
+
 `KEY` is the SSH private key for the unit (`chmod 600` it). Every command needs it, unless
 the key is already in your `~/.ssh/config` or ssh-agent.
 
