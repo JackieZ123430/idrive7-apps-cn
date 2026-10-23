@@ -376,21 +376,27 @@ rootfs_rw_do() {   # run "$@" with / writable (remounts rw only if it has to)
 install_renderd() {
     src=$SELF_DIR/mgu-renderd
     [ -f "$src" ] || die "mgu-renderd not found next to $0"
-    systemctl stop "$RENDERD_UNIT" 2>/dev/null
+    # everything is put in place first and the running renderer is restarted only at the end, in
+    # one step (the apps draw in software only for those few seconds); unchanged: not restarted
+    same=0; cmp -s "$src" "$RENDERD_DIR/mgu-renderd" 2>/dev/null && same=1
+    # a running binary can be replaced by rename: the old process keeps its copy until restarted
     mkdir -p "$RENDERD_DIR" && cp "$src" "$RENDERD_DIR/mgu-renderd.new" && mv "$RENDERD_DIR/mgu-renderd.new" "$RENDERD_DIR/mgu-renderd" || die "copy failed"
     chown -R 0:0 "$RENDERD_DIR"; chmod 755 "$RENDERD_DIR" "$RENDERD_DIR/mgu-renderd"
     if [ "${1:-}" = "--persist" ]; then
         rm -f "/run/systemd/system/$RENDERD_UNIT"
         renderd_unit > "$TMP.unit" || die "tmp"
+        cmp -s "$TMP.unit" "/etc/systemd/system/$RENDERD_UNIT" || same=0
         rootfs_rw_do sh -c "cp '$TMP.unit' '/etc/systemd/system/$RENDERD_UNIT' && mkdir -p /etc/systemd/system/oapcontroller.service.wants && ln -sf '../$RENDERD_UNIT' '/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT'" || die "cannot write /etc/systemd/system/$RENDERD_UNIT"
         rm -f "$TMP.unit"
         say "renderer persisted (starts with the app platform)"
     else
         # runtime unit: gone after a reboot
         renderd_unit > "/run/systemd/system/$RENDERD_UNIT" || die "cannot write the runtime unit"
+        same=0
     fi
     systemctl daemon-reload
-    systemctl start "$RENDERD_UNIT" || die "renderer did not start: journalctl -u $RENDERD_UNIT"
+    if [ $same = 1 ] && systemctl is-active -q "$RENDERD_UNIT"; then say "renderer unchanged and running"; return 0; fi
+    systemctl restart "$RENDERD_UNIT" || die "renderer did not start: journalctl -u $RENDERD_UNIT"
     i=0; while [ $i -lt 10 ] && [ ! -S /run/mgu-renderd/renderd.sock ]; do sleep 1; i=$((i+1)); done
     if [ -S /run/mgu-renderd/renderd.sock ]; then say "renderer running - apps switch to it within a few seconds"
     else warn "renderer socket not up yet - see: journalctl -u $RENDERD_UNIT"; fi

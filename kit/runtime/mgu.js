@@ -144,6 +144,7 @@ class Ui {
 
     text(name, text, row, cell) {
         const c = this.comp(name);
+        if (c && !row && (!cell || cell === 'Text') && this.display) this.display.label(name, text);   // slim bar mirrors it
         return c ? this._try('text ' + name, c.setValue(row || 0, cell || 'Text', hmiText(text), 'Text')) : Promise.resolve();
     }
     /** Set several cells of one row: ui.cells('LIST', 3, { Text1stCol: 'a', Text2ndCol: 'b' }) */

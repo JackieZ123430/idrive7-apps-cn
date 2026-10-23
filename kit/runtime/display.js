@@ -59,6 +59,8 @@ class Display {
         this.lastWords = null; this.lastSent = 0;
         this.pressed = null; this.pressedT = 0;   // last pressed bar button (flash)
         this.focused = null;                         // bar button the iDrive controller is on
+        this.labels = {};                            // bar labels the app changed (ui.text)
+        this.barOff = 0;                             // how far the HMI has scrolled its bar left
         this.tickHandlers = [];
         this.bgShown = null;
         this.place = null;
@@ -66,7 +68,11 @@ class Display {
         const canvasScreens = (spec.screens || []).filter((s) => s.kind === 'canvas');
         this.screen = canvasScreens[0] || null;
         if (!this.screen) return;
-        this.ui.onVisible((name) => { if (name === this.screen.name) this._syncVisible(); });
+        this.ui.onVisible((name, v) => {
+            if (name !== this.screen.name) return;
+            if (v) this.barOff = 0;                   // the HMI builds the screen afresh
+            this._syncVisible();
+        });
         if (this.ui.onFocus) this.ui.onFocus((name) => { if (name === this.screen.name) { this._syncVisible(); this._lost(); } });
         settings.onChange((k) => {
             if (k === 'layout') { this._place(); this.lastWords = null; }
@@ -86,7 +92,7 @@ class Display {
             });
             c.on('focus', (ev) => {
                 if (!ev || typeof ev.value !== 'boolean') return;          // (row-only events)
-                if (ev.value) this.focused = b[0]; else if (this.focused === b[0]) this.focused = null;
+                if (ev.value) { this.focused = b[0]; this._scroll(); } else if (this.focused === b[0]) this.focused = null;
                 this._repaint();
             });
         });
@@ -301,7 +307,7 @@ class Display {
         G.header(c, t, 0, 0, sx, FULL.headH, this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges);
         // slim bar: each label over its HMI button
         const by = H - FULL.barH;
-        const btns = this.buttons().map((b) => ({ id: b.id, label: b.label, x: b.x - pl.x, w: b.w }));
+        const btns = this.buttons().map((b) => ({ id: b.id, label: b.label, x: b.x - this.barOff - pl.x, w: b.w }));
         const flash = this.pressed && Date.now() - this.pressedT < 300 ? btns.findIndex((b) => b.id === this.pressed) : -1;
         const focus = btns.findIndex((b) => b.id === this.focused);
         if (btns.length) G.menuBar(c, t, 0, by, W, FULL.barH, btns, focus, 'slim', flash);
@@ -310,13 +316,38 @@ class Display {
         r.xf(1, 0, 0).append(c).xf();
     }
 
-    /** The HMI's bar buttons in screen pixels: [{ id, label, x, w }]. */
+    /** A bar button's text changed (ui.text): its width, and so the bar's layout, follow. */
+    label(id, text) {
+        if (!(this.screen && (this.screen.buttons || []).some((b) => b[0] === id))) return;
+        if (this.labels[id] === String(text)) return;
+        this.labels[id] = String(text);
+        this._btns = null;
+        this._scroll();
+        this._repaint();
+    }
+
+    /**
+     * Wider than the screen, the HMI scrolls its bar as little as needed to show the focused
+     * button whole between x 132 and the screen's right edge (measured), and keeps that offset
+     * until focus leaves the visible part again. The slim bar copies it, so each label stays over
+     * the HMI button a tap lands on.
+     */
+    _scroll() {
+        const f = this.buttons().find((b) => b.id === this.focused);
+        if (!f) return;
+        const right = HMI.screen.w;
+        if (f.x + f.w - this.barOff > right) this.barOff = f.x + f.w - right;
+        if (f.x - this.barOff < HMI.btn.x) this.barOff = f.x - HMI.btn.x;
+        if (this.barOff < 0) this.barOff = 0;
+    }
+
+    /** The HMI's bar buttons in screen pixels, unscrolled: [{ id, label, x, w }]. */
     buttons() {
         if (this._btns) return this._btns;
         const m = new Recorder(1, 1);
         let x = HMI.btn.x;
         this._btns = (this.screen.buttons || []).map((b) => {
-            const label = String(b[1] || b[0]);
+            const label = this.labels[b[0]] != null ? this.labels[b[0]] : String(b[1] || b[0]);
             const w = Math.round(m.textWidth(label.replace(/[^\x20-\x7e]/g, ''), HMI.btn.size, { font: 'label' }) * HMI.btn.k) + HMI.btn.pad;
             const r = { id: b[0], label, x, w };
             x += w;
