@@ -23,9 +23,13 @@ done
 cp "$HERE/car/deploy-car.sh" "$HERE/mgu-app-install.sh" "$HERE/mainapp-patch.js" "$HERE/car/README.txt" "$OUT/"
 # GPU renderer (kit/renderd, built in Docker: see kit/renderd/README.md)
 RD=$KIT/kit/renderd/build/mgu-renderd
-if [ ! -f "$RD" ] && command -v docker >/dev/null; then
+if command -v docker >/dev/null; then
+    # make rebuilds only when the source changed, so a pulled update is never shipped stale
     (cd "$KIT/kit/renderd" && { docker image inspect mgu-renderd-build >/dev/null 2>&1 || docker build -t mgu-renderd-build docker; } \
-        && docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" mgu-renderd-build make) || true
+        && docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" mgu-renderd-build make >/dev/null) \
+        || echo "note: mgu-renderd build failed - using the existing binary, if any"
+elif [ -f "$RD" ] && [ -n "$(find "$KIT/kit/renderd/src" -newer "$RD" -type f)" ]; then
+    echo "warning: kit/renderd/src is newer than build/mgu-renderd and there's no Docker to rebuild it: shipping the old renderer"
 fi
 if [ -f "$RD" ]; then cp "$RD" "$OUT/mgu-renderd"; chmod 755 "$OUT/mgu-renderd"
 else echo "note: no mgu-renderd build (needs Docker) - the kit installs the apps with software rendering only"; fi
