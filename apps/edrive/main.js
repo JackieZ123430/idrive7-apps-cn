@@ -509,11 +509,6 @@ mgu.run({
         settings.onChange((k) => {
             if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
             if (k === 'poll') schedule();
-            if (k === 'priceDown') {
-                // tapping "price (down)" steps the price one step lower (the price row itself steps up)
-                const steps = settings.item('price').steps, i = steps.indexOf(settings.get('price'));
-                settings.set('price', steps[i < 0 ? steps.indexOf(0.25) : Math.max(0, i - 1)]);
-            }
         });
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
     },

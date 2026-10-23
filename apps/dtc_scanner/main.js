@@ -41,6 +41,10 @@ const ECU = {
     0x78: 'IHKA climate',
 };
 const ecuName = (a) => ECU[a] || ('ECU 0x' + hex(a));
+// fault texts for this car from a coding tool's export (kit/tools/dtc_texts.py; not in git)
+let TEXTS = {};
+try { TEXTS = require('./dtc_texts'); } catch (e) { /* none generated */ }
+const describe = (addr, code) => TEXTS[hex(addr) + ':' + code] || null;
 
 mgu.run({
     async start(ctx) {
@@ -225,8 +229,17 @@ mgu.run({
                 cv.text(s.label, 133, y + 24, 18, col, { align: 'center', font: 'bold', spacing: 1 });
                 cv.text(d.code, 246, y + 28, 32, t.text, { font: 'bold', spacing: 1 });
                 cv.text(ecuName(d.addr), 420, y + 27, 26, t.text);
-                if (d.mem === 'info') cv.text('INFO MEMORY', 760, y + 26, 18, t.dim, { font: 'bold', spacing: 1 });
-                cv.text('status ' + hex(d.status) + '   addr 0x' + hex(d.addr), 1552, y + 26, 20, t.dim, { align: 'right' });
+                // the fault's text when known (cut to fit), else status + address
+                const desc = describe(d.addr, d.code);
+                if (desc) {
+                    const max = 1552 - 680;
+                    let s = (d.mem === 'info' ? 'INFO: ' : '') + desc;
+                    if (cv.textWidth(s, 20) > max) { while (s.length > 4 && cv.textWidth(s + '...', 20) > max) s = s.slice(0, -1); s = s.trim() + '...'; }
+                    cv.text(s, 680, y + 26, 20, t.dim);
+                } else {
+                    if (d.mem === 'info') cv.text('INFO MEMORY', 760, y + 26, 18, t.dim, { font: 'bold', spacing: 1 });
+                    cv.text('status ' + hex(d.status) + '   addr 0x' + hex(d.addr), 1552, y + 26, 20, t.dim, { align: 'right' });
+                }
                 if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
         }

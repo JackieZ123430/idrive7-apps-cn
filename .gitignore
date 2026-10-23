@@ -11,3 +11,5 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+# fault texts for one car from a coding tool export (kit/tools/dtc_texts.py)
+apps/dtc_scanner/dtc_texts.js
