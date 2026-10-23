@@ -73,6 +73,14 @@ class Settings {
             this.values.theme = th.default; this.values._themeV = 2;
             try { fs.writeFileSync(this.file, JSON.stringify(this.values, null, 1)); } catch (e) { /* read-only */ }
         }
+        // a setting with "reset": n in app.json goes back to its default once when n changes
+        // (a new default reaches cars that saved the old one); later choices are kept
+        let changed = false;
+        for (const it of this.schema) {
+            const mark = '_reset_' + it.key;
+            if (it.reset && this.values[mark] !== it.reset) { this.values[it.key] = it.default; this.values[mark] = it.reset; changed = true; }
+        }
+        if (changed && fs.existsSync(this.file)) try { fs.writeFileSync(this.file, JSON.stringify(this.values, null, 1)); } catch (e) { /* read-only */ }
     }
     get(key) { return this.values[key]; }
     set(key, value) {

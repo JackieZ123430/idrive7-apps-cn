@@ -123,16 +123,16 @@ mgu.run({
             for (let i = 0; i <= 5; i++) {
                 const yy = y + (i / 5) * h;
                 cv.fillRect(x, yy, w, 1, withAlpha(t.tick, 0.3));
-                cv.text(String(Math.round(pMax * (1 - i / 5))), x - 10, yy + 7, 18, t.accent, { align: 'right' });
-                cv.text(String(Math.round(tMax * (1 - i / 5))), x + w + 10, yy + 7, 18, t.accent2);
+                cv.text(String(Math.round(pMax * (1 - i / 5))), x - 10, yy + 7, 20, t.accent, { align: 'right' });
+                cv.text(String(Math.round(tMax * (1 - i / 5))), x + w + 10, yy + 7, 20, t.accent2);
             }
             for (let r = 1000; r <= rMax; r += 1000) {
                 cv.fillRect(X(r), y, 1, h, withAlpha(t.tick, 0.2));
-                cv.text(String(r / 1000), X(r), y + h + 24, 18, t.dim, { align: 'center' });
+                cv.text(String(r / 1000), X(r), y + h + 26, 20, t.dim, { align: 'center' });
             }
-            cv.text(pU().toUpperCase(), x - 10, y - 14, 18, t.accent, { align: 'right', font: 'bold', spacing: 1 });
-            cv.text(tU().toUpperCase(), x + w + 10, y - 14, 18, t.accent2, { font: 'bold', spacing: 1 });
-            cv.text('x1000 RPM', x + w / 2, y + h + 48, 16, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+            cv.text(pU().toUpperCase(), x - 10, y - 14, 22, t.accent, { align: 'right', font: 'bold', spacing: 1 });
+            cv.text(tU().toUpperCase(), x + w + 10, y - 14, 22, t.accent2, { font: 'bold', spacing: 1 });
+            cv.text('x1000 RPM', x + w / 2, y + h + 52, 20, t.dim, { align: 'center', font: 'bold', spacing: 1 });
             const line = (run, key, Y, conv, col, width) => {
                 const pts = run.curve.filter((c) => G.isNum(c[key])).map((c) => [X(c.rpm), Y(conv(c[key]))]);
                 if (pts.length > 1) cv.polyline(pts, width, col);
@@ -177,11 +177,11 @@ mgu.run({
             plot(cv, t, 104, 135, 960, 294, [cur, base]);
             if (base) {
                 cv.fillRect(600, 74, 26, 4, withAlpha(t.dim, 0.7));
-                cv.text('BASELINE ' + Math.round(pw(base.peakP)) + ' ' + pU(), 634, 83, 18, t.dim, { font: 'bold', spacing: 1 });
+                cv.text('BASELINE ' + Math.round(pw(base.peakP)) + ' ' + pU(), 634, 84, 22, t.dim, { font: 'bold', spacing: 0.5 });
             }
             if (settings.get('ecuTorque') && cur && cur.curve.some((c) => G.isNum(c.ecu))) {
                 cv.fillRect(880, 74, 26, 3, withAlpha(t.text, 0.55));
-                cv.text('ECU TORQUE', 914, 83, 18, t.dim, { font: 'bold', spacing: 1 });
+                cv.text('ECU TORQUE', 914, 84, 22, t.dim, { font: 'bold', spacing: 0.5 });
             }
 
             G.panel(cv, t, 1168, 44, 408, 468, live.state === 'pull' ? 'Recording' : 'Peak');
@@ -197,11 +197,11 @@ mgu.run({
                     cur && base && cur !== base ? pw(cur.peakP) - pw(base.peakP) : null);
                 bigStat(cv, t, 1192, 299, 'TORQUE', cur ? tq(cur.peakT) : null, tU(), cur ? '@ ' + cur.peakTrpm + ' RPM' : null, t.accent2,
                     cur && base && cur !== base ? tq(cur.peakT) - tq(base.peakT) : null);
-                let msg = cur ? 'crank, est. · ' + cur.weight + ' kg · ' + cur.loss + '% loss' : 'waiting for a pull';
+                let msg = cur ? 'estimate at the crank' : 'waiting for a pull';
                 let col = t.dim;
                 if (live.state === 'done' && now < live.until) { msg = 'NEW RUN RECORDED'; col = GO; }
-                if (live.state === 'short' && now < live.until) { msg = 'pull too short (need 1500 rpm in one gear)'; col = t.warn; }
-                cv.text(msg, 1192, 484, 18, col, { font: 'bold', spacing: 0.5 });
+                if (live.state === 'short' && now < live.until) { msg = 'pull too short'; col = t.warn; }
+                cv.text(msg, 1192, 486, 22, col, { font: 'bold', spacing: 0.5 });
             }
         }
 
@@ -209,7 +209,7 @@ mgu.run({
             const st = store();
             G.panel(cv, t, 24, 44, 1552, 468, 'Saved runs');
             const cols = [48, 320, 560, 800, 1050, 1300];
-            ['WHEN', 'PEAK POWER', 'PEAK TORQUE', 'SPEED RANGE', 'SETUP', ''].forEach((h, i) => cv.text(h, cols[i], 127, 18, t.dim, { font: 'bold', spacing: 1 }));
+            ['WHEN', 'PEAK POWER', 'PEAK TORQUE', 'SPEED RANGE', 'SETUP', ''].forEach((h, i) => cv.text(h, cols[i], 127, 22, t.dim, { font: 'bold', spacing: 1 }));
             if (!st.runs.length) cv.text('No runs yet.', 48, 210, 26, t.dim);
             st.runs.slice(0, 8).forEach((r, i) => {
                 const y = 174 + i * 41, d = new Date(r.at), p = (n) => String(n).padStart(2, '0');
@@ -220,9 +220,8 @@ mgu.run({
                 cv.text(Math.round(tq(r.peakT)) + ' ' + tU() + ' @ ' + r.peakTrpm, cols[2], y, 24, t.accent2, { font: 'bold' });
                 cv.text(Math.round(r.v0) + '-' + Math.round(r.v1) + ' km/h', cols[3], y, 24, t.text);
                 cv.text(r.weight + ' kg · ' + r.loss + '%', cols[4], y, 24, t.dim);
-                if (isBase) cv.text('BASELINE', cols[5], y, 20, t.text, { font: 'bold', spacing: 2 });
+                if (isBase) cv.text('BASELINE', cols[5], y, 22, t.text, { font: 'bold', spacing: 1 });
             });
-            cv.text('Select a run with "Next run", pin it as the baseline to compare every new pull against it.', 48, 495, 18, t.dim);
         }
 
         /** G20-style frame: tab bar with the page names along the top. */

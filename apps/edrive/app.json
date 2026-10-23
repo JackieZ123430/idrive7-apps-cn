@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -21,6 +21,9 @@
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
       "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
     }
   },
   "screens": [
@@ -75,7 +78,7 @@
     },
     {
       "key": "range20",
-      "label": "Range at 100%, 20 °C",
+      "label": "Electric range when full, 20 °C",
       "type": "number",
       "unit": "km",
       "default": 50,
@@ -92,6 +95,58 @@
         80,
         90,
         100
+      ]
+    },
+    {
+      "key": "reserve",
+      "label": "Engine starts at",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto (learned)"
+        ],
+        [
+          "0",
+          "0 %"
+        ],
+        [
+          "4",
+          "4 %"
+        ],
+        [
+          "5",
+          "5 %"
+        ],
+        [
+          "6",
+          "6 %"
+        ],
+        [
+          "7",
+          "7 %"
+        ],
+        [
+          "8",
+          "8 %"
+        ],
+        [
+          "9",
+          "9 %"
+        ],
+        [
+          "10",
+          "10 %"
+        ],
+        [
+          "12",
+          "12 %"
+        ],
+        [
+          "15",
+          "15 %"
+        ]
       ]
     },
     {
@@ -136,9 +191,9 @@
     },
     {
       "key": "price",
-      "label": "Electricity price (tap: up)",
+      "label": "Electricity price",
       "type": "number",
-      "unit": "€/kWh",
+      "unit": "EUR/kWh",
       "default": 0.25,
       "steps": [
         0,
@@ -176,18 +231,6 @@
         0.55,
         0.6,
         0.7
-      ]
-    },
-    {
-      "key": "priceDown",
-      "label": "Electricity price (tap: down)",
-      "type": "choice",
-      "default": "tap",
-      "options": [
-        [
-          "tap",
-          "lower 1 step"
-        ]
       ]
     },
     {
@@ -366,6 +409,11 @@
         "factor": 0.5,
         "offset": -40,
         "invalid": 255
+      },
+      "rpm": {
+        "factor": 0.25,
+        "offset": 0,
+        "invalid": 65535
       }
     }
   }

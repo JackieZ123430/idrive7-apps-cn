@@ -299,7 +299,7 @@ function bar(cv, t, x, y, w, h, g) {
     if (max - marks[marks.length - 1] > step * 0.45) marks.push(max);
     cv.fillRect(x, by + bh + 2, bw, 2, withAlpha('#ffffff', 0.85));
     marks.slice(1).forEach((a) => { if (a < max - 1e-9) cv.fillRect(X(a) - 2, by + bh + 2, 4, 2, t.bg); });
-    if (h >= 80) marks.forEach((a) => cv.text(fmt(a, dec), X(a), by + bh + 24, 17, withAlpha(t.text, 0.8), { align: 'center', font: 'bold' }));
+    if (h >= 80) marks.forEach((a) => cv.text(fmt(a, dec), X(a), by + bh + 26, 20, withAlpha(t.text, 0.85), { align: 'center', font: 'bold' }));
 }
 
 /**
@@ -543,10 +543,10 @@ function tyres(cv, t, x, y, w, h, g) {
             let pc = isNum(pv) ? t.text : t.dim;
             if (isNum(pv) && isNum(tgt) && tgt > 0) { const r = pv / tgt; pc = r < 0.85 ? t.crit : r < 0.93 ? t.warn : r > 1.15 ? t.warn : t.ok; }
             cv.text(fmt(pv, g.pressure.decimals == null ? 1 : g.pressure.decimals), lx, ty + th * 0.42 + 40, 34, pc, { align: al, font: 'num' });
-            cv.text(g.pressure.unit || 'bar', lx, ty + th * 0.42 + 64, 18, t.dim, { align: al });
+            cv.text(g.pressure.unit || 'bar', lx, ty + th * 0.42 + 64, 22, t.dim, { align: al });
         } else {
             cv.text(fmt(val, g.decimals), lx, ty + th / 2 + 6, 40, isNum(val) ? t.text : t.dim, { align: al, font: 'num' });
-            if (g.unit) cv.text(g.unit, lx, ty + th / 2 + 34, 20, t.dim, { align: al });
+            if (g.unit) cv.text(g.unit, lx, ty + th / 2 + 34, 22, t.dim, { align: al });
         }
     }
 }
@@ -563,12 +563,12 @@ function gmeter(cv, t, cx, cy, r, g) {
         for (let ring_ = 0.5; ring_ <= max + 1e-6; ring_ += 0.5) {
             const rr = (ring_ / max) * r;
             c.arc(x, y, rr - 1.5, rr + 1.5, 0, 360, ring_ % 1 === 0 ? t.tick : withAlpha(t.tick, 0.5));
-            c.text(ring_.toFixed(1), x + rr * 0.7071 + 6, y - rr * 0.7071 - 4, 20, t.dim);
+            c.text(ring_.toFixed(1), x + rr * 0.7071 + 6, y - rr * 0.7071 - 4, 22, t.dim);
         }
         c.line(x - r, y, x + r, y, 2, withAlpha(t.tick, 0.6));
         c.line(x, y - r, x, y + r, 2, withAlpha(t.tick, 0.6));
-        c.text('BRAKE', x, y + r - 14, 18, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
-        c.text('ACCEL', x, y - r + 30, 18, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+        c.text('BRAKE', x, y + r - 14, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+        c.text('ACCEL', x, y - r + 32, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
     }, cv.textScale), Math.round(cx) - S, Math.round(cy) - S);
     const P = (lat, lon) => [cx + clamp(lat / max, -1.1, 1.1) * r, cy - clamp(lon / max, -1.1, 1.1) * r];
     const tr = g.trail || [];
@@ -607,16 +607,16 @@ function frame(cv, t, tabs, sel, badges) {
     const opt = { align: 'center', font: 'bold', spacing: 1.5 };
     let x = 16;
     (tabs || []).forEach((name, i) => {
-        const label = String(name).toUpperCase(), tw = Math.max(150, cv.textWidth(label, 17, opt) + 48), on = i === sel;
+        const label = String(name).toUpperCase(), tw = Math.max(150, cv.textWidth(label, 20, opt) + 48), on = i === sel;
         if (on) {
             cv.gradientRect(x, 0, tw, BAR_H, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.22)]]);
             cv.fillRect(x, BAR_H - 4, tw, 4, S);
         }
-        cv.text(label, x + tw / 2, 24, 17, on ? t.selText || S : t.dim, opt);
+        cv.text(label, x + tw / 2, 25, 20, on ? t.selText || S : t.dim, opt);
         if (i < tabs.length - 1) cv.fillRect(x + tw, 9, 1, BAR_H - 18, withAlpha('#ffffff', 0.12));
         x += tw;
     });
-    badgeRow(cv, t, W - 16, 6, 24, 16, (badges || []).filter(Boolean));
+    badgeRow(cv, t, W - 16, 6, 24, 18, (badges || []).filter(Boolean));
 }
 
 /** Badges right-aligned at xr (right edge), top y, height h, text size. Returns the left edge. */

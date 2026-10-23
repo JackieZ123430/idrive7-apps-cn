@@ -1,8 +1,8 @@
 {
   "id": "car_vitals",
   "title": "M Vitals",
-  "description": "Live engine, thermal, intake / fuel pressure, tyre and chassis gauges",
-  "version": "2.9.3",
+  "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
+  "version": "2.11.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -115,7 +115,7 @@
         ],
         [
           "fuel",
-          "Intake & fuel"
+          "Fuel & ignition"
         ],
         [
           "chassis",
@@ -417,6 +417,126 @@
       ]
     },
     {
+      "key": "showEgs",
+      "label": "Gearbox temperature (EGS)",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Show"
+        ],
+        [
+          "off",
+          "Hide"
+        ]
+      ]
+    },
+    {
+      "key": "showIat",
+      "label": "Intake air temperature",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Show"
+        ],
+        [
+          "off",
+          "Hide"
+        ]
+      ]
+    },
+    {
+      "key": "showHpfp",
+      "label": "High pressure fuel",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Show"
+        ],
+        [
+          "off",
+          "Hide"
+        ]
+      ]
+    },
+    {
+      "key": "showLpfp",
+      "label": "Low pressure fuel",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Show"
+        ],
+        [
+          "off",
+          "Hide"
+        ]
+      ]
+    },
+    {
+      "key": "showTiming",
+      "label": "Ignition timing",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Show"
+        ],
+        [
+          "off",
+          "Hide"
+        ]
+      ]
+    },
+    {
+      "key": "showMisfire",
+      "label": "Misfire counter",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Show"
+        ],
+        [
+          "off",
+          "Hide"
+        ]
+      ]
+    },
+    {
       "key": "showTyres",
       "label": "Tyre card",
       "type": "choice",
@@ -529,7 +649,7 @@
       }
     },
     "dme": {
-      "comment": "Intake / fuel values from the engine unit (DME, ecu 18 = 0x12) with UDS 0x22. F4xx = the standard OBD PIDs (F40F = PID 0x0F); a candidate with \"obd\" instead of \"did\" asks for the same PID with OBD service 01 (some engine units refuse the F4xx identifiers with NRC 31). Candidates are tried in order; the first plausible one wins. value = raw * factor + offset (bar / deg C). If a tile says 'not available from this DME', add your engine's BMW-specific DID here. boost: tried in order when the sport display sends no boost (setting 'Boost from'); absolute pressure in kPa, the outside air pressure (baro) is subtracted.",
+      "comment": "Intake / fuel values from the engine unit (DME, ecu 18 = 0x12) with UDS 0x22. F4xx = the standard OBD PIDs (F40F = PID 0x0F); a candidate with \"obd\" instead of \"did\" asks for the same PID with OBD service 01 (some engine units refuse the F4xx identifiers with NRC 31). Candidates are tried in order; the first plausible one wins. value = raw * factor + offset (bar / deg C). If a tile says 'not available from this DME', add your engine's BMW-specific DID here. boost: tried in order when the sport display sends no boost (setting 'Boost from'); absolute pressure in kPa, the outside air pressure (baro) is subtracted. timing: OBD PID 0x0E, degrees before top dead centre. misfire: OBD service 06 monitor results (MID A2 = cylinder 1, A3 = cylinder 2 ...), tid 0C = misfires this driving cycle (0B = average of the last 10 cycles); engine units that only speak UDS are asked 0x22 F6A2... egs: gearbox temperature from the gearbox unit (EGS); give each candidate its \"ecu\".",
       "ecu": 18,
       "iat": [
         {
@@ -719,6 +839,45 @@
           "min": 50,
           "max": 115,
           "note": "OBD service 01 PID 0x33 (same as F433)"
+        }
+      ],
+      "timing": [
+        {
+          "obd": "0E",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.5,
+          "offset": -64,
+          "min": -64,
+          "max": 63.5,
+          "note": "OBD service 01 PID 0x0E timing advance, degrees before TDC (cylinder 1)"
+        },
+        {
+          "did": "F40E",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.5,
+          "offset": -64,
+          "min": -64,
+          "max": 63.5,
+          "note": "the same PID over UDS 0x22"
+        }
+      ],
+      "misfire": {
+        "tid": "0C",
+        "note": "set to {} to switch off; \"ecu\" to ask another unit"
+      },
+      "egs": [
+        {
+          "ecu": 24,
+          "did": "DA12",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -48,
+          "min": -40,
+          "max": 160,
+          "note": "gearbox unit (EGS, 0x18) transmission oil temperature, deg C + 48 (from a forum report, not confirmed on a car: only shown once it changes; the replies go to the log, \"raw EGS\")"
         }
       ]
     }

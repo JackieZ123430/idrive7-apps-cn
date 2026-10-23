@@ -3,7 +3,7 @@
  * Warm-Up - know when the engine is ready to be used, and when it has cooled.
  *
  *   - oil + coolant gauges (oil is what matters: it lags coolant by minutes)
- *   - warm-up calculator: minutes and clock time until oil / coolant are warm,
+ *   - warm-up calculator: minutes until oil / coolant are warm,
  *     from the measured warm-up rate (typical rates until enough is measured),
  *     projected on the trend graph; "engine off" when a hybrid drives electric
  *   - safe rev limit that climbs from the cold limit to the redline with oil temp
@@ -30,7 +30,10 @@ mgu.run({
         const car = new Car(ctx, ['rpm', 'speed', 'temps', 'torque']);
 
         /* ---------- tracking ---------- */
-        const hist = [];             // [t, oil, coolant] every 5 s, 20 min
+        const hist = [];             // [t, oil, coolant] every 5 s, 20 min; t = steady clock (mono)
+        // the head unit sets its clock after start-up: wall-clock times can jump by hours, which
+        // threw the trend lines across the screen. A steady clock only ever moves forward.
+        const mono = () => { const h = process.hrtime(); return h[0] * 1000 + h[1] / 1e6; };
         let lastHist = 0, lastT = 0;
         // cool-down: hardS = seconds of hard use; needS = cool-down it asks for; cool = gentle seconds done
         let hardS = 0, needS = 0, cool = 0, doneAt = 0;
@@ -52,8 +55,9 @@ mgu.run({
                 // "cooled" message stays for 20 s, then all clear
                 if (doneAt && t - doneAt > 20000) { hardS = 0; needS = 0; cool = 0; doneAt = 0; }
             }
-            if (t - lastHist > 5000 && (G.isNum(d.oil) || G.isNum(d.coolant))) {
-                lastHist = t; hist.push([t, d.oil, d.coolant, d.rpm, d.speed]);
+            const m = mono();
+            if (m - lastHist > 5000 && (G.isNum(d.oil) || G.isNum(d.coolant))) {
+                lastHist = m; hist.push([m, d.oil, d.coolant, d.rpm, d.speed]);
                 while (hist.length > 240) hist.shift();
             }
         }, () => { hist.length = 0; hardS = 0; needS = 0; cool = 0; doneAt = 0; });
@@ -61,8 +65,6 @@ mgu.run({
         const F = () => settings.get('tempUnit') === 'f';
         const T = (c) => (G.isNum(c) ? (F() ? c * 9 / 5 + 32 : c) : null);
         const tU = () => (F() ? '°F' : '°C');
-        const pad = (n) => (n < 10 ? '0' : '') + n;
-        const clock = (ms) => { const x = new Date(ms); return pad(x.getHours()) + ':' + pad(x.getMinutes()); };
 
         function limit(oil) {
             const warm = settings.get('warmOil'), red = settings.get('redline'), cold = Math.min(settings.get('coldLimit'), red);
@@ -115,22 +117,20 @@ mgu.run({
             });
         }
 
-        /** One "ready in" row: label, big minutes, clock time + rate on the right. */
+        /** One "ready in" row: label + target, big minutes (or the state), a reason on the right. */
         function etaRow(cv, t, y, label, e, target) {
-            cv.text(label, 952, y, 18, t.dim, { font: 'bold', spacing: 2 });
+            cv.text(label, 952, y, 22, t.dim, { font: 'bold', spacing: 1.5 });
             let big, col = t.text, right = '', unit = '';
             if (e.state === 'ready') { big = 'READY'; col = GO; }
-            else if (e.state === 'off') { big = 'ENGINE OFF'; col = t.dim; right = 'not warming (electric driving)'; }
-            else if (e.state === 'stalled') { big = 'NOT WARMING'; col = t.warn; right = 'drive to warm up faster'; }
-            else if (e.state === 'warming') {
-                big = e.min > 60 ? '>60' : '~' + Math.max(1, Math.round(e.min)); unit = 'min';
-                right = 'at ' + clock(Date.now() + e.min * 60000) + '  ·  ' + (F() ? e.rate * 1.8 : e.rate).toFixed(1) + tU() + '/min' + (e.est ? ' (est.)' : '');
-            } else { big = '--'; col = t.dim; }
+            else if (e.state === 'off') { big = 'ENGINE OFF'; col = t.dim; right = 'electric driving'; }
+            else if (e.state === 'stalled') { big = 'NOT WARMING'; col = t.warn; right = 'drive to warm up'; }
+            else if (e.state === 'warming') { big = e.min > 60 ? '>60' : '~' + Math.max(1, Math.round(e.min)); unit = 'min'; }
+            else { big = '--'; col = t.dim; }
             // the large number font has digits and a few letters only: words in bold, minutes in num + 'min'
             const bw = cv.text(big, 952, y + 50, unit ? 52 : 40, col, { font: unit || big === '--' ? 'num' : 'bold', spacing: unit ? 0 : 1 });
-            if (unit) cv.text(unit, 960 + bw, y + 50, 24, t.dim);
-            if (right) cv.text(right, 1552, y + 46, 20, t.dim, { align: 'right' });
-            cv.text('target ' + Math.round(T(target)) + tU(), 1552, y, 18, t.dim, { align: 'right' });
+            if (unit) cv.text(unit, 960 + bw, y + 50, 26, t.dim);
+            if (right) cv.text(right, 1552, y + 48, 24, t.dim, { align: 'right' });
+            cv.text('target ' + Math.round(T(target)) + tU(), 1552, y, 22, t.dim, { align: 'right' });
         }
 
         function render() {
@@ -163,17 +163,16 @@ mgu.run({
                 const gentleNow = G.isNum(d.rpm) && d.rpm < GENTLE_RPM;
                 // the oil warm-up stays visible as one line
                 const eo = eta('oil', d.oil, warm, d);
-                const line = eo.state === 'ready' ? 'Oil warm' : eo.state === 'warming' ? 'Oil ready in ~' + Math.max(1, Math.round(eo.min)) + ' min (at ' + clock(now + eo.min * 60000) + ')'
+                const line = eo.state === 'ready' ? 'Oil warm' : eo.state === 'warming' ? 'Oil ready in ~' + Math.max(1, Math.round(eo.min)) + ' min'
                     : eo.state === 'off' ? 'Engine off - oil not warming' : eo.state === 'stalled' ? 'Oil not warming' : '';
-                cv.text(line, 952, 170, 20, eo.state === 'ready' ? GO : t.dim, { font: 'bold' });
-                cv.text('COOL-DOWN LEFT', 952, 206, 18, t.dim, { font: 'bold', spacing: 2 });
-                const lw = cv.text(left > 0 ? String(Math.ceil(left)) : '0', 952, 287, 80, left > 0 ? t.text : GO, { font: 'num' });
-                cv.text('s', 962 + lw, 287, 30, t.dim);
-                cv.text(left > 0 ? (gentleNow ? 'counting - keep it gentle' : 'paused - under ' + GENTLE_RPM + ' rpm to count') : 'done', 1552, 244, 22, left > 0 && !gentleNow ? t.warn : t.text, { align: 'right', font: 'bold' });
-                cv.text('after ' + Math.round(hardS) + ' s of hard driving', 1552, 276, 20, t.dim, { align: 'right' });
+                cv.text(line, 952, 170, 24, eo.state === 'ready' ? GO : t.dim, { font: 'bold' });
+                cv.text('COOL-DOWN LEFT', 952, 210, 22, t.dim, { font: 'bold', spacing: 1.5 });
+                const lw = cv.text(left > 0 ? String(Math.ceil(left)) : '0', 952, 289, 80, left > 0 ? t.text : GO, { font: 'num' });
+                cv.text('s', 962 + lw, 289, 30, t.dim);
+                cv.text(left > 0 ? (gentleNow ? 'keep it gentle' : 'paused - stay under ' + GENTLE_RPM + ' rpm') : 'done', 1552, 262, 24, left > 0 && !gentleNow ? t.warn : t.text, { align: 'right', font: 'bold' });
                 const f = needS ? G.clamp(cool / needS, 0, 1) : 1;
-                cv.roundRect(952, 301, 600, 12, 6, t.track);
-                if (f > 0) cv.rampRect(952, 301, Math.max(12, 600 * f), 12, 6, [t.warn, GO], 952, 600);
+                cv.roundRect(952, 303, 600, 12, 6, t.track);
+                if (f > 0) cv.rampRect(952, 303, Math.max(12, 600 * f), 12, 6, [t.warn, GO], 952, 600);
             } else {
                 etaRow(cv, t, 170, 'OIL READY IN', eta('oil', d.oil, warm, d), warm);
                 etaRow(cv, t, 255, 'COOLANT READY IN', eta('coolant', d.coolant, warmC, d), warmC);
@@ -181,30 +180,30 @@ mgu.run({
 
             // ---- safe rev limit (always) + trend
             const red = settings.get('redline'), fl = lim ? lim / red : 0;
-            cv.text('SAFE REV LIMIT', 952, 350, 16, t.dim, { font: 'bold', spacing: 2 });
-            cv.text(lim ? lim + ' rpm' : '---- rpm', 1552, 352, 22, ready ? GO : t.text, { align: 'right', font: 'bold' });
-            cv.roundRect(1130, 342, 280, 8, 4, t.track);
-            if (fl > 0) cv.roundRect(1130, 342, 280 * fl, 8, 4, ready ? GO : col);
+            cv.text('SAFE REV LIMIT', 952, 350, 22, t.dim, { font: 'bold', spacing: 1.5 });
+            cv.text(lim ? lim + ' rpm' : '---- rpm', 1552, 352, 26, ready ? GO : t.text, { align: 'right', font: 'bold' });
+            cv.roundRect(1160, 340, 230, 8, 4, t.track);
+            if (fl > 0) cv.roundRect(1160, 340, 230 * fl, 8, 4, ready ? GO : col);
 
-            const gx = 952, gy = 376, gw = 600, gh = 96;
-            const now0 = hist.length ? hist[hist.length - 1][0] : now;
+            // trend: last minutes (steady clock, see mono) + up to 5 min projected; nothing is drawn outside the graph
+            const gx = 952, gy = 398, gw = 600, gh = 90, nowX = gx + gw - 90;
+            const now0 = hist.length ? hist[hist.length - 1][0] : mono();
             const span = G.clamp(hist.length ? now0 - hist[0][0] : 0, 300000, 1200000);
             const ahead = 300000;                                  // projection: up to 5 min ahead
             const lo = 0, hi = 140;
-            const X = (ts) => gx + (gw - 90) - ((now0 - ts) / span) * (gw - 90), Y = (c) => gy + gh - (G.clamp(c, lo, hi) - lo) / (hi - lo) * gh;
-            cv.text('LAST ' + Math.round(span / 60000) + ' MIN + NEXT 5', gx, gy - 6, 14, t.dim, { font: 'bold', spacing: 1.5 });
-            cv.fillRect(gx + 240, gy - 14, 18, 3, t.oil || t.accent); cv.text('OIL', gx + 262, gy - 6, 14, t.dim, { font: 'bold' });
-            cv.fillRect(gx + 310, gy - 14, 18, 3, t.cold); cv.text('COOLANT', gx + 332, gy - 6, 14, t.dim, { font: 'bold' });
+            const X = (ts) => nowX - ((now0 - ts) / span) * (gw - 90), Y = (c) => gy + gh - (G.clamp(c, lo, hi) - lo) / (hi - lo) * gh;
+            cv.fillRect(gx, gy - 20, 22, 4, t.oil || t.accent); cv.text('OIL', gx + 30, gy - 11, 20, t.dim, { font: 'bold' });
+            cv.fillRect(gx + 100, gy - 20, 22, 4, t.cold); cv.text('COOLANT', gx + 130, gy - 11, 20, t.dim, { font: 'bold' });
             cv.fillRect(gx, Y(warm), gw, 1, withAlpha(GO, 0.5));
-            cv.text(String(Math.round(T(warm))), gx + gw + 6, Y(warm) + 6, 14, GO);
-            cv.fillRect(gx + gw - 90, gy, 1, gh, withAlpha(t.tick, 0.5));       // "now"
+            cv.text(String(Math.round(T(warm))), gx + gw + 4, Y(warm) + 7, 20, GO);
+            cv.fillRect(nowX, gy, 1, gh, withAlpha(t.tick, 0.5));       // "now"
             [[1, t.oil || t.accent, 'oil', warm, d.oil], [2, t.cold, 'coolant', warmC, d.coolant]].forEach(([i, c, key, target, cur]) => {
-                const pts = hist.filter((h) => G.isNum(h[i])).map((h) => [X(h[0]), Y(h[i])]);
+                const pts = hist.filter((h) => G.isNum(h[i])).map((h) => [X(h[0]), Y(h[i])]).filter((p) => p[0] >= gx && p[0] <= nowX + 0.5);
                 if (pts.length > 1) cv.polyline(pts, 3, c);
                 // projection to the target, dashed
                 const e = eta(key, cur, target, d);
                 if (e.state === 'warming' && pts.length) {
-                    const x0 = gx + gw - 90, y0 = Y(cur), mins = Math.min(e.min, ahead / 60000);
+                    const x0 = nowX, y0 = Y(cur), mins = Math.min(e.min, ahead / 60000);
                     const x1 = x0 + (mins * 60000 / ahead) * 90, y1 = Y(cur + e.rate * mins);
                     for (let k = 0; k < 6; k++) {
                         const a = k / 6, b = (k + 0.5) / 6;

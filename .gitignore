@@ -14,3 +14,5 @@ __pycache__/
 kit/renderd/build/
 kit/renderd/protocol/*-protocol.c
 kit/renderd/protocol/*-client-protocol.h
+# fault texts for one car from a coding tool export (kit/tools/dtc_texts.py)
+apps/dtc_scanner/dtc_texts.js

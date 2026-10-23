@@ -32,5 +32,6 @@ else echo "note: no mgu-renderd build (needs Docker) - the kit installs the apps
 chmod +x "$OUT"/*.sh
 (cd "$OUT" && md5sum deploy-car.sh mgu-app-install.sh mainapp-patch.js apps/*.mgu $( [ -f mgu-renderd ] && echo mgu-renderd ) > KIT_SUMS)
 tar czf "$KIT/dist/mgu-custom-apps.tar.gz" -C "$KIT/dist" mgu-custom-apps
+cp "$HERE/push-to-car.ps1" "$KIT/dist/"                 # Windows: next to the .tar.gz
 echo "kit: $OUT  ($(ls "$OUT/apps" | tr '\n' ' '))"
 echo "     $KIT/dist/mgu-custom-apps.tar.gz"
