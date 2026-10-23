@@ -59,7 +59,7 @@ const variant = (a) => {
     const v = ids[hex(a)] ? SGBD[hex(a) + ' ' + ids[hex(a)]] : null;
     return v && /^[A-Za-z0-9_]+$/.test(v) ? v : null;
 };
-// the fonts are ASCII only; database texts can be German
+// the fonts are ASCII only
 const ascii = (s) => String(s).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae')
     .replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[^\x20-\x7e]/g, '');
 const variantTexts = {};          // SGBD -> { code: text }, read on first use

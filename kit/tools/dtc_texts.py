@@ -18,7 +18,8 @@ texts/<SGBD>.json (code -> text), unit_names.json (SGBD -> name) and dtc_texts.j
 ("<address>:<code>" -> text). Only those data files are copied, to apps/dtc_scanner/dtc_db/; the
 scanner asks each unit with faults for its SGBD index (UDS 22 F1 50) and looks its texts up there.
 
-Both are BMW's texts: they stay out of git (.gitignore).
+Only English texts are imported: one with German in it (german_words.txt) is left out, and the
+scanner shows no text for that fault. The texts are BMW's: they stay out of git (.gitignore).
 """
 import json, os, re, shutil, sys, tarfile, zipfile
 
@@ -34,7 +35,7 @@ def from_export(src, out):
             addr = m.group(1).upper().zfill(2)
             continue
         m = re.match(r'\s*([0-9A-Fa-f]{6})\s*->\s*(.+?)\s*$', line)
-        if m and addr and not re.match(r'(?i)no description', m.group(2)):
+        if m and addr and not re.match(r'(?i)no description', m.group(2)) and is_english(m.group(2)):
             # plain ASCII: drawn with the app's baked fonts
             texts[addr + ':' + m.group(1).upper()] = re.sub(r'[^\x20-\x7e]', '', m.group(2))
     with open(out, 'w', encoding='utf-8', newline='\n') as f:
@@ -68,6 +69,33 @@ def _strings(data, what):
     return d
 
 
+# English only: a text with a German word in it (german_words.txt, or an umlaut / sharp s) is left
+# out, and the Fault Scanner shows no text for that fault. Signal identifiers (Fehler_Status_LIN),
+# short words and abbreviations (ABS, DASS) are not looked at; whole words in capitals are
+# (KILOMETERSTAND).
+GERMAN = {w.strip() for w in open(os.path.join(HERE, 'german_words.txt'), encoding='utf-8')
+          if w.strip() and not w.startswith('#')}
+_WORD = re.compile(r"[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_\-]*")
+
+
+def is_english(t):
+    for w in _WORD.findall(t):
+        if '_' in w or any(c.isdigit() for c in w):
+            continue
+        for p in w.split('-'):
+            if re.search('[äöüßÄÖÜ]', p) or (len(p) >= (5 if p.isupper() else 3) and p.lower() in GERMAN):
+                return False
+    return True
+
+
+def english(d, n):
+    """The English texts of d; n counts [kept, left out]."""
+    out = {k: v for k, v in d.items() if is_english(v)}
+    n[0] += len(out)
+    n[1] += len(d) - len(out)
+    return out
+
+
 def from_db(src, out):
     files = _members(src)
     idx = sorted((p for p in files if p == 'sgbd_index.json' or p.endswith('/sgbd_index.json')), key=len)
@@ -85,11 +113,11 @@ def from_db(src, out):
         sys.exit('%s: no sgbd_index.json - not an oap-dtcscan package?' % src)
     base = idx[0][:-len('sgbd_index.json')]
     sgbd = _strings(files[idx[0]](), 'sgbd_index.json')
-    texts = {}
+    texts, n = {}, [0, 0]
     for p in files:
         m = re.match(re.escape(base) + r'texts/([A-Za-z0-9_]+)\.json$', p)
         if m:
-            texts[m.group(1)] = _strings(files[p](), p)
+            texts[m.group(1)] = english(_strings(files[p](), p), n)
     tmp = out.rstrip('/\\') + '.new'
     shutil.rmtree(tmp, ignore_errors=True)
     os.makedirs(os.path.join(tmp, 'texts'))
@@ -98,13 +126,15 @@ def from_db(src, out):
     for name in ('unit_names.json', 'dtc_texts.json'):
         if base + name in files:
             with open(os.path.join(tmp, name), 'w', encoding='utf-8') as f:
-                json.dump(_strings(files[base + name](), name), f, ensure_ascii=False)
+                json.dump(english(_strings(files[base + name](), name), n if name == 'dtc_texts.json' else [0, 0]), f,
+                          ensure_ascii=False)
     for name, d in texts.items():
         with open(os.path.join(tmp, 'texts', name + '.json'), 'w', encoding='utf-8') as f:
             json.dump(d, f, ensure_ascii=False, separators=(',', ':'))
     shutil.rmtree(out, ignore_errors=True)
     os.replace(tmp, out)
     print('%d control unit types, %d fault texts -> %s' % (len(texts), sum(len(d) for d in texts.values()), os.path.normpath(out)))
+    print('%d English texts imported, %d German ones left out (no text shown for those)' % tuple(n))
 
 
 if __name__ == '__main__':
