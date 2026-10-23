@@ -72,6 +72,10 @@ docker run --rm -v $PWD/kit/renderd/build:/b -v $PWD/out:/o mgu-renderd-build \
     /lib64/ld-linux-x86-64.so.2 /b/mgu-renderd --replay /o/stream.bin --out /o/frame.pam
 ```
 
+`--out` gets the last frame. Add `--raw /o/frames.rgba` to also get every frame (raw RGBA,
+1920 x 720, top row first), e.g. for a video: preview's `frames=<n>` draws n frames at 60 a
+second in real time, and [`kit/tools/make_gif.sh`](../tools/make_gif.sh) turns that into a GIF.
+
 `tools/ivi-probe list` shows the compositor's screens, layers and surfaces.
 
 ## Protocol (src/proto.h)

@@ -9,6 +9,7 @@
  *
  *   mgu-renderd [--socket PATH] [--group GID] [--screen ID] [-v]
  *   mgu-renderd --replay FILE --out FILE.ppm     render a recorded client stream offscreen
+ *   ... --raw FILE.rgba                          also append every frame there (raw RGBA, top row first)
  */
 #define _GNU_SOURCE
 #include <EGL/egl.h>
@@ -409,7 +410,7 @@ static void accept_client(void) {
 }
 
 /* ---------------- offscreen replay (testing on a PC) ---------------- */
-static int replay(const char *in, const char *out) {
+static int replay(const char *in, const char *out, const char *raw) {
     setenv("EGL_PLATFORM", "surfaceless", 0);
     if (egl_setup(EGL_DEFAULT_DISPLAY, 1) < 0) return 1;
     EGLint pa[] = { EGL_WIDTH, 16, EGL_HEIGHT, 16, EGL_NONE };
@@ -422,6 +423,9 @@ static int replay(const char *in, const char *out) {
     uint8_t *buf = malloc(n + 4); if (fread(buf, 1, n, f) != (size_t)n) return 1; fclose(f);
     client c; memset(&c, 0, sizeof c); c.xf.s = 1; strcpy(c.app, "replay");
     GLuint tex = 0, fbo = 0;
+    FILE *rf = raw ? fopen(raw, "wb") : NULL;
+    uint8_t *rpx = NULL;
+    if (raw && !rf) { perror(raw); return 1; }
     int frames = 0; uint64_t tsum = 0;
     for (long off = 0; off + 8 <= n;) {
         uint32_t type, len; memcpy(&type, buf + off, 4); memcpy(&len, buf + off + 4, 4);
@@ -439,10 +443,16 @@ static int replay(const char *in, const char *out) {
             gfx_draw(&c.g, &c.xf, c.w, c.h, (uint32_t *)pl, len / 4, 1);
             glFinish();
             tsum += now_us() - t0; frames++;
+            if (rf) {
+                if (!rpx) rpx = malloc((size_t)c.w * c.h * 4);
+                glReadPixels(0, 0, c.w, c.h, GL_RGBA, GL_UNSIGNED_BYTE, rpx);
+                for (int y = c.h - 1; y >= 0; y--) fwrite(rpx + (size_t)y * c.w * 4, 1, (size_t)c.w * 4, rf);
+            }
         } else if (handle(&c, type, pl, len) < 0) { LOG("bad message %u", type); return 1; }
         free(pl);
         off += 8 + len;
     }
+    if (rf) { fclose(rf); free(rpx); }
     if (!fbo) { LOG("no frame in %s", in); return 1; }
     uint8_t *px = malloc((size_t)c.w * c.h * 4);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -461,7 +471,7 @@ static volatile sig_atomic_t quit;
 static void on_sig(int s) { quit = 1; }
 
 int main(int argc, char **argv) {
-    const char *sock = "/run/mgu-renderd/renderd.sock", *rin = NULL, *rout = "out.pam";
+    const char *sock = "/run/mgu-renderd/renderd.sock", *rin = NULL, *rout = "out.pam", *rraw = NULL;
     int gid = -1;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--socket") && i + 1 < argc) sock = argv[++i];
@@ -469,11 +479,12 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--screen") && i + 1 < argc) want_screen = strtoul(argv[++i], NULL, 0);
         else if (!strcmp(argv[i], "--replay") && i + 1 < argc) rin = argv[++i];
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) rout = argv[++i];
+        else if (!strcmp(argv[i], "--raw") && i + 1 < argc) rraw = argv[++i];
         else if (!strcmp(argv[i], "-v")) verbose = 1;
-        else { fprintf(stderr, "usage: %s [--socket PATH] [--group GID] [--screen ID] [-v] | --replay FILE --out FILE.pam\n", argv[0]); return 2; }
+        else { fprintf(stderr, "usage: %s [--socket PATH] [--group GID] [--screen ID] [-v] | --replay FILE --out FILE.pam [--raw FILE.rgba]\n", argv[0]); return 2; }
     }
     t_start = now_us();
-    if (rin) return replay(rin, rout);
+    if (rin) return replay(rin, rout, rraw);
 
     signal(SIGPIPE, SIG_IGN);
     signal(SIGTERM, on_sig); signal(SIGINT, on_sig);

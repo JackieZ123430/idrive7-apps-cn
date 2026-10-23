@@ -1,27 +1,27 @@
-# MGU Custom Apps
+<h1 align="center">MGU Custom Apps</h1>
 
-**Custom apps for the BMW MGU head unit (iDrive 7 / ID7), plus a complete kit to build your own.**
+<p align="center">
+  <b>Custom apps for the BMW MGU head unit (iDrive 7), drawn by their own GPU render engine at a true 60 fps.</b><br>
+  Plus a complete kit to build your own.
+</p>
 
-Real electric range, battery health and a charge log for plug-in hybrids, a sport cluster
-with intake / fuel pressure and tyre data, shift lights and a full-screen tach, a virtual dyno,
-brake and drag timers, a G-meter, an oil warm-up guide, and a fault-code scanner/cleaner. They run on the car's own app platform,
-use the HMI's real screens and settings menus, read live vehicle data, and survive reboots.
-A small GPU renderer service draws them full-screen at up to 60 fps.
-Everything can be removed again with one command.
+<p align="center">
+  <img alt="60 fps" src="https://img.shields.io/badge/frame%20rate-60%20fps-2ea44f?style=for-the-badge">
+  <img alt="OpenGL ES 2" src="https://img.shields.io/badge/render-OpenGL%20ES%202-1c6dd0?style=for-the-badge">
+  <img alt="GPU time" src="https://img.shields.io/badge/GPU%20time-~1%20ms%20%2F%20frame-8957e5?style=for-the-badge">
+  <img alt="iDrive 7" src="https://img.shields.io/badge/BMW-iDrive%207%20MGU-e4002b?style=for-the-badge">
+</p>
 
-| | |
-|---|---|
-| ![eDrive](docs/screens/edrive.png)<br>**eDrive**: real electric range, battery health, last charge, 12 V | ![eDrive charge log](docs/screens/edrive_log.png)<br>**eDrive**: charge log with cost and totals |
-| ![M Vitals engine](docs/screens/m_vitals_engine.png)<br>**M Vitals**: rpm, boost, speed + gear, power, torque | ![M Vitals fuel and ignition](docs/screens/m_vitals_fuel.png)<br>**M Vitals**: intake air, HPFP / LPFP fuel pressure, ignition timing, misfires per cylinder |
-| ![M Vitals chassis](docs/screens/m_vitals_chassis.png)<br>**M Vitals**: g-force, tyre pressures + temperatures, xDrive | ![Redline](docs/screens/redline.png)<br>**Redline**: G20-style rev bar, big gear, red shift blink, shift scoring |
-| ![G-Force](docs/screens/gforce.png)<br>**G-Force**: friction circle, peaks, records | ![Virtual Dyno](docs/screens/dyno.png)<br>**Virtual Dyno**: power and torque curve |
-| ![Brake Test](docs/screens/brake_test.png)<br>**Brake Test**: 100-0 distance, deceleration, fade | ![Drag Timer](docs/screens/draggy.png)<br>**Drag Timer**: splits, ¼ mile, speed trace |
-| ![Warm-Up](docs/screens/warmup.png)<br>**Warm-Up**: time to working temperature, safe rev limit, turbo cool-down | ![Fault Scanner](docs/screens/dtc_scanner.png)<br>**Fault Scanner**: fault codes of every control unit |
+<p align="center">
+  <img src="docs/media/redline.gif" alt="Redline: full-screen rev bar, shift lights and gear, animated at 60 fps" width="100%">
+</p>
 
-*(Screenshots: each app's built-in demo data drawn by the GPU renderer (`mgu-renderd --replay`)
-in the full-screen layout, over the HMI's own back arrow and status icons, in the default M
-Tricolour theme. Every app also has M Red, Ice White and Night Amber, picked from
-its Settings page. In the car the same screens show live data.)*
+Real electric range, battery health and a charge log for plug-in hybrids. A sport cluster with
+boost, fuel pressures, ignition timing, misfires and tyre data. Shift lights and a full-screen
+tach, a virtual dyno, brake and drag timers, a G-meter, an oil warm-up guide and a fault-code
+scanner / cleaner. They run on the car's own app platform, use the HMI's real buttons and
+settings menus, read live vehicle data and survive reboots. Everything can be removed again
+with one command.
 
 > **Disclaimer.** This is an unofficial hobby project. It is not affiliated with, endorsed by
 > or supported by BMW AG. You modify your own head unit at your own risk. Use the apps parked
@@ -30,8 +30,95 @@ its Settings page. In the car the same screens show live data.)*
 
 ---
 
+## Not a PNG slideshow: a custom render engine
+
+BMW's app platform has one way for an app to show custom graphics: draw a picture in
+JavaScript, compress it to **PNG**, and hand it to the HMI, which decodes it and puts it in an
+image box. It's the only route the SDK offers for custom graphics, and it tops out at a handful
+of frames per second: on the head unit's Atom CPU, just compressing one 1600 × 520 PNG takes
+about 60 ms, before anything is drawn or sent.
+
+These apps don't do that. They ship with **`mgu-renderd`**, a small render engine written for
+this project in C on OpenGL ES 2. An app doesn't send pictures at all: it sends a few kilobytes
+of **drawing commands** per frame, and the engine draws them on the head unit's Intel GPU, on
+its own compositor layer, in step with the display's refresh. Result: **a true 60 fps**, with
+needles and bars that glide instead of jump.
+
+<p align="center">
+  <img src="docs/media/compare.gif" alt="The same Redline frames shown at 10 fps (PNG path) and at full rate (GPU engine)" width="80%"><br>
+  <sub>Top: the same frames held at 10 fps, the PNG path's typical rate. Bottom: every frame, as the engine draws them.</sub>
+</p>
+
+| | Stock way: PNG images | `mgu-renderd` |
+|---|---|---|
+| **What the app sends** | a compressed bitmap per frame | drawing commands, a few KB per frame |
+| **Who draws** | JavaScript on the CPU, pixel by pixel | the Intel HD Graphics 505 GPU |
+| **Frame rate** | a few fps (PNG encode alone: ~60 ms) | **60 fps**, paced by the display |
+| **Motion** | values jump from frame to frame | spring-smoothed gauges, every frame |
+| **Screen space** | the HMI's image box, its title bar and 120 px button bar | full screen: header in the HMI's title strip, slim 48 px bar |
+
+**Measured on a real car** (head unit app logs, 10-second averages):
+
+| App | Frame rate | GPU time per frame | App (JavaScript) time per frame |
+|---|---|---|---|
+| M Vitals | 60-61 fps | 1.0-1.3 ms (peak 11 ms) | 2-5 ms |
+| eDrive | 60-61 fps | 1.0-1.2 ms | |
+| G-Force | 56-61 fps | 1.3 ms | |
+
+A frame has 16.7 ms at 60 fps. The GPU needs about one of them, so there is plenty of headroom.
+Static parts (cards, dial faces, scales) are drawn once and cached on the GPU. If the engine
+isn't installed, the same apps fall back to the PNG path automatically (same code, same look).
+
+```
+ app (Node.js)  ──  drawing commands  ──▶  mgu-renderd (C, OpenGL ES 2)  ──▶  own layer above the HMI
+     │              Unix socket, per frame        Intel GPU, synced to vsync          (input still goes to the HMI)
+     └── buttons, settings, tiles: BMW's own HMI widgets, so the iDrive controller and touch work as usual
+```
+
+More in [How apps draw](#44-how-apps-draw-remote-hmi-rhmi) and [`kit/renderd`](kit/renderd/README.md).
+
+---
+
+## Gallery
+
+<table>
+<tr>
+<td width="50%"><img src="docs/media/m_vitals.gif" alt="M Vitals engine page"><br><b>M Vitals</b>: rpm, boost, speed + gear, power, torque</td>
+<td width="50%"><img src="docs/media/gforce.gif" alt="G-Force"><br><b>G-Force</b>: friction circle with trail, grip envelope, peaks, records</td>
+</tr>
+<tr>
+<td><img src="docs/media/draggy.gif" alt="Drag Timer"><br><b>Drag Timer</b>: live speed trace, splits, ¼ mile</td>
+<td><img src="docs/media/brake_test.gif" alt="Brake Test"><br><b>Brake Test</b>: 100-0 distance, deceleration trace, fade</td>
+</tr>
+<tr>
+<td><img src="docs/media/m_vitals_chassis.gif" alt="M Vitals chassis page"><br><b>M Vitals</b>: g-force, tyre pressures + temperatures, xDrive split</td>
+<td><img src="docs/media/warmup.gif" alt="Warm-Up"><br><b>Warm-Up</b>: time to working temperature, safe rev limit</td>
+</tr>
+<tr>
+<td><img src="docs/screens/m_vitals_fuel.png" alt="M Vitals fuel and ignition page"><br><b>M Vitals</b>: intake air, HPFP / LPFP fuel pressure, ignition timing, misfires per cylinder</td>
+<td><img src="docs/screens/edrive.png" alt="eDrive"><br><b>eDrive</b>: real electric range, battery health, last charge, 12 V</td>
+</tr>
+<tr>
+<td><img src="docs/screens/edrive_log.png" alt="eDrive charge log"><br><b>eDrive</b>: charge log with cost and totals</td>
+<td><img src="docs/screens/dyno.png" alt="Virtual Dyno"><br><b>Virtual Dyno</b>: power and torque curve from a pull</td>
+</tr>
+<tr>
+<td><img src="docs/screens/dtc_scanner.png" alt="Fault Scanner"><br><b>Fault Scanner</b>: fault codes of every control unit</td>
+<td><img src="docs/screens/redline.png" alt="Redline"><br><b>Redline</b>: G20-style rev bar, big gear, shift scoring</td>
+</tr>
+</table>
+
+<sub>Every animation is recorded offline from the app's built-in demo drive through the engine's
+own drawing code (`mgu-renderd --replay`, see [6.3](#63-preview-build-deploy)), over the HMI's
+back arrow and status icons, in the default M Tricolour theme. GIFs play at 50 fps at most;
+the car shows 60. Every app also has M Red, Ice White and Night Amber themes. In the car the
+same screens show live data.</sub>
+
+---
+
 ## Contents
 
+- [Not a PNG slideshow](#not-a-png-slideshow-a-custom-render-engine) · [Gallery](#gallery)
 1. [The apps](#1-the-apps)
 2. [What you need](#2-what-you-need)
 3. [Quick start](#3-quick-start)
@@ -98,7 +185,7 @@ scp root@<unit>:'/usr/lib/oap-mainapp/preinstalled_apps/x_call@*.tgz' .
 mkdir x_call && tar xzf x_call@*.tgz -C x_call
 node kit/tools/extract_sdk.js x_call/javascript/app.js     # writes ./oap-sdk/
 ```
-Or download it of a public internet webiste:
+Or download it from a public website:
 https://bedrive.ru/da77
 
 
@@ -260,14 +347,18 @@ The HMI doesn't run app code. An app ships a **description** of its screens:
 The kit's trick for rich graphics: each app's main screen is a single large image component,
 and the app draws it itself. Two ways to get the drawing on screen, chosen automatically:
 
-- **GPU renderer, 60 fps** ([`kit/renderd`](kit/renderd/README.md)). The app records its drawing
-  commands (`kit/runtime/record.js`) and sends them to `mgu-renderd`, a small system service.
-  `mgu-renderd` draws them with OpenGL ES on its own compositor surface over the HMI, in step
-  with the display. Static parts (cards, dial faces, scales) are cached on the GPU. Gauges glide
-  between values instead of jumping.
-- **Software fallback.** Without the service (or with the app setting *Renderer = Software*), the
-  same recording is drawn in pure JavaScript (`kit/runtime/canvas.js`), encoded as PNG and handed
-  to the HMI's image component at 6-15 fps. Same code, same look, the HMI's own title and bar.
+- **The GPU render engine, 60 fps** ([`kit/renderd`](kit/renderd/README.md)). The app records
+  its drawing commands (`kit/runtime/record.js`: rectangles, gradients, arcs, lines, glyph runs
+  from baked font atlases, cached layers) and streams them to `mgu-renderd`, a small system
+  service, over a Unix socket. `mgu-renderd` draws them with OpenGL ES 2 on its own compositor
+  layer over the HMI and asks for the next frame when the compositor takes the last one, so
+  frames are paced by the display itself. Static parts (cards, dial faces, scales) are drawn
+  once into GPU textures. Gauges glide between values with spring smoothing. A watchdog hides
+  an app that stops sending frames, so a hung app can never cover the HMI.
+- **PNG fallback, the stock way.** Without the service (or with the app setting *Renderer =
+  Software*), the same recording is played into a pure JavaScript rasteriser
+  (`kit/runtime/canvas.js`), encoded as PNG and handed to the HMI's image component at 4-15 fps.
+  Same code, same look, with the HMI's own title and bar.
 
 With the renderer, apps use the whole screen (app setting *Screen layout = Full screen*,
 the default):
@@ -516,6 +607,14 @@ record what the renderer would get and replay it in `mgu-renderd`
 node kit/tools/preview.js dist/boost out wait=8 render --gpu out/stream.bin
 ```
 
+To record an animation like the ones at the top, `frames=<n>` draws n frames at 60 a second in
+real time, and `mgu-renderd --replay ... --raw` writes every one of them. `make_gif.sh` does it
+all and encodes a GIF (needs Docker and ffmpeg):
+
+```sh
+kit/tools/make_gif.sh docs/media/redline.gif redline 6 6     # 6 s, after 6 s of demo drive
+```
+
 ---
 
 ## 7. Vehicle signals reference
@@ -582,11 +681,11 @@ kit/runtime/          app runtime: mgu.js (platform glue), record.js + display.j
                       diag.js (UDS over TASU), fonts/
 kit/renderd/          mgu-renderd: the GPU renderer service (C, GLES2, Wayland/ivi)
 kit/platform/         permissions template used by build.py
-kit/tools/            build.py, preview.js, make_icon.js, bake_fonts.py,
+kit/tools/            build.py, preview.js, make_gif.sh, make_icon.js, bake_fonts.py,
                       extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
 deploy/               make-car-kit.sh, push-to-car.sh, mgu-app-install.sh, mainapp-patch.js
 deploy/car/           deploy-car.sh (runs on the unit) + its README
-docs/                 RHMI widget reference, screenshots (docs/screens)
+docs/                 RHMI widget reference, screenshots (docs/screens), animations (docs/media)
 ```
 
 Not in the repository, on purpose:

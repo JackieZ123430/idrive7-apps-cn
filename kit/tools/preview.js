@@ -6,7 +6,9 @@
  *   node kit/tools/preview.js dist/car_vitals [outDir] [clicks...] [--set key=value ...] [--gpu FILE]
  *
  * clicks = component names to "press" between frames, e.g. BTN_PAGE BTN_PAGE;
- * also wait=<seconds> and render (draw a frame now).
+ * also wait=<seconds>, render (draw a frame now) and frames=<n> (n frames at 60 a second, in
+ * real time, so demo data and animations move as on the car: with --gpu and mgu-renderd --raw
+ * that is a 60 fps video).
  * Demo data is forced on. Each image the app pushes is written as
  * <outDir>/<component>-<n>.png.
  * --gpu FILE: also write what the GPU renderer would get (full-screen layout: header, slim bar) to FILE;
@@ -68,6 +70,9 @@ const themeFn = () => require(path.join(kitDir, 'themes')).theme(settings.get('t
 const { Display } = require(path.join(kitDir, 'display'));
 settings.onChange = settings.onChange || (() => {});
 const display = new Display(ui, log, spec, settings, themeFn);
+// every frame goes to the stream, also unchanged ones (frames=<n> must stay in step with time)
+const send = display._send.bind(display);
+display._send = (n, o, s) => send(n, o, s, true);
 const ctx = {
     ui, settings, spec, dataDir: out, log, display,
     canvas: (w, h) => display.canvas(w, h),
@@ -90,6 +95,14 @@ setTimeout(async () => {
         // wait=<seconds> pauses (demo data keeps running); render forces a frame
         if (/^wait=/.test(c)) { await new Promise((r) => setTimeout(r, Number(c.slice(5)) * 1000)); continue; }
         if (c === 'render') { if (loopFn) await loopFn(); continue; }
+        if (/^frames=/.test(c)) {
+            const n = Number(c.slice(7)), t0 = Date.now();
+            for (let i = 0; i < n; i++) {
+                if (loopFn) await loopFn();
+                await new Promise((r) => setTimeout(r, Math.max(0, t0 + (i + 1) * 1000 / 60 - Date.now())));
+            }
+            continue;
+        }
         if (!handlers[c]) { console.warn('no handler', c); continue; }
         await handlers[c]({ row: 0 });
         await new Promise((r) => setTimeout(r, 300));
