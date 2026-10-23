@@ -147,7 +147,7 @@ mgu.run({
                     }
                     scan = { at: Date.now(), demo: false, ecus: Array.from(byEcu.values()), infoFailed };
                     try { fs.writeFileSync(FILE, JSON.stringify(scan)); } catch (e) { log.warn('save scan: ' + e); }
-                    await identify(scan.ecus.filter((e) => e.dtcs.length).map((e) => e.addr));
+                    await identify(scan.ecus.map((e) => e.addr));
                 }
                 scan.ecus.sort((a, b) => b.dtcs.length - a.dtcs.length || a.addr - b.addr);
                 const n = scan.ecus.reduce((s, e) => s + e.dtcs.length, 0);
@@ -164,18 +164,21 @@ mgu.run({
         }
 
         /**
-         * Ask units with faults for their SGBD index once (22 F1 50), so the database can give their
-         * faults a text. Read-only; a unit that doesn't answer is not asked again.
+         * Ask every unit that answered the scan for its SGBD index once (22 F1 50), so the database can
+         * give its faults a text and the unit its name; kept in data/ecu_ids.json (also the list of this
+         * car's unit types). Read-only; a unit that refuses is not asked again, one that stays silent is.
          */
         async function identify(addrs) {
             const todo = HAS_DB ? addrs.filter((a) => ids[hex(a)] === undefined) : [];
             if (!todo.length) return;
-            msg = 'Identifying control units...'; changed();
+            let i = 0;
             for (const a of todo) {
+                msg = 'Identifying control units... ' + (++i) + '/' + todo.length; changed();
                 try {
                     const r = await diag.physical(a, 0x22, [0xF1, 0x50], 3000,
                         (u) => (u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50) || (u[0] === 0x7F && u[1] === 0x22));
-                    ids[hex(a)] = r && r[0] === 0x62 && r.length >= 6 ? hex(((r[3] << 16) | (r[4] << 8) | r[5]) >>> 0, 6) : '';
+                    if (!r) { log.info('unit ' + hex(a) + ': no answer to 22 F1 50 (asked again next scan)'); continue; }
+                    ids[hex(a)] = r[0] === 0x62 && r.length >= 6 ? hex(((r[3] << 16) | (r[4] << 8) | r[5]) >>> 0, 6) : '';
                     log.info('unit ' + hex(a) + ': SGBD index ' + (ids[hex(a)] || 'none') + (variant(a) ? ' -> ' + variant(a) : ''));
                 } catch (e) { log.warn('identify ' + hex(a) + ': ' + e); }
             }
