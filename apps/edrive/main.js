@@ -255,7 +255,7 @@ mgu.run({
                         if (soc !== null) { live.soc = soc; live.socT = Date.now(); onSoc(soc, live.socT); }
                         detectHybrid(v12 !== null);
                         // health changes over months: read it once every "sohDays" (kept across restarts),
-                        // on "Read battery now", and after a failed read at most once an hour
+                        // on "Read now", and after a failed read at most once an hour
                         const sohDue = live.soh === null || Date.now() - live.sohT > settings.get('sohDays') * 86400000;
                         if (!st.noHybrid && (forceSoh || (sohDue && Date.now() - sohFailT > 3600000))) {
                             const soh = await readValue('soh');
@@ -503,7 +503,7 @@ mgu.run({
             G.panel(cv, t, 24, 44, 1552, 468, 'Battery diagnostics');
             const link = diag.p ? (diag.available ? 'link up' : 'link down') : 'no link (' + (diag.error || 'not started') + ')';
             cv.text('UDS 22 ReadDataByIdentifier / OBD 01  ·  ' + link + '  ·  ambient ' + (G.isNum(live.ambient) ? G.fmt(live.ambient, 1) + ' °C' : 'n/a')
-                + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(live.speed, 0) + ' km/h' : 'n/a'), 48, 121, 24, t.text, { font: 'label' });
+                + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(G.hold('speed', live.speed), 0) + ' km/h' : 'n/a'), 48, 121, 24, t.text, { font: 'label' });
             const cols = [48, 160, 260, 380, 820, 1000, 1290];
             ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS', 'READ'].forEach((h, i) => cv.text(h, cols[i], 167, 22, t.dim, { font: 'bold', spacing: 1 }));
             cv.fillRect(48, 178, 1504, 1, t.tick);
@@ -538,9 +538,9 @@ mgu.run({
             return ui.image('MAIN_GFX', cv);
         }
 
-        let loop = ctx.loop('MAIN', settings.get('fps'), render);
+        // every screen refresh (60 fps) with the GPU renderer; 2 fps in software (PNG frames)
+        ctx.loop('MAIN', 2, render);
         settings.onChange((k) => {
-            if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); }
             if (k === 'poll') schedule();
         });
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));

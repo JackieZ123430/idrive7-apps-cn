@@ -64,6 +64,19 @@ function smooth(key, target, w) {
     if (Math.abs(target - s.x) < 1e-6 * (Math.abs(target) + 1) && Math.abs(s.v) < 1e-4) s.x = target;
     return s.x;
 }
+/**
+ * A readout that changes at most every `ms` (default 200 = 5 times a second, like the OEM
+ * cluster's speed): the value of `key` sampled then and held in between. At 60 fps a number
+ * that follows every sample flickers.
+ */
+const holds = new Map();
+function hold(key, value, ms) {
+    const now = Date.now(), h = holds.get(key);
+    if (!isNum(value)) { holds.delete(key); return value; }
+    if (h && now - h.t < (ms || 200) && now >= h.t) return h.v;
+    holds.set(key, { v: value, t: now });
+    return value;
+}
 const sm = (g, key, v) => (g.smooth === false ? v : smooth(key, v, typeof g.smooth === 'number' ? g.smooth : 16));
 
 /* ---------------- layer cache ---------------- */
@@ -635,11 +648,13 @@ function badgeRow(cv, t, xr, y, h, size, badges) {
 /**
  * Full-screen header in screen pixels (x, y, w, h): the app's name, its page tabs (selected
  * one lit, with an underline) and badges on the right. Tabs that don't fit drop the name.
+ * flat: no sheen (plain t.bg).
  */
-function header(cv, t, x, y, w, h, title, tabs, sel, badges) {
+function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat) {
     const S = t.sel || t.accent, opt = { align: 'center', font: 'bold', spacing: 2 };
     cv.fillRect(x, y, w, h, t.bg);
-    cv.gradientRect(x, y, w, h, [[0, withAlpha('#ffffff', 0.02)], [1, withAlpha('#ffffff', 0.08)]]);
+    // flat: plain, to match the HMI's own black strip next to it
+    if (!flat) cv.gradientRect(x, y, w, h, [[0, withAlpha('#ffffff', 0.02)], [1, withAlpha('#ffffff', 0.08)]]);
     cv.fillRect(x, y + h - 2, w, 2, withAlpha('#ffffff', 0.22));
     const right = badgeRow(cv, t, x + w - 16, y + (h - 30) / 2, 30, 18, badges || []);
     const names = (tabs || []).map((n) => String(n).toUpperCase());
@@ -698,6 +713,6 @@ function stripes(cv, t, x, y, w) {
 
 module.exports = {
     BAR_H, TOP, BOTTOM, frame, header, layer, onLayerDrop, panel, segBar, radial, needle, ring, bar, stat, readout,
-    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, smooth, niceStep,
+    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, smooth, hold, niceStep,
     fmt, isNum, clamp, mix, zoneColor, withAlpha, ramp,
 };

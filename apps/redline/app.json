@@ -2,7 +2,7 @@
   "id": "redline",
   "title": "Redline",
   "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "vendor": "custom",
   "loggingId": "OA97",
   "iconGlyph": "rpm",
@@ -25,7 +25,7 @@
       "kind": "canvas",
       "title": "Redline",
       "buttons": [
-        ["BTN_RESET", "Reset peaks"],
+        ["BTN_RESET", "Reset max"],
         ["BTN_PAGE", "Next page"],
         ["BTN_PREV", "Previous page"],
         ["BTN_SETTINGS", "Settings"]
@@ -51,7 +51,7 @@
      "options": [["kmh", "km/h"], ["mph", "mph"]]},
     {"key": "peakHold", "label": "Peak hold (0 = until reset)", "type": "number", "unit": "s", "default": 15,
      "steps": [0, 5, 10, 15, 30, 60]},
-    {"key": "fps", "label": "Refresh rate", "type": "number", "unit": "fps", "default": 15, "steps": [6, 8, 10, 12, 15]},
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 5, "steps": [5, 10, 15, 30, 60]},
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
      "options": [["full", "Full screen"], ["standard", "Standard"]]},
     {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",

@@ -140,7 +140,7 @@ mgu.run({
                 G.bar(cv, t, 672, 233 + i * 108, 372, 92, { label: l + '  ' + side, value: v, decimals: 2, max: settings.get('scale'), ramp: 'hot', peak: pk[i] });
             });
             const d = car.data();
-            cv.text(G.fmt(V(d.speed), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });
+            cv.text(G.fmt(V(G.hold('speed', d.speed, 1000 / settings.get('speedRate'))), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });
 
             // session peaks
             G.panel(cv, t, 1092, 44, 484, 468, 'Session peaks');
@@ -182,7 +182,7 @@ mgu.run({
         }
 
         let clearArmed = null;
-        const actionLabel = () => ui.text('BTN_ACTION', page === 0 ? 'New session' : clearArmed ? 'Press again to clear' : 'Clear records');
+        const actionLabel = () => ui.text('BTN_ACTION', page === 0 ? 'Reset max' : clearArmed ? 'Yes, clear' : 'Delete all');
         const flip = () => { page = 1 - page; actionLabel(); return render(); };
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
@@ -195,8 +195,8 @@ mgu.run({
             if (R === rec) saveSoon();
             actionLabel(); return render();
         });
-        let loop = ctx.loop('MAIN', settings.get('fps'), render);
-        settings.onChange((k) => { if (k === 'fps') { loop.stop(); loop = ctx.loop('MAIN', settings.get('fps'), render); } });
+        // every screen refresh (60 fps) with the GPU renderer; 10 fps in software (PNG frames)
+        ctx.loop('MAIN', 10, render);
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
     },
 });
