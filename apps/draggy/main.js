@@ -149,7 +149,7 @@ mgu.run({
             const col = stCol === 'go' ? GO : t[stCol];
             // --- speed + clock ---
             G.panel(cv, t, 24, 44, 520, 468, 'Speed');
-            const sp = V(G.hold('speed', live.speed, 1000 / settings.get('speedRate')));   // setting: 5/s like the cluster .. 60
+            const sp = V(G.hold('speed', live.speed, 1000 / settings.get('speedRate')));   // setting: 10/s by default, 5 like the cluster .. 60
             cv.text(G.fmt(sp, 0), 460, 227, 150, G.isNum(sp) ? t.text : t.dim, { align: 'right', font: 'num' });
             cv.text(vU(), 476, 227, 28, t.dim);
             cv.fillRect(44, 255, 480, 2, t.panelEdge);

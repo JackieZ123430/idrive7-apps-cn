@@ -2,7 +2,7 @@
   "id": "redline",
   "title": "Redline",
   "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard",
-  "version": "1.7.3",
+  "version": "1.8.0",
   "vendor": "custom",
   "loggingId": "OA97",
   "iconGlyph": "rpm",
@@ -33,8 +33,6 @@
     }
   ],
   "settings": [
-    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
-     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
     {"key": "redline", "label": "Redline", "type": "number", "unit": "rpm", "default": 7000,
      "steps": [5000, 5500, 6000, 6500, 7000, 7200, 7500, 7800, 8000, 8500, 9000]},
     {"key": "shiftBefore", "label": "Shift point before redline", "type": "number", "unit": "rpm", "default": 300,
@@ -51,11 +49,13 @@
      "options": [["kmh", "km/h"], ["mph", "mph"]]},
     {"key": "peakHold", "label": "Peak hold (0 = until reset)", "type": "number", "unit": "s", "default": 15,
      "steps": [0, 5, 10, 15, 30, 60]},
-    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 5, "steps": [5, 10, 15, 30, 60]},
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [5, 10, 15, 30, 60]},
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
      "options": [["full", "Full screen"], ["standard", "Standard"]]},
     {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU (60 fps)"], ["software", "Software"]]},
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
     {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
      "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
   ]

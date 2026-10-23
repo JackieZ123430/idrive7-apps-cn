@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -52,30 +52,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "theme",
-      "label": "Colour theme",
-      "type": "choice",
-      "default": "m_tricolour",
-      "options": [
-        [
-          "m_red",
-          "M Red"
-        ],
-        [
-          "m_tricolour",
-          "M Tricolour"
-        ],
-        [
-          "ice",
-          "Ice White"
-        ],
-        [
-          "amber",
-          "Night Amber"
-        ]
-      ]
-    },
     {
       "key": "range20",
       "label": "Electric range when full, 20 °C",
@@ -297,10 +273,34 @@
       "type": "bool",
       "default": false
     },
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
      "options": [["full", "Full screen"], ["standard", "Standard"]]},
     {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU (60 fps)"], ["software", "Software"]]},
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
     {
       "key": "demo",
       "label": "Demo data",

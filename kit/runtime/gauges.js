@@ -649,8 +649,12 @@ function badgeRow(cv, t, xr, y, h, size, badges) {
  * Full-screen header in screen pixels (x, y, w, h): the app's name, its page tabs (selected
  * one lit, with an underline) and badges on the right. Tabs that don't fit drop the name.
  * flat: no sheen (plain t.bg).
+ * compact: smaller text, badges right after the tabs and only as wide as that content, so the
+ * HMI's own status strip (radio station, phone signal, icons) can show to the right of it.
+ * Returns the x where the header's content ends.
  */
-function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat) {
+function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat, compact) {
+    if (compact) return headerCompact(cv, t, x, y, w, h, title, tabs, sel, badges);
     const S = t.sel || t.accent, opt = { align: 'center', font: 'bold', spacing: 2 };
     cv.fillRect(x, y, w, h, t.bg);
     // flat: plain, to match the HMI's own black strip next to it
@@ -677,6 +681,44 @@ function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat) {
         if (i < names.length - 1) cv.fillRect(tx + bw, y + h * 0.28, 1, h * 0.44, withAlpha('#ffffff', 0.14));
         tx += bw;
     });
+}
+
+function headerCompact(cv, t, x, y, w, h, title, tabs, sel, badges) {
+    const S = t.sel || t.accent, opt = { align: 'center', font: 'bold', spacing: 1.6 };
+    const bopt = { align: 'center', font: 'bold', spacing: 1.5 };
+    const names = (tabs || []).map((n) => String(n).toUpperCase());
+    const tw = names.map((n) => Math.max(132, cv.textWidth(n, 18, opt) + 44));
+    const tabsW = tw.reduce((a, b) => a + b, 0);
+    const bh = 30, bsize = 17;
+    const bws = (badges || []).map((b) => Math.max(bh * 3.5, cv.textWidth(b.text, bsize, bopt) + bh));
+    const badgesW = bws.reduce((a, b) => a + b + bh * 0.4, 0);
+    const tsize = 32, titleW = title ? cv.textWidth(title, tsize) : 0;
+    const room = w - 20 - (badgesW ? badgesW + 12 : 0);
+    const showTitle = title && titleW + 32 + tabsW <= room;
+    // only as wide as the content: the rest of the strip stays the HMI's
+    let end = x + 20 + (showTitle ? titleW + 32 : 0);
+    names.forEach((n, i) => { if (end + tw[i] <= x + room) end += tw[i]; });
+    end = Math.min(x + w, end + (badgesW ? 12 + badgesW : 0) + 16);
+    cv.fillRect(x, y, end - x, h, t.bg);
+    cv.fillRect(x, y + h - 2, end - x, 2, withAlpha('#ffffff', 0.22));
+    let tx = x + 20;
+    if (showTitle) {
+        cv.text(title, tx, y + h / 2 + tsize * 0.36, tsize, t.text);
+        tx += titleW + 32;
+    }
+    names.forEach((n, i) => {
+        const on = i === sel, bw = tw[i];
+        if (tx + bw > x + room) return;
+        if (on) {
+            cv.gradientRect(tx, y, bw, h, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.25)]]);
+            cv.fillRect(tx, y + h - 4, bw, 4, S);
+        }
+        cv.text(n, tx + bw / 2, y + h / 2 + 6, 18, on ? t.selText || '#ffffff' : t.dim, opt);
+        if (i < names.length - 1) cv.fillRect(tx + bw, y + h * 0.3, 1, h * 0.4, withAlpha('#ffffff', 0.14));
+        tx += bw;
+    });
+    if (badgesW) badgeRow(cv, t, tx + 12 + badgesW, y + (h - bh) / 2, bh, bsize, badges);
+    return end;
 }
 
 /**

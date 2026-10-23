@@ -16,3 +16,5 @@ kit/renderd/protocol/*-protocol.c
 kit/renderd/protocol/*-client-protocol.h
 # fault texts for one car from a coding tool export (kit/tools/dtc_texts.py)
 apps/dtc_scanner/dtc_texts.js
+# fault text database (BMW's texts per control unit), imported with kit/tools/dtc_texts.py --db
+apps/dtc_scanner/dtc_db/

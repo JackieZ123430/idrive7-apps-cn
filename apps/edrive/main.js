@@ -2,10 +2,14 @@
 /**
  * eDrive - what the high-voltage battery really gives you.
  *
- *   - real electric range: (charge - the charge the engine starts at) x km per %.
- *     km per % is learned from electric-only driving (engine off between two charge
- *     readings, last ~60 km); until then it comes from the range a full battery gives
- *     at the outside temperature (RANGE_CURVE, scaled to your "range when full, 20 °C").
+ *   - real electric range: the charge above the one the engine starts at, divided by what
+ *     this car uses: per km for driving (learned from electric-only driving, last ~60 km)
+ *     plus per hour for climate control and the on-board electrics (heating when cold,
+ *     A/C when hot: it costs range by the hour, so more of it in slow traffic). The hourly
+ *     draw is learned per outside-temperature band, mostly from standing / creeping with
+ *     the engine off; until then a typical draw for the temperature (AUX_KW) is used.
+ *     Before any electric driving is learned: the range a full battery gives at the outside
+ *     temperature (RANGE_CURVE, scaled to your "range when full, 20 °C").
  *     The engine-start charge is learned from engine starts while driving at <= 20 %.
  *   - battery health (SOH): usable capacity compared to a new battery
  *   - energy in the battery now: charge x SOH x size when new (kWh)
@@ -30,6 +34,7 @@ const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { Diag, hex } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
+const { RangeModel } = require('./range');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
@@ -39,7 +44,6 @@ const LOSS = 1.1;                // grid energy per kWh stored (charger + batter
 const KM_MI = 0.621371;
 const VALUES = ['soc', 'soh', 'v12'];
 const V12_HIST = 120;            // 12 V samples kept (one per 30 s = 1 h)
-const LEARN_KM = 60;             // electric driving remembered for km per % (older km fade out)
 const RESERVE = 8;               // engine-start charge (%) until two engine starts have been seen
 
 /**
@@ -92,6 +96,10 @@ mgu.run({
         let st = {};
         try { st = JSON.parse(fs.readFileSync(STATE, 'utf8')) || {}; } catch (e) { /* first run */ }
         if (st.lastCharge && !st.log) st.log = [st.lastCharge];      // saved by v1.1 (no log yet)
+        // learned before 1.8 the use per km also held the climate draw: keep it, but light, so it relearns soon
+        if (st.learn && st.rangeV !== 2) { const f = Math.min(1, 10 / st.learn.km); st.learn.km *= f; st.learn.pct *= f; }
+        st.rangeV = 2;
+        const model = new RangeModel(st);
         let savedAt = 0;
         const save = () => {
             savedAt = Date.now();
@@ -129,13 +137,8 @@ mgu.run({
             const e = (st.engineStarts || []).slice().sort((a, b) => a - b);
             return e.length >= 2 ? e[Math.floor(e.length / 2)] : RESERVE;
         }
-        /** km per % from electric-only driving, once there is enough of it (>= 5 km and 3 %). */
-        function learnedKmPerPct() {
-            const L = st.learn;
-            if (!L || L.km < 5 || L.pct < 3) return null;
-            const k = L.km / L.pct;
-            return k > 0.1 && k < 3 ? k : null;
-        }
+        /** kWh in 1 % of charge today (size when new x health). */
+        const kwhPerPct = () => settings.get('designKwh') * (G.isNum(live.soh) ? live.soh : 100) / 100 / 100;
 
         ctx.signals.watch('de.bmw.infrastructure.EnvironmentalInformation', '1', {
             ExteriorTemperature: (v) => { const a = sc('ambient', v.temperatureExterior); if (a !== null) live.ambient = a; },
@@ -176,12 +179,11 @@ mgu.run({
         }
         function onSoc(soc, now) {
             const prev = st.lastSoc, moving = G.isNum(live.speed) && live.speed > 3;
-            // electric driving since the last reading (engine seen off throughout): learn km per %
-            if (G.isNum(prev) && now - (st.lastSocT || 0) < 120000 && seg.km > 0.05 && !seg.engine && now - live.rpmT < 5000) {
-                const L = st.learn || { km: 0, pct: 0 };
-                L.km += seg.km; L.pct += prev - soc;                   // regen counts against the % used
-                if (L.km > LEARN_KM) { const f = LEARN_KM / L.km; L.km *= f; L.pct *= f; }
-                st.learn = L;
+            // since the last reading with the engine off throughout (and the car awake: rpm signal live):
+            // standing / creeping teaches the climate + on-board draw per hour, driving the use per km
+            const h = (now - (st.lastSocT || 0)) / 3600000;
+            if (G.isNum(prev) && h < 120000 / 3600000 && !seg.engine && now - live.rpmT < 5000 && !st.session) {
+                model.learn(prev - soc, h, seg.km, live.ambient, kwhPerPct());
             }
             seg.km = 0; seg.engine = G.isNum(live.rpm) && live.rpm > 400;
             if (G.isNum(prev)) {
@@ -302,18 +304,26 @@ mgu.run({
             return { lo: lo * k, hi: hi * k, mid: (lo + hi) / 2 * k };
         }
         /**
-         * Electric range at charge soc: { mid, lo, hi, kpp (km per %), learned, res (engine-start %), full }.
-         * Only the charge above the engine-start point counts.
+         * Electric range at charge soc: { mid, lo, hi, kpp (km per %), learned, res (engine-start %), full,
+         * auxKw (climate + on-board draw), auxLearned, auxKm (range it costs) }. Only the charge above the
+         * engine-start point counts. Learned: % per km driving + (% per hour climate / typical speed).
          */
         function estimate(soc, tC) {
-            const res = reserve(), span = Math.max(1, 100 - res), r = rangeAt(tC), learned = learnedKmPerPct();
-            const kpp = learned || r.mid / span, use = G.isNum(soc) ? Math.max(0, soc - res) : null;
-            const mid = use === null ? null : use * kpp;
-            return {
-                mid, lo: use === null ? null : learned ? mid * 0.9 : use * r.lo / span,
-                hi: use === null ? null : learned ? mid * 1.1 : use * r.hi / span,
-                kpp, learned: !!learned, res, full: kpp * span,
-            };
+            const res = reserve(), span = Math.max(1, 100 - res), use = G.isNum(soc) ? Math.max(0, soc - res) : null;
+            const k = kwhPerPct(), m = model.range(use, tC, k), aux = m ? m.aux : model.auxRate(tC, k);
+            const base = { res, auxKw: aux.rate * k, auxLearned: aux.learned };
+            if (m) {
+                return Object.assign(base, {
+                    mid: m.mid, lo: use === null ? null : m.mid * 0.9, hi: use === null ? null : m.mid * 1.1,
+                    kpp: m.kpp, learned: true, full: m.kpp * span, auxKm: use === null ? null : m.noAux - m.mid,
+                });
+            }
+            // before driving is learned: the temperature curve (it already holds typical climate use)
+            const r = rangeAt(tC), kpp = r.mid / span, mid = use === null ? null : use * kpp;
+            return Object.assign(base, {
+                mid, lo: use === null ? null : use * r.lo / span, hi: use === null ? null : use * r.hi / span,
+                kpp, learned: false, full: kpp * span, auxKm: null,
+            });
         }
         /** km a charge of +pct % adds (charge log). */
         const kmOf = (pct) => pct * estimate(null, live.ambient).kpp;
@@ -391,7 +401,11 @@ mgu.run({
                 label: 'Full: ' + Math.round(D(e.full)) + ' ' + dU(), value: has ? D(e.mid) : null, unit: dU(), max: D(e.full), niceMax: true, ramp: 'hot',
             });
             cv.text(e.learned ? 'from your last ' + Math.round(D(st.learn.km)) + ' ' + dU() + ' of electric driving'
-                : 'estimate - learns as you drive electric', 48, 412, 24, t.dim);
+                : 'estimate - learns as you drive electric', 48, 404, 24, t.dim);
+            // climate control + on-board electrics: costs range by the hour
+            const ac = e.auxKw >= 1.5 ? t.warn : t.dim;
+            cv.text('CLIMATE & ON-BOARD  ' + G.fmt(e.auxKw, 1) + ' kW' + (e.auxLearned ? '' : ' (typical)')
+                + (G.isNum(e.auxKm) && has ? '  ·  -' + Math.round(D(e.auxKm)) + ' ' + dU() : ''), 48, 444, 22, ac, { font: 'bold', spacing: 1 });
             const amb = G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) + ' ' + tU() : '--';
             cv.text('OUTSIDE  ' + amb, 48, 486, 24, t.dim, { font: 'bold', spacing: 1 });
             // 12 V battery: resting ~12.4-12.8 V, 13.5-14.8 V while the DC/DC or alternator charges it

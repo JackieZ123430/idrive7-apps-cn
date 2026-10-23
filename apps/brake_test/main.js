@@ -17,6 +17,8 @@ const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
 
+const SPEED_MS = 100;   // speed readout: 10 times a second
+
 const W = 1600, H = 520;
 const MPH = 1.609344, FT = 3.28084;
 const GO = '#2fd27a';
@@ -133,13 +135,13 @@ mgu.run({
                 const other = tests().find((x) => x.key !== showKey && last.result[x.key]);
                 if (other) cv.text(other.label + ':  ' + D(last.result[other.key].m).toFixed(1) + ' ' + dU() + '  ·  ' + last.result[other.key].s.toFixed(2) + ' s', 48, 380, 22, t.text);
             } else if (run) {
-                cv.text(G.fmt(V(G.hold('speed', d.speed, 1000 / settings.get('speedRate'))), 0) + (mph() ? ' mph' : ' km/h') + '  ·  ' + G.fmt(-d.gLong, 2) + ' g', 48, 295, 30, t.text, { font: 'bold' });
+                cv.text(G.fmt(V(G.hold('speed', d.speed, SPEED_MS)), 0) + (mph() ? ' mph' : ' km/h') + '  ·  ' + G.fmt(-d.gLong, 2) + ' g', 48, 295, 30, t.text, { font: 'bold' });
             }
             const st = state === 'arm' ? STATE.arm + Math.round(V(low.v) + 3) + (mph() ? ' MPH' : ' KM/H') : STATE[state];
             const col = state === 'ready' ? GO : state === 'braking' ? t.crit : t.dim;
             cv.roundRect(48, 412, 422, 44, 8, withAlpha(col, state === 'ready' ? 0.25 + 0.2 * Math.sin(now / 160) : 0.18));
             cv.text(msg && now < msgUntil ? msg.toUpperCase() : st, 259, 445, msg && now < msgUntil ? 18 : 24, col, { align: 'center', font: 'bold', spacing: 2 });
-            cv.text('SPEED ' + G.fmt(V(G.hold('speed', d.speed, 1000 / settings.get('speedRate'))), 0) + '   ·   ' + G.fmt(d.gLong, 2) + ' g', 48, 495, 22, t.dim, { font: 'bold', spacing: 0.5 });
+            cv.text('SPEED ' + G.fmt(V(G.hold('speed', d.speed, SPEED_MS)), 0) + '   ·   ' + G.fmt(d.gLong, 2) + ' g', 48, 495, 22, t.dim, { font: 'bold', spacing: 0.5 });
 
             // ---- decel trace (g over distance)
             G.panel(cv, t, 518, 44, 620, 468, 'Deceleration');

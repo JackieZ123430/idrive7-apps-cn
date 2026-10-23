@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.11.2",
+  "version": "2.12.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -75,30 +75,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "theme",
-      "label": "Colour theme",
-      "type": "choice",
-      "default": "m_tricolour",
-      "options": [
-        [
-          "m_red",
-          "M Red"
-        ],
-        [
-          "m_tricolour",
-          "M Tricolour"
-        ],
-        [
-          "ice",
-          "Ice White"
-        ],
-        [
-          "amber",
-          "Night Amber"
-        ]
-      ]
-    },
     {
       "key": "page",
       "label": "Start page",
@@ -277,31 +253,6 @@
         125,
         130,
         135
-      ]
-    },
-    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 5, "steps": [5, 10, 15, 30, 60]},
-    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
-     "options": [["full", "Full screen"], ["standard", "Standard"]]},
-    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU (60 fps)"], ["software", "Software"]]},
-    {
-      "key": "demo",
-      "label": "Demo data",
-      "type": "choice",
-      "default": "auto",
-      "options": [
-        [
-          "auto",
-          "Auto"
-        ],
-        [
-          "on",
-          "Always"
-        ],
-        [
-          "off",
-          "Never"
-        ]
       ]
     },
     {
@@ -561,6 +512,55 @@
         [
           "off",
           "Hide"
+        ]
+      ]
+    },
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [5, 10, 15, 30, 60]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
+    {
+      "key": "demo",
+      "label": "Demo data",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Always"
+        ],
+        [
+          "off",
+          "Never"
         ]
       ]
     }
