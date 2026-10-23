@@ -38,7 +38,7 @@ const HMI = {
     // "Settings" 370 px wide)
     btn: { x: 132, pad: 180, size: 40, k: 1.465 },
     left: 84,                                   // the HMI's back arrow column (x 0..84): kept see-through
-    barTop: 600,                                // top of the HMI's own 120 px button bar
+    barTop: 596,                                // top of the HMI's own button bar (its 2 px edge line; body from 600)
     headBg: '#000000',                          // the HMI's title / status strip
     status: { x: 1340, h: 76 },                 // status icons top right (notifications .. clock)
 };
