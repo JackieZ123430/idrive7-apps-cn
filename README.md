@@ -138,6 +138,17 @@ HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh restore  # und
 `KEY` is the SSH private key for the unit (`chmod 600` it). Every command needs it, unless
 the key is already in your `~/.ssh/config` or ssh-agent.
 
+**Windows (no WSL):** `deploy/push-to-car.ps1` does the same with Windows' own OpenSSH client,
+using the SSH key the [idrive7-8-ssh-root](https://github.com/cauliflowermossgrape/idrive7-8-ssh-root)
+tool writes (`data\enrollments\<VIN>\id_rsa`, the unit's IP is in `connect.txt` next to it):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\push-to-car.ps1 check   -Key <path>\id_rsa -Ip <unit-ip>
+powershell -ExecutionPolicy Bypass -File deploy\push-to-car.ps1 install -Key <path>\id_rsa -Ip <unit-ip>
+```
+
+It takes `dist\mgu-custom-apps.tar.gz` (or `-Kit <path>`), so the kit can also be built elsewhere.
+
 No network? Copy `dist/mgu-custom-apps/` to a USB stick and on the unit run
 `sh deploy-car.sh check`, then `sh deploy-car.sh install`.
 

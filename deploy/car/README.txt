@@ -57,7 +57,7 @@ Files it touches
   /var/opt/public/oap/oap_12201/data/custom_apps.json    (new) our app list
   /var/opt/public/oap/_mgu_custom/                       (new) patched main.js + boot script
   /etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf   (new)
-  /var/opt/public/oap/oap_12221.. oap_12299/             (new) the apps
+  /var/opt/public/oap/oap_<12450 downwards>/             (new) the apps
 
 The provisioning hook (why it is needed)
 ----------------------------------------
@@ -77,4 +77,6 @@ Things to know
   data folder is wiped, 2nd: it is uninstalled). Re-run install to bring it back.
 * Never kill an app process by hand for the same reason; the installer restarts
   the platform instead.
-* BMW's own apps are never modified (the installer refuses uids below 12221).
+* BMW's own apps are never modified: the installer only updates or removes apps it
+  installed itself (built with the kit or listed in custom_apps.json), and gives new
+  apps uids from the top of MainApp's range (12450 down) so the two never collide.
