@@ -40,11 +40,42 @@ const ECU = {
     0x64: 'PDC parking', 0x67: 'ZBE controller', 0x6D: 'SM seat module', 0x76: 'VDP dampers',
     0x78: 'IHKA climate',
 };
-const ecuName = (a) => ECU[a] || ('ECU 0x' + hex(a));
-// fault texts for this car from a coding tool's export (kit/tools/dtc_texts.py; not in git)
-let TEXTS = {};
-try { TEXTS = require('./dtc_texts'); } catch (e) { /* none generated */ }
-const describe = (addr, code) => TEXTS[hex(addr) + ':' + code] || null;
+// Fault texts, first match wins:
+//  1. dtc_texts.js   this car's own coding tool export (kit/tools/dtc_texts.py; not in git)
+//  2. known_texts.js a few hand-written ones (in git)
+//  3. dtc_db/        a fault text database imported with kit/tools/dtc_texts.py --db (not in git: it is
+//                    BMW's). Each unit's SGBD index (UDS 22 F1 50, what ISTA's identification reads)
+//                    picks its texts: sgbd_index.json "<address> <index>" -> texts/<SGBD>.json;
+//                    dtc_texts.json there holds "<address>:<code>" ones; unit_names.json names the unit.
+const DB = path.join(__dirname, 'dtc_db');
+const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return {}; } };
+const req = (m) => { try { return require(m); } catch (e) { return {}; } };
+const TEXTS = Object.assign({}, readJson(path.join(DB, 'dtc_texts.json')), req('./known_texts'), req('./dtc_texts'));
+const SGBD = readJson(path.join(DB, 'sgbd_index.json'));
+const UNIT_NAMES = readJson(path.join(DB, 'unit_names.json'));
+const HAS_DB = Object.keys(SGBD).length > 0;
+let ids = {};                     // "12" -> "0F26E8" (unit's SGBD index); '' = asked, gave none
+const variant = (a) => {
+    const v = ids[hex(a)] ? SGBD[hex(a) + ' ' + ids[hex(a)]] : null;
+    return v && /^[A-Za-z0-9_]+$/.test(v) ? v : null;
+};
+// the fonts are ASCII only; database texts can be German
+const ascii = (s) => String(s).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae')
+    .replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[^\x20-\x7e]/g, '');
+const variantTexts = {};          // SGBD -> { code: text }, read on first use
+function describe(addr, code) {
+    const own = TEXTS[hex(addr) + ':' + code];
+    if (own) return ascii(own);
+    const v = variant(addr);
+    if (!v) return null;
+    if (!variantTexts[v]) variantTexts[v] = readJson(path.join(DB, 'texts', v + '.json'));
+    return variantTexts[v][code] ? ascii(variantTexts[v][code]) : null;
+}
+// a unit the database identified is named by what it is (same on every model); else the address table
+const ecuName = (a) => {
+    const v = variant(a);
+    return (v && UNIT_NAMES[v] && ascii(UNIT_NAMES[v])) || ECU[a] || v || ('ECU 0x' + hex(a));
+};
 
 mgu.run({
     async start(ctx) {
@@ -55,6 +86,8 @@ mgu.run({
         const FILE = path.join(ctx.dataDir, 'last_scan.json');
         let scan = null;              // { at, demo, ecus: [{ addr, dtcs: [{code,status,mem}], nrc }] }
         try { scan = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { /* none yet */ }
+        const IDS = path.join(ctx.dataDir, 'ecu_ids.json');
+        ids = readJson(IDS);
         let phase = 'idle', msg = '', replies = 0, busy = false, version = 0;
         const changed = () => { version++; loop && loop.kick(); };
         const useDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !diag.available);
@@ -114,6 +147,7 @@ mgu.run({
                     }
                     scan = { at: Date.now(), demo: false, ecus: Array.from(byEcu.values()), infoFailed };
                     try { fs.writeFileSync(FILE, JSON.stringify(scan)); } catch (e) { log.warn('save scan: ' + e); }
+                    await identify(scan.ecus.filter((e) => e.dtcs.length).map((e) => e.addr));
                 }
                 scan.ecus.sort((a, b) => b.dtcs.length - a.dtcs.length || a.addr - b.addr);
                 const n = scan.ecus.reduce((s, e) => s + e.dtcs.length, 0);
@@ -127,6 +161,26 @@ mgu.run({
             busy = false; page = 0;
             ui.text('BTN_SCAN', 'Scan again');
             changed();
+        }
+
+        /**
+         * Ask units with faults for their SGBD index once (22 F1 50), so the database can give their
+         * faults a text. Read-only; a unit that doesn't answer is not asked again.
+         */
+        async function identify(addrs) {
+            const todo = HAS_DB ? addrs.filter((a) => ids[hex(a)] === undefined) : [];
+            if (!todo.length) return;
+            msg = 'Identifying control units...'; changed();
+            for (const a of todo) {
+                try {
+                    const r = await diag.physical(a, 0x22, [0xF1, 0x50], 3000,
+                        (u) => (u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50) || (u[0] === 0x7F && u[1] === 0x22));
+                    ids[hex(a)] = r && r[0] === 0x62 && r.length >= 6 ? hex(((r[3] << 16) | (r[4] << 8) | r[5]) >>> 0, 6) : '';
+                    log.info('unit ' + hex(a) + ': SGBD index ' + (ids[hex(a)] || 'none') + (variant(a) ? ' -> ' + variant(a) : ''));
+                } catch (e) { log.warn('identify ' + hex(a) + ': ' + e); }
+            }
+            try { fs.writeFileSync(IDS, JSON.stringify(ids)); } catch (e) { log.warn('save ids: ' + e); }
+            msg = '';
         }
 
         let clearArmed = null;
@@ -170,6 +224,14 @@ mgu.run({
         const pageCount = () => Math.max(1, Math.ceil(faults().length / PER_PAGE)) + 2;
         const when = (ms) => { const d = new Date(ms); const p = (n) => String(n).padStart(2, '0'); return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
         const ccList = () => (scan && scan.demo ? DEMO.cc : Array.from(cc.entries()).map(([id, m]) => Object.assign({ id }, m, ccNames.get(id) || {})));
+
+        /** txt cut with "..." to at most max px wide */
+        function fit(cv, txt, size, max, opt) {
+            txt = String(txt);
+            if (cv.textWidth(txt, size, opt) <= max) return txt;
+            while (txt.length > 4 && cv.textWidth(txt + '...', size, opt) > max) txt = txt.slice(0, -1);
+            return txt.trim() + '...';
+        }
 
         function tile(cv, t, x, label, value, sub, col) {
             G.panel(cv, t, x, 44, 374, 115, label);
@@ -228,15 +290,11 @@ mgu.run({
                 cv.roundRect(48, y, 170, 34, 6, withAlpha(col, 0.22));
                 cv.text(s.label, 133, y + 25, 20, col, { align: 'center', font: 'bold', spacing: 0.5 });
                 cv.text(d.code, 246, y + 28, 32, t.text, { font: 'bold', spacing: 1 });
-                cv.text(ecuName(d.addr), 420, y + 27, 26, t.text);
+                cv.text(fit(cv, ecuName(d.addr), 26, 680 - 420 - 16), 420, y + 27, 26, t.text);
                 // the fault's text when known (cut to fit)
                 const desc = describe(d.addr, d.code);
-                let txt = desc ? (d.mem === 'info' ? 'INFO: ' : '') + desc : d.mem === 'info' ? 'INFO MEMORY' : '';
-                if (txt) {
-                    const max = 1552 - 680;
-                    if (cv.textWidth(txt, 22) > max) { while (txt.length > 4 && cv.textWidth(txt + '...', 22) > max) txt = txt.slice(0, -1); txt = txt.trim() + '...'; }
-                    cv.text(txt, 680, y + 27, 22, t.dim);
-                }
+                const txt = desc ? (d.mem === 'info' ? 'INFO: ' : '') + desc : d.mem === 'info' ? 'INFO MEMORY' : '';
+                if (txt) cv.text(fit(cv, txt, 22, 1552 - 680), 680, y + 27, 22, t.dim);
                 if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
         }
@@ -250,7 +308,7 @@ mgu.run({
                 const y = 231 + i * 47;
                 cv.circle(66, y + 18, 9, COL[m.color] || t.dim);
                 cv.text(m.name || 'Message ' + m.id, 92, y + 27, 28, t.text, { font: 'bold' });
-                if (m.ecu !== undefined) cv.text(ecuName(m.ecu), 1552, y + 27, 22, t.dim, { align: 'right' });
+                if (m.ecu !== undefined) cv.text(fit(cv, ecuName(m.ecu), 22, 420), 1552, y + 27, 22, t.dim, { align: 'right' });
                 if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
             if (l.length > PER_PAGE) cv.text('+ ' + (l.length - PER_PAGE) + ' more', 1552, 506, 22, t.dim, { align: 'right' });
@@ -267,7 +325,7 @@ mgu.run({
                 const col = act ? t.crit : n ? t.warn : GO;
                 cv.roundRect(x, y, cw, ch - 6, 6, withAlpha(col, 0.12));
                 cv.fillRect(x, y, 5, ch - 6, col);
-                cv.text(ecuName(e.addr), x + 18, y + (e.nrc ? 23 : 32), 22, t.text, { font: 'bold' });
+                cv.text(fit(cv, ecuName(e.addr), 22, cw - 120, { font: 'bold' }), x + 18, y + (e.nrc ? 23 : 32), 22, t.text, { font: 'bold' });
                 if (e.nrc) cv.text(NRC[e.nrc] || 'NRC ' + hex(e.nrc), x + 18, y + 44, 20, t.dim);
                 cv.text(n ? n + (n === 1 ? ' fault' : ' faults') : 'OK', x + cw - 12, y + 32, 22, col, { align: 'right', font: 'bold' });
             });
@@ -298,7 +356,12 @@ mgu.run({
             scannedOnOpen = true;
             setTimeout(doScan, 1500);       // give TASU's availability a moment
         };
-        ui.onVisible((name, on) => { if (name === 'MAIN' && on) maybeAuto(); });
+        // back from Settings or an HMI popup: draw again at once, and once more when the renderer's surface
+        // is up - this app only draws when something changed, so the screen would otherwise stay empty
+        // until the next change (e.g. Next page)
+        const redraw = () => { changed(); setTimeout(changed, 600); };
+        ui.onVisible((name, on) => { if (name === 'MAIN' && on) { maybeAuto(); redraw(); } });
+        if (ui.onFocus) ui.onFocus((name, on) => { if (name === 'MAIN' && on) redraw(); });
         if (ui.isVisible('MAIN')) maybeAuto();
         settings.onChange(() => changed());
         if (scan) ui.text('BTN_SCAN', 'Scan again');

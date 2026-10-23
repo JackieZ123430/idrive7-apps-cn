@@ -116,12 +116,17 @@ def hmi_text(s):
 
 
 def setting_options(s):
-    """(values, labels) of a choice / number setting, in order - the drop-down's rows."""
+    """(values, labels) of a choice / number setting, in order - the drop-down's rows.
+    "markDefault": true adds " (default)" to the default's row."""
     if s['type'] == 'choice':
-        return [o[0] for o in s['options']], [o[1] for o in s['options']]
-    steps = s.get('steps') or []
-    unit = (' ' + s['unit']) if s.get('unit') else ''
-    return list(steps), [('%g' % v) + unit for v in steps]
+        values, labels = [o[0] for o in s['options']], [o[1] for o in s['options']]
+    else:
+        steps = s.get('steps') or []
+        unit = (' ' + s['unit']) if s.get('unit') else ''
+        values, labels = list(steps), [('%g' % v) + unit for v in steps]
+    if s.get('markDefault'):
+        labels = [lb + ' (default)' if v == s.get('default') else lb for v, lb in zip(values, labels)]
+    return values, labels
 
 
 def build_ui(spec):
@@ -309,6 +314,9 @@ def build(app_id):
     for f in os.listdir(adir):
         if f.endswith('.js'):
             shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', 'app.js' if f == 'main.js' else f))
+        elif os.path.isdir(os.path.join(adir, f)):
+            # data folders go along as they are (e.g. dtc_scanner/dtc_db, the fault text database)
+            shutil.copytree(os.path.join(adir, f), os.path.join(src, 'javascript', f))
     # kit runtime
     kr = os.path.join(KIT, 'runtime')
     for f in os.listdir(kr):

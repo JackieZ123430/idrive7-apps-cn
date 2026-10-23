@@ -129,18 +129,21 @@ mgu.run({
             circle(cv, t, 324, 282, 182);
             // live readout
             G.panel(cv, t, 648, 44, 420, 468, 'Now');
-            const comb = G.isNum(cur.long) ? Math.sqrt(cur.lat * cur.lat + cur.long * cur.long) : null;
+            // numbers at the G-force display rate (default 10 a second); the dot and trail stay at full rate
+            const gms = 1000 / (settings.get('gRate') || 10);
+            const hl = G.hold('glat', cur.lat, gms), hg = G.hold('glong', cur.long, gms);
+            const comb = G.isNum(hg) ? Math.sqrt(hl * hl + hg * hg) : null;
             const cw = cv.text(G.fmt(comb, 2), 672, 199, 120, G.isNum(comb) ? (comb > 0.9 ? t.accent2 : t.text) : t.dim, { font: 'num' });
             cv.text('g', 680 + cw, 199, 36, t.dim);
-            const bars = [['LATERAL', G.isNum(cur.lat) ? Math.abs(cur.lat) : null, G.isNum(cur.lat) ? (cur.lat >= 0 ? 'L' : 'R') : ''],
-                ['LONGITUDINAL', G.isNum(cur.long) ? Math.abs(cur.long) : null, G.isNum(cur.long) ? (cur.long >= 0 ? 'ACC' : 'BRK') : '']];
+            const bars = [['LATERAL', G.isNum(hl) ? Math.abs(hl) : null, G.isNum(hl) ? (hl >= 0 ? 'L' : 'R') : ''],
+                ['LONGITUDINAL', G.isNum(hg) ? Math.abs(hg) : null, G.isNum(hg) ? (hg >= 0 ? 'ACC' : 'BRK') : '']];
             // OEM-style bars; the hang is this session's peak on the side it is pulling to now
-            const pk = [cur.lat >= 0 ? S.peak.left : S.peak.right, cur.long >= 0 ? S.peak.acc : S.peak.brk];
+            const pk = [hl >= 0 ? S.peak.left : S.peak.right, hg >= 0 ? S.peak.acc : S.peak.brk];
             bars.forEach(([l, v, side], i) => {
                 G.bar(cv, t, 672, 233 + i * 108, 372, 92, { label: l + '  ' + side, value: v, decimals: 2, max: settings.get('scale'), ramp: 'hot', peak: pk[i] });
             });
             const d = car.data();
-            cv.text(G.fmt(V(G.hold('speed', d.speed, 1000 / settings.get('speedRate'))), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });
+            cv.text(G.fmt(V(G.hold('speed', d.speed, gms)), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });
 
             // session peaks
             G.panel(cv, t, 1092, 44, 484, 468, 'Session peaks');

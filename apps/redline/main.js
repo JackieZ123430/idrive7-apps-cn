@@ -219,7 +219,7 @@ mgu.run({
             if (shiftNow) cv.text('SHIFT', GX + 150, 436, 30, redNow ? '#ff2a2a' : withAlpha('#ff2a2a', 0.5), { font: 'bold', spacing: 3 });
 
             // ---- left: digital speed, temperatures, cold oil, stats
-            const spd = G.hold('speed', d.speed, 1000 / settings.get('speedRate'));     // setting: 5/s like the cluster .. 60
+            const spd = G.hold('speed', d.speed, 1000 / settings.get('speedRate'));     // setting: 10/s by default, 5 like the cluster .. 60
             const v = G.isNum(spd) ? (mph() ? spd / MPH : spd) : null;
             cv.text('SPEED', 40, 156, 22, t.dim, { font: 'bold', spacing: 1.5 });
             const vw = cv.text(G.fmt(v, 0), 36, 276, 116, G.isNum(v) ? t.text : t.dim, { font: 'num' });

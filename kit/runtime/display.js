@@ -15,9 +15,9 @@
  *
  * Layout (setting "layout"):
  *   full      (default) the renderer's surface covers the whole screen right of the HMI's back
- *             arrow. Up top, in the HMI's title strip, a header with the app's name and its
- *             page tabs (G.frame); the HMI's status icons (clock, mic, profile) show through a
- *             see-through corner. At the bottom a slim 48 px button bar drawn by the kit in
+ *             arrow. Up top, in the HMI's title strip, a compact header with the app's name and
+ *             its page tabs (G.frame); right of it the strip is see-through, so the HMI's own
+ *             status (radio station, phone signal, clock, mic, profile) shows. At the bottom a slim 48 px button bar drawn by the kit in
  *             place of the HMI's 120 px one: each label sits over the HMI button under it, so
  *             taps and controller presses land on the right one, and the HMI's focus events
  *             (Focusable=3 bar buttons) light up the button the iDrive controller is on. The
@@ -304,13 +304,15 @@ class Display {
         const c = this.chromeRec || (this.chromeRec = new Recorder(W, H));
         c.reset();
         const tb = r.chrome.tabs || { tabs: [], sel: -1, badges: [] };
-        const sx = HMI.status.x - pl.x;                       // status icons start here
-        // header across the top in the HMI strip's own black; the strip under the status icons gets
-        // its bottom edge too
+        // compact header in the HMI strip's own black, only as wide as its name, tabs and badges:
+        // right of it the HMI's strip shows through (radio station, phone signal, status icons)
         const hx = HMI.left - pl.x;
+        const end = G.header(c, Object.assign({}, t, { bg: HMI.headBg }), hx, 0, HMI.status.x - pl.x - hx, FULL.headH,
+            this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges, true, true);
+        const sx = Math.min(HMI.status.x - pl.x, Math.ceil(end));
+        // the strip's bottom edge continues under the see-through part
         c.fillRect(sx, 0, W - sx, FULL.headH, HMI.headBg);
         c.fillRect(sx, FULL.headH - 2, W - sx, 2, G.withAlpha('#ffffff', 0.22));
-        G.header(c, Object.assign({}, t, { bg: HMI.headBg }), hx, 0, sx - hx, FULL.headH, this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges, true);
         // slim bar: each label over its HMI button
         const by = H - FULL.barH;
         const btns = this.buttons().map((b) => ({ id: b.id, label: b.label, x: b.x - this.barOff - pl.x, w: b.w }));
