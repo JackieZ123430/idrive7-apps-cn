@@ -321,6 +321,10 @@ def build(app_id):
             # (e.g. dtc_scanner/dtc_db, the fault text database -> dtc_db.pack)
             raw, size, _ = pack_data.pack(os.path.join(adir, f), os.path.join(src, 'javascript', f + '.pack'))
             print('  %s/: %.1f MB packed to %.2f MB' % (f, raw / 1e6, size / 1e6))
+        elif f.endswith('.pack') and not os.path.isdir(os.path.join(adir, f[:-5])):
+            # a committed pack (e.g. dtc_scanner/dtc_db.pack); a local folder of the same name replaces it
+            shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', f))
+            print('  %s (committed)' % f)
     # kit runtime
     kr = os.path.join(KIT, 'runtime')
     for f in os.listdir(kr):

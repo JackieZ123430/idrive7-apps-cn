@@ -5,3 +5,4 @@
 *.gif binary
 *.mgu binary
 kit/renderd/prebuilt/mgu-renderd binary
+*.pack binary
