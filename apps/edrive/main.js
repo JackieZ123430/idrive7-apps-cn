@@ -208,17 +208,21 @@ mgu.run({
         }
 
         /* ---------- hybrid system or not ----------
-         * Any reply from the battery unit (even a refusal) = there is a hybrid system.
-         * No reply 3 times in a row while another unit answers = no hybrid system:
-         * remembered, so the next start shows the 12 V page straight away. */
+         * Any reply from the battery unit (even a refusal) = there is a hybrid system, for good
+         * (st.hybrid is remembered, so a real hybrid is never switched off later).
+         * No reply 3 times in a row while another unit answers (the 12 V read) = no hybrid system.
+         * Cars where the 12 V can't be read either (seen on a G06 N63): 6 times in a row with the
+         * diagnostic link up is enough. Remembered, so the next start shows the 12 V page straight away. */
         let smeMiss = 0, lastSocTry = 0;
         function detectHybrid(otherUnitAnswered) {
             const rs = (cfg.soc || []).map((c) => raws[reader.key(c)]);
             if (rs.some((r) => r && r.bytes)) {
                 smeMiss = 0;
                 if (st.noHybrid || !st.hybrid) { st.noHybrid = false; st.hybrid = true; save(); log.info('hybrid battery unit answers'); }
-            } else if (rs.some((r) => r && r.why === 'no reply') && otherUnitAnswered && !st.hybrid) {
-                if (++smeMiss >= 3 && !st.noHybrid) { st.noHybrid = true; save(); log.info('no hybrid battery unit: 12 V only'); }
+            } else if (rs.some((r) => r && r.why === 'no reply') && !st.hybrid) {
+                if (++smeMiss >= (otherUnitAnswered ? 3 : 6) && !st.noHybrid) {
+                    st.noHybrid = true; save(); log.info('no hybrid battery unit: 12 V only');
+                }
             }
         }
         const isHybrid = () => (settings.get('hybrid') === 'yes' ? true : settings.get('hybrid') === 'no' ? false : !st.noHybrid);
