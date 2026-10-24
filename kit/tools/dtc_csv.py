@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""import_ista_csv.py - code-only ISTA fault texts from a CSV export (Code + Description columns).
+"""dtc_csv.py - code-only fault texts from a CSV export (Code + Description columns).
 
-    python kit/tools/import_ista_csv.py BMW_Fault_Codes.csv [out_dir]
+    python kit/tools/dtc_csv.py BMW_Fault_Codes.csv [out_dir]
 
-Writes ista_texts.json (codes with exactly one text) and ista_ambiguous.json (codes with several
+Writes dtc_scanner_texts.json (codes with exactly one text) and dtc_scanner_ambiguous.json (codes with several
 different texts: how many - the scanner shows "n possible texts" for those instead of guessing)
-into out_dir, default ista/ (not in git: the texts are BMW's). Then:
+into out_dir, default dtc_tables/ (not in git: the texts are BMW's). Then:
 
-    python kit/tools/ista_tables.py ista
+    python kit/tools/dtc_tables.py dtc_tables
     python kit/tools/build.py dtc_scanner
 
 Headings Code + Description in any case (also FaultCode/DTC/Fehlercode, Text/Fehlertext); a BOM and
@@ -17,7 +17,7 @@ import csv, json, os, re, sys
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, '..', '..', 'ista')
+OUT = os.path.join(HERE, '..', '..', 'dtc_tables')
 
 
 def load_csv(source):
@@ -55,7 +55,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     unique = {c: next(iter(v)) for c, v in values.items() if len(v) == 1}
     ambiguous = {c: len(v) for c, v in values.items() if len(v) > 1}
-    for name, d in (('ista_texts.json', unique), ('ista_ambiguous.json', ambiguous)):
+    for name, d in (('dtc_scanner_texts.json', unique), ('dtc_scanner_ambiguous.json', ambiguous)):
         with open(os.path.join(out, name), 'w', encoding='utf-8', newline='\n') as f:
             json.dump(d, f, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
     print('%d codes with one text, %d with several (not guessed) -> %s' % (len(unique), len(ambiguous), os.path.normpath(out)))

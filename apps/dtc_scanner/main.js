@@ -11,7 +11,7 @@
  *           cluster's KombiInterface_2 lists.
  *
  * Pages: faults (6 per page) -> Check Control -> control units that answered.
- * Fault codes are BMW hex codes (as ISTA shows them); the head unit has no
+ * Fault codes are BMW hex codes (as BMW's diagnostic tools show them); the head unit has no
  * text database for them, so look them up by code + control unit.
  */
 const fs = require('fs');
@@ -44,22 +44,25 @@ const ECU = {
 //  1. dtc_texts.js   this car's own coding tool export (kit/tools/dtc_texts.py; not in git)
 //  2. known_texts.js a few hand-written ones (in git)
 //  3. dtc_db/        a fault text database imported with kit/tools/dtc_texts.py --db (not in git: it is
-//                    BMW's). Each unit's SGBD index (UDS 22 F1 50, what ISTA's identification reads)
+//                    BMW's). Each unit's SGBD index (UDS 22 F1 50, what BMW's diagnostic tools identify it by)
 //                    picks its texts: sgbd_index.json "<address> <index>" -> texts/<SGBD>.json;
 //                    dtc_texts.json there holds "<address>:<code>" ones; unit_names.json names the unit.
 //  4. dtc_db/code_texts.json  a fault code list (kit/tools/dtc_texts.py --codes) for faults with no
 //                    text above: "<code>": text (any unit) or { "<address>": text } (those units only).
-//  5. dtc_db/ista/   ISTA fault texts (kit/tools/ista_tables.py; BMW's, not in git), split so only the
+//  5. dtc_db/tables/ fault text tables (kit/tools/dtc_tables.py; BMW's, not in git), split so only the
 //                    units that report faults are read: variant/<sgbd>.json the text for exactly that
 //                    unit type, addr/<address>.json the text all types at that address agree on (both
 //                    before 3.), codes.json code-only texts and ambiguous.json "<code>": how many
 //                    different texts a code has (when nothing else knows it).
-const DB = path.join(__dirname, 'dtc_db');
+// The build packs dtc_db/ into one compressed file, dtc_db.pack (kit/runtime/pack.js): ~19 MB of
+// texts take ~3.5 MB, and a lookup inflates only the few KB that hold its code.
+const DB = require('./kit/pack').open(path.join(__dirname, 'dtc_db'));
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return {}; } };
 const req = (m) => { try { return require(m); } catch (e) { return {}; } };
-const TEXTS = Object.assign({}, readJson(path.join(DB, 'dtc_texts.json')), req('./known_texts'), req('./dtc_texts'));
-const SGBD = readJson(path.join(DB, 'sgbd_index.json'));
-const UNIT_NAMES = readJson(path.join(DB, 'unit_names.json'));
+const OWN = Object.assign({}, req('./known_texts'), req('./dtc_texts'));
+const text = (key) => OWN[key] || DB.get('dtc_texts.json', key);
+const SGBD = DB.json('sgbd_index.json');
+const UNIT_NAMES = DB.json('unit_names.json');
 const HAS_DB = Object.keys(SGBD).length > 0;
 let ids = {};                     // "12" -> "0F26E8" (unit's SGBD index); '' = asked, gave none
 const variant = (a) => {
@@ -69,12 +72,8 @@ const variant = (a) => {
 // the fonts are ASCII only
 const ascii = (s) => String(s).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae')
     .replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[^\x20-\x7e]/g, '');
-const variantTexts = {};          // SGBD -> { code: text }, read on first use
-let CODES = null;                 // code list, read on first use
-const istaFiles = {};             // dtc_db/ista/<file> -> its texts, read on first use ({} if none)
-const ista = (f) => istaFiles[f] || (istaFiles[f] = readJson(path.join(DB, 'ista', f)));
-// a summary where ISTA's texts for a unit family differ in wording but agree on the fault
-// (not an exact ISTA text)
+// a summary where the texts for a unit family differ in wording but agree on the fault
+// (not an exact BMW text)
 const FAMILY = {
     '23:D1C604': 'Assist sensors: Unexpected Ethernet communication/link',
     '61:03178A': 'Telematics: Mobile network connection limited',
@@ -82,22 +81,20 @@ const FAMILY = {
 function describe(addr, rawCode) {
     const code = String(rawCode).trim().toUpperCase().replace(/^0X/, '').padStart(6, '0');
     const key = hex(addr) + ':' + code;
-    const own = TEXTS[key];
+    const own = text(key);
     if (own) return ascii(own);
     const v = variant(addr);
-    // ISTA: exactly this unit type's text, else the one all unit types at this address agree on
-    const iv = (v && ista('variant/' + v.toLowerCase() + '.json')[code]) || ista('addr/' + hex(addr) + '.json')[code];
+    // exactly this unit type's text, else the one all unit types at this address agree on
+    const iv = (v && DB.get('tables/variant/' + v.toLowerCase() + '.json', code)) || DB.get('tables/addr/' + hex(addr) + '.json', code);
     if (iv) return ascii(iv);
-    if (v && !variantTexts[v]) variantTexts[v] = readJson(path.join(DB, 'texts', v + '.json'));
-    const t = (v && variantTexts[v][code]) || TEXTS['*:' + code];       // "*:<code>": any unit
+    const t = (v && DB.get('texts/' + v + '.json', code)) || text('*:' + code);   // "*:<code>": any unit
     if (t) return ascii(t);
-    if (!CODES) CODES = readJson(path.join(DB, 'code_texts.json'));
-    const c = CODES[code];
-    const ct = (typeof c === 'string' ? c : c && c[hex(addr)]) || ista('codes.json')[code] || FAMILY[key];
+    const c = DB.get('code_texts.json', code);
+    const ct = (typeof c === 'string' ? c : c && c[hex(addr)]) || DB.get('tables/codes.json', code) || FAMILY[key];
     if (ct) return ascii(ct);
-    // several different ISTA texts and the unit type unknown: say so rather than guess
-    const n = ista('ambiguous.json')[code];
-    return n > 0 ? 'ISTA: ' + n + ' possible texts (ECU dependent)' : null;
+    // several different texts and the unit type unknown: say so rather than guess
+    const n = DB.get('tables/ambiguous.json', code);
+    return n > 0 ? n + ' possible texts (depends on unit type)' : null;
 }
 // a unit the database identified is named by what it is (same on every model); else the address table
 const ecuName = (a) => {

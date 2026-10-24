@@ -15,6 +15,8 @@ apps use on this firmware (see reference/rhmi-widget-cells.md).
 """
 import json, os, re, shutil, sys, tarfile, uuid
 from xml.sax.saxutils import escape
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pack_data  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -315,8 +317,10 @@ def build(app_id):
         if f.endswith('.js'):
             shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', 'app.js' if f == 'main.js' else f))
         elif os.path.isdir(os.path.join(adir, f)):
-            # data folders go along as they are (e.g. dtc_scanner/dtc_db, the fault text database)
-            shutil.copytree(os.path.join(adir, f), os.path.join(src, 'javascript', f))
+            # data folders go along as one compressed file, read with kit/runtime/pack.js
+            # (e.g. dtc_scanner/dtc_db, the fault text database -> dtc_db.pack)
+            raw, size, _ = pack_data.pack(os.path.join(adir, f), os.path.join(src, 'javascript', f + '.pack'))
+            print('  %s/: %.1f MB packed to %.2f MB' % (f, raw / 1e6, size / 1e6))
     # kit runtime
     kr = os.path.join(KIT, 'runtime')
     for f in os.listdir(kr):

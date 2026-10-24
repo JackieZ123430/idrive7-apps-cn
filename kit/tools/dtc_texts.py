@@ -148,6 +148,13 @@ def from_db(src, out):
     for name, d in texts.items():
         with open(os.path.join(tmp, 'texts', name + '.json'), 'w', encoding='utf-8') as f:
             json.dump(d, f, ensure_ascii=False, separators=(',', ':'))
+    # shared_codes.json is only for --codes: the build leaves it out of the app's dtc_db.pack
+    with open(os.path.join(tmp, '.packignore'), 'w', encoding='utf-8', newline='\n') as f:
+        f.write('# not packed into the app (kit/tools/pack_data.py)\nshared_codes.json\n')
+    # keep what the other tools put there (fault text tables, code list)
+    for keep in ('tables', 'code_texts.json'):
+        if os.path.exists(os.path.join(out, keep)):
+            os.replace(os.path.join(out, keep), os.path.join(tmp, keep))
     shutil.rmtree(out, ignore_errors=True)
     os.replace(tmp, out)
     print('%d control unit types, %d fault texts -> %s' % (len(texts), sum(len(d) for d in texts.values()), os.path.normpath(out)))
