@@ -18,3 +18,6 @@ kit/renderd/protocol/*-client-protocol.h
 apps/dtc_scanner/dtc_texts.js
 # fault text database (BMW's texts per control unit), imported with kit/tools/dtc_texts.py --db
 apps/dtc_scanner/dtc_db/
+# ISTA fault text tables (BMW's): kept out of git; kit/tools/ista_tables.py puts them into dtc_db/ista
+/ista/
+apps/dtc_scanner/ista_*.json

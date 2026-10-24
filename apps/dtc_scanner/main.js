@@ -49,6 +49,11 @@ const ECU = {
 //                    dtc_texts.json there holds "<address>:<code>" ones; unit_names.json names the unit.
 //  4. dtc_db/code_texts.json  a fault code list (kit/tools/dtc_texts.py --codes) for faults with no
 //                    text above: "<code>": text (any unit) or { "<address>": text } (those units only).
+//  5. dtc_db/ista/   ISTA fault texts (kit/tools/ista_tables.py; BMW's, not in git), split so only the
+//                    units that report faults are read: variant/<sgbd>.json the text for exactly that
+//                    unit type, addr/<address>.json the text all types at that address agree on (both
+//                    before 3.), codes.json code-only texts and ambiguous.json "<code>": how many
+//                    different texts a code has (when nothing else knows it).
 const DB = path.join(__dirname, 'dtc_db');
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return {}; } };
 const req = (m) => { try { return require(m); } catch (e) { return {}; } };
@@ -66,17 +71,33 @@ const ascii = (s) => String(s).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace
     .replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[^\x20-\x7e]/g, '');
 const variantTexts = {};          // SGBD -> { code: text }, read on first use
 let CODES = null;                 // code list, read on first use
-function describe(addr, code) {
-    const own = TEXTS[hex(addr) + ':' + code];
+const istaFiles = {};             // dtc_db/ista/<file> -> its texts, read on first use ({} if none)
+const ista = (f) => istaFiles[f] || (istaFiles[f] = readJson(path.join(DB, 'ista', f)));
+// a summary where ISTA's texts for a unit family differ in wording but agree on the fault
+// (not an exact ISTA text)
+const FAMILY = {
+    '23:D1C604': 'Assist sensors: Unexpected Ethernet communication/link',
+    '61:03178A': 'Telematics: Mobile network connection limited',
+};
+function describe(addr, rawCode) {
+    const code = String(rawCode).trim().toUpperCase().replace(/^0X/, '').padStart(6, '0');
+    const key = hex(addr) + ':' + code;
+    const own = TEXTS[key];
     if (own) return ascii(own);
     const v = variant(addr);
+    // ISTA: exactly this unit type's text, else the one all unit types at this address agree on
+    const iv = (v && ista('variant/' + v.toLowerCase() + '.json')[code]) || ista('addr/' + hex(addr) + '.json')[code];
+    if (iv) return ascii(iv);
     if (v && !variantTexts[v]) variantTexts[v] = readJson(path.join(DB, 'texts', v + '.json'));
     const t = (v && variantTexts[v][code]) || TEXTS['*:' + code];       // "*:<code>": any unit
     if (t) return ascii(t);
     if (!CODES) CODES = readJson(path.join(DB, 'code_texts.json'));
     const c = CODES[code];
-    const ct = typeof c === 'string' ? c : c && c[hex(addr)];
-    return ct ? ascii(ct) : null;
+    const ct = (typeof c === 'string' ? c : c && c[hex(addr)]) || ista('codes.json')[code] || FAMILY[key];
+    if (ct) return ascii(ct);
+    // several different ISTA texts and the unit type unknown: say so rather than guess
+    const n = ista('ambiguous.json')[code];
+    return n > 0 ? 'ISTA: ' + n + ' possible texts (ECU dependent)' : null;
 }
 // a unit the database identified is named by what it is (same on every model); else the address table
 const ecuName = (a) => {
