@@ -47,9 +47,8 @@ const ECU = {
 //                    BMW's). Each unit's SGBD index (UDS 22 F1 50, what ISTA's identification reads)
 //                    picks its texts: sgbd_index.json "<address> <index>" -> texts/<SGBD>.json;
 //                    dtc_texts.json there holds "<address>:<code>" ones; unit_names.json names the unit.
-//  4. dtc_db/obd_texts.json  an OBD code list (kit/tools/dtc_texts.py --codes): the OBD description of
-//                    a code, for no unit in particular - used for the engine and transmission only,
-//                    shown as "OBD: ...".
+//  4. dtc_db/code_texts.json  a fault code list (kit/tools/dtc_texts.py --codes) for faults with no
+//                    text above: "<code>": text (any unit) or { "<address>": text } (those units only).
 const DB = path.join(__dirname, 'dtc_db');
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return {}; } };
 const req = (m) => { try { return require(m); } catch (e) { return {}; } };
@@ -66,8 +65,7 @@ const variant = (a) => {
 const ascii = (s) => String(s).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae')
     .replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[^\x20-\x7e]/g, '');
 const variantTexts = {};          // SGBD -> { code: text }, read on first use
-const OBD_UNITS = [0x12, 0x13, 0x18];    // DME/DDE, second DME, EGS
-let OBD = null;                   // code -> OBD description, read on first use
+let CODES = null;                 // code list, read on first use
 function describe(addr, code) {
     const own = TEXTS[hex(addr) + ':' + code];
     if (own) return ascii(own);
@@ -75,9 +73,10 @@ function describe(addr, code) {
     if (v && !variantTexts[v]) variantTexts[v] = readJson(path.join(DB, 'texts', v + '.json'));
     const t = (v && variantTexts[v][code]) || TEXTS['*:' + code];       // "*:<code>": any unit
     if (t) return ascii(t);
-    if (!OBD_UNITS.includes(addr)) return null;
-    if (!OBD) OBD = readJson(path.join(DB, 'obd_texts.json'));
-    return OBD[code] ? 'OBD: ' + ascii(OBD[code]) : null;
+    if (!CODES) CODES = readJson(path.join(DB, 'code_texts.json'));
+    const c = CODES[code];
+    const ct = typeof c === 'string' ? c : c && c[hex(addr)];
+    return ct ? ascii(ct) : null;
 }
 // a unit the database identified is named by what it is (same on every model); else the address table
 const ecuName = (a) => {

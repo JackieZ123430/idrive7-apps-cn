@@ -2,8 +2,7 @@
 
     dtc_texts.py <DTC export .txt> [out.js]      texts for the faults in a coding tool's export
     dtc_texts.py --db <zip | .tgz | folder> [out_dir]   a fault text database for every control unit
-    dtc_texts.py --codes <.csv> [out_dir]        an OBD fault code list (code,description) - engine
-                                                 and transmission only, run after --db
+    dtc_texts.py --codes <.csv> [out_dir]        a fault code list (code,description), run after --db
 
 Export: coding tools (e.g. a BimmerCode / E-Sys style backup) write the car's fault memory with texts:
 
@@ -20,11 +19,12 @@ texts/<SGBD>.json (code -> text), unit_names.json (SGBD -> name) and dtc_texts.j
 ("<address>:<code>" -> text). Only those data files are copied, to apps/dtc_scanner/dtc_db/; the
 scanner asks each unit with faults for its SGBD index (UDS 22 F1 50) and looks its texts up there.
 
-OBD code list (--codes): a CSV of code + description (BMW_Fault_Codes.csv) holds the OBD (SAE)
-description of each code, with no control unit. Its codes mean other things in other units, so the
-scanner uses it only for the engine and transmission units (DME/DDE, EGS) and only where the
-database has no English text; it shows them as "OBD: ...". Codes with more than one description in
-the list, and placeholders (DUMMY_SAE), are left out. Written to <out_dir>/obd_texts.json.
+Code list (--codes): a CSV of code + description (BMW_Fault_Codes.csv), with no control unit. It
+fills in faults the database has no English text for. A code's texts are grouped by meaning (the
+same fault worded differently counts once). A code with one meaning that only one unit uses (per
+the database) gets its text for any unit. A code that several units use, or with several meanings,
+gets a text only for the units its texts name ("DME: ...", "HU-H: ..."; which unit each name is,
+is learned from the database's English texts), else none. Written to <out_dir>/code_texts.json.
 
 Only English texts are imported: one with German in it (german_words.txt) is left out, and the
 scanner shows no text for that fault. The texts are BMW's: they stay out of git (.gitignore).
@@ -121,11 +121,17 @@ def from_db(src, out):
         sys.exit('%s: no sgbd_index.json - not an oap-dtcscan package?' % src)
     base = idx[0][:-len('sgbd_index.json')]
     sgbd = _strings(files[idx[0]](), 'sgbd_index.json')
-    texts, n = {}, [0, 0]
+    texts, n, used = {}, [0, 0], {}
+    addrs = {}
+    for k, v in sgbd.items():
+        addrs.setdefault(v, set()).add(k.split()[0])
     for p in files:
         m = re.match(re.escape(base) + r'texts/([A-Za-z0-9_]+)\.json$', p)
         if m:
-            texts[m.group(1)] = english(_strings(files[p](), p), n)
+            d = _strings(files[p](), p)
+            for code in d:
+                used.setdefault(code.upper(), set()).update(addrs.get(m.group(1), ()))
+            texts[m.group(1)] = english(d, n)
     tmp = out.rstrip('/\\') + '.new'
     shutil.rmtree(tmp, ignore_errors=True)
     os.makedirs(os.path.join(tmp, 'texts'))
@@ -136,6 +142,9 @@ def from_db(src, out):
             with open(os.path.join(tmp, name), 'w', encoding='utf-8') as f:
                 json.dump(english(_strings(files[base + name](), name), n if name == 'dtc_texts.json' else [0, 0]), f,
                           ensure_ascii=False)
+    # fault codes that several control units use, each with its own meaning (for --codes)
+    with open(os.path.join(tmp, 'shared_codes.json'), 'w', encoding='utf-8') as f:
+        json.dump({c: sorted(a) for c, a in used.items() if len(a) > 1}, f, separators=(',', ':'))
     for name, d in texts.items():
         with open(os.path.join(tmp, 'texts', name + '.json'), 'w', encoding='utf-8') as f:
             json.dump(d, f, ensure_ascii=False, separators=(',', ':'))
@@ -143,6 +152,23 @@ def from_db(src, out):
     os.replace(tmp, out)
     print('%d control unit types, %d fault texts -> %s' % (len(texts), sum(len(d) for d in texts.values()), os.path.normpath(out)))
     print('%d English texts imported, %d German ones left out (no text shown for those)' % tuple(n))
+
+
+def _words(t):
+    return set(re.findall(r'[a-z]{3,}', t.lower())) - {'the', 'and', 'for', 'with'}
+
+
+def _alike(a, b, wa=None):
+    wa, wb = wa or _words(a), _words(b)
+    return len(wa & wb) / max(1, min(len(wa), len(wb)))
+
+
+_UNIT_TAG = re.compile(r'([A-Z][A-Z0-9]+[a-z0-9]?)(?:[-/ ][A-Z0-9]{1,6})?\s*:')
+
+
+def _tag(t):
+    m = _UNIT_TAG.match(t)
+    return m.group(1) if m else None
 
 
 def from_codes(src, out):
@@ -153,22 +179,71 @@ def from_codes(src, out):
             if len(row) < 2 or not re.fullmatch(r'[0-9A-Fa-f]{6}', row[0].strip()):
                 continue                                    # header, blank lines
             t = re.sub(r'\s+', ' ', row[1].split('\n')[0].replace('"', "'")).strip()
+            t = re.sub(r'[^\x20-\x7e]', '', t) if is_english(t) else ''
             if t and 'DUMMY' not in t:
                 seen.setdefault(row[0].strip().upper(), {}).setdefault(t.lower(), t)
-    texts, n = {}, [0, 0]
+    # each code's texts grouped by meaning: wording differs, the fault is the same
+    meanings = {}
     for code, ts in seen.items():
-        if len(ts) == 1:                                    # one meaning only
-            t = re.sub(r'[^\x20-\x7e]', '', next(iter(ts.values())))
-            if is_english(t):
-                texts[code] = t
-                n[0] += 1
+        groups = []
+        for t in ts.values():
+            w = _words(t)
+            for g in groups:
+                if _alike(g[0], t, _words(g[0])) >= 0.5 or _alike(t, g[0], w) >= 0.5:
+                    g.append(t)
+                    break
             else:
-                n[1] += 1
+                groups.append([t])
+        meanings[code] = groups
+    # which unit a "DME: ..." / "HU-H: ..." text is for: learned from the database's English texts
+    db = os.path.join(out, 'sgbd_index.json')
+    shared, tags = {}, {}
+    if os.path.isfile(db):
+        sgbd = json.load(open(db, encoding='utf-8'))
+        addrs = {}
+        for k, v in sgbd.items():
+            addrs.setdefault(v, set()).add(k.split()[0])
+        if os.path.isfile(os.path.join(out, 'shared_codes.json')):
+            shared = json.load(open(os.path.join(out, 'shared_codes.json'), encoding='utf-8'))
+        count = {}
+        for name, units in addrs.items():
+            p = os.path.join(out, 'texts', name + '.json')
+            if not os.path.isfile(p):
+                continue
+            for code, text in json.load(open(p, encoding='utf-8')).items():
+                for g in meanings.get(code, ()):
+                    if max(_alike(x, text) for x in g) >= 0.3:
+                        for x in g:
+                            if _tag(x):
+                                for a in units:
+                                    c = count.setdefault(_tag(x), {})
+                                    c[a] = c.get(a, 0) + 1
+        for tag, c in count.items():
+            n = sum(c.values())
+            if n >= 30:                                     # a unit's own name, not a word
+                tags[tag] = {a for a, k in c.items() if k / n >= 0.5}
+    # one meaning, one unit: for any unit. Else per unit, where the text says which (by its tag)
+    texts, per_unit = {}, 0
+    for code, groups in meanings.items():
+        if len(groups) == 1 and code not in shared:
+            texts[code] = groups[0][0]
+            continue
+        units = {}
+        for g in groups:
+            for a in set().union(*(tags.get(_tag(x), set()) for x in g)):
+                units.setdefault(a, []).append(g[0])
+        units = {a: ts[0] for a, ts in units.items() if len(ts) == 1}
+        if units:
+            texts[code] = units
+            per_unit += 1
     os.makedirs(out, exist_ok=True)
-    with open(os.path.join(out, 'obd_texts.json'), 'w', encoding='utf-8') as f:
+    old = os.path.join(out, 'obd_texts.json')
+    if os.path.isfile(old):
+        os.remove(old)
+    with open(os.path.join(out, 'code_texts.json'), 'w', encoding='utf-8') as f:
         json.dump(texts, f, ensure_ascii=False, separators=(',', ':'))
-    print('%d OBD codes -> %s (%d with more than one description and %d German ones left out)'
-          % (len(texts), os.path.join(os.path.normpath(out), 'obd_texts.json'), len(seen) - len(texts) - n[1], n[1]))
+    print('%d fault codes -> %s (%d for some units only; %d left out: more than one meaning, unit unknown)'
+          % (len(texts), os.path.join(os.path.normpath(out), 'code_texts.json'), per_unit, len(meanings) - len(texts)))
 
 
 if __name__ == '__main__':
