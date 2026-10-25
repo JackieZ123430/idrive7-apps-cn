@@ -20,13 +20,18 @@ const GO = '#2fd27a';
 const KOMBI = 'de.bmw.infotainment.KombiInterface_2';
 const COLORS = { DEFAULT: 0, RED: 1, YELLOW: 2, GREEN: 3, ORANGE: 4 };
 
-/** the object holding `key` somewhere inside v (unions arrive wrapped in their member's name) */
-function find(v, key) {
+/**
+ * the object holding `key` somewhere inside v (unions arrive wrapped in their member's name). With
+ * str: only where that key is a text - the hint answer nests { cBSServiceHint: { cBSServiceHint: "..." } }
+ */
+function find(v, key, str) {
     if (!v || typeof v !== 'object') return null;
-    if (key in v) return v;
-    for (const k of Object.keys(v)) { const r = find(v[k], key); if (r) return r; }
+    if (key in v && (!str || typeof v[key] === 'string')) return v;
+    for (const k of Object.keys(v)) { const r = find(v[k], key, str); if (r) return r; }
     return null;
 }
+/** JSON without the item icons (each answer carries a PNG as a long list of byte numbers) */
+const brief = (v) => JSON.stringify(v, (k, x) => (k === 'symbolData' ? '[icon]' : x));
 const colour = (c) => (typeof c === 'number' ? c : COLORS[String(c)] !== undefined ? COLORS[String(c)] : 0);
 const txt = (s) => String(s === undefined || s === null ? '' : s).replace(/[^\x20-\x7e]/g, (ch) => ({ 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue', 'ß': 'ss' }[ch] || '')).trim();
 
@@ -54,7 +59,7 @@ mgu.run({
         /* ---------- reading ---------- */
         sig.watch(KOMBI, '1', {
             cbsDataServiceList: (v) => {
-                rawList = JSON.stringify(v);
+                rawList = brief(v);
                 const arr = Array.isArray(v) ? v : (v && (v.cbsDataServiceList || v.value)) || [];
                 list = arr.map((e) => {
                     const s = find(e, 'cBSIdentifier') || {};
@@ -65,7 +70,7 @@ mgu.run({
                 changed();
             },
             cbsDataSBA: (v) => {
-                rawSba = JSON.stringify(v);
+                rawSba = brief(v);
                 const s = find(v, 'cBSDataSBAText') || {};
                 sba = { text: txt(s.cBSDataSBAText), way: txt(s.cBSDataSBADistance), date: txt(s.cBSDataSBADate), colour: colour(s.cBSDataSBAColor) };
                 changed();
@@ -92,9 +97,9 @@ mgu.run({
                 }
                 if (!kombi || !kombi.proxy) throw new Error('instrument cluster not reachable');
                 const r = await sig.call(kombi.proxy, 'requestCBSServiceHint', { id: it.id }, 6000);
-                const h = find(r, 'cBSServiceHint') || {};
+                const h = find(r, 'cBSServiceHint', true) || {};
                 hint.text = [txt(h.cBSServiceHint), txt(h.cBSServiceWay), txt(h.cBSServiceDate)].filter(Boolean).join('   ') || 'No details for this item';
-                log.info('hint ' + it.id + ': ' + JSON.stringify(r));
+                log.info('hint ' + it.id + ': ' + brief(r));
             } catch (e) {
                 log.warn('requestCBSServiceHint ' + it.id + ': ' + e);
                 hint.text = 'Details not available (' + (e.message || e) + ')';
