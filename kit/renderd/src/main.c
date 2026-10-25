@@ -348,6 +348,14 @@ static int handle(client *c, uint32_t type, const uint8_t *p, uint32_t len) {
         if (gfx_layer_def(&c->g, w[0], lw, lh, c->xf.s, w + 3, nw - 3) < 0) { const char *e = gfx_error(); send_msg(c, E_ERROR, e, (uint32_t)strlen(e)); }
         return 0;
     }
+    case M_IMAGE: {
+        if (nw < 3) return -1;
+        if ((uint64_t)w[1] * w[2] * 4 + 12 > len) return -1;
+        if (!c->placed) return 0;
+        make_current_any(c);
+        if (gfx_image(&c->g, w[0], (int)w[1], (int)w[2], p + 12) < 0) { const char *e = gfx_error(); send_msg(c, E_ERROR, e, (uint32_t)strlen(e)); }
+        return 0;
+    }
     case M_DROP_LAYER:
         if (nw < 1) return -1;
         make_current_any(c);

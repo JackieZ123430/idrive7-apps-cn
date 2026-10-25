@@ -2,7 +2,7 @@
 /**
  * make_icon.js <glyph> <out.png> - 140x140 app tile icon in the HMI's style
  * (white line art on transparent, one accent element). Glyphs: gauge, flag,
- * engine, battery, lab, or any 1-3 characters (drawn as text).
+ * engine, battery, service, doom, ..., or any 1-3 characters (drawn as text).
  */
 const fs = require('fs');
 const path = require('path');
@@ -89,6 +89,23 @@ if (glyph === 'gauge') {
     c.roundRect(118, 58, 12, 24, 3, W);
     for (let i = 0; i < 3; i++) c.roundRect(22 + i * 22, 52, 16, 36, 3, i < 2 ? '#2fd27a' : W);
     c.polyline([[96, 46], [84, 72], [100, 72], [88, 96]], 6, A);
+} else if (glyph === 'service') {
+    // wrench + oil drop
+    c.line(40, 104, 84, 60, 16, W);
+    c.arc(94, 46, 14, 26, 70, 340, W);          // open jaw facing up-right
+    c.circle(36, 108, 9, W);
+    c.circle(40, 50, 15, A);                     // oil drop
+    c.quad([[40, 18], [26, 44], [54, 44], [40, 18]], A);
+} else if (glyph === 'doom') {
+    // horned demon skull, red eyes
+    c.convex([[30, 52], [14, 14], [46, 38]], W);            // horns
+    c.convex([[110, 52], [126, 14], [94, 38]], W);
+    c.circle(70, 64, 40, W);                                 // cranium
+    c.roundRect(44, 86, 52, 34, 10, W);                      // jaw
+    c.convex([[44, 56], [66, 64], [62, 78], [46, 74]], A);   // eyes
+    c.convex([[96, 56], [74, 64], [78, 78], [94, 74]], A);
+    c.convex([[70, 82], [64, 94], [76, 94]], '#000000');     // nose
+    for (let i = 0; i < 4; i++) c.fillRect(52 + i * 11, 104, 3, 16, '#000000');   // teeth
 } else {
     c.strokeRoundRect(14, 14, 112, 112, 22, 6, W);
     c.text(glyph, 70, 88, 56, W, { font: 'bold', align: 'center' });

@@ -17,7 +17,7 @@ const EventEmitter = require('events');
 const rec = require('./record');
 
 const SOCKET = process.env.MGU_RENDERD_SOCKET || '/run/mgu-renderd/renderd.sock';
-const M = { HELLO: 1, PLACE: 2, SHOW: 3, ATLAS: 4, RAMP: 5, LAYER: 6, FRAME: 7, DROP_LAYER: 8 };
+const M = { HELLO: 1, PLACE: 2, SHOW: 3, ATLAS: 4, RAMP: 5, LAYER: 6, FRAME: 7, DROP_LAYER: 8, IMAGE: 9 };
 const E = { READY: 101, TICK: 102, ERROR: 103, STATS: 104 };
 
 function msg(type, payload) {
@@ -43,7 +43,7 @@ class RenderClient extends EventEmitter {
         this.placement = null;
         this.visible = false;
         this.inbuf = Buffer.alloc(0);
-        this.sent = { atlas: new Set(), ramp: new Set(), layer: new Set() };
+        this.sent = { atlas: new Set(), ramp: new Set(), layer: new Set(), image: new Map() };
         this.stats = null;
         this.waiting = false;        // a frame was sent, no tick back yet
         this.retry = null;
@@ -89,7 +89,7 @@ class RenderClient extends EventEmitter {
         if (this.sock) this.sock.destroy();
         if (this.fd !== null) { fs.closeSync(this.fd); this.fd = null; }
     }
-    _reset() { this.sent.atlas.clear(); this.sent.ramp.clear(); this.sent.layer.clear(); this.waiting = false; }
+    _reset() { this.sent.atlas.clear(); this.sent.ramp.clear(); this.sent.layer.clear(); this.sent.image.clear(); this.waiting = false; }
     _write(b) {
         if (this.fd !== null) { fs.writeSync(this.fd, b); return true; }
         return this.sock && this.connected ? this.sock.write(b) : false;
@@ -168,6 +168,18 @@ class RenderClient extends EventEmitter {
         if (r.atlases) r.atlases.forEach((id) => this._ensureAtlas(id));
         if (r.ramps) r.ramps.forEach((id) => this._ensureRamp(id));
         if (r.layersUsed || r.sublayers) (r.layersUsed || r.sublayers).forEach((id) => this._ensureLayer(id));
+        if (r.images) r.images.forEach((id) => this._ensureImage(id));
+    }
+    /** upload a pixel image when this connection hasn't got its current version */
+    _ensureImage(id) {
+        const im = rec.imageById.get(id);
+        if (!im || !im.data) return;
+        if (this.sent.image.get(id) === im.ver) return;
+        const head = Buffer.alloc(12);
+        head.writeUInt32LE(id, 0); head.writeUInt32LE(im.w, 4); head.writeUInt32LE(im.h, 8);
+        const px = Buffer.from(im.data.buffer, im.data.byteOffset, im.w * im.h * 4);
+        this._write(msg(M.IMAGE, Buffer.concat([head, px])));
+        this.sent.image.set(id, im.ver);
     }
     _ensureLayer(id) {
         if (this.sent.layer.has(id)) return;

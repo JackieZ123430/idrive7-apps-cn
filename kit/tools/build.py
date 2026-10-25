@@ -131,6 +131,26 @@ def setting_options(s):
     return values, labels
 
 
+
+def fetch_assets(adir, assets):
+    """Large files an app needs but git doesn't keep (app.json "assets"): downloaded once, checked by SHA-256."""
+    import hashlib, io, urllib.request, zipfile
+    sha = lambda b: hashlib.sha256(b).hexdigest()
+    for a in assets:
+        dst = os.path.join(adir, a['file'])
+        if os.path.exists(dst) and sha(open(dst, 'rb').read()) == a['sha256']:
+            continue
+        print('  fetching %s from %s' % (a['file'], a['url']))
+        data = urllib.request.urlopen(a['url'], timeout=300).read()
+        if a.get('zipSha256') and sha(data) != a['zipSha256']:
+            sys.exit('%s: download does not match its SHA-256' % a['url'])
+        if a.get('zipMember'):
+            data = zipfile.ZipFile(io.BytesIO(data)).read(a['zipMember'])
+        if sha(data) != a['sha256']:
+            sys.exit('%s: file does not match its SHA-256' % a['file'])
+        open(dst, 'wb').write(data)
+
+
 def build_ui(spec):
     """screens/settings -> (application.xml, uiDescription.json, strings, screen meta)"""
     app = spec['id']
@@ -313,9 +333,13 @@ def build(app_id):
     json.dump({'settings': {app_id: spec.get('config', {})}}, open(os.path.join(src, 'config', 'base.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
     # app code
     adir = os.path.join(APPS, app_id)
+    fetch_assets(adir, spec.get('assets', []))
     for f in os.listdir(adir):
         if f.endswith('.js'):
             shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', 'app.js' if f == 'main.js' else f))
+        elif f.endswith(('.wasm', '.wad')) or f in ('LICENSE', 'NOTICE'):
+            # files the app reads as they are (doom: the game as WebAssembly, its data, its licences)
+            shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', f))
         elif os.path.isdir(os.path.join(adir, f)):
             # data folders go along as one compressed file, read with kit/runtime/pack.js
             # (e.g. dtc_scanner/dtc_db, the fault text database -> dtc_db.pack)

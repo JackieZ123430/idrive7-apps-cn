@@ -20,6 +20,7 @@ enum {
     M_LAYER = 6,      /* u32 id, f32 w, f32 h, commands: drawn once into a cached texture */
     M_FRAME = 7,      /* commands: the next frame */
     M_DROP_LAYER = 8, /* u32 id */
+    M_IMAGE = 9,      /* u32 id, u32 w, u32 h, w*h RGBA bytes (opaque): a pixel image, replaced on every upload */
 };
 
 /* daemon -> client */
@@ -49,6 +50,7 @@ enum {
     OP_QUAD = 15,     /* x0 y0 x1 y1 x2 y2 x3 y3 c  convex quad, anti-aliased edges */
     OP_ALPHA = 16,    /* a  global opacity for what follows (0..1) */
     OP_XF = 17,       /* s ox oy  transform for what follows: device = v * s + (ox, oy); s <= 0: back to the placement's */
+    OP_IMAGE = 18,    /* id ver x y w h  pixel image (M_IMAGE) scaled into the rect, nearest pixel; ver: the app's upload count */
 };
 
 #endif

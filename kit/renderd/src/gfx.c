@@ -227,8 +227,36 @@ void gfx_layer_drop(gfx_client *c, uint32_t id) {
     }
 }
 
+static gfx_layer *find_image(gfx_client *c, uint32_t id) {
+    for (gfx_layer *l = c->images; l; l = l->next) if (l->id == id) return l;
+    return NULL;
+}
+
+/* upload (or replace) pixel image id: opaque RGBA, top row first */
+int gfx_image(gfx_client *c, uint32_t id, int w, int h, const uint8_t *rgba) {
+    if (w < 1 || h < 1 || w > 4096 || h > 4096) { snprintf(err, sizeof err, "image %u: bad size %dx%d", id, w, h); return -1; }
+    gfx_layer *l = find_image(c, id);
+    if (!l) {
+        l = calloc(1, sizeof *l);
+        l->id = id;
+        glGenTextures(1, &l->tex);
+        glBindTexture(GL_TEXTURE_2D, l->tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        l->next = c->images; c->images = l;
+    }
+    glBindTexture(GL_TEXTURE_2D, l->tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    if (l->w != w || l->h != h) { glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba); l->w = w; l->h = h; }
+    else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    return 0;
+}
+
 void gfx_client_free(gfx_client *c) {
     while (c->layers) gfx_layer_drop(c, c->layers->id);
+    while (c->images) { gfx_layer *l = c->images; c->images = l->next; glDeleteTextures(1, &l->tex); free(l); }
     c->natlas = c->nramp = 0;
 }
 
@@ -464,6 +492,19 @@ static void draw_layer(gfx_client *c, uint32_t id, float lx, float ly, const gfx
     flush();
 }
 
+/* pixel image id into device rect x0,y0..x1,y1 (top row of the image at the top) */
+static void draw_image(gfx_client *c, uint32_t id, float x0, float y0, float x1, float y1) {
+    gfx_layer *l = find_image(c, id);
+    if (!l) return;
+    flush();
+    cur_tex = l->tex;
+    vert *v = quad(roundf(x0), roundf(y0), roundf(x1), roundf(y1), K_TEX);
+    v[0].v[12] = 0; v[0].v[13] = 0; v[1].v[12] = 1; v[1].v[13] = 0;
+    v[2].v[12] = 1; v[2].v[13] = 1; v[3].v[12] = 0; v[3].v[13] = 1;
+    setcol(v, 0xffffffff);
+    flush();
+}
+
 static void run(gfx_client *c, const gfx_xf *xf0, const uint32_t *cmd, size_t n, int depth) {
     gfx_xf cur = *xf0;
     const gfx_xf *xf = &cur;
@@ -574,6 +615,7 @@ static void run(gfx_client *c, const gfx_xf *xf0, const uint32_t *cmd, size_t n,
             break;
         }
         case OP_LAYER: NEED(3); if (depth == 0) draw_layer(c, U(i), F(i + 1), F(i + 2), xf); i += 3; break;
+        case OP_IMAGE: NEED(6); draw_image(c, U(i), X(F(i + 2)), Y(F(i + 3)), X(F(i + 2) + F(i + 4)), Y(F(i + 3) + F(i + 5))); i += 6; break;
         case OP_CLIP: {
             NEED(4);
             flush();

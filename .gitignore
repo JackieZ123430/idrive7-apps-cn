@@ -21,3 +21,6 @@ apps/dtc_scanner/dtc_db/
 # fault text tables (BMW's): kept out of git; kit/tools/dtc_tables.py puts them into dtc_db/tables
 /dtc_tables/
 dtc_scanner_*.json
+
+# Doom: Freedoom data is downloaded by the build (app.json "assets")
+apps/doom/*.wad

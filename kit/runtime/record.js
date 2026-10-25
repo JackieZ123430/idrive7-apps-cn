@@ -16,7 +16,7 @@ const fonts = require('./fonts');
 
 const OP = {
     CLEAR: 1, RECT: 2, GRAD: 3, RRECT: 4, RSTROKE: 5, CARD: 6, RAMPRECT: 7, ARC: 8, LINE: 9,
-    TRIS: 10, GLYPHS: 11, LAYER: 12, CLIP: 13, NOCLIP: 14, QUAD: 15, ALPHA: 16, XF: 17,
+    TRIS: 10, GLYPHS: 11, LAYER: 12, CLIP: 13, NOCLIP: 14, QUAD: 15, ALPHA: 16, XF: 17, IMAGE: 18,
 };
 
 /* ---------- colours: 0xRRGGBBAA ---------- */
@@ -58,6 +58,16 @@ function atlasId(f, family) {
 }
 function atlasById(id) { const a = atlasList.find((x) => x.id === id); return a ? a.f : null; }
 
+// pixel images (e.g. a game's frame): id -> { w, h, data (RGBA bytes), ver }. setImage() bumps ver;
+// a frame records id + ver, so a changed picture is a changed frame, and the transport uploads it
+const imageById = new Map();
+function setImage(id, w, h, data) {
+    const im = imageById.get(id) || { ver: 0 };
+    im.w = w | 0; im.h = h | 0; im.data = data; im.ver = (im.ver + 1) >>> 0;
+    imageById.set(id, im);
+    return im;
+}
+
 // cached layers (static parts of widgets): drawn once, used by id
 let layerSeq = 0;
 const layerById = new Map();
@@ -77,9 +87,10 @@ class Recorder {
         this.layersUsed = null;      // Set of layer ids this recording draws
         this.atlases = new Set();    // glyph atlases and colour ramps it uses (uploaded once by the transport)
         this.ramps = new Set();
+        this.images = new Set();     // pixel images it draws (setImage)
         this.recording = true;
     }
-    reset() { this.n = 0; if (this.layersUsed) this.layersUsed.clear(); this.atlases.clear(); this.ramps.clear(); return this; }
+    reset() { this.n = 0; if (this.layersUsed) this.layersUsed.clear(); this.atlases.clear(); this.ramps.clear(); this.images.clear(); return this; }
     _grow(k) {
         if (this.n + k <= this.u.length) return;
         let len = this.u.length * 2;
@@ -92,6 +103,15 @@ class Recorder {
     words() { return this.u.subarray(0, this.n); }
 
     /* ---------- canvas.js API ---------- */
+    /** Draw pixel image `id` (see setImage) scaled into x, y, w, h (nearest pixel). */
+    image(id, x, y, w, h) {
+        const im = imageById.get(id);
+        if (!im || !(w > 0 && h > 0)) return this;
+        this._grow(7); const f = this.f, i = this.n;
+        this.u[i] = OP.IMAGE; this.u[i + 1] = id; this.u[i + 2] = im.ver; f[i + 3] = x; f[i + 4] = y; f[i + 5] = w; f[i + 6] = h;
+        this.images.add(id);
+        this.n += 7; return this;
+    }
     clear(c) { this._grow(2); this.u[this.n++] = OP.CLEAR; this.u[this.n++] = pack(c || [0, 0, 0, 0]); return this; }
 
     fillRect(x, y, w, h, c) {
@@ -187,6 +207,7 @@ class Recorder {
         const w = r.words();
         this._grow(w.length); this.u.set(w, this.n); this.n += w.length;
         r.atlases.forEach((a) => this.atlases.add(a)); r.ramps.forEach((a) => this.ramps.add(a));
+        if (r.images) r.images.forEach((id) => this.images.add(id));
         if (r.layersUsed) r.layersUsed.forEach((id) => (this.layersUsed || (this.layersUsed = new Set())).add(id));
         return this;
     }
@@ -320,6 +341,7 @@ function play(words, real) {
             i += k * 8; break;
         }
         case OP.LAYER: { const L = layerById.get(u[i]); if (L) cv.blit(softLayer(L), f[i + 1], f[i + 2]); i += 3; break; }
+        case OP.IMAGE: { const im = imageById.get(u[i]); if (im && cv.drawImage) cv.drawImage(im.data, im.w, im.h, f[i + 2], f[i + 3], f[i + 4], f[i + 5]); i += 6; break; }
         case OP.CLIP: clip = [f[i], f[i + 1], f[i + 2], f[i + 3]]; i += 4; break;     // (software path: ignored)
         case OP.NOCLIP: clip = null; break;
         case OP.ALPHA: alpha = f[i]; i += 1; break;
@@ -331,4 +353,4 @@ function play(words, real) {
     return real;
 }
 
-module.exports = { Recorder, OP, pack, unpack, rampId, rampList, atlasId, atlasList, atlasById, makeLayer, dropLayer, layerById, play, softLayer };
+module.exports = { Recorder, OP, pack, unpack, rampId, rampList, atlasId, atlasList, atlasById, makeLayer, dropLayer, layerById, play, softLayer, setImage, imageById };

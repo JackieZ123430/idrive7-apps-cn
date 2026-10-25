@@ -61,6 +61,23 @@ class Canvas {
         return this;
     }
 
+    /** Draw an opaque RGBA image (sw x sh bytes) scaled into x, y, w, h, nearest pixel. */
+    drawImage(src, sw, sh, x, y, w, h) {
+        const x0 = Math.max(0, Math.round(x)), y0 = Math.max(0, Math.round(y));
+        const x1 = Math.min(this.w, Math.round(x + w)), y1 = Math.min(this.h, Math.round(y + h));
+        if (x1 <= x0 || y1 <= y0) return this;
+        const d = this.d, fx = sw / w, fy = sh / h;
+        for (let py = y0; py < y1; py++) {
+            const sy = Math.min(sh - 1, ((py - y + 0.5) * fy) | 0) * sw;
+            let di = (py * this.w + x0) * 4;
+            for (let px = x0; px < x1; px++, di += 4) {
+                const si = (sy + Math.min(sw - 1, ((px - x + 0.5) * fx) | 0)) * 4;
+                d[di] = src[si]; d[di + 1] = src[si + 1]; d[di + 2] = src[si + 2]; d[di + 3] = 255;
+            }
+        }
+        return this;
+    }
+
     /**
      * Draw another canvas (a pre-drawn layer) at (x, y), alpha-blended. Fully
      * transparent pixels are skipped and opaque ones copied, so blitting a cached

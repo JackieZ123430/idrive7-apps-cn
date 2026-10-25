@@ -41,7 +41,9 @@ const { Settings } = (() => {
 })();
 
 const handlers = {};
-let loopFn = null;
+const loops = {};
+let shown = (spec.screens && spec.screens[0] && spec.screens[0].name) || 'MAIN';
+const loopFn = () => loops[shown] && loops[shown]();
 let frame = 0;
 const settings = new Settings(spec.settings);
 try { fs.unlinkSync(settings.file); } catch (e) {}
@@ -61,7 +63,7 @@ const ui = {
     rows: async (n, c) => console.log('rows', n, c),
     visible: async () => {}, enabled: async () => {}, checked: async () => {},
     onClick: (n, fn) => { handlers[n] = fn; },
-    open: async (n) => console.log('open', n), close: async () => {},
+    open: async (n) => { console.log('open', n); if (loops[n]) shown = n; }, close: async () => {},
     isVisible: () => !!process.env.MGU_RENDERD_FILE, onVisible: () => {}, comp: () => ({}),
 };
 const softImage = (n, cv) => ui._image(n, cv);
@@ -78,7 +80,7 @@ const ctx = {
     canvas: (w, h) => display.canvas(w, h),
     signals: { watch: async (iface) => ({ iface, error: 'preview' }), proxy: async () => { throw new Error('preview'); } },
     theme: themeFn,
-    loop: (n, fps, fn) => { loopFn = fn; return { stop() {}, kick() {} }; },
+    loop: (n, fps, fn) => { loops[n] = fn; return { stop() {}, kick() {} }; },
 };
 
 const realLoad = Module._load;
@@ -94,11 +96,11 @@ setTimeout(async () => {
     for (const c of clicks) {
         // wait=<seconds> pauses (demo data keeps running); render forces a frame
         if (/^wait=/.test(c)) { await new Promise((r) => setTimeout(r, Number(c.slice(5)) * 1000)); continue; }
-        if (c === 'render') { if (loopFn) await loopFn(); continue; }
+        if (c === 'render') { await loopFn(); continue; }
         if (/^frames=/.test(c)) {
             const n = Number(c.slice(7)), t0 = Date.now();
             for (let i = 0; i < n; i++) {
-                if (loopFn) await loopFn();
+                await loopFn();
                 await new Promise((r) => setTimeout(r, Math.max(0, t0 + (i + 1) * 1000 / 60 - Date.now())));
             }
             continue;

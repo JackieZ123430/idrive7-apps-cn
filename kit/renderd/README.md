@@ -96,8 +96,11 @@ second in real time, and [`kit/tools/make_gif.sh`](../tools/make_gif.sh) turns t
 ## Protocol (src/proto.h)
 
 Messages are `u32 type, u32 len, payload`. The client sends HELLO, PLACE (surface rect + logical
-scale/offset), SHOW, ATLAS / RAMP / LAYER (uploaded once), FRAME (draw ops) and DROP_LAYER.
+scale/offset), SHOW, ATLAS / RAMP / LAYER (uploaded once), IMAGE (a pixel image: id, w, h + RGBA
+bytes, sent again only when the app changes it, e.g. each frame of a game), FRAME (draw ops) and
+DROP_LAYER.
 The daemon sends READY, TICK (send the next frame), STATS and ERROR. Colours are 0xRRGGBBAA.
 Draw ops are listed in `proto.h`; `XF s ox oy` switches the transform for what follows (screen
 pixels with `1 0 0`, back to the placement's with `0`), and a `CLEAR` inside a `CLIP` makes that
-rectangle transparent.
+rectangle transparent. `IMAGE id ver x y w h` draws an uploaded pixel image scaled to the
+rectangle (nearest pixel, so a 320 x 200 game stays sharp).
