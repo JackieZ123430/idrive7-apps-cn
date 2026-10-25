@@ -1,0 +1,56 @@
+{
+  "id": "service",
+  "title": "Service",
+  "description": "Service due: oil, brakes, brake fluid, inspection and more, in km and date - reset an item after the service",
+  "version": "1.0.0",
+  "vendor": "custom",
+  "loggingId": "OA96",
+  "iconGlyph": "wrench",
+  "signals": {
+    "de.bmw.infotainment.ConditionBasedServicesLegacy": {
+      "cBSMessageEngineOil": "s",
+      "cBSMessageBrakeFront": "s",
+      "cBSMessageBrakeRear": "s",
+      "cBSMessageGearOil": "s",
+      "cBSMessageParticleFilter": "s",
+      "cBSMessageSparkPlug": "s",
+      "cBSReset": "rw"
+    },
+    "de.bmw.infotainment.cbs.ConditionBasedServices": {
+      "cBSList": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Service",
+      "buttons": [
+        ["BTN_SELECT", "Next item"],
+        ["BTN_RESET", "Reset item"],
+        ["BTN_PAGE", "Next page"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "unit", "label": "Distance", "type": "choice", "default": "km",
+     "options": [["km", "km"], ["mi", "miles"]]},
+    {"key": "distScale", "label": "Car sends distance in", "type": "choice", "default": "1",
+     "options": [["1", "km (default)"], ["10", "10 km steps"]]},
+    {"key": "soonKm", "label": "Due soon below", "type": "number", "unit": "km", "default": 2000,
+     "steps": [500, 1000, 2000, 3000, 5000]},
+    {"key": "soonDays", "label": "Due soon within", "type": "number", "unit": "days", "default": 30,
+     "steps": [14, 30, 60, 90]},
+    {"key": "fromList", "label": "Also items from the service list", "type": "bool", "default": true},
+    {"key": "diagPage", "label": "Diagnostics page", "type": "bool", "default": false},
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+  ]
+}

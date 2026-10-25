@@ -95,6 +95,14 @@ function call(p, method, params, timeoutMs) {
     return nativeTick(() => p.callMethod(method, params || {}, timeoutMs || 5000));
 }
 
+/**
+ * Write a field that has a setter (e.g. ConditionBasedServicesLegacy.cBSReset) on a proxy from
+ * proxy() or watch().proxy. value = the field's struct. Resolves when the provider took it.
+ */
+function set(p, field, value, timeoutMs) {
+    return nativeTick(() => p.setValue(field, value, timeoutMs || 5000));
+}
+
 /** Subscribe to a broadcast/event or field on a proxy from proxy(). */
 function on(p, name, fn, log) {
     return nativeTick(() => p.subscribe({ name, onReceive: (v) => { try { fn(v); } catch (e) { if (log) log.warn(name + ': ' + e); } } }));
@@ -106,4 +114,4 @@ function onAvailable(p, fn) {
         .then(() => { if (p.isAvailable && p.isAvailable()) fn(true); });
 }
 
-module.exports = { watch, proxy, call, on, onAvailable, loadConfig, hasNative: () => !!someip };
+module.exports = { watch, proxy, call, set, on, onAvailable, loadConfig, hasNative: () => !!someip };

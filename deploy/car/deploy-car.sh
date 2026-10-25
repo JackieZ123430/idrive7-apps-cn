@@ -202,7 +202,15 @@ cmd_install() {
     if [ -f "$SELF_DIR/mgu-renderd" ]; then
         sh "$INSTALLER" renderd --persist || warn "GPU renderer not installed - apps use software rendering"
     fi
-    say "restarting the app platform (screen reloads, ~1-2 min)"
+    # WITH_HMI=1: the HMI as well, in the same go - one restart that also drops the old screens and
+    # tiles the HMI keeps in memory (instead of the app platform now and the HMI separately later)
+    if [ "${WITH_HMI:-0}" = 1 ]; then
+        say "restarting the HMI and the app platform (screen goes black, ~1-2 min)"
+        systemctl restart hmi.service || warn "HMI restart failed - the old screens go at the next reboot"
+        sleep 5
+    else
+        say "restarting the app platform (screen reloads, ~1-2 min)"
+    fi
     systemctl restart oapcontroller.service
     sleep 5
     systemctl is-active oapcontroller.service >/dev/null 2>&1 || warn "oapcontroller not active after restart"

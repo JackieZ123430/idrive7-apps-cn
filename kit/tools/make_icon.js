@@ -89,6 +89,13 @@ if (glyph === 'gauge') {
     c.roundRect(118, 58, 12, 24, 3, W);
     for (let i = 0; i < 3; i++) c.roundRect(22 + i * 22, 52, 16, 36, 3, i < 2 ? '#2fd27a' : W);
     c.polyline([[96, 46], [84, 72], [100, 72], [88, 96]], 6, A);
+} else if (glyph === 'wrench') {
+    // wrench (service) + oil drop
+    c.line(36, 104, 86, 54, 14, W);
+    c.arc(96, 44, 14, 26, 70, 340, W);                // open jaw: a ring with a gap at the top right
+    c.circle(30, 110, 10, W);
+    c.circle(38, 50, 16, A);
+    c.line(38, 18, 26, 42, 5, A); c.line(38, 18, 50, 42, 5, A);
 } else {
     c.strokeRoundRect(14, 14, 112, 112, 22, 6, W);
     c.text(glyph, 70, 88, 56, W, { font: 'bold', align: 'center' });
