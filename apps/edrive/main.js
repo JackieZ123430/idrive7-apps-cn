@@ -149,6 +149,7 @@ mgu.run({
         const onZone = (what, on, zone) => {
             if (typeof on !== 'boolean') return;
             const z = zones[what];
+            if (zone === 'ALL_ZONES') zone = 0;                          // enums may come as names
             if (!zone) Object.keys(z).forEach((k) => delete z[k]);      // ALL_ZONES (0) sets every zone
             z[zone || 0] = on;
             const any = Object.keys(z).some((k) => z[k]);
@@ -173,8 +174,9 @@ mgu.run({
             statusEngineSpeed2: (v) => { const r = sc('rpm', v.actualValueRPMEngineCrankshaft); if (r !== null && r >= 0 && r < 12000) onRpm(r); },
         }, log).then((s) => log.info('rpm ' + (s.error ? 'error: ' + s.error : 'subscribed')));
         ctx.signals.watch('de.bmw.infotainment.climate.climatemaster.ClimateMaster', '1', {
-            statusClimateSystemOn: (v) => onZone('climate', v && v.airConditioningOn, v && v.operationZone),
-            statusAirCondAC: (v) => onZone('ac', v && v.acButton, v && v.operationZone),
+            // both are lists, one entry per zone (a single entry may also come unwrapped)
+            statusClimateSystemOn: (v) => [].concat(v || []).forEach((e) => onZone('climate', e && e.airConditioningOn, e && e.operationZone)),
+            statusAirCondAC: (v) => [].concat(v || []).forEach((e) => onZone('ac', e && e.acButton, e && e.operationZone)),
         }, log).then((s) => log.info('climate ' + (s.error ? 'error: ' + s.error : 'subscribed')));
 
         // connect in the background: the screen must not wait for the diagnostic link
