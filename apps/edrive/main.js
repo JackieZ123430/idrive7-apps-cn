@@ -8,6 +8,9 @@
  *     A/C when hot: it costs range by the hour, so more of it in slow traffic). The hourly
  *     draw is learned per outside-temperature band, mostly from standing / creeping with
  *     the engine off; until then a typical draw for the temperature (AUX_KW) is used.
+ *     Climate control on or off comes from the car (ClimateMaster.statusClimateSystemOn):
+ *     off, only the on-board electrics are taken off the range (learned separately), so
+ *     the range goes up when you switch the climate off and down when you switch it on.
  *     Before any electric driving is learned: the range a full battery gives at the outside
  *     temperature (RANGE_CURVE, scaled to your "range when full, 20 °C").
  *     The engine-start charge is learned from engine starts while driving at <= 20 %.
@@ -24,8 +27,8 @@
  *
  * Charge, SOH and 12 V are read with UDS ReadDataByIdentifier over the head
  * unit's diagnostic link (kit/diag.js); the DIDs and scalings live in app.json
- * "config.battery" so they can be adjusted per model. Outside temperature and
- * speed come over SOME/IP.
+ * "config.battery" so they can be adjusted per model. Outside temperature,
+ * speed and climate control on / off come over SOME/IP.
  */
 const fs = require('fs');
 const path = require('path');
@@ -61,6 +64,7 @@ class Demo {
         const s = (Date.now() - this.t0) / 1000;
         return {
             soc: 100 - (s * 0.8) % 95, soh: 91.5, ambient: 6 + 14 * Math.sin(s / 12), v12: 12.45 + 0.05 * Math.sin(s / 5),
+            climate: s % 30 < 20, ac: s % 30 < 10,
             charge: { from: 28, to: 97, toT: this.t0 - 3 * 3600000, kwh: 7.6 },
         };
     }
@@ -105,14 +109,15 @@ mgu.run({
             savedAt = Date.now();
             try { fs.writeFileSync(STATE, JSON.stringify(st)); } catch (e) { log.warn('save: ' + e); }
         };
-        const live = { soc: null, socT: 0, soh: G.isNum(st.soh) ? st.soh : null, sohT: st.sohT || 0, v12: null, v12T: 0, ambient: null, speed: null, rpm: null, rpmT: 0 };
+        const live = { soc: null, socT: 0, soh: G.isNum(st.soh) ? st.soh : null, sohT: st.sohT || 0, v12: null, v12T: 0, ambient: null, speed: null, rpm: null, rpmT: 0,
+            climate: null, ac: null };
 
         /* ---------- electric driving: what the car really does per % ----------
          * seg = distance since the last charge reading, and whether the engine ran meanwhile.
          * At the next reading, a stretch driven with the engine off adds its km and % used to
          * st.learn (km per %); an engine start while driving at a low charge is where this car
          * stops driving electric (st.engineStarts). */
-        const seg = { km: 0, engine: false };
+        const seg = { km: 0, engine: false, climate: null, climateMixed: false };
         let lastSpeedT = 0;
         const onSpeed = (kmh) => {
             const now = Date.now();
@@ -137,6 +142,24 @@ mgu.run({
             const e = (st.engineStarts || []).slice().sort((a, b) => a - b);
             return e.length >= 2 ? e[Math.floor(e.length / 2)] : RESERVE;
         }
+        /* ---------- climate control on / off (per zone: on when any zone is on) ----------
+         * Off, only the on-board electrics draw (model.auxRate). A reading stretch during which it was
+         * switched on or off teaches nothing ('mixed'), so neither draw learns the other's. */
+        const zones = { climate: {}, ac: {} };
+        const onZone = (what, on, zone) => {
+            if (typeof on !== 'boolean') return;
+            const z = zones[what];
+            if (!zone) Object.keys(z).forEach((k) => delete z[k]);      // ALL_ZONES (0) sets every zone
+            z[zone || 0] = on;
+            const any = Object.keys(z).some((k) => z[k]);
+            if (what === 'climate') {
+                if (live.climate !== null && any !== live.climate) { seg.climateMixed = true; log.info('climate control ' + (any ? 'on' : 'off')); }
+                live.climate = any;
+            } else live.ac = any;
+        };
+        /** Climate during the stretch since the last charge reading: true / false / null / 'mixed'. */
+        const stretchClimate = () => (seg.climateMixed ? 'mixed' : seg.climate);
+
         /** kWh in 1 % of charge today (size when new x health). */
         const kwhPerPct = () => settings.get('designKwh') * (G.isNum(live.soh) ? live.soh : 100) / 100 / 100;
 
@@ -149,6 +172,10 @@ mgu.run({
         ctx.signals.watch('de.bmw.infotainment.vehicle.CDS', '1', {
             statusEngineSpeed2: (v) => { const r = sc('rpm', v.actualValueRPMEngineCrankshaft); if (r !== null && r >= 0 && r < 12000) onRpm(r); },
         }, log).then((s) => log.info('rpm ' + (s.error ? 'error: ' + s.error : 'subscribed')));
+        ctx.signals.watch('de.bmw.infotainment.climate.climatemaster.ClimateMaster', '1', {
+            statusClimateSystemOn: (v) => onZone('climate', v && v.airConditioningOn, v && v.operationZone),
+            statusAirCondAC: (v) => onZone('ac', v && v.acButton, v && v.operationZone),
+        }, log).then((s) => log.info('climate ' + (s.error ? 'error: ' + s.error : 'subscribed')));
 
         // connect in the background: the screen must not wait for the diagnostic link
         const diag = new Diag(ctx.signals, log);
@@ -183,9 +210,10 @@ mgu.run({
             // standing / creeping teaches the climate + on-board draw per hour, driving the use per km
             const h = (now - (st.lastSocT || 0)) / 3600000;
             if (G.isNum(prev) && h < 120000 / 3600000 && !seg.engine && now - live.rpmT < 5000 && !st.session) {
-                model.learn(prev - soc, h, seg.km, live.ambient, kwhPerPct());
+                model.learn(prev - soc, h, seg.km, live.ambient, kwhPerPct(), stretchClimate());
             }
             seg.km = 0; seg.engine = G.isNum(live.rpm) && live.rpm > 400;
+            seg.climate = live.climate; seg.climateMixed = false;
             if (G.isNum(prev)) {
                 if (soc > prev + 0.3 && !moving) {
                     if (!st.session) st.session = { from: prev, fromT: st.lastSocT || now };
@@ -288,6 +316,7 @@ mgu.run({
                 soc: live.soc, soh: live.soh, sohAge: live.sohT ? now - live.sohT : null, ambient: live.ambient, demo: false,
                 socAge: live.socT ? now - live.socT : null, stale: !(live.socT && now - live.socT < maxAge),
                 v12: live.v12T && now - live.v12T < maxAge ? live.v12 : null, charge: lastCharge(),
+                climate: live.climate, ac: live.ac,
             };
         }
         /** Range of a full battery at tC: { lo, hi, mid } in km (no temperature: 10 °C assumed). */
@@ -309,28 +338,36 @@ mgu.run({
         }
         /**
          * Electric range at charge soc: { mid, lo, hi, kpp (km per %), learned, res (engine-start %), full,
-         * auxKw (climate + on-board draw), auxLearned, auxKm (range it costs) }. Only the charge above the
-         * engine-start point counts. Learned: % per km driving + (% per hour climate / typical speed).
+         * auxKw (climate + on-board draw), auxLearned, auxKm (range it costs), climate }. Only the charge
+         * above the engine-start point counts. Learned: % per km driving + (% per hour climate / typical
+         * speed). climate: true / false / null (not known: as on); off, only the on-board draw counts.
          */
-        function estimate(soc, tC) {
+        function estimate(soc, tC, climate) {
             const res = reserve(), span = Math.max(1, 100 - res), use = G.isNum(soc) ? Math.max(0, soc - res) : null;
-            const k = kwhPerPct(), m = model.range(use, tC, k), aux = m ? m.aux : model.auxRate(tC, k);
-            const base = { res, auxKw: aux.rate * k, auxLearned: aux.learned };
+            const k = kwhPerPct(), m = model.range(use, tC, k, climate), aux = m ? m.aux : model.auxRate(tC, k, climate);
+            const base = { res, auxKw: aux.rate * k, auxLearned: aux.learned, climate };
             if (m) {
                 return Object.assign(base, {
                     mid: m.mid, lo: use === null ? null : m.mid * 0.9, hi: use === null ? null : m.mid * 1.1,
                     kpp: m.kpp, learned: true, full: m.kpp * span, auxKm: use === null ? null : m.noAux - m.mid,
                 });
             }
-            // before driving is learned: the temperature curve (it already holds typical climate use)
-            const r = rangeAt(tC), kpp = r.mid / span, mid = use === null ? null : use * kpp;
+            // before driving is learned: the temperature curve (it already holds typical climate use);
+            // climate off gives back what typical climate use costs per km, above the on-board draw
+            const r = rangeAt(tC);
+            let f = 1;
+            if (climate === false) {
+                const onPerKm = span / r.mid, climPerKm = (model.auxRate(tC, k).rate - aux.rate) / model.evSpeed();
+                f = onPerKm / Math.max(onPerKm * 0.5, onPerKm - Math.max(0, climPerKm));
+            }
+            const kpp = r.mid / span * f, mid = use === null ? null : use * kpp;
             return Object.assign(base, {
-                mid, lo: use === null ? null : use * r.lo / span, hi: use === null ? null : use * r.hi / span,
+                mid, lo: use === null ? null : use * r.lo / span * f, hi: use === null ? null : use * r.hi / span * f,
                 kpp, learned: false, full: kpp * span, auxKm: null,
             });
         }
         /** km a charge of +pct % adds (charge log). */
-        const kmOf = (pct) => pct * estimate(null, live.ambient).kpp;
+        const kmOf = (pct) => pct * estimate(null, live.ambient, live.climate).kpp;
 
         /* ---------- units ---------- */
         const MI = () => settings.get('distUnit') === 'mi';
@@ -391,7 +428,7 @@ mgu.run({
         }
 
         function renderMain(cv, t, d) {
-            const e = estimate(d.soc, d.ambient), has = G.isNum(d.soc);
+            const e = estimate(d.soc, d.ambient, d.climate), has = G.isNum(d.soc);
 
             // ---- range: what is left until the engine starts
             G.panel(cv, t, 24, 44, 720, 468, 'Real electric range');
@@ -406,9 +443,10 @@ mgu.run({
             });
             cv.text(e.learned ? 'from your last ' + Math.round(D(st.learn.km)) + ' ' + dU() + ' of electric driving'
                 : 'estimate - learns as you drive electric', 48, 404, 24, t.dim);
-            // climate control + on-board electrics: costs range by the hour
-            const ac = e.auxKw >= 1.5 ? t.warn : t.dim;
-            cv.text('CLIMATE & ON-BOARD  ' + G.fmt(e.auxKw, 1) + ' kW' + (e.auxLearned ? '' : ' (typical)')
+            // climate control + on-board electrics: costs range by the hour (off: the on-board draw only)
+            const ac = e.climate !== false && e.auxKw >= 1.5 ? t.warn : t.dim;
+            const what = e.climate === false ? 'CLIMATE OFF  ·  ON-BOARD  ' : e.climate ? 'CLIMATE ON' + (d.ac ? ' (A/C)' : '') + '  ' : 'CLIMATE & ON-BOARD  ';
+            cv.text(what + G.fmt(e.auxKw, 1) + ' kW' + (e.auxLearned ? '' : ' (typical)')
                 + (G.isNum(e.auxKm) && has ? '  ·  -' + Math.round(D(e.auxKm)) + ' ' + dU() : ''), 48, 444, 22, ac, { font: 'bold', spacing: 1 });
             const amb = G.isNum(d.ambient) ? G.fmt(T(d.ambient), 1) + ' ' + tU() : '--';
             cv.text('OUTSIDE  ' + amb, 48, 486, 24, t.dim, { font: 'bold', spacing: 1 });
@@ -521,7 +559,8 @@ mgu.run({
             G.panel(cv, t, 24, 44, 1552, 468, 'Battery diagnostics');
             const link = diag.p ? (diag.available ? 'link up' : 'link down') : 'no link (' + (diag.error || 'not started') + ')';
             cv.text('UDS 22 ReadDataByIdentifier / OBD 01  ·  ' + link + '  ·  ambient ' + (G.isNum(live.ambient) ? G.fmt(live.ambient, 1) + ' °C' : 'n/a')
-                + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(G.hold('speed', live.speed), 0) + ' km/h' : 'n/a'), 48, 121, 24, t.text, { font: 'label' });
+                + '  ·  speed ' + (G.isNum(live.speed) ? G.fmt(G.hold('speed', live.speed), 0) + ' km/h' : 'n/a')
+                + '  ·  climate ' + (live.climate === null ? 'n/a' : live.climate ? 'on' : 'off') + (live.ac ? ' (A/C)' : ''), 48, 121, 24, t.text, { font: 'label' });
             const cols = [48, 160, 260, 380, 820, 1000, 1290];
             ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS', 'READ'].forEach((h, i) => cv.text(h, cols[i], 167, 22, t.dim, { font: 'bold', spacing: 1 }));
             cv.fillRect(48, 178, 1504, 1, t.tick);
