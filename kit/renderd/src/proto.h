@@ -21,6 +21,8 @@ enum {
     M_FRAME = 7,      /* commands: the next frame */
     M_DROP_LAYER = 8, /* u32 id */
     M_IMAGE = 9,      /* u32 id, u32 w, u32 h, w*h RGBA bytes (opaque): a pixel image, replaced on every upload */
+    M_GRAB = 10,      /* u32 on: this app wants the iDrive controller to itself (mgu-inputgate.so in the HMI).
+                         Holds while the app is shown and repeats it at least every GRAB_US; see inputgate/ */
 };
 
 /* daemon -> client */
@@ -29,6 +31,9 @@ enum {
     E_TICK = 102,     /* u32 frame number, u32 ms since start: the compositor took the last frame, send the next */
     E_ERROR = 103,    /* utf8 text */
     E_STATS = 104,    /* u32 frames shown in the last second, u32 avg render us, u32 max render us */
+    E_CCU = 105,      /* the iDrive controller event the HMI didn't get (while this app holds M_GRAB):
+                         FrontCCU RotaryEncoderStateFront as on the wire - u8 sequence, u16 BE knob,
+                         u8 press, u8 tilt, ... */
 };
 
 /* draw opcodes */

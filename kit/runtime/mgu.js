@@ -312,6 +312,15 @@ async function runInner(impl) {
         app, ui, settings, log, spec: SPEC, dataDir: DATA_DIR, display,
         signals: require('./signals'),
         theme: () => themes.theme(settings.get('theme')),
+        /**
+         * controller.grab(true): the iDrive controller's knob, press and tilt go to this app only
+         * (the HMI stops moving its focus or opening its menus); BACK, MENU and the touchscreen
+         * still work. Read the controller with signals (FrontCCU). Only while shown; release with
+         * grab(false). Needs the GPU renderer and mgu-inputgate.so in the HMI (deploy-car.sh).
+         */
+        // onInput(fn): while grabbed, fn gets each controller event the HMI didn't (same fields
+        // as FrontCCU.statusRotaryEncoderState, enums as numbers)
+        controller: { grab(on) { display.grab(on); }, onInput(fn) { display.onCcu = fn; } },
         /** The surface to draw one frame on (record.js Recorder, reused): pass it to ui.image. */
         canvas(w, h) { return display.canvas(w, h); },
         /**

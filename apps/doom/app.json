@@ -2,7 +2,7 @@
   "id": "doom",
   "title": "Doom",
   "description": "Doom (Freedoom: Phase 1) on the iDrive - parked only. Main menu with all settings; the game drawn in full resolution across the whole screen, on the controller; BACK returns to the menu and saves",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "vendor": "custom",
   "loggingId": "OA9F",
   "iconGlyph": "doom",
@@ -146,8 +146,12 @@
       "key": "run",
       "label": "Move speed",
       "type": "choice",
-      "default": "run",
+      "default": "slow",
       "options": [
+        [
+          "slow",
+          "Slow walk (easiest to steer)"
+        ],
         [
           "walk",
           "Walk"

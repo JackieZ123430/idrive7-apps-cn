@@ -97,6 +97,14 @@ EXPORT(mgu_view_ptr) uint32_t mgu_view_ptr(void) { return (uint32_t)(uintptr_t)v
 EXPORT(mgu_view_w) int mgu_view_w(void) { return r_width; }
 EXPORT(mgu_view_h) int mgu_view_h(void) { return r_height; }
 EXPORT(mgu_view_on) int mgu_view_on(void) { return view_on; }
+/* walking speed in % of Doom's (running stays as it is): the controller's tilt is all or
+   nothing, so a slower walk makes it easier to steer */
+extern fixed_t forwardmove[2], sidemove[2];
+EXPORT(mgu_walk) void mgu_walk(int percent) {
+    if (percent < 20) percent = 20; if (percent > 100) percent = 100;
+    forwardmove[0] = 0x19 * percent / 100;
+    sidemove[0] = 0x18 * percent / 100;
+}
 /* render size of the 3D view (applied from the next frame) */
 EXPORT(mgu_set_res) void mgu_set_res(int w, int h) {
     if (w < 320) w = 320; if (w > RW_MAX) w = RW_MAX;

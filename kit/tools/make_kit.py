@@ -33,7 +33,7 @@ CAR_FILES = [('car/deploy-car.sh', 'deploy-car.sh'), ('mgu-app-install.sh', 'mgu
 def source_hash():
     """Fingerprint of everything the renderer binary is built from (line endings ignored)."""
     files = []
-    for sub, exts in (('src', None), ('protocol', ('.xml',)), ('docker', None), ('', ('Makefile',))):
+    for sub, exts in (('src', None), ('inputgate', ('.cpp',)), ('protocol', ('.xml',)), ('docker', None), ('', ('Makefile',))):
         d = os.path.join(RENDERD, sub)
         for n in sorted(os.listdir(d)):
             p = os.path.join(d, n)
@@ -89,8 +89,9 @@ def pick_renderer():
             if not pre_ok:
                 os.makedirs(PRE_DIR, exist_ok=True)
                 shutil.copyfile(BUILT, PRE)
+                shutil.copyfile(gate_of(BUILT), gate_of(PRE))
                 with open(PRE_SUM, 'w', encoding='utf-8', newline='\n') as f:
-                    f.write(want + '\n# sha256 of kit/renderd src/, protocol/*.xml, docker/, Makefile '
+                    f.write(want + '\n# sha256 of kit/renderd src/, inputgate/*.cpp, protocol/*.xml, docker/, Makefile '
                             '(make_kit.py source_hash) this binary was built from\n')
                 print('renderer: source changed - updated kit/renderd/prebuilt/ (commit it)')
             return BUILT
@@ -106,6 +107,11 @@ def pick_renderer():
         return ask('The source in kit/renderd changed since the prebuilt renderer was made, and there is '
                    'no Docker to rebuild it (see kit/renderd/README.md).', older)
     return ask('No prebuilt renderer and no Docker to build one (see kit/renderd/README.md).', None)
+
+
+def gate_of(rd):
+    """the controller gate (mgu-inputgate.so, loaded into the HMI) built next to the renderer"""
+    return os.path.join(os.path.dirname(rd), 'mgu-inputgate.so')
 
 
 def md5(p):
@@ -130,18 +136,20 @@ def main():
     for src, dst in CAR_FILES:
         data = open(os.path.join(DEPLOY, src), 'rb').read().replace(b'\r\n', b'\n')
         open(os.path.join(OUT, dst), 'wb').write(data)
+    gate = rd and os.path.isfile(gate_of(rd))
     if rd: shutil.copyfile(rd, os.path.join(OUT, 'mgu-renderd'))
-    else: print('note: no mgu-renderd in the kit - the apps install with software rendering only')
+    if gate: shutil.copyfile(gate_of(rd), os.path.join(OUT, 'mgu-inputgate.so'))
+    if not rd: print('note: no mgu-renderd in the kit - the apps install with software rendering only')
 
     names = ['deploy-car.sh', 'mgu-app-install.sh', 'mainapp-patch.js'] + \
-            ['apps/' + n for n in sorted(os.listdir(os.path.join(OUT, 'apps')))] + (['mgu-renderd'] if rd else [])
+            ['apps/' + n for n in sorted(os.listdir(os.path.join(OUT, 'apps')))] + (['mgu-renderd'] if rd else []) + (['mgu-inputgate.so'] if gate else [])
     with open(os.path.join(OUT, 'KIT_SUMS'), 'w', encoding='utf-8', newline='\n') as f:
         for n in names: f.write('%s  %s\n' % (md5(os.path.join(OUT, n)), n))
 
     # the archive carries Unix modes (scripts and the renderer executable), also when made on Windows
     def mode(ti):
         ti.uid = ti.gid = 0; ti.uname = ti.gname = 'root'
-        ti.mode = 0o755 if ti.isdir() or ti.name.endswith(('.sh', '/mgu-renderd')) else 0o644
+        ti.mode = 0o755 if ti.isdir() or ti.name.endswith(('.sh', '/mgu-renderd', '.so')) else 0o644
         return ti
     with tarfile.open(os.path.join(DIST, 'mgu-custom-apps.tar.gz'), 'w:gz') as tf:
         tf.add(OUT, arcname='mgu-custom-apps', filter=mode)

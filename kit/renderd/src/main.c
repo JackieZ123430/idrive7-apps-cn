@@ -20,6 +20,7 @@
 #include <poll.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,11 +94,36 @@ typedef struct client {
     uint32_t frames_shown, ticks;
     /* watchdog: a visible app that stops talking (hung) is hidden until it talks again */
     uint64_t last_msg; int stale;
+    /* controller grab (M_GRAB): last time the app asked for it, 0 = not */
+    uint64_t grab_t;
     /* stats */
     uint64_t stat_t0; uint32_t stat_frames; uint64_t stat_sum, stat_max;
 } client;
 
 #define WATCHDOG_US 3000000ull
+#define GRAB_US 1500000ull          /* an app's M_GRAB holds this long unless repeated */
+#define GATE_TOUCH_US 200000ull     /* mgu-inputgate.so in the HMI: file older than 700 ms = released */
+static char gate_file[256];
+static int ccu_fd = -1;            /* "@mgu-renderd-ccu": controller events from mgu-inputgate.so */
+static int gate_on;
+static uint64_t gate_t;
+
+/* the controller gate (inputgate/mgu-inputgate.cpp): the file exists and is fresh while a shown,
+   live app holds a grab; otherwise it is removed and the HMI has the controller */
+static void gate_update(uint64_t tnow, int want) {
+    if (!gate_file[0]) return;
+    if (want) {
+        if (!gate_on || tnow - gate_t >= GATE_TOUCH_US) {
+            int fd = open(gate_file, O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
+            if (fd >= 0) { futimens(fd, NULL); close(fd); }
+            if (!gate_on) LOG("controller: grabbed by an app");
+            gate_on = 1; gate_t = tnow;
+        }
+    } else if (gate_on) {
+        unlink(gate_file); gate_on = 0;
+        LOG("controller: back to the HMI");
+    }
+}
 static client *clients[MAX_CLIENTS];
 static int listen_fd = -1;
 
@@ -356,6 +382,10 @@ static int handle(client *c, uint32_t type, const uint8_t *p, uint32_t len) {
         if (gfx_image(&c->g, w[0], (int)w[1], (int)w[2], p + 12) < 0) { const char *e = gfx_error(); send_msg(c, E_ERROR, e, (uint32_t)strlen(e)); }
         return 0;
     }
+    case M_GRAB:
+        if (nw < 1) return -1;
+        c->grab_t = w[0] ? now_us() : 0;
+        return 0;
     case M_DROP_LAYER:
         if (nw < 1) return -1;
         make_current_any(c);
@@ -524,6 +554,19 @@ int main(int argc, char **argv) {
     if (gid >= 0 && chown(sock, (uid_t)-1, (gid_t)gid) < 0) LOG("chown %s: %s", sock, strerror(errno));
     chmod(sock, gid >= 0 ? 0660 : 0666);
     LOG("listening on %s", sock);
+    /* controller events from mgu-inputgate.so (abstract socket: no file, gone with us) */
+    ccu_fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    if (ccu_fd >= 0) {
+        struct sockaddr_un ca = { .sun_family = AF_UNIX };
+        static const char cn[] = "\0mgu-renderd-ccu";
+        memcpy(ca.sun_path, cn, sizeof cn - 1);
+        if (bind(ccu_fd, (struct sockaddr *)&ca, (socklen_t)(offsetof(struct sockaddr_un, sun_path) + sizeof cn - 1)) < 0) { LOG("controller socket: %s", strerror(errno)); close(ccu_fd); ccu_fd = -1; }
+    }
+    /* controller gate file next to the socket */
+    {
+        const char *sl = strrchr(sock, '/');
+        if (sl && (size_t)(sl - sock) + 12 < sizeof gate_file) { snprintf(gate_file, sizeof gate_file, "%.*s/inputgate", (int)(sl - sock), sock); unlink(gate_file); }
+    }
 
     while (!quit) {
         uint64_t tnow = now_us();
@@ -536,24 +579,43 @@ int main(int argc, char **argv) {
             }
             render_client(c);
         }
+        int want_gate = 0;
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            client *c = clients[i];
+            if (c && c->grab_t && c->visible && !c->stale && tnow - c->grab_t < GRAB_US) want_gate = 1;
+        }
+        gate_update(tnow, want_gate);
         while (wl_display_prepare_read(dpy) != 0) wl_display_dispatch_pending(dpy);
         wl_display_flush(dpy);
-        struct pollfd pf[2 + MAX_CLIENTS];
-        int np = 0, map[MAX_CLIENTS + 2];
+        struct pollfd pf[3 + MAX_CLIENTS];
+        int np = 0, map[MAX_CLIENTS + 3];
         pf[np].fd = wl_display_get_fd(dpy); pf[np].events = POLLIN; map[np++] = -1;
         pf[np].fd = listen_fd; pf[np].events = POLLIN; map[np++] = -2;
+        pf[np].fd = ccu_fd; pf[np].events = POLLIN; map[np++] = -3;    /* (fd -1: ignored by poll) */
         for (int i = 0; i < MAX_CLIENTS; i++) if (clients[i]) {
             pf[np].fd = clients[i]->fd;
             pf[np].events = POLLIN | (clients[i]->outlen ? POLLOUT : 0);
             map[np++] = i;
         }
-        int r = poll(pf, np, 250);
+        int r = poll(pf, np, gate_on ? 100 : 250);   /* gate held: keep its file fresh */
         if (r < 0 && errno != EINTR) { wl_display_cancel_read(dpy); break; }
         if (pf[0].revents & POLLIN) wl_display_read_events(dpy); else wl_display_cancel_read(dpy);
         if (pf[0].revents & (POLLERR | POLLHUP)) { LOG("compositor connection lost"); break; }
         wl_display_dispatch_pending(dpy);
         if (pf[1].revents & POLLIN) accept_client();
-        for (int k = 2; k < np; k++) {
+        if (pf[2].revents & POLLIN) {
+            uint8_t ev[64];
+            ssize_t n;
+            uint64_t t = now_us();
+            while ((n = recv(ccu_fd, ev, sizeof ev, MSG_DONTWAIT)) > 0) {
+                if (!gate_on || n < 5) continue;
+                for (int i = 0; i < MAX_CLIENTS; i++) {
+                    client *c = clients[i];
+                    if (c && c->grab_t && c->visible && !c->stale && t - c->grab_t < GRAB_US) send_msg(c, E_CCU, ev, (uint32_t)n);
+                }
+            }
+        }
+        for (int k = 3; k < np; k++) {
             client *c = clients[map[k]];
             if (!c) continue;
             if (pf[k].revents & POLLOUT && c->outlen) {
@@ -566,6 +628,7 @@ int main(int argc, char **argv) {
         }
     }
     for (int i = 0; i < MAX_CLIENTS; i++) if (clients[i]) client_free(clients[i]);
+    gate_update(0, 0);
     unlink(sock);
     LOG("exit");
     return 0;

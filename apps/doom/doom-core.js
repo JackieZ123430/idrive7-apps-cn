@@ -239,6 +239,8 @@ class Doom {
         const w = this.x.mgu_view_w(), h = this.x.mgu_view_h();
         return { px: new Uint8Array(this.mem.buffer, this.x.mgu_view_ptr(), w * h * 4), w, h };
     }
+    /** walking speed in % of Doom's own (20..100; running is not changed) */
+    walk(percent) { if (this.x && !this.dead && this.x.mgu_walk) this.x.mgu_walk(percent | 0); }
     /** render size of the 3D view (up to 1920 x 640) */
     setRes(w, h) { if (this.x && !this.dead && this.x.mgu_set_res) this.x.mgu_set_res(w | 0, h | 0); }
     /** the status bar's border texture, 64 x 64 RGBA (for the sides of a wide screen), or null */

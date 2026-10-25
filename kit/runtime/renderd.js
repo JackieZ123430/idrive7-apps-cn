@@ -17,8 +17,8 @@ const EventEmitter = require('events');
 const rec = require('./record');
 
 const SOCKET = process.env.MGU_RENDERD_SOCKET || '/run/mgu-renderd/renderd.sock';
-const M = { HELLO: 1, PLACE: 2, SHOW: 3, ATLAS: 4, RAMP: 5, LAYER: 6, FRAME: 7, DROP_LAYER: 8, IMAGE: 9 };
-const E = { READY: 101, TICK: 102, ERROR: 103, STATS: 104 };
+const M = { HELLO: 1, PLACE: 2, SHOW: 3, ATLAS: 4, RAMP: 5, LAYER: 6, FRAME: 7, DROP_LAYER: 8, IMAGE: 9, GRAB: 10 };
+const E = { READY: 101, TICK: 102, ERROR: 103, STATS: 104, CCU: 105 };
 
 function msg(type, payload) {
     const len = payload ? payload.length : 0;
@@ -72,6 +72,7 @@ class RenderClient extends EventEmitter {
             this._write(msg(M.HELLO, Buffer.from(this.appId)));
             if (this.placement) this._sendPlace();
             if (this.visible) this._write(this._u32msg(M.SHOW, [1]));
+            if (this.grabbing) this._write(this._u32msg(M.GRAB, [1]));
         });
         s.on('data', (d) => this._data(d));
         s.on('error', (e) => { if (!this.errLogged) { this.errLogged = true; this.log.warn('renderd: ' + e.message); } });
@@ -83,7 +84,21 @@ class RenderClient extends EventEmitter {
         });
         return this;
     }
+    /**
+     * Have the iDrive controller to ourselves (the HMI ignores the knob, press and tilt while it
+     * holds; BACK / MENU and the touchscreen still work). Needs mgu-inputgate.so in the HMI.
+     * Holds while we are shown and repeated here every 0.5 s; released at once with grab(false).
+     */
+    grab(on) {
+        on = !!on;
+        if (on === !!this.grabbing) return;
+        this.grabbing = on;
+        if (this.grabTimer) { clearInterval(this.grabTimer); this.grabTimer = null; }
+        if (on) this.grabTimer = setInterval(() => { if (this.connected) this._write(this._u32msg(M.GRAB, [1])); }, 500);
+        if (this.connected) this._write(this._u32msg(M.GRAB, [on ? 1 : 0]));
+    }
     close() {
+        this.grab(false);
         this.closed = true;
         if (this.retry) clearTimeout(this.retry);
         if (this.sock) this.sock.destroy();
@@ -111,6 +126,12 @@ class RenderClient extends EventEmitter {
             } else if (type === E.TICK) {
                 this.waiting = false;
                 this.emit('tick', p.readUInt32LE(0), p.readUInt32LE(4));
+            } else if (type === E.CCU && p.length >= 5) {
+                // the controller event the HMI didn't get (we hold the grab): FrontCCU names
+                this.emit('ccu', {
+                    frontSequenceNumberOperatingElement: p[0], frontRotaryEncoderOperation: p.readUInt16BE(1),
+                    frontRotaryEncoderPushButton: p[3], frontRotaryEncoderDeflection: p[4],
+                });
             } else if (type === E.STATS) {
                 this.stats = { fps: p.readUInt32LE(0), avgUs: p.readUInt32LE(4), maxUs: p.readUInt32LE(8) };
                 this.emit('stats', this.stats);

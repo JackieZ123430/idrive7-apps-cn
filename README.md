@@ -155,7 +155,7 @@ the unit and kept across reboots.
 | **Fault Scanner** | Scans every control unit for stored fault codes (UDS over the head unit's diagnostic gateway), shows them per module with status, shows live Check Control messages, and can clear fault memories (two-press confirm). Fault texts come from your car's own coding-tool export (`kit/tools/dtc_texts.py`), a few hand-written ones, and, if you import one, a fault text database for every control unit (`kit/tools/dtc_texts.py --db`): units with faults are then asked their SGBD index (UDS 22 F1 50), which picks their texts and their name. Only English texts are imported (one with German in it is left out, and that fault shows no text). A fault code list (CSV, `kit/tools/dtc_texts.py --codes`) fills in faults that still have none, for the units its texts belong to. Fault text tables (the `dtc_scanner_*.json` files, `kit/tools/dtc_tables.py`, after `--db`) add a text for each unit type and each address. The build packs the whole database into one compressed file (`dtc_db.pack`: about 19 MB of texts in 3.7 MB, `kit/tools/pack_data.py`), and the app only unpacks the few KB that hold the codes it shows. The repository ships the fault text tables already packed (`apps/dtc_scanner/dtc_db.pack`: the tables and the SGBD index, used with permission); a local `dtc_db/` folder you import replaces it. Imported databases and car exports stay out of git. |
 | **eDrive** | For plug-in hybrids / EVs: real electric range that adapts to how your car is driven: the charge above the point where the engine starts, divided by what the car uses per km for driving (learned from electric-only driving, last ~60 km) plus what climate control and the on-board electrics draw per hour (heating when cold, A/C when hot, learned per outside-temperature band while standing or creeping with the engine off). The climate draw costs range by the hour, so it costs more of it in slow traffic; the screen shows it in kW and the km it costs. Whether climate control is on comes from the car itself (ClimateMaster `statusClimateSystemOn`): switched off, only the on-board electrics (learned separately, typically 0.3 kW) are taken off and the range goes up; switched on, it goes down again (shown as CLIMATE ON / CLIMATE OFF, with A/C when the A/C button is on). Until it has learned, the range comes from the outside temperature (a full battery gives 50 km at 20 °C, 40-45 km at 10 °C, 30-38 km at 0 °C, 20-30 km at -10 °C, scaled to your own 20 °C range), shown with its low-high spread, battery health (SOH: how much a full charge holds compared to new, in % and kWh) and the energy in the battery now (kWh; the battery size when new is a setting, e.g. 12 kWh for a 330e / 530e, 24 kWh for an X5 45e). Also shows the last HV battery charge (+%, kWh, km added; a charge done while the head unit slept shows at the next start) and the 12 V battery voltage. A charge log page lists every charge (date, % and kWh added, range added, cost from your electricity price, 0.25 €/kWh by default) with monthly / all-time totals and a 14-day chart. On a car without a hybrid system it detects that the battery unit never answers and shows only the 12 V battery (or set Hybrid system = No). Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
 | **Service** | The car's service requirements (BMW Condition Based Service) as the iDrive's own *Vehicle status > Service requirements* shows them: engine oil, brakes, brake fluid, vehicle check, inspection and the rest, each with the distance and date the car gives (in its own language and units), coloured green / yellow / red, a summary of the next service, and the item's service hint text as details. Read from the instrument cluster (`KombiInterface_2`). Read-only: these cars offer the head unit no service reset (that is done in the cluster's own menu or by a workshop). |
-| **Doom** | Freedoom: Phase 1 (four episodes, free game data) running in the head unit as WebAssembly. The engine draws the 3D view in full resolution across the whole screen (1920 x 504, Doom's vertical field of view widened to the screen), with the status bar, menus and messages on top at 4:3; 35 fps on the VM. A main menu (Play / Continue, New game, all settings) comes first; the game then has the screen to itself with no header or button bar, and BACK returns to the menu. **Turn the controller to aim, push it to walk and sidestep, press to fire and open doors, press twice for the next weapon** (read straight from the controller signal; without it, as on the VM, the controller position along a hidden bar picks the move). Parked only: it pauses while the car moves, when you leave the screen or a popup / call covers it, and saves itself each time, so it carries on where you stopped. Settings, in the main menu: difficulty, episode, walk / run, aim speed and direction, render resolution (full / medium / low). GPL-2.0, see [Doom licences](#doom-licences). |
+| **Doom** | Freedoom: Phase 1 (four episodes, free game data) running in the head unit as WebAssembly. The engine draws the 3D view in full resolution across the whole screen (1920 x 504, Doom's vertical field of view widened to the screen), with the status bar, menus and messages on top at 4:3; 35 fps on the VM. A main menu (Play / Continue, New game, all settings) comes first; the game then has the screen to itself with no header or button bar, and BACK returns to the menu. **Turn the controller to aim, push it to walk and sidestep, press to fire and open doors, press twice for the next weapon.** While you play, the game has the controller to itself: the HMI ignores the knob, press and tilt, so pushing forward no longer opens the HMI's pull-down menu and pushing left no longer leaves the game. BACK, MENU and the touchscreen always work. This uses the controller gate that `deploy-car.sh` loads into the HMI (see [5.1](#51-what-deploy-carsh-install-does)). Without the gate, the game reads the controller signal itself and the HMI reacts to it too. Parked only: it pauses while the car moves, when you leave the screen or a popup / call covers it, and saves itself each time, so it carries on where you stopped. Settings, in the main menu: difficulty, episode, move speed (slow walk by default, walk, run), aim speed and direction, render resolution (full / medium / low). GPL-2.0, see [Doom licences](#doom-licences). |
 
 On the VM or a bench unit without vehicle data, every app switches to a built-in demo drive
 after 5 seconds (launch, pull through the gears, a hard stop, corners, an engine warming up from
@@ -314,7 +314,7 @@ sh deploy-car.sh restore    # back to stock (asks you to type YES)
 ### 3.4 Doom: the extra steps
 
 Doom installs like the other apps: it is in the kit unless you list only other apps. There are
-three differences:
+four differences:
 
 1. **The build downloads the game data once.** Git doesn't keep the WAD, so the first
    `build.py` / `make-car-kit` run fetches Freedoom: Phase 1 0.13.0 (a 24 MB zip from the
@@ -326,6 +326,12 @@ three differences:
    little longer. Nothing to do on your side.
 3. **It needs the GPU renderer for the full screen.** The kit installs `mgu-renderd` anyway. If
    it isn't running, Doom falls back to a smaller picture inside the normal app area.
+4. **The HMI restarts once more during install, for the controller gate.** `deploy-car.sh install`
+   loads `mgu-inputgate.so` into the HMI, so the game can have the controller to itself (see
+   [5.1](#51-what-deploy-carsh-install-does)). The screen goes dark for a few seconds. If the HMI
+   doesn't come back healthy with it, the installer takes it out again by itself. Don't want it?
+   Install with `NO_INPUTGATE=1 sh deploy-car.sh install`. Doom then still works, but the HMI also
+   reacts to the controller (pushing forward opens its pull-down menu).
 
 ```sh
 python3 kit/tools/build.py doom                       # -> dist/doom@<ver>.mgu (fetches the WAD the first time)
@@ -536,7 +542,16 @@ the internet.
 5. **Installs the GPU renderer** `mgu-renderd` (kit/renderd) as a systemd service that starts
    with the app platform. It runs as a throwaway user with only the compositor, GPU and app
    groups. If it can't be installed the apps still work, drawn in software.
-6. **Restarts the app platform** once. The HMI reloads the Apps list in about 1-2 minutes.
+6. **Loads the controller gate** `mgu-inputgate.so` into the HMI with a systemd drop-in for
+   `hmi.service` (other preloads are kept), and restarts the HMI once. While a full-screen app asks
+   for the controller (Doom while you play), the HMI gets the knob, press and tilt as "untouched",
+   and the app gets the real events through the renderer. The buttons (BACK, MENU, ...) and the
+   touchscreen are never held back. It holds only while the renderer keeps a marker file
+   (`/run/mgu-renderd/inputgate`) fresh for an app that is on screen and asking. App closed or
+   crashed, popup, renderer gone: the HMI has the controller back within 0.7 s. If the HMI doesn't
+   come back healthy after the restart, the drop-in is removed again by itself.
+   `NO_INPUTGATE=1` skips this step.
+7. **Restarts the app platform** once. The HMI reloads the Apps list in about 1-2 minutes.
 
 Files it touches:
 
@@ -549,6 +564,7 @@ Files it touches:
 /var/opt/public/oap/oap_12221 ... oap_12299/              (new) the apps
 /var/opt/mgu-renderd/                                    (new) the GPU renderer
 /etc/systemd/system/mgu-renderd.service                  (new) its service (+ oapcontroller.service.wants link)
+/etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf  (new) loads the controller gate into the HMI
 ```
 
 ### 5.2 The provisioning hook
@@ -656,6 +672,7 @@ mgu.run({
 | `ctx.loop(screen, fps, fn)` | render loop that runs only while that screen is shown: once per display refresh with the GPU renderer, `fps` times a second without; returns `{stop()}` |
 | `ctx.theme()` | current colour theme (`bg`, `text`, `dim`, `accent`, `warn`, `crit`, `cold`, ...) |
 | `ctx.signals` | raw SOME/IP access: `watch(iface, instance, handlers)`, `proxy`, `call`, `set(proxy, field, value)` (needs `w`) |
+| `ctx.controller` | `grab(on)`: the iDrive controller's knob, press and tilt go to this app only while it is shown (the HMI stops reacting to them; BACK, MENU and touch still work). `onInput(fn)`: fn gets each held-back event (`frontRotaryEncoderOperation`, `frontRotaryEncoderPushButton`, `frontRotaryEncoderDeflection`, numbers as in FrontCCU). Needs the GPU renderer and the controller gate (5.1) |
 | `ctx.log` | `info/warn/error` → system log + `data/<id>.log` |
 | `ctx.dataDir` | the app's writable folder (persistent) |
 

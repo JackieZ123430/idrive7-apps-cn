@@ -53,8 +53,9 @@ available, and puts the binary in the kit.
 ### Prebuilt binary
 
 So nobody needs Linux or Docker just to install the apps, the binary is committed in
-`prebuilt/mgu-renderd`, with `prebuilt/SOURCE_SHA256`: a fingerprint of `src/`,
-`protocol/*.xml`, `docker/` and the `Makefile` it was built from (line endings ignored, so a
+`prebuilt/mgu-renderd` (and the controller gate `prebuilt/mgu-inputgate.so`), with
+`prebuilt/SOURCE_SHA256`: a fingerprint of `src/`, `inputgate/*.cpp`, `protocol/*.xml`, `docker/`
+and the `Makefile` they were built from (line endings ignored, so a
 Windows checkout matches). The kit builder:
 
 - **with Docker:** compiles the source (`make` skips it when nothing changed). If the source
@@ -79,6 +80,32 @@ The unit runs it as a throwaway user (`DynamicUser`) with only the groups it nee
 `mgu_wayland` (compositor), `video` (GPU) and `tm_oap_app` (the apps may use its socket).
 `deploy-car.sh restore` removes it.
 
+## Controller gate (inputgate/)
+
+`mgu-inputgate.so` lets a full-screen app (Doom) have the iDrive controller to itself. It is
+loaded into the HMI (`HmiMain3D`) with `LD_PRELOAD`, through a drop-in for `hmi.service`. It hooks
+CommonAPI-SomeIP's `Connection::handleProxyReceive`, which every SOME/IP notification for the HMI
+passes through. While the gate is closed, it rewrites FrontCCU (service 0xb508) event 0x8002
+(`RotaryEncoderStateFront`: sequence, knob position, press, tilt) for the HMI: knob still, not
+pressed, centred. The real event goes on to the renderer over the abstract datagram socket
+`@mgu-renderd-ccu`, and from there to the app as `E_CCU`. The buttons (event 0x8001) and touch are
+never changed. When the gate opens, the knob position carries on from where the HMI last saw it,
+so its focus doesn't jump.
+
+The gate is closed only while `/run/mgu-renderd/inputgate` is younger than 0.7 s. The renderer
+touches it every 0.2 s while an app that is shown and not hung has sent `GRAB 1` within the last
+1.5 s (`ctx.controller.grab(true)` repeats it). Anything else (`GRAB 0`, the app closing or
+crashing, the renderer stopping, a clock jump backwards) opens it.
+
+```sh
+sh mgu-app-install.sh inputgate --persist   # copy next to the renderer, drop-in, restart the HMI (undoes itself if the HMI isn't healthy after)
+sh mgu-app-install.sh inputgate             # same, gone after a reboot (/run drop-in)
+sh mgu-app-install.sh inputgate-remove      # restarts the HMI without it
+```
+
+`inputgate/vsomeip-include/` holds the vsomeip 3.1 compat interface headers it is compiled
+against (MPL-2.0, as in their file headers).
+
 ## Test without a car
 
 ```sh
@@ -98,8 +125,9 @@ second in real time, and [`kit/tools/make_gif.sh`](../tools/make_gif.sh) turns t
 Messages are `u32 type, u32 len, payload`. The client sends HELLO, PLACE (surface rect + logical
 scale/offset), SHOW, ATLAS / RAMP / LAYER (uploaded once), IMAGE (a pixel image: id, w, h + RGBA
 bytes, sent again only when the app changes it, e.g. each frame of a game), FRAME (draw ops) and
-DROP_LAYER.
-The daemon sends READY, TICK (send the next frame), STATS and ERROR. Colours are 0xRRGGBBAA.
+DROP_LAYER, GRAB (the controller to this app, see above).
+The daemon sends READY, TICK (send the next frame), STATS, ERROR and CCU (a controller event
+held back from the HMI for this app). Colours are 0xRRGGBBAA.
 Draw ops are listed in `proto.h`; `XF s ox oy` switches the transform for what follows (screen
 pixels with `1 0 0`, back to the placement's with `0`), and a `CLEAR` inside a `CLIP` makes that
 rectangle transparent. `IMAGE id ver x y w h` draws an uploaded pixel image scaled to the

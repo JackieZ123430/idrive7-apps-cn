@@ -1,2 +1,2 @@
-ec84f3d30f8e54b5abd5d16e17b88e03171d5ffafae8b41151e0091ffe57128b
-# sha256 of kit/renderd src/, protocol/*.xml, docker/, Makefile (make_kit.py source_hash) this binary was built from
+e763e38419041cc2d7d38882b419362275083e9e90b77245d3623059acf1a69e
+# sha256 of kit/renderd src/, inputgate/*.cpp, protocol/*.xml, docker/, Makefile (make_kit.py source_hash) this binary was built from

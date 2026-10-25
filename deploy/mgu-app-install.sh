@@ -17,6 +17,11 @@
 #   sh mgu-app-install.sh renderd [--persist]           install / start the GPU renderer
 #                                                       (mgu-renderd next to this script)
 #   sh mgu-app-install.sh renderd-remove                stop and remove it
+#   sh mgu-app-install.sh inputgate [--persist]         let full-screen apps (Doom) have the iDrive
+#                                                       controller (mgu-inputgate.so in the HMI;
+#                                                       restarts the HMI once, undoes itself if the
+#                                                       HMI doesn't come back healthy)
+#   sh mgu-app-install.sh inputgate-remove              take it out again (restarts the HMI)
 #
 # Options (env):  NO_RESTART=1  don't restart oapcontroller after changes
 #                 BACKUP_ROOT=<dir>   where backups go (default next to script)
@@ -64,6 +69,9 @@ NODE=${NODE:-/usr/bin/node}
 # GPU renderer (kit/renderd): apps draw through it at 60 fps when it runs, else in software
 RENDERD_DIR=/var/opt/mgu-renderd
 RENDERD_UNIT=mgu-renderd.service
+# controller gate for full-screen apps (kit/renderd/inputgate): preloaded into the HMI
+GATE_SO=$RENDERD_DIR/mgu-inputgate.so
+GATE_DROPIN_NAME=hmi.service.d/zz-mgu-inputgate.conf
 APP_GID=12202          # tm_oap_app: every app has it, so they may use the renderer's socket
 # MainApp's usableUidsAndGids is 12203..12450 and it allocates from the bottom;
 # custom apps are allocated from the top so the two never meet.
@@ -434,6 +442,7 @@ install_renderd() {
 }
 
 remove_renderd() {
+    remove_inputgate
     systemctl stop "$RENDERD_UNIT" 2>/dev/null
     rm -f "/run/systemd/system/$RENDERD_UNIT"
     if [ -e "/etc/systemd/system/$RENDERD_UNIT" ] || [ -L "/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT" ]; then
@@ -442,6 +451,88 @@ remove_renderd() {
     systemctl daemon-reload
     rm -rf "$RENDERD_DIR"
     say "renderer removed (apps draw in software again)"
+}
+
+# ---- controller gate (kit/renderd/inputgate/mgu-inputgate.cpp) ----
+hmi_preload() {   # the HMI's LD_PRELOAD without ours (other drop-ins may preload things too)
+    # from the unit files themselves (systemctl show prints values with spaces as [unprintable]);
+    # the last assignment wins, as in systemd
+    systemctl cat hmi.service --no-pager 2>/dev/null | awk '
+        /^# \// { ours = index($0, "mgu-inputgate") > 0; next }
+        ours { next }
+        /^[ \t]*Environment=/ && index($0, "LD_PRELOAD=") {
+            v = substr($0, index($0, "LD_PRELOAD=") + 11)
+            q = index(v, "\""); if (q) v = substr(v, 1, q - 1)
+            last = v
+        }
+        END { print last }' | tr ':' ' ' | tr ' ' '\n' | grep -v '^$' | grep -v 'mgu-inputgate' | tr '\n' ' ' | sed 's/ $//'
+}
+gate_dropin_text() {
+    other=$(hmi_preload)
+    cat <<UNIT
+# added by mgu-app-install.sh - lets a full-screen custom app (Doom) have the iDrive controller:
+# while it asks for it (via mgu-renderd), the HMI ignores the knob, press and tilt; buttons and
+# touch always work. Remove: sh mgu-app-install.sh inputgate-remove
+[Service]
+Environment="LD_PRELOAD=${other:+$other }$GATE_SO"
+UNIT
+}
+hmi_healthy() {   # HMI up for a while with the gate loaded
+    i=0
+    while [ $i -lt 60 ]; do
+        p=$(pidof HmiMain3D 2>/dev/null | cut -d' ' -f1)
+        if [ -n "$p" ] && grep -q mgu-inputgate "/proc/$p/maps" 2>/dev/null; then
+            sleep 15
+            p2=$(pidof HmiMain3D 2>/dev/null | cut -d' ' -f1)
+            [ "$p2" = "$p" ] && systemctl is-active -q hmi.service && return 0
+            return 1
+        fi
+        sleep 1; i=$((i+1))
+    done
+    return 1
+}
+gate_dropin_remove() {
+    rm -f "/run/systemd/system/$GATE_DROPIN_NAME"
+    if [ -e "/etc/systemd/system/$GATE_DROPIN_NAME" ]; then
+        rootfs_rw_do sh -c "rm -f '/etc/systemd/system/$GATE_DROPIN_NAME'; rmdir /etc/systemd/system/hmi.service.d 2>/dev/null; true"
+    fi
+    systemctl daemon-reload
+}
+install_inputgate() {
+    src=$SELF_DIR/mgu-inputgate.so
+    [ -f "$src" ] || die "mgu-inputgate.so not found next to $0"
+    [ -d "$RENDERD_DIR" ] || die "install the renderer first (sh $0 renderd)"
+    same=0; cmp -s "$src" "$GATE_SO" 2>/dev/null && same=1
+    cp "$src" "$GATE_SO.new" && chmod 755 "$GATE_SO.new" && chown 0:0 "$GATE_SO.new" && mv "$GATE_SO.new" "$GATE_SO" || die "copy failed"
+    gate_dropin_text > "$TMP.gate" || die "tmp"
+    if [ "${1:-}" = "--persist" ]; then
+        rm -f "/run/systemd/system/$GATE_DROPIN_NAME"
+        cmp -s "$TMP.gate" "/etc/systemd/system/$GATE_DROPIN_NAME" || same=0
+        rootfs_rw_do sh -c "mkdir -p /etc/systemd/system/hmi.service.d && cp '$TMP.gate' '/etc/systemd/system/$GATE_DROPIN_NAME'" || die "cannot write /etc/systemd/system/$GATE_DROPIN_NAME"
+    else
+        mkdir -p /run/systemd/system/hmi.service.d && cp "$TMP.gate" "/run/systemd/system/$GATE_DROPIN_NAME" || die "cannot write the runtime drop-in"
+        same=0
+    fi
+    rm -f "$TMP.gate"
+    systemctl daemon-reload
+    p=$(pidof HmiMain3D 2>/dev/null | cut -d' ' -f1)
+    if [ $same = 1 ] && [ -n "$p" ] && grep -q mgu-inputgate "/proc/$p/maps" 2>/dev/null; then say "controller gate unchanged and loaded"; return 0; fi
+    say "restarting the HMI to load the controller gate (the screen goes dark for a moment)..."
+    systemctl restart hmi.service
+    if hmi_healthy; then say "controller gate loaded - full-screen apps can have the controller"; return 0; fi
+    warn "the HMI did not come back healthy with the controller gate - taking it out again"
+    gate_dropin_remove
+    systemctl restart hmi.service
+    rm -f "$GATE_SO"
+    return 1
+}
+remove_inputgate() {
+    had=0
+    { [ -e "/etc/systemd/system/$GATE_DROPIN_NAME" ] || [ -e "/run/systemd/system/$GATE_DROPIN_NAME" ]; } && had=1
+    gate_dropin_remove
+    rm -f "$GATE_SO"
+    if [ $had = 1 ] && [ "${NO_RESTART:-0}" != 1 ]; then say "restarting the HMI without the controller gate..."; systemctl restart hmi.service; fi
+    say "controller gate removed"
 }
 
 apply() {
@@ -473,5 +564,7 @@ case "$cmd" in
     unpatch)   unpatch_mainapp; apply ;;
     renderd)   install_renderd "${1:-}" ;;
     renderd-remove) remove_renderd ;;
+    inputgate) install_inputgate "${1:-}" ;;
+    inputgate-remove) remove_inputgate ;;
     *) sed -n '2,19p' "$0"; exit 2 ;;
 esac

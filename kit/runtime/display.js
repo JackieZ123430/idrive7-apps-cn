@@ -129,8 +129,16 @@ class Display {
         gpu.on('tick', () => { if (this.gpu === gpu) this.tickHandlers.forEach((fn) => fn()); });
         gpu.on('close', () => { if (this.gpu === gpu) this._lost(); });
         gpu.on('stats', (s) => { this.gpuStats = s; });
+        gpu.on('ccu', (v) => { if (this.gpu === gpu && this.onCcu) this.onCcu(v); });
         G.onLayerDrop((id) => { if (this.gpu) this.gpu.dropLayer(id); });
         gpu.connect();
+        if (this.grabbing) gpu.grab(true);
+    }
+
+    /** the iDrive controller to this app alone while on (GPU renderer + mgu-inputgate.so needed) */
+    grab(on) {
+        this.grabbing = !!on;
+        if (this.gpu) this.gpu.grab(this.grabbing);
     }
 
     /** GPU path gone (or off): the HMI's own image shows again - push a frame now. */

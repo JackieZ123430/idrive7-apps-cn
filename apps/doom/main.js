@@ -66,7 +66,14 @@ mgu.run({
         };
         // render resolution of the 3D view (the "detail" setting)
         let detail = null;
+        // move speed: slow (the default) is Doom's walk at 55 %, walk is Doom's walk, run is running
+        let walkPct = null;
+        function applySpeed() {
+            const p = settings.get('run') === 'slow' ? 55 : 100;
+            if (p !== walkPct && started && !err) { walkPct = p; game.walk(p); }
+        }
         function applyDetail() {
+            applySpeed();
             const d = DETAIL[settings.get('detail')] ? settings.get('detail') : 'full';
             if (d !== detail && started && !err) { detail = d; game.setRes(DETAIL[d][0], DETAIL[d][1]); log.info('render ' + DETAIL[d].join(' x ')); }
         }
@@ -111,11 +118,18 @@ mgu.run({
 
         /* ---------- controls ---------- */
         const ctl = new Controls(game, {
-            log, run: () => settings.get('run') !== 'walk',
+            log, run: () => settings.get('run') === 'run',
             aim: () => settings.get('aim'), reversed: () => settings.get('aimdir') === 'reversed',
         });
+        // the controller events the HMI didn't get while the game holds the controller (the
+        // renderer hands them on from mgu-inputgate.so in the HMI): works where the app's own
+        // SOME/IP copy doesn't arrive (the VM)
+        let ccuT = 0;
+        if (ctx.controller && ctx.controller.onInput) ctx.controller.onInput((v) => { ccuT = Date.now(); ctl.raw(v); });
         ctx.signals.watch('de.bmw.infotainment.controlelements.FrontCCU', '1', {
-            statusRotaryEncoderState: (v) => ctl.raw(v),
+            // (while the game holds the controller, the same events come from the renderer too:
+            // that copy wins, this one is for when it doesn't come)
+            statusRotaryEncoderState: (v) => { if (Date.now() - ccuT > 1000) ctl.raw(v); },
             // the buttons around the controller: only logged (the HMI uses them itself)
             statusPushButtonsState: (() => { let n = 0, last = ''; return (v) => { const s = JSON.stringify(v); if (s !== last && n++ < 20) log.info('buttons ' + s); last = s; }; })(),
         }, log).then((s) => log.info('controller ' + (s.error ? 'error: ' + s.error : 'subscribed')));
@@ -133,6 +147,9 @@ mgu.run({
             const go = started && !err && !moving() && shown();
             if (go !== going) {
                 going = go;
+                // the controller to the game alone while it runs (the HMI's pull-down / back on
+                // a tilt stay away); BACK and MENU still work. Needs mgu-inputgate.so (deploy-car.sh)
+                if (ctx.controller) ctx.controller.grab(go);
                 if (!go) {
                     ctl.enable(false);
                     if (game.save(SLOT)) { saved = true; log.info('saved'); }
