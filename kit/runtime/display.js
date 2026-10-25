@@ -88,13 +88,18 @@ class Display {
             if (!c || !c.on) return;
             // the bar is redrawn here at once: apps that draw only when their data changes
             // (Fault Scanner) would otherwise leave the highlight behind
+            // the controller is on this screen's buttons, so no popup covers it: if the HMI never said
+            // "focus back" after a popup (seen after an update + HMI restart: only the bar showed until
+            // Settings and back), take this as the screen having focus again
+            const inFront = () => { if (this.ui._setFocus) this.ui._setFocus(this.screen.name, true); };
             c.on('action', () => {
+                inFront();
                 this.pressed = b[0]; this.pressedT = Date.now(); this._repaint();
                 setTimeout(() => this._repaint(), 320);              // end of the press flash
             });
             c.on('focus', (ev) => {
                 if (!ev || typeof ev.value !== 'boolean') return;          // (row-only events)
-                if (ev.value) { this.focused = b[0]; this._scroll(); } else if (this.focused === b[0]) this.focused = null;
+                if (ev.value) { inFront(); this.focused = b[0]; this._scroll(); } else if (this.focused === b[0]) this.focused = null;
                 this._repaint();
             });
         });

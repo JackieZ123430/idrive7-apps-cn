@@ -96,8 +96,9 @@ function call(p, method, params, timeoutMs) {
 }
 
 /**
- * Write a field (its setter) on a proxy from proxy() or watch().proxy, as BMW's SDK does
- * (_someIpProxy.setValue). Needs "w" in the field's app.json flags, or the installer
+ * Write a field that has a setter (e.g. ConditionBasedServicesLegacy.cBSReset) on a proxy from
+ * proxy() or watch().proxy, as BMW's SDK does (_someIpProxy.setValue). value = the field's struct;
+ * resolves when the provider took it. Needs "w" in the field's app.json flags, or the installer
  * leaves the setter out of the app's interface config.
  */
 function set(p, field, value, timeoutMs) {

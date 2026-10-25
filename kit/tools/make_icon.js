@@ -89,13 +89,13 @@ if (glyph === 'gauge') {
     c.roundRect(118, 58, 12, 24, 3, W);
     for (let i = 0; i < 3; i++) c.roundRect(22 + i * 22, 52, 16, 36, 3, i < 2 ? '#2fd27a' : W);
     c.polyline([[96, 46], [84, 72], [100, 72], [88, 96]], 6, A);
-} else if (glyph === 'service') {
-    // wrench + oil drop
-    c.line(40, 104, 84, 60, 16, W);
-    c.arc(94, 46, 14, 26, 70, 340, W);          // open jaw facing up-right
-    c.circle(36, 108, 9, W);
-    c.circle(40, 50, 15, A);                     // oil drop
-    c.quad([[40, 18], [26, 44], [54, 44], [40, 18]], A);
+} else if (glyph === 'wrench') {
+    // wrench (service) + oil drop
+    c.line(36, 104, 86, 54, 14, W);
+    c.arc(96, 44, 14, 26, 70, 340, W);                // open jaw: a ring with a gap at the top right
+    c.circle(30, 110, 10, W);
+    c.circle(38, 50, 16, A);
+    c.line(38, 18, 26, 42, 5, A); c.line(38, 18, 50, 42, 5, A);
 } else if (glyph === 'doom') {
     // horned demon skull, red eyes
     c.convex([[30, 52], [14, 14], [46, 38]], W);            // horns

@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "1.8.0",
+  "version": "1.9.4",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -24,6 +24,15 @@
     },
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.climate.climatemaster.ClimateMaster": {
+      "statusClimateSystemOn": "rs",
+      "statusAirCondAC": "rs"
+    },
+    "de.bmw.infotainment.climate.Climate2": {
+      "statusACFront": "rs",
+      "statusAirConditionDRStatus": "rs",
+      "statusActualValuePowerACCompressor": "rs"
     }
   },
   "screens": [
@@ -388,6 +397,48 @@
           "min": 5,
           "max": 18,
           "note": "the same PID with OBD service 01, for engine units that refuse F442 with NRC 31"
+        },
+        {
+          "ecu": 19,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "second engine unit (0x13), on cars that have one"
+        },
+        {
+          "ecu": 19,
+          "obd": "42",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18
+        },
+        {
+          "ecu": 24,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "transmission unit EGS (0x18): control module voltage too, when the engine unit doesn't answer (e.g. G06 N63)"
+        },
+        {
+          "ecu": 24,
+          "obd": "42",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18
         }
       ],
       "chargeMinPct": 3

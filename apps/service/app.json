@@ -1,27 +1,33 @@
 {
   "id": "service",
   "title": "Service",
-  "description": "Service items (CBS) from the instrument cluster: what is due when, reset an item after a service, set the inspection dates",
-  "version": "1.0.1",
+  "description": "Service requirements from the instrument cluster: oil, brakes, brake fluid, vehicle check, inspection - distance, date and details",
+  "version": "1.1.1",
   "vendor": "custom",
-  "loggingId": "OA9D",
-  "iconGlyph": "service",
+  "loggingId": "OA96",
+  "iconGlyph": "wrench",
   "signals": {
-    "de.bmw.infotainment.KombiInterface_2": { "cbsDataServiceList": "rs" },
-    "de.bmw.infotainment.ConditionBasedServicesLegacy": {
-      "cBSMessageEngineOil": "s", "cBSMessageBrakeFront": "s", "cBSMessageBrakeRear": "s",
-      "cBSMessageGearOil": "s", "cBSMessageParticleFilter": "s", "cBSMessageSparkPlug": "s",
-      "cBSReset": "w"
-    },
-    "de.bmw.infotainment.KombiIF": { "terminCBS": "w" }
+    "de.bmw.infotainment.KombiInterface_2": {
+      "cbsDataServiceList": "rs",
+      "cbsDataSBA": "rs",
+      "_methods": ["requestCBSServiceHint"]
+    }
   },
   "screens": [
-    { "name": "MAIN", "kind": "canvas", "title": "Service",
-      "buttons": [["BTN_NEXT", "Next item"], ["BTN_RESET", "Reset item"], ["BTN_DATES", "Inspection dates"], ["BTN_SETTINGS", "Settings"]] },
-    { "name": "DATES", "kind": "canvas", "title": "Inspection dates",
-      "buttons": [["BTN_FIELD", "Next field"], ["BTN_UP", "+1"], ["BTN_DOWN", "-1"], ["BTN_SAVE", "Save date"]] }
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Service",
+      "buttons": [
+        ["BTN_SELECT", "Next item"],
+        ["BTN_DETAILS", "Details"],
+        ["BTN_PAGE", "Next page"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
   ],
   "settings": [
+    {"key": "diagPage", "label": "Diagnostics page", "type": "bool", "default": false},
     {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
      "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",

@@ -91,6 +91,13 @@ preflight() {
     ls "$SELF_DIR"/apps/*.mgu >/dev/null 2>&1 || warn "no apps/*.mgu in the kit"
 }
 
+# every app in the kit must pass the unit's interface generation BEFORE anything is changed
+# (an app asking for a signal the unit doesn't offer that way would stop the install half-way)
+verify_apps() {
+    ls "$SELF_DIR"/apps/*.mgu >/dev/null 2>&1 || return 0
+    sh "$INSTALLER" verify "$SELF_DIR"/apps/*.mgu || die "an app is refused by this unit (see above) - nothing changed"
+}
+
 meta() {   # path [root] -> "present uid:gid:mode md5" or "absent"
     p=${2:-}/$1
     if [ -e "$p" ]; then
@@ -182,7 +189,8 @@ rootfs_ro() { [ "${RW_DONE:-0}" = 1 ] && { sync; mount -o remount,ro / 2>/dev/nu
 
 cmd_check() {
     preflight
-    say "unit looks OK. MainApp patch test-built fine."
+    verify_apps
+    say "unit looks OK. MainApp patch test-built fine, every app accepted."
     say "would back up and possibly change:"
     echo "$TOUCHED" | while read -r p; do echo "    /$p  ($(meta "$p" | cut -d' ' -f1))"; done
     say "would install:"; for f in "$SELF_DIR"/apps/*.mgu; do [ -f "$f" ] && echo "    $(basename "$f")"; done
@@ -191,6 +199,7 @@ cmd_check() {
 
 cmd_install() {
     preflight
+    verify_apps
     make_backup
     export BACKUP_ROOT=$BK_LOCAL/$BK/installer NO_RESTART=1
     sh "$INSTALLER" patch --persist || die "enabling the hook failed - run: sh $0 restore"
@@ -202,7 +211,15 @@ cmd_install() {
     if [ -f "$SELF_DIR/mgu-renderd" ]; then
         sh "$INSTALLER" renderd --persist || warn "GPU renderer not installed - apps use software rendering"
     fi
-    say "restarting the app platform (screen reloads, ~1-2 min)"
+    # WITH_HMI=1: the HMI as well, in the same go - one restart that also drops the old screens and
+    # tiles the HMI keeps in memory (instead of the app platform now and the HMI separately later)
+    if [ "${WITH_HMI:-0}" = 1 ]; then
+        say "restarting the HMI and the app platform (screen goes black, ~1-2 min)"
+        systemctl restart hmi.service || warn "HMI restart failed - the old screens go at the next reboot"
+        sleep 5
+    else
+        say "restarting the app platform (screen reloads, ~1-2 min)"
+    fi
     systemctl restart oapcontroller.service
     sleep 5
     systemctl is-active oapcontroller.service >/dev/null 2>&1 || warn "oapcontroller not active after restart"
