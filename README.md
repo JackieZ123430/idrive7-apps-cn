@@ -311,7 +311,34 @@ sh deploy-car.sh backups    # list backups
 sh deploy-car.sh restore    # back to stock (asks you to type YES)
 ```
 
-### 3.4 Back to stock
+### 3.4 Doom: the extra steps
+
+Doom installs like the other apps: it is in the kit unless you list only other apps. There are
+three differences:
+
+1. **The build downloads the game data once.** Git doesn't keep the WAD, so the first
+   `build.py` / `make-car-kit` run fetches Freedoom: Phase 1 0.13.0 (a 24 MB zip from the
+   [Freedoom releases](https://github.com/freedoom/freedoom/releases/tag/v0.13.0)), checks its
+   SHA-256, and saves `apps/doom/freedoom1.wad`. Later builds reuse it. **No internet on the
+   build PC?** Download `freedoom-0.13.0.zip` somewhere else and put `freedoom1.wad` from it
+   into `apps/doom/`. Any other WAD (including id's original `doom.wad`) fails the SHA-256 check.
+2. **It is bigger.** The package is ~11 MB (the engine plus the game data), so the push takes a
+   little longer. Nothing to do on your side.
+3. **It needs the GPU renderer for the full screen.** The kit installs `mgu-renderd` anyway. If
+   it isn't running, Doom falls back to a smaller picture inside the normal app area.
+
+```sh
+python3 kit/tools/build.py doom                       # -> dist/doom@<ver>.mgu (fetches the WAD the first time)
+deploy/make-car-kit.sh doom                           # just Doom in the kit (or no arguments: all apps)
+HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh install
+```
+
+On the car: **Apps → Doom** opens the main menu (Play / Continue, New game, settings). Starting
+it the first time takes a few seconds while the head unit compiles the engine. The game runs
+only while parked. Saves stay in the app's data folder, so they survive reinstalls of the same
+app, but not `restore`.
+
+### 3.5 Back to stock
 
 `restore` stops the platform and removes every custom app, the hook and the boot drop-in. It
 then puts every touched file back exactly as it was in the **stock backup**, the first backup
