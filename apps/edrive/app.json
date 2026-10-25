@@ -58,7 +58,7 @@
   "settings": [
     {
       "key": "range20",
-      "label": "Electric range when full, 20 Ā°C",
+      "label": "Electric range when full, 20 °C",
       "type": "number",
       "unit": "km",
       "default": 50,
