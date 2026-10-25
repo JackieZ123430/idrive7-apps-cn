@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -28,6 +28,11 @@
     "de.bmw.infotainment.climate.climatemaster.ClimateMaster": {
       "statusClimateSystemOn": "rs",
       "statusAirCondAC": "rs"
+    },
+    "de.bmw.infotainment.climate.Climate2": {
+      "statusACFront": "rs",
+      "statusAirConditionDRStatus": "rs",
+      "statusActualValuePowerACCompressor": "rs"
     }
   },
   "screens": [
