@@ -4,6 +4,8 @@
 # Runs ON the unit (or the QEMU VM) as root. Same script for both.
 #
 #   sh mgu-app-install.sh install <app@ver.mgu> [...]   install or update
+#   sh mgu-app-install.sh verify <app@ver.mgu> [...]    would the unit accept it? (dry run of
+#                                                       step 4 below; nothing is changed)
 #   sh mgu-app-install.sh uninstall <app-id> [...]
 #   sh mgu-app-install.sh list                          installed apps + state
 #   sh mgu-app-install.sh status <app-id>               details + recent log
@@ -207,6 +209,33 @@ unpatch_mainapp() {
     CHANGED=1
 }
 
+# gen <manifest.json> <uid> <outDir>: BMW's generator; on failure only its error line, not the
+# whole minified generator source node prints with it
+gen() {
+    "$NODE" "$TMP/oapgen/gen.js" "$CATALOG" "$1" "$2" "$3" > "$TMP/gen.log" 2>&1 && return 0
+    grep -m 1 '^[A-Za-z]*Error:' "$TMP/gen.log" | cut -c 1-400 >&2 || tail -n 3 "$TMP/gen.log" >&2
+    return 1
+}
+
+# verify_one <app.mgu>: would install_one's interface generation pass on this unit? Only $TMP is
+# written. Returns 1 (with the generator's reason) if not.
+verify_one() {
+    pkg=$1
+    [ -f "$pkg" ] || die "no such file: $pkg"
+    rm -rf "$TMP"; mkdir -p "$TMP/out"
+    tar xzf "$pkg" -C "$TMP" || die "cannot unpack $pkg"
+    [ -f "$TMP/meta.json" ] && [ -f "$TMP/source/manifest.json" ] && [ -f "$TMP/oapgen/gen.js" ] \
+        || die "$pkg is not an MGU app bundle"
+    id=$("$NODE" -e "process.stdout.write(require('$TMP/meta.json').id)")
+    ver=$("$NODE" -e "process.stdout.write(require('$TMP/meta.json').version)")
+    u=$(uid_of "$id"); [ -n "$u" ] || u=$FIRST_UID
+    if gen "$TMP/source/manifest.json" "$u" "$TMP/out"; then
+        say "$id $ver: accepted"; rm -rf "$TMP"; return 0
+    fi
+    echo "[mgu-app] ERROR: $id $ver is refused by this unit (its signals in app.json, see above)" >&2
+    rm -rf "$TMP"; return 1
+}
+
 install_one() {
     pkg=$1
     [ -f "$pkg" ] || die "no such file: $pkg"
@@ -248,8 +277,10 @@ install_one() {
     done
     # someipInterfaces + acl.json with BMW's generator
     mkdir -p "$top/someipInterfaces"
-    "$NODE" "$TMP/oapgen/gen.js" "$CATALOG" "$top/source/manifest.json" "$u" "$top/someipInterfaces" \
-        || die "interface generation failed (see above)"
+    if ! gen "$top/source/manifest.json" "$u" "$top/someipInterfaces"; then
+        [ $update = 0 ] && rm -rf "$top"        # a new app: leave no half-installed folder behind
+        die "interface generation failed for $id (see above)"
+    fi
 
     # ownership/modes as on stock installs. data/ kvs/ share/ security/ keep what the app
     # (or the platform) put in them: on an update, chowning their contents to 12201 leaves
@@ -425,6 +456,9 @@ case "$cmd" in
                backup; for f in "$@"; do install_one "$f"; done
                patch_active || warn "provisioning hook not active: MainApp will hide the app. Run: sh $0 patch"
                if [ $NEED_RESTART = 1 ]; then apply; else say "updated in place - the new version runs on the next tile tap"; fi ;;
+    verify)    [ $# -gt 0 ] || die "usage: $0 verify <app.mgu>..."
+               bad=0; for f in "$@"; do verify_one "$f" || bad=1; done
+               exit $bad ;;
     uninstall) [ $# -gt 0 ] || die "usage: $0 uninstall <app-id>..."
                # stop the platform first so MainApp doesn't see the app vanish
                # under it (it would try to "recover" it)

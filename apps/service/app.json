@@ -2,7 +2,7 @@
   "id": "service",
   "title": "Service",
   "description": "Service due: oil, brakes, brake fluid, inspection and more, in km and date - reset an item after the service",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "vendor": "custom",
   "loggingId": "OA96",
   "iconGlyph": "wrench",
@@ -14,7 +14,7 @@
       "cBSMessageGearOil": "s",
       "cBSMessageParticleFilter": "s",
       "cBSMessageSparkPlug": "s",
-      "cBSReset": "rw"
+      "cBSReset": "w"
     },
     "de.bmw.infotainment.cbs.ConditionBasedServices": {
       "cBSList": "rs"
