@@ -64,7 +64,7 @@ class Demo {
         const s = (Date.now() - this.t0) / 1000;
         return {
             soc: 100 - (s * 0.8) % 95, soh: 91.5, ambient: 6 + 14 * Math.sin(s / 12), v12: 12.45 + 0.05 * Math.sin(s / 5),
-            climate: s % 30 < 20, ac: s % 30 < 10,
+            climate: s % 30 < 10 ? 'ac' : s % 30 < 20, ac: s % 30 < 10,
             charge: { from: 28, to: 97, toT: this.t0 - 3 * 3600000, kwh: 7.6 },
         };
     }
@@ -164,16 +164,14 @@ mgu.run({
             return out;
         };
         const one = (v, key) => { const e = entries(v, key)[0]; return e ? e[key] : undefined; };
-        /* Climate counts as on (costing range) when the system is on and the A/C is on, or it is cold
-         * enough that it heats. Automatic climate keeps the system itself on almost always, so that
-         * alone would never change - the A/C button is what the driver switches. */
+        /* Climate: false (off: on-board draw only), true (on: fan, heating), 'ac' (on with the A/C
+         * compressor as well) - each costs its own draw. null: not known. */
         const climateNow = () => {
             const sys = Object.keys(zones.climate).length ? Object.keys(zones.climate).some((k) => zones.climate[k]) : null;
             const ac = Object.keys(zones.ac).length ? Object.keys(zones.ac).some((k) => zones.ac[k]) : null;
             live.ac = ac;
-            if (sys === false) return false;
-            if (ac === null) return sys;
-            return ac || (G.isNum(live.ambient) && live.ambient < 10);
+            if (ac) return 'ac';
+            return sys;
         };
         const seen = (what, v) => {
             const raw = JSON.stringify(v);
@@ -182,7 +180,7 @@ mgu.run({
         const climateChanged = () => {
             const now = climateNow();
             if (now === null) return;
-            if (live.climate !== null && now !== live.climate) { seg.climateMixed = true; log.info('climate control ' + (now ? 'on' : 'off')); }
+            if (live.climate !== null && now !== live.climate) { seg.climateMixed = true; log.info('climate control ' + (now === 'ac' ? 'on (A/C)' : now ? 'on' : 'off')); }
             live.climate = now;
         };
         // ClimateMaster: lists, one entry per zone (not offered on every car)
@@ -393,7 +391,7 @@ mgu.run({
          * Electric range at charge soc: { mid, lo, hi, kpp (km per %), learned, res (engine-start %), full,
          * auxKw (climate + on-board draw), auxLearned, auxKm (range it costs), climate }. Only the charge
          * above the engine-start point counts. Learned: % per km driving + (% per hour climate / typical
-         * speed). climate: true / false / null (not known: as on); off, only the on-board draw counts.
+         * speed). climate: 'ac' / true / false / null (not known: as on); off, only the on-board draw counts.
          */
         function estimate(soc, tC, climate) {
             const res = reserve(), span = Math.max(1, 100 - res), use = G.isNum(soc) ? Math.max(0, soc - res) : null;
@@ -412,6 +410,10 @@ mgu.run({
             if (climate === false) {
                 const onPerKm = span / r.mid, climPerKm = (model.auxRate(tC, k).rate - aux.rate) / model.evSpeed();
                 f = onPerKm / Math.max(onPerKm * 0.5, onPerKm - Math.max(0, climPerKm));
+            } else if (climate === 'ac') {
+                // the curve holds typical climate use without the compressor: it costs on top
+                const onPerKm = span / r.mid, acPerKm = (aux.rate - model.auxRate(tC, k, true).rate) / model.evSpeed();
+                f = onPerKm / (onPerKm + Math.max(0, acPerKm));
             }
             const kpp = r.mid / span * f, mid = use === null ? null : use * kpp;
             return Object.assign(base, {

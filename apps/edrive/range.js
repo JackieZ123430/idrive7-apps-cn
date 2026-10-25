@@ -9,7 +9,8 @@
  *               typical draw for the temperature (AUX_KW) is used, from an hour on only its own.
  *               With climate control OFF (the car says so) only the on-board electrics draw:
  *               learned the same way, but in one bucket (st.base, no bands), typical BASE_KW.
- *               climate = true / false / null (not known: as on, the way it was before).
+ *               With the A/C on as well, its own bands (st.acAux), typical AUX_KW + AC_KW.
+ *               climate = 'ac' / true / false / null (not known: as on, the way it was before).
  *   speed:      typical speed of electric driving, stops in traffic included (up to STOP_H after
  *               moving; longer is parking): the climate draw costs range by the hour, so per km it
  *               is draw / speed (more of it in slow traffic)
@@ -27,19 +28,23 @@ const STOP_H = 5 / 60;           // standing this long after moving still counts
 const AUX_KW = [[-10, 3.0], [0, 2.2], [10, 1.0], [18, 0.5], [24, 0.5], [30, 1.2], [38, 2.0]];
 /** Typical on-board draw (kW) with climate control off: control units, screens, pumps, fans. */
 const BASE_KW = 0.3;
+/** Typical extra draw (kW) of the A/C compressor by outside temperature: [°C, kW] (cold: dehumidifying). */
+const AC_KW = [[0, 0.5], [10, 0.8], [18, 1.0], [25, 1.5], [35, 2.5]];
 
 const isNum = (v) => typeof v === 'number' && isFinite(v);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const bandOf = (tC) => { let i = 0; while (i < BANDS.length && tC >= BANDS[i]) i++; return 'b' + i; };
 const fade = (o, k, max) => { if (o[k] > max) { const f = max / o[k]; Object.keys(o).forEach((x) => { o[x] *= f; }); } };
 
-function auxKwTypical(tC) {
-    const c = AUX_KW, t = clamp(isNum(tC) ? tC : 15, c[0][0], c[c.length - 1][0]);
+function curve(c, tC) {
+    const t = clamp(isNum(tC) ? tC : 15, c[0][0], c[c.length - 1][0]);
     let i = 0;
     while (i < c.length - 2 && t > c[i + 1][0]) i++;
     const f = (t - c[i][0]) / (c[i + 1][0] - c[i][0]);
     return c[i][1] + (c[i + 1][1] - c[i][1]) * f;
 }
+const auxKwTypical = (tC) => curve(AUX_KW, tC);
+const acKwTypical = (tC) => curve(AC_KW, tC);
 
 class RangeModel {
     constructor(st) { this.st = st; this.stoodH = Infinity; }
@@ -63,8 +68,9 @@ class RangeModel {
             const w = Math.min(1, b.h), own = Math.max(0, b.pct / b.h);
             return { rate: own * w + typ * (1 - w), learned: true, climate };
         }
-        const typ = auxKwTypical(tC) / kwhPerPct;
-        const b = isNum(tC) && this.st.aux && this.st.aux[bandOf(tC)];
+        const ac = climate === 'ac', bands = ac ? this.st.acAux : this.st.aux;
+        const typ = (auxKwTypical(tC) + (ac ? acKwTypical(tC) : 0)) / kwhPerPct;
+        const b = isNum(tC) && bands && bands[bandOf(tC)];
         if (!b || b.h < 0.25) return { rate: typ, learned: false, climate };
         const w = Math.min(1, b.h), own = Math.max(0, b.pct / b.h);
         return { rate: own * w + typ * (1 - w), learned: true, climate };
@@ -91,7 +97,10 @@ class RangeModel {
             if (!mixed) {
                 let b;
                 if (climate === false) b = st.base || (st.base = { h: 0, pct: 0 });
-                else { st.aux = st.aux || {}; b = st.aux[bandOf(tC)] || (st.aux[bandOf(tC)] = { h: 0, pct: 0 }); }
+                else {
+                    const key = climate === 'ac' ? 'acAux' : 'aux', bands = st[key] || (st[key] = {});
+                    b = bands[bandOf(tC)] || (bands[bandOf(tC)] = { h: 0, pct: 0 });
+                }
                 b.h += h; b.pct += used;
                 fade(b, 'h', AUX_H);
             }
@@ -123,4 +132,4 @@ class RangeModel {
     }
 }
 
-module.exports = { RangeModel, auxKwTypical, bandOf, LEARN_KM, AUX_KW, BASE_KW };
+module.exports = { RangeModel, auxKwTypical, acKwTypical, bandOf, LEARN_KM, AUX_KW, BASE_KW, AC_KW };
