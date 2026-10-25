@@ -141,6 +141,29 @@ mgu.run({
             l.push(key); log.info('raw ' + name + ': ' + key);
         };
         let lastCar = 0, oilCarT = 0;          // oilCarT: last valid oil temperature from the car's own signal
+        // xDrive split sources, first one with data wins (see xdriveSplit):
+        //   1. BasicDataSet torque split, fresh (< SPLIT_STALE ms), valid qualifier, not 0
+        //   2. the drive mode: in 2WD the front axle gets nothing, so 100 % rear
+        //   3. none: the bars show no data rather than a made-up number
+        const SPLIT_STALE = 10000;
+        const SPLIT_OK = (q) => q === undefined || q === null || q === 2 || q === 10 ||
+            q === 'SIGNALWERT_IST_GUELTIG' || q === 'SIGNALWERT_IST_GUELTIG__REKALIBRIERUNGSBEDARF';
+        let splitAt = 0;
+        const xdriveSplit = (d) => {
+            if (usingDemo()) return { rear: d.splitRear, from: null };
+            const now = Date.now();
+            if (G.isNum(live.splitRear) && now - splitAt < SPLIT_STALE) return { rear: live.splitRear, from: null };
+            // transfer case: front axle torque against what the gearbox puts out (engine torque x gear ratio)
+            if (G.isNum(live.lmvFront) && now - lmvAt < 3000) {
+                const nm = live.lmvFront, ratio = xcfg.gearRatios[(live.gear || 0) - 1];
+                const input = G.isNum(live.torque) && ratio ? live.torque * ratio : null;
+                if (nm <= 5) return { rear: 100, from: 'transfer case: clutch open', nm };
+                if (input > 50) return { rear: 100 - Math.max(0, Math.min(100, nm / input * 100)), from: 'transfer case, estimated', nm };
+                return { rear: null, from: 'transfer case', nm };
+            }
+            if (d.awd === '_2WD') return { rear: 100, from: '2WD mode' };
+            return { rear: null, from: null };
+        };
         const guess = new GearGuess();
         let gearLogs = 0, lastModeKey = '';
         const put = (k, v) => {
@@ -211,8 +234,14 @@ mgu.run({
                 basicDataSet: (v) => {
                     logRaw('gearbox oil', v.valueTemperatureTransmissionOil);
                     put('gearbox', sc('gearboxTemp', v.valueTemperatureTransmissionOil));
-                    const split = sc('torqueSplitRear', v.valueDistributionLongitudinalTorqueRearAxisFrontAxis);
-                    put('splitRear', split);
+                    // xDrive split: the only signal the car has for it. Taken only when its qualifier
+                    // says valid (or the car leaves the qualifier out) and it isn't 0 - a car that
+                    // doesn't fill the field sends 0 or 65535; xdriveSplit() then falls back.
+                    const rawSplit = v.valueDistributionLongitudinalTorqueRearAxisFrontAxis;
+                    const q = v.qualifierValueDistributionLongitudinalTorqueRearAxisFrontAxis;
+                    logRaw('torque split [value, qualifier]', [rawSplit, q]);
+                    const split = SPLIT_OK(q) ? sc('torqueSplitRear', rawSplit) : null;
+                    if (G.isNum(split) && split > 0) { put('splitRear', split); splitAt = Date.now(); }
                     if (G.isNum(split) && split > 1 && split < 97) markAwd();     // torque going to the front axle
                 },
             }],
@@ -297,6 +326,9 @@ mgu.run({
         link.quiet = true;
         link.init();
         const rd = new DidReader(link, { ecu: dme.ecu });
+        // xDrive front axle torque from the transfer case unit (config.xdrive), read while the Chassis page is on screen
+        const xcfg = Object.assign({ front: [], gearRatios: [] }, (ctx.spec.config && ctx.spec.config.xdrive) || {});
+        let chassisSeen = 0, lmvAt = 0;
         const fuelT = {}, fuelFail = {}, fuelTry = {};
         let fuelSeen = 0, engineSeen = 0, fuelTimer = null, fuelBusy = false, fuelLast = 0;
         let baro = 101.3, baroT = 0;                                       // outside air pressure, kPa
@@ -341,6 +373,16 @@ mgu.run({
             const m = await rd.value('boost', dme.boost);
             return m === null ? null : (m - baro) / 100;
         }
+        /** Front axle torque from the transfer case (Nm); the raw reply goes to the log once per new value shape. */
+        async function readLmv() {
+            const v = await rd.value('lmvFront', xcfg.front);
+            const c = xcfg.front[rd.pick.lmvFront || 0], r = c && rd.raws[rd.key(c)];
+            if (r) logRaw('xDrive transfer case 22 DB32', r.bytes ? r.bytes.split(' ').slice(3, 11).join(' ') : r.why);
+            if (v === null) { fuelFail.lmv = (fuelFail.lmv || 0) + 1; return; }
+            fuelFail.lmv = 0;
+            live.lmvFront = v; lmvAt = Date.now(); lastCar = lmvAt;
+            if (v > 20) markAwd();                    // torque going to the front axle
+        }
         /*
          * Fast (~2/s) for the values of the page on screen (Fuel & ignition, or boost on Engine when it
          * comes from the engine unit), all of them every 5 s otherwise so the history keeps filling.
@@ -353,7 +395,10 @@ mgu.run({
             // a value set to Hide is not asked for at all
             const want = (k) => settings.get(SHOW[k]) !== 'off' && (k === 'misfire' ? !!dme.misfire : (dme[k] || []).length > 0);
             const onFuelPage = now - fuelSeen < 1500;
-            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : null;
+            // transfer case: only on the Chassis page with the xDrive card shown, and only while the car's own split is missing
+            const onChassis = now - chassisSeen < 1500 && xcfg.front.length > 0 && settings.get('xdrive') !== 'off'
+                && !(G.isNum(live.splitRear) && now - splitAt < SPLIT_STALE);
+            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : onChassis ? ['lmv'] : null;
             // misfire counts change slowly: every 4th fast round on its page (~2 s), every slow round otherwise
             pollFuel.n = (pollFuel.n || 0) + 1;
             const misNow = want('misfire') && (!fast || (onFuelPage && pollFuel.n % 4 === 0));
@@ -363,6 +408,7 @@ mgu.run({
                     for (const k of keys) {
                         if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
                         fuelTry[k] = Date.now();
+                        if (k === 'lmv') { await readLmv(); continue; }
                         const v = k === 'boost' ? await readBoost() : k === 'misfire' ? await readMisfire() : await rd.value(k, dme[k]);
                         if (k === 'egs' || k === 'timing') { const c = dme[k][rd.pick[k] || 0], r = c && rd.raws[rd.key(c)]; if (r) logRaw(k === 'egs' ? 'EGS' : 'timing', r.bytes || r.why); }
                         if (k === 'oil' && v !== null && Date.now() - oilCarT < 15000) continue;      // the car's own value came meanwhile
@@ -612,6 +658,8 @@ mgu.run({
         }
 
         function drawChassis(cv, t, d) {
+            chassisSeen = Date.now();
+            kickFuel();
             if (G.isNum(d.gLat) && G.isNum(d.gLong)) { trail.push([d.gLat, d.gLong]); if (trail.length > 60) trail.shift(); }
             // xDrive column and tyre card when shown; the g-force card takes the space of hidden ones
             const xd = settings.get('xdrive');
@@ -629,9 +677,14 @@ mgu.run({
                 const hot = d.awdQual === 'FUNKTION_NICHT_VERFUEGBAR_FEHLER';
                 cv.text(mode, ax + 24, 160, 52, hot ? t.crit : t.text, { font: 'bold' });
                 if (hot) cv.text('DERATED / OFF', ax + 24, 196, 22, t.crit, { font: 'bold', spacing: 1.5 });
-                const rear = d.splitRear;
+                const sp = xdriveSplit(d), rear = sp.rear;
                 G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
                 G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
+                // where the split came from when it isn't the car's own torque split
+                // under the mode: front axle torque and where the split came from, when it isn't the car's own
+                const note = G.isNum(sp.nm) ? 'front ' + G.fmt(sp.nm, 0) + ' Nm (transfer case)'
+                    : sp.from ? 'from ' + sp.from : !G.isNum(rear) ? 'car sends no torque split' : '';
+                if (note) cv.text(note, ax + 24, 232, 20, t.dim);
             }
         }
 
