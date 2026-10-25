@@ -13,6 +13,11 @@
 #include "g_game.h"
 #include "p_saveg.h"
 #include "m_controls.h"
+#include "i_video.h"
+#include "r_main.h"
+#include "w_wad.h"
+#include "z_zone.h"
+#include "mgu_hires.h"
 
 #define IMPORT(name) __attribute__((import_module("env"), import_name(#name)))
 #define EXPORT(name) __attribute__((export_name(#name)))
@@ -68,7 +73,50 @@ EXPORT(mgu_start) void mgu_start(void) {
 }
 
 void DG_Init(void) {}
-void DG_DrawFrame(void) { frames++; js_frame(); }
+/* the 3D view in full resolution (mgu_hires.h): r_buffer (palette indexes) -> RGBA, each frame */
+extern struct color colors[256];
+static uint32_t view_rgba[RW_MAX * RH_MAX];
+static int view_on;
+static void view_convert(void) {
+    uint32_t pal[256];
+    int i, x, y;
+    for (i = 0; i < 256; i++)
+        pal[i] = 0xff000000u | ((uint32_t)colors[i].b << 16) | ((uint32_t)colors[i].g << 8) | colors[i].r;
+    for (y = 0; y < r_height; y++) {
+        const uint8_t *in = r_buffer + y * RPITCH;
+        uint32_t *out = view_rgba + y * r_width;
+        for (x = 0; x < r_width; x++) out[x] = pal[in[x]];
+    }
+}
+void DG_DrawFrame(void) {
+    view_on = mgu_view_drawn;
+    if (view_on) view_convert();
+    frames++; js_frame();
+}
+EXPORT(mgu_view_ptr) uint32_t mgu_view_ptr(void) { return (uint32_t)(uintptr_t)view_rgba; }
+EXPORT(mgu_view_w) int mgu_view_w(void) { return r_width; }
+EXPORT(mgu_view_h) int mgu_view_h(void) { return r_height; }
+EXPORT(mgu_view_on) int mgu_view_on(void) { return view_on; }
+/* render size of the 3D view (applied from the next frame) */
+EXPORT(mgu_set_res) void mgu_set_res(int w, int h) {
+    if (w < 320) w = 320; if (w > RW_MAX) w = RW_MAX;
+    if (h < 100) h = 100; if (h > RH_MAX) h = RH_MAX;
+    r_width = w & ~1; r_height = h & ~1;
+    R_SetViewSize(10, 0);
+}
+/* a 64 x 64 flat (e.g. the status bar border FLOOR7_2) as RGBA, for the app to tile; 0 if missing */
+static uint32_t flat_rgba[64 * 64];
+EXPORT(mgu_flat) uint32_t mgu_flat(void) {
+    int lump = W_CheckNumForName("FLOOR7_2"), i;
+    const uint8_t *src;
+    if (lump < 0) return 0;
+    src = W_CacheLumpNum(lump, PU_STATIC);
+    for (i = 0; i < 64 * 64; i++) {
+        struct color c = colors[src[i]];
+        flat_rgba[i] = 0xff000000u | ((uint32_t)c.b << 16) | ((uint32_t)c.g << 8) | c.r;
+    }
+    return (uint32_t)(uintptr_t)flat_rgba;
+}
 void DG_SleepMs(uint32_t ms) { (void)ms; }       /* JS paces the ticks; never block the event loop */
 uint32_t DG_GetTicksMs(void) { return js_ticks(); }
 int DG_GetKey(int *pressed, unsigned char *key) {

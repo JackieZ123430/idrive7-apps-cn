@@ -230,6 +230,23 @@ class Doom {
         }
     }
 
+    /** The 3D view of the last frame in full resolution, or null when the frame had none
+     *  (menu screens, intermission, automap): { px (RGBA, valid until the next tick), w, h }.
+     *  Its pixels are 1.2 times taller than wide, like Doom's: show it stretched to h * 1.2.
+     *  The 320 x 200 frame() then has the view's part see-through (alpha 0) to go on top. */
+    view() {
+        if (!this.x || this.dead || !this.x.mgu_view_on || !this.x.mgu_view_on()) return null;
+        const w = this.x.mgu_view_w(), h = this.x.mgu_view_h();
+        return { px: new Uint8Array(this.mem.buffer, this.x.mgu_view_ptr(), w * h * 4), w, h };
+    }
+    /** render size of the 3D view (up to 1920 x 640) */
+    setRes(w, h) { if (this.x && !this.dead && this.x.mgu_set_res) this.x.mgu_set_res(w | 0, h | 0); }
+    /** the status bar's border texture, 64 x 64 RGBA (for the sides of a wide screen), or null */
+    flat() {
+        const p = this.x && !this.dead && this.x.mgu_flat ? this.x.mgu_flat() : 0;
+        return p ? new Uint8Array(this.mem.buffer, p, 64 * 64 * 4).slice() : null;
+    }
+
     /** the last frame: RGBA bytes (a view into the game's memory, valid until the next tick) */
     frame() { return new Uint8Array(this.mem.buffer, this.x.mgu_screen(), this.w * this.h * 4); }
 

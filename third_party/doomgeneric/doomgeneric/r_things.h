@@ -22,6 +22,7 @@
 
 
 
+#include "mgu_hires.h"
 #define MAXVISSPRITES  	128
 
 extern vissprite_t	vissprites[MAXVISSPRITES];
@@ -30,8 +31,8 @@ extern vissprite_t	vsprsortedhead;
 
 // Constant arrays used for psprite clipping
 //  and initializing clipping.
-extern short		negonearray[SCREENWIDTH];
-extern short		screenheightarray[SCREENWIDTH];
+extern short		negonearray[RW_MAX];
+extern short		screenheightarray[RW_MAX];
 
 // vars for R_DrawMaskedColumn
 extern short*		mfloorclip;

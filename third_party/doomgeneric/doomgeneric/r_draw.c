@@ -35,11 +35,12 @@
 
 // State.
 #include "doomstat.h"
+#include "mgu_hires.h"
 
 
 // ?
-#define MAXWIDTH			1120
-#define MAXHEIGHT			832
+#define MAXWIDTH			RW_MAX
+#define MAXHEIGHT			RH_MAX
 
 // status bar height at bottom of screen
 #define SBARHEIGHT		32
@@ -61,6 +62,11 @@ int		viewheight;
 int		viewwindowx;
 int		viewwindowy; 
 byte*		ylookup[MAXHEIGHT]; 
+
+// the 3D view's own buffer and size (mgu_hires.h)
+byte		r_buffer[RW_MAX * RH_MAX];
+int		r_width = 1920, r_height = 504;
+boolean		mgu_view_drawn;
 int		columnofs[MAXWIDTH]; 
 
 // Color tables for different players,
@@ -113,9 +119,9 @@ void R_DrawColumn (void)
 	return; 
 				 
 #ifdef RANGECHECK 
-    if ((unsigned)dc_x >= SCREENWIDTH
+    if ((unsigned)dc_x >= RPITCH
 	|| dc_yl < 0
-	|| dc_yh >= SCREENHEIGHT) 
+	|| dc_yh >= RH_MAX) 
 	I_Error ("R_DrawColumn: %i to %i at %i", dc_yl, dc_yh, dc_x); 
 #endif 
 
@@ -138,7 +144,7 @@ void R_DrawColumn (void)
 	//  using a lighting/special effects LUT.
 	*dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
 	
-	dest += SCREENWIDTH; 
+	dest += RPITCH; 
 	frac += fracstep;
 	
     } while (count--); 
@@ -178,26 +184,26 @@ void R_DrawColumn (void)
     while (count >= 8) 
     { 
 	dest[0] = colormap[source[frac>>25]]; 
-	dest[SCREENWIDTH] = colormap[source[(frac+fracstep)>>25]]; 
-	dest[SCREENWIDTH*2] = colormap[source[(frac+fracstep2)>>25]]; 
-	dest[SCREENWIDTH*3] = colormap[source[(frac+fracstep3)>>25]];
+	dest[RPITCH] = colormap[source[(frac+fracstep)>>25]]; 
+	dest[RPITCH*2] = colormap[source[(frac+fracstep2)>>25]]; 
+	dest[RPITCH*3] = colormap[source[(frac+fracstep3)>>25]];
 	
 	frac += fracstep4; 
 
-	dest[SCREENWIDTH*4] = colormap[source[frac>>25]]; 
-	dest[SCREENWIDTH*5] = colormap[source[(frac+fracstep)>>25]]; 
-	dest[SCREENWIDTH*6] = colormap[source[(frac+fracstep2)>>25]]; 
-	dest[SCREENWIDTH*7] = colormap[source[(frac+fracstep3)>>25]]; 
+	dest[RPITCH*4] = colormap[source[frac>>25]]; 
+	dest[RPITCH*5] = colormap[source[(frac+fracstep)>>25]]; 
+	dest[RPITCH*6] = colormap[source[(frac+fracstep2)>>25]]; 
+	dest[RPITCH*7] = colormap[source[(frac+fracstep3)>>25]]; 
 
 	frac += fracstep4; 
-	dest += SCREENWIDTH*8; 
+	dest += RPITCH*8; 
 	count -= 8;
     } 
 	
     while (count > 0)
     { 
 	*dest = colormap[source[frac>>25]]; 
-	dest += SCREENWIDTH; 
+	dest += RPITCH; 
 	frac += fracstep; 
 	count--;
     } 
@@ -221,9 +227,9 @@ void R_DrawColumnLow (void)
 	return; 
 				 
 #ifdef RANGECHECK 
-    if ((unsigned)dc_x >= SCREENWIDTH
+    if ((unsigned)dc_x >= RPITCH
 	|| dc_yl < 0
-	|| dc_yh >= SCREENHEIGHT)
+	|| dc_yh >= RH_MAX)
     {
 	
 	I_Error ("R_DrawColumn: %i to %i at %i", dc_yl, dc_yh, dc_x);
@@ -243,8 +249,8 @@ void R_DrawColumnLow (void)
     {
 	// Hack. Does not work corretly.
 	*dest2 = *dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
-	dest += SCREENWIDTH;
-	dest2 += SCREENWIDTH;
+	dest += RPITCH;
+	dest2 += RPITCH;
 	frac += fracstep; 
 
     } while (count--);
@@ -255,7 +261,7 @@ void R_DrawColumnLow (void)
 // Spectre/Invisibility.
 //
 #define FUZZTABLE		50 
-#define FUZZOFF	(SCREENWIDTH)
+#define FUZZOFF	(RPITCH)
 
 
 int	fuzzoffset[FUZZTABLE] =
@@ -302,8 +308,8 @@ void R_DrawFuzzColumn (void)
 	return; 
 
 #ifdef RANGECHECK 
-    if ((unsigned)dc_x >= SCREENWIDTH
-	|| dc_yl < 0 || dc_yh >= SCREENHEIGHT)
+    if ((unsigned)dc_x >= RPITCH
+	|| dc_yl < 0 || dc_yh >= RH_MAX)
     {
 	I_Error ("R_DrawFuzzColumn: %i to %i at %i",
 		 dc_yl, dc_yh, dc_x);
@@ -331,7 +337,7 @@ void R_DrawFuzzColumn (void)
 	if (++fuzzpos == FUZZTABLE) 
 	    fuzzpos = 0;
 	
-	dest += SCREENWIDTH;
+	dest += RPITCH;
 
 	frac += fracstep; 
     } while (count--); 
@@ -367,8 +373,8 @@ void R_DrawFuzzColumnLow (void)
     x = dc_x << 1;
     
 #ifdef RANGECHECK 
-    if ((unsigned)x >= SCREENWIDTH
-	|| dc_yl < 0 || dc_yh >= SCREENHEIGHT)
+    if ((unsigned)x >= RPITCH
+	|| dc_yl < 0 || dc_yh >= RH_MAX)
     {
 	I_Error ("R_DrawFuzzColumn: %i to %i at %i",
 		 dc_yl, dc_yh, dc_x);
@@ -398,8 +404,8 @@ void R_DrawFuzzColumnLow (void)
 	if (++fuzzpos == FUZZTABLE) 
 	    fuzzpos = 0;
 	
-	dest += SCREENWIDTH;
-	dest2 += SCREENWIDTH;
+	dest += RPITCH;
+	dest2 += RPITCH;
 
 	frac += fracstep; 
     } while (count--); 
@@ -433,9 +439,9 @@ void R_DrawTranslatedColumn (void)
 	return; 
 				 
 #ifdef RANGECHECK 
-    if ((unsigned)dc_x >= SCREENWIDTH
+    if ((unsigned)dc_x >= RPITCH
 	|| dc_yl < 0
-	|| dc_yh >= SCREENHEIGHT)
+	|| dc_yh >= RH_MAX)
     {
 	I_Error ( "R_DrawColumn: %i to %i at %i",
 		  dc_yl, dc_yh, dc_x);
@@ -459,7 +465,7 @@ void R_DrawTranslatedColumn (void)
 	// Thus the "green" ramp of the player 0 sprite
 	//  is mapped to gray, red, black/indigo. 
 	*dest = dc_colormap[dc_translation[dc_source[frac>>FRACBITS]]];
-	dest += SCREENWIDTH;
+	dest += RPITCH;
 	
 	frac += fracstep; 
     } while (count--); 
@@ -482,9 +488,9 @@ void R_DrawTranslatedColumnLow (void)
     x = dc_x << 1;
 				 
 #ifdef RANGECHECK 
-    if ((unsigned)x >= SCREENWIDTH
+    if ((unsigned)x >= RPITCH
 	|| dc_yl < 0
-	|| dc_yh >= SCREENHEIGHT)
+	|| dc_yh >= RH_MAX)
     {
 	I_Error ( "R_DrawColumn: %i to %i at %i",
 		  dc_yl, dc_yh, x);
@@ -510,8 +516,8 @@ void R_DrawTranslatedColumnLow (void)
 	//  is mapped to gray, red, black/indigo. 
 	*dest = dc_colormap[dc_translation[dc_source[frac>>FRACBITS]]];
 	*dest2 = dc_colormap[dc_translation[dc_source[frac>>FRACBITS]]];
-	dest += SCREENWIDTH;
-	dest2 += SCREENWIDTH;
+	dest += RPITCH;
+	dest2 += RPITCH;
 	
 	frac += fracstep; 
     } while (count--); 
@@ -598,8 +604,8 @@ void R_DrawSpan (void)
 #ifdef RANGECHECK
     if (ds_x2 < ds_x1
 	|| ds_x1<0
-	|| ds_x2>=SCREENWIDTH
-	|| (unsigned)ds_y>SCREENHEIGHT)
+	|| ds_x2>=RPITCH
+	|| (unsigned)ds_y>RH_MAX)
     {
 	I_Error( "R_DrawSpan: %i to %i at %i",
 		 ds_x1,ds_x2,ds_y);
@@ -727,8 +733,8 @@ void R_DrawSpanLow (void)
 #ifdef RANGECHECK
     if (ds_x2 < ds_x1
 	|| ds_x1<0
-	|| ds_x2>=SCREENWIDTH
-	|| (unsigned)ds_y>SCREENHEIGHT)
+	|| ds_x2>=RPITCH
+	|| (unsigned)ds_y>RH_MAX)
     {
 	I_Error( "R_DrawSpan: %i to %i at %i",
 		 ds_x1,ds_x2,ds_y);
@@ -780,24 +786,14 @@ R_InitBuffer
 { 
     int		i; 
 
-    // Handle resize,
-    //  e.g. smaller view windows
-    //  with border and/or status bar.
-    viewwindowx = (SCREENWIDTH-width) >> 1; 
-
-    // Column offset. For windows.
+    // the view has its own buffer (mgu_hires.h); on the 320 x 200 screen it covers everything
+    // above the status bar
+    viewwindowx = 0;
+    viewwindowy = 0;
     for (i=0 ; i<width ; i++) 
-	columnofs[i] = viewwindowx + i;
-
-    // Samw with base row offset.
-    if (width == SCREENWIDTH) 
-	viewwindowy = 0; 
-    else 
-	viewwindowy = (SCREENHEIGHT-SBARHEIGHT-height) >> 1; 
-
-    // Preclaculate all row offsets.
+	columnofs[i] = i;
     for (i=0 ; i<height ; i++) 
-	ylookup[i] = I_VideoBuffer + (i+viewwindowy)*SCREENWIDTH; 
+	ylookup[i] = r_buffer + i*RPITCH; 
 } 
  
  
@@ -828,7 +824,7 @@ void R_FillBackScreen (void)
     // If we are running full screen, there is no need to do any of this,
     // and the background buffer can be freed if it was previously in use.
 
-    if (scaledviewwidth == SCREENWIDTH)
+    if (1)      // the view always covers the screen above the status bar (mgu_hires.h)
     {
         if (background_buffer != NULL)
         {
@@ -945,8 +941,7 @@ void R_DrawViewBorder (void)
     int		ofs;
     int		i; 
  
-    if (scaledviewwidth == SCREENWIDTH) 
-	return; 
+    return;     // no border: the view covers the screen above the status bar (mgu_hires.h)
   
     top = ((SCREENHEIGHT-SBARHEIGHT)-viewheight)/2; 
     side = (SCREENWIDTH-scaledviewwidth)/2; 

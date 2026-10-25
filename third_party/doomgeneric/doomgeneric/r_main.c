@@ -22,6 +22,7 @@
 
 
 
+#include "mgu_hires.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -59,6 +60,7 @@ int			centery;
 fixed_t			centerxfrac;
 fixed_t			centeryfrac;
 fixed_t			projection;
+fixed_t			r_maxscale = 64*FRACUNIT;
 
 // just for profiling purposes
 int			framecount;	
@@ -95,7 +97,7 @@ int			viewangletox[FINEANGLES/2];
 // The xtoviewangleangle[] table maps a screen pixel
 // to the lowest viewangle that maps back to x ranges
 // from clipangle to -clipangle.
-angle_t			xtoviewangle[SCREENWIDTH+1];
+angle_t			xtoviewangle[RW_MAX+1];
 
 lighttable_t*		scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
 lighttable_t*		scalelightfixed[MAXLIGHTSCALE];
@@ -486,13 +488,13 @@ fixed_t R_ScaleFromGlobalAngle (angle_t visangle)
     {
 	scale = FixedDiv (num, den);
 
-	if (scale > 64*FRACUNIT)
-	    scale = 64*FRACUNIT;
+	if (scale > r_maxscale)
+	    scale = r_maxscale;
 	else if (scale < 256)
 	    scale = 256;
     }
     else
-	scale = 64*FRACUNIT;
+	scale = r_maxscale;
 	
     return scale;
 }
@@ -550,14 +552,16 @@ void R_InitTextureMapping (void)
     //
     // Calc focallength
     //  so FIELDOFVIEW angles covers SCREENWIDTH.
-    focallength = FixedDiv (centerxfrac,
-			    finetangent[FINEANGLES/4+FIELDOFVIEW/2] );
+    // (mgu_hires.h: the projection sets the field of view, wider than 90 degrees on a wide view)
+    fixed_t		tanlimit;
+    focallength = projection;
+    tanlimit = FixedDiv (centerxfrac, focallength) + FRACUNIT;
 	
     for (i=0 ; i<FINEANGLES/2 ; i++)
     {
-	if (finetangent[i] > FRACUNIT*2)
+	if (finetangent[i] > tanlimit)
 	    t = -1;
-	else if (finetangent[i] < -FRACUNIT*2)
+	else if (finetangent[i] < -tanlimit)
 	    t = viewwidth+1;
 	else
 	{
@@ -675,25 +679,25 @@ void R_ExecuteSetViewSize (void)
 
     setsizeneeded = false;
 
-    if (setblocks == 11)
-    {
-	scaledviewwidth = SCREENWIDTH;
-	viewheight = SCREENHEIGHT;
-    }
-    else
-    {
-	scaledviewwidth = setblocks*32;
-	viewheight = (setblocks*168/10)&~7;
-    }
-    
-    detailshift = setdetail;
-    viewwidth = scaledviewwidth>>detailshift;
+    // mgu_hires.h: the view is r_width x r_height, in its own buffer, always above the status bar
+    // (setblocks / setdetail are ignored). Doom's vertical field of view (half height 84 at a
+    // projection of 160) is kept; the horizontal one follows the view's shape.
+    if (r_width < 64) r_width = 64;
+    if (r_width > RW_MAX) r_width = RW_MAX;
+    if (r_height < 64) r_height = 64;
+    if (r_height > RH_MAX) r_height = RH_MAX;
+    scaledviewwidth = r_width;
+    viewheight = r_height;
+    detailshift = 0;
+    viewwidth = scaledviewwidth;
 	
     centery = viewheight/2;
     centerx = viewwidth/2;
     centerxfrac = centerx<<FRACBITS;
     centeryfrac = centery<<FRACBITS;
-    projection = centerxfrac;
+    projection = (fixed_t) (((int64_t) centeryfrac * 160) / 84);
+    // nearest wall scale: Doom's 64 at 168 rows, grown with the view
+    r_maxscale = (fixed_t) (((int64_t) 64 * FRACUNIT * viewheight) / 168);
 
     if (!detailshift)
     {
@@ -715,8 +719,9 @@ void R_ExecuteSetViewSize (void)
     R_InitTextureMapping ();
     
     // psprite scales
-    pspritescale = FRACUNIT*viewwidth/SCREENWIDTH;
-    pspriteiscale = FRACUNIT*SCREENWIDTH/viewwidth;
+    // weapon: scaled with the view's height (168 rows = 1), centred
+    pspritescale = (fixed_t) (((int64_t) FRACUNIT * viewheight) / 168);
+    pspriteiscale = (fixed_t) (((int64_t) FRACUNIT * 168) / viewheight);
     
     // thing clipping
     for (i=0 ; i<viewwidth ; i++)
@@ -727,7 +732,7 @@ void R_ExecuteSetViewSize (void)
     {
 	dy = ((i-viewheight/2)<<FRACBITS)+FRACUNIT/2;
 	dy = abs(dy);
-	yslope[i] = FixedDiv ( (viewwidth<<detailshift)/2*FRACUNIT, dy);
+	yslope[i] = FixedDiv (projection, dy);
     }
 	
     for (i=0 ; i<viewwidth ; i++)
@@ -743,7 +748,7 @@ void R_ExecuteSetViewSize (void)
 	startmap = ((LIGHTLEVELS-1-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
 	for (j=0 ; j<MAXLIGHTSCALE ; j++)
 	{
-	    level = startmap - j*SCREENWIDTH/(viewwidth<<detailshift)/DISTMAP;
+	    level = startmap - j*160/(projection>>FRACBITS)/DISTMAP;
 	    
 	    if (level < 0)
 		level = 0;

@@ -22,6 +22,7 @@
 
 
 // Screenwidth.
+#include "mgu_hires.h"
 #include "doomdef.h"
 
 // Some more or less basic data types
@@ -430,15 +431,15 @@ typedef struct
   
   // leave pads for [minx-1]/[maxx+1]
   
-  byte		pad1;
+  unsigned short	pad1;
   // Here lies the rub for all
   //  dynamic resize/change of resolution.
-  byte		top[SCREENWIDTH];
-  byte		pad2;
-  byte		pad3;
+  unsigned short	top[RW_MAX];
+  unsigned short	pad2;
+  unsigned short	pad3;
   // See above.
-  byte		bottom[SCREENWIDTH];
-  byte		pad4;
+  unsigned short	bottom[RW_MAX];
+  unsigned short	pad4;
 
 } visplane_t;
 

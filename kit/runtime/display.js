@@ -164,13 +164,13 @@ class Display {
             // the surface covers the whole screen, so the HMI's own bar can't show under the back
             // arrow column; the page content goes right of that column
             const w = scr.w - HMI.left, h = scr.h, src = FULL.src;
-            const ah = h - FULL.headH - this.barH();
+            const ah = h - this.headH() - this.barH();
             const s = Math.floor(Math.min(w / src.w, ah / src.h) * 1000) / 1000;
             pl = {
                 x: 0, y: 0, w: scr.w, h, full: true,
                 scale: s,
                 ox: HMI.left + Math.round((w - src.w * s) / 2 - src.x * s),
-                oy: Math.round(FULL.headH + (ah - src.h * s) / 2 - src.y * s),
+                oy: Math.round(this.headH() + (ah - src.h * s) / 2 - src.y * s),
             };
         }
         this.place = pl;
@@ -203,7 +203,7 @@ class Display {
         if (!r) { r = new Recorder(w, h, { textScale: scale }); this.recorders.set(key, r); }
         r.reset();
         // full-screen layout: G.frame hands its tabs to the header instead of drawing them
-        r.chrome = this.active() && this.place.full ? { tabs: null } : null;
+        r.chrome = this.active() && this.place.full && this.screen.chrome !== false ? { tabs: null } : null;
         // where the frame lands on screen (apps that draw some parts in screen pixels, r.xf)
         r.place = this.active() ? this.place : null;
         return r;
@@ -281,7 +281,7 @@ class Display {
         const words = new Uint32Array(r.words());
         this.last = {
             name, softImage, w: r.w, h: r.h,
-            frame: { words: () => words, atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []) },
+            frame: { words: () => words, atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), images: new Set(r.images || []) },
         };
         if (!this.keepTimer) {
             this.keepTimer = setInterval(() => {
@@ -363,7 +363,9 @@ class Display {
      * Height of the kit's slim bar: 0 for a screen with "bar": false in app.json (a game: its
      * bar buttons still exist in the HMI under the surface, for focus and taps, but aren't drawn).
      */
-    barH() { return this.screen && this.screen.bar === false ? 0 : FULL.barH; }
+    barH() { return this.screen && (this.screen.bar === false || this.screen.chrome === false) ? 0 : FULL.barH; }
+    /** Header height: 0 for "chrome": false (the app draws the whole screen itself, e.g. a game). */
+    headH() { return this.screen && this.screen.chrome === false ? 0 : FULL.headH; }
 
     /** The HMI's bar buttons in screen pixels, unscrolled: [{ id, label, x, w }]. */
     buttons() {

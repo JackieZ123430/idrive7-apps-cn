@@ -263,7 +263,8 @@ class Ui {
 function wireSettings(ctx) {
     const { ui, settings } = ctx;
     const schema = settings.schema;
-    if (!schema.length || !ui.comp('SETTINGS')) return;
+    // the settings screen, or an app's own menu screen that shows them ("settings": true)
+    if (!schema.length || !schema.some((s) => ui.comp('SET_' + s.key.toUpperCase()))) return;
     // choice / number settings are drop-downs (kit/tools/build.py): their rows are the values in this order
     const values = (s) => (s.type === 'choice' ? (s.options || []).map((o) => o[0]) : s.type === 'number' ? s.steps || [] : null);
     const refresh = () => Promise.all(schema.map((s) => {

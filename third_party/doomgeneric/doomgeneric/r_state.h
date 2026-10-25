@@ -21,6 +21,7 @@
 #define __R_STATE__
 
 // Need data structure definitions.
+#include "mgu_hires.h"
 #include "d_player.h"
 #include "r_data.h"
 
@@ -106,7 +107,7 @@ extern player_t*	viewplayer;
 extern angle_t		clipangle;
 
 extern int		viewangletox[FINEANGLES/2];
-extern angle_t		xtoviewangle[SCREENWIDTH+1];
+extern angle_t		xtoviewangle[RW_MAX+1];
 //extern fixed_t		finetangent[FINEANGLES/2];
 
 extern fixed_t		rw_distance;

@@ -19,6 +19,7 @@
 
 
 
+#include "mgu_hires.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -72,8 +73,8 @@ lighttable_t**	spritelights;
 
 // constant arrays
 //  used for psprite clipping and initializing clipping
-short		negonearray[SCREENWIDTH];
-short		screenheightarray[SCREENWIDTH];
+short		negonearray[RW_MAX];
+short		screenheightarray[RW_MAX];
 
 
 //
@@ -292,7 +293,7 @@ void R_InitSprites (char** namelist)
 {
     int		i;
 	
-    for (i=0 ; i<SCREENWIDTH ; i++)
+    for (i=0 ; i<RW_MAX ; i++)
     {
 	negonearray[i] = -1;
     }
@@ -832,8 +833,8 @@ void R_SortVisSprites (void)
 //
 // R_DrawSprite
 //
-static short		clipbot[SCREENWIDTH];
-static short		cliptop[SCREENWIDTH];
+static short		clipbot[RW_MAX];
+static short		cliptop[RW_MAX];
 void R_DrawSprite (vissprite_t* spr)
 {
     drawseg_t*		ds;

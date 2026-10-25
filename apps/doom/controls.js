@@ -26,7 +26,7 @@ const DIR = { 1: 'N', 2: 'N', 4: 'E', 5: 'E', 7: 'S', 8: 'S', 10: 'W', 11: 'W' }
 const PUSH_KEYS = { N: [KEY.UP], S: [KEY.DOWN], E: [KEY.SRIGHT], W: [KEY.SLEFT] };
 // bar fallback: what each (hidden) bar button holds
 const BAR = {
-    BTN_OPTS: [], BTN_STAND: [], BTN_WEAPON: [],
+    BTN_STAND: [], BTN_WEAPON: [],
     BTN_BACK: [KEY.DOWN], BTN_TL: [KEY.LEFT], BTN_WL: [KEY.UP, KEY.LEFT],
     BTN_WALK: [KEY.UP], BTN_WR: [KEY.UP, KEY.RIGHT], BTN_TR: [KEY.RIGHT],
 };
@@ -104,16 +104,9 @@ class Controls {
         if (on) this.focused = name; else if (this.focused === name) this.focused = null;
         this.apply();
     }
-    /** a bar button was pressed (controller press or a tap). Returns 'settings' when that should open. */
+    /** a (hidden) bar button was pressed: the controller's press or a tap */
     barClick(name) {
-        if (this.live) {
-            // the controller's press reaches the HMI too: ignore it. A tap on the touchscreen (no
-            // controller press just now) on Settings opens the settings.
-            const t = this.now();
-            if (name === 'BTN_OPTS' && t - this.pressT > 600 && !this.pressed) return 'settings';
-            return null;
-        }
-        if (name === 'BTN_OPTS') return 'settings';
+        if (this.live) return null;           // the controller's own press reaches the HMI too: already handled
         if (!this.enabled) return null;
         if (name === 'BTN_WEAPON') { this.tap(KEY.NEXTW); return null; }
         this.tap(KEY.FIRE); this.tap(KEY.USE);

@@ -84,7 +84,7 @@ struct color colors[256];
 
 #else  // CMAP256
 
-static struct color colors[256];
+struct color colors[256];           // (not static: the iDrive app's view conversion uses it too)
 
 
 #endif  // CMAP256
@@ -153,6 +153,11 @@ void cmap_to_rgb565(uint16_t * out, uint8_t * in, int in_pixels)
     }
 }
 
+#ifdef MGU_RGBA
+#include "mgu_hires.h"
+static int mgu_seethrough_line;     /* this line is over the 3D view */
+#endif
+
 void cmap_to_fb(uint8_t *out, uint8_t *in, int in_pixels)
 {
     int i, k;
@@ -185,7 +190,12 @@ void cmap_to_fb(uint8_t *out, uint8_t *in, int in_pixels)
                   (c.g << s_Fb.green.offset) |
                   (c.b << s_Fb.blue.offset);
 #ifdef MGU_RGBA
-            pix |= 0xff000000u;              /* opaque */
+            /* opaque, except the see-through marking over the 3D view (mgu_hires.h) */
+            /* (all zero: the GPU renderer blends premultiplied alpha) */
+            if (mgu_seethrough_line && *in == MGU_SEETHROUGH)
+                pix = 0;
+            else
+                pix |= 0xff000000u;
 #endif
 
 #ifdef SYS_BIG_ENDIAN
@@ -369,6 +379,9 @@ void I_FinishUpdate (void)
             }
 #else
             //cmap_to_rgb565((void*)line_out, (void*)line_in, SCREENWIDTH);
+#ifdef MGU_RGBA
+            mgu_seethrough_line = mgu_view_drawn && (SCREENHEIGHT - 1 - y) < SCREENHEIGHT - 32;
+#endif
             cmap_to_fb((void*)line_out, (void*)line_in, SCREENWIDTH);
 #endif
             line_out += (SCREENWIDTH * fb_scaling * (s_Fb.bits_per_pixel/8)) + x_offset_end;

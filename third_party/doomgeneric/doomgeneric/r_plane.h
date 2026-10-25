@@ -21,6 +21,7 @@
 #define __R_PLANE__
 
 
+#include "mgu_hires.h"
 #include "r_data.h"
 
 
@@ -34,11 +35,11 @@ typedef void (*planefunction_t) (int top, int bottom);
 extern planefunction_t	floorfunc;
 extern planefunction_t	ceilingfunc_t;
 
-extern short		floorclip[SCREENWIDTH];
-extern short		ceilingclip[SCREENWIDTH];
+extern short		floorclip[RW_MAX];
+extern short		ceilingclip[RW_MAX];
 
-extern fixed_t		yslope[SCREENHEIGHT];
-extern fixed_t		distscale[SCREENWIDTH];
+extern fixed_t		yslope[RH_MAX];
+extern fixed_t		distscale[RW_MAX];
 
 void R_InitPlanes (void);
 void R_ClearPlanes (void);

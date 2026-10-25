@@ -1,8 +1,8 @@
 {
   "id": "doom",
   "title": "Doom",
-  "description": "Doom (Freedoom: Phase 1) on the iDrive - parked only. Turn the controller to aim, push it to walk, press to fire. Saves itself when you leave",
-  "version": "1.1.2",
+  "description": "Doom (Freedoom: Phase 1) on the iDrive - parked only. Main menu with all settings; the game drawn in full resolution across the whole screen, on the controller; BACK returns to the menu and saves",
+  "version": "1.3.0",
   "vendor": "custom",
   "loggingId": "OA9F",
   "iconGlyph": "doom",
@@ -27,14 +27,33 @@
   "screens": [
     {
       "name": "MAIN",
+      "kind": "menu",
+      "title": "Doom",
+      "settings": true,
+      "items": [
+        [
+          "button",
+          "BTN_PLAY",
+          "Play"
+        ],
+        [
+          "button",
+          "BTN_NEW",
+          "New game"
+        ],
+        [
+          "text",
+          "MENU_INFO",
+          ""
+        ]
+      ]
+    },
+    {
+      "name": "GAME",
       "kind": "canvas",
       "title": "Doom",
-      "bar": false,
+      "chrome": false,
       "buttons": [
-        [
-          "BTN_OPTS",
-          "Settings"
-        ],
         [
           "BTN_BACK",
           "Back up"
@@ -73,7 +92,7 @@
   "settings": [
     {
       "key": "skill",
-      "label": "Difficulty (starts a new game)",
+      "label": "Difficulty (new game)",
       "type": "choice",
       "default": "3",
       "options": [
@@ -101,7 +120,7 @@
     },
     {
       "key": "episode",
-      "label": "Episode (starts a new game)",
+      "label": "Episode (new game)",
       "type": "choice",
       "default": "1",
       "options": [
@@ -120,22 +139,6 @@
         [
           "4",
           "4: Double Impact"
-        ]
-      ]
-    },
-    {
-      "key": "newgame",
-      "label": "Game",
-      "type": "choice",
-      "default": "continue",
-      "options": [
-        [
-          "continue",
-          "Continue (saved when you leave)"
-        ],
-        [
-          "new",
-          "Start a new game now"
         ]
       ]
     },
@@ -192,42 +195,22 @@
       ]
     },
     {
-      "key": "theme",
-      "label": "Colour theme",
+      "key": "detail",
+      "label": "Render resolution",
       "type": "choice",
-      "default": "m_red",
+      "default": "full",
       "options": [
         [
-          "m_red",
-          "M Red"
+          "full",
+          "Full: 1920 x 504, every screen pixel"
         ],
         [
-          "m_tricolour",
-          "M Tricolour"
+          "medium",
+          "Medium: 1440 x 378"
         ],
         [
-          "ice",
-          "Ice White"
-        ],
-        [
-          "amber",
-          "Night Amber"
-        ]
-      ]
-    },
-    {
-      "key": "renderer",
-      "label": "Renderer",
-      "type": "choice",
-      "default": "auto",
-      "options": [
-        [
-          "auto",
-          "GPU 60 fps (default)"
-        ],
-        [
-          "software",
-          "Software"
+          "low",
+          "Low: 960 x 252"
         ]
       ]
     }

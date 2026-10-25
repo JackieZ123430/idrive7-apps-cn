@@ -2,25 +2,32 @@
 /**
  * Doom - Freedoom: Phase 1 on the iDrive, for when you're parked.
  *
- * The game is doomgeneric (GPL-2, see LICENSE in this folder) compiled to WebAssembly
- * (doom.wasm, built by doom-src/build.sh) and run here at 35 tics a second (doom-core.js).
- * Each frame (320 x 200) goes to the GPU renderer as a pixel image (kit setImage / OP_IMAGE).
+ * The game is doomgeneric (GPL-2, see LICENSE / NOTICE in this folder) compiled to WebAssembly
+ * (doom.wasm, built by third_party/doomgeneric/build.sh) and run here at 35 tics a second
+ * (doom-core.js). The engine draws the 3D view in full resolution (up to 1920 x 504, Doom's pixels
+ * 1.2 tall: shown 1920 x 605) as its own picture; the status bar, menus and messages come in
+ * Doom's 320 x 200 layer, see-through where the view is, drawn on top at 960 x 720 (4:3).
+ * Pictures without a 3D view (intermission, automap, finale) are shown 4:3 alone.
+ *
+ * Screens:
+ *   MAIN  the main menu, an HMI list: Play / Continue, New game, every setting.
+ *   GAME  the game alone on the whole screen ("chrome": false: no header, no bar, no panels),
+ *         as big as the display allows. BACK (the HMI's own) returns to the menu.
  *
  * Controls (controls.js): turn the controller to aim, push it to walk / sidestep, press to fire
- * and open doors, press twice for the next weapon. No button bar on this screen: the game uses
- * the whole height. Settings: tap "Settings" at the bottom left of the touchscreen.
+ * and open doors, press twice for the next weapon.
  *
- * The game pauses and saves itself while the car moves (over 3 km/h), when the screen is left or
- * covered (BACK, MENU, OPTION, a call) and when the app stops; it carries on from there.
+ * The game runs only while GAME is on screen and the car is parked; whenever it stops (BACK,
+ * MENU, a popup or call, driving off, the app closing) it saves, and Play carries on from there.
  */
 const path = require('path');
 const mgu = require('./kit/mgu');
-const G = require('./kit/gauges');
 const { Recorder, setImage } = require('./kit/record');
-const { Doom, GS, PST } = require('./doom-core');
+const { Doom, GS } = require('./doom-core');
 const { Controls } = require('./controls');
 
-const W = 1600, H = 520, IMG = 1, SLOT = 0;
+const W = 1600, H = 520, IMG = 1, VIEW = 2, SIDE = 3, SLOT = 0;
+const DETAIL = { full: [1920, 504], medium: [1440, 378], low: [960, 252] };
 const MAX_KMH = 3;
 const SKILLS = ['', 'Too young to die', 'Not too rough', 'Hurt me plenty', 'Ultra-Violence', 'Nightmare!'];
 
@@ -47,26 +54,60 @@ mgu.run({
             wasm: path.join(__dirname, 'doom.wasm'), wadDir: __dirname, dataDir: ctx.dataDir, log,
             args: ['-skill', String(skill()), '-episode', String(episode()), '-mb', '16'],
         });
-        let started = false, err = null, frames = 0, fps = 0, fpsT = Date.now(), fpsN = 0, note = '', noteT = 0;
+        let started = false, err = null, frames = 0, saved = false;
+        let hasView = false;
         game.onFrame = (px, w, h) => {
             setImage(IMG, w, h, px);
-            frames++; fpsN++;
-            const now = Date.now();
-            if (now - fpsT >= 1000) { fps = fpsN * 1000 / (now - fpsT); fpsN = 0; fpsT = now; }
+            const v = game.view();
+            hasView = !!v;
+            if (v) setImage(VIEW, v.w, v.h, v.px);
+            if (!frames) sideStrip(game.flat());     // (the palette is there once a frame is drawn)
+            frames++;
         };
-        game.onDead = (e) => { err = e; };
-        const say = (s) => { note = s; noteT = Date.now(); log.info(s); };
+        // render resolution of the 3D view (the "detail" setting)
+        let detail = null;
+        function applyDetail() {
+            const d = DETAIL[settings.get('detail')] ? settings.get('detail') : 'full';
+            if (d !== detail && started && !err) { detail = d; game.setRes(DETAIL[d][0], DETAIL[d][1]); log.info('render ' + DETAIL[d].join(' x ')); }
+        }
+        // game frames per second (Doom's own rate is 35) -> log every 10 s while playing
+        let fpsF = 0, fpsT = Date.now();
+        setInterval(() => {
+            const now = Date.now();
+            if (frames > fpsF && going) log.info('game ' + ((frames - fpsF) * 1000 / (now - fpsT)).toFixed(1) + ' fps');
+            fpsF = frames; fpsT = now;
+        }, 10000);
+        game.onDead = (e) => { err = e; menu(); };
         try {
             game.start(); started = true;
-            if (game.load(SLOT)) say('Carrying on with the saved game');
+            saved = game.load(SLOT);
+            if (saved) log.info('saved game loaded');
+            game.pause(true);                      // runs only on the game screen
+            applyDetail();
         } catch (e) { err = e; log.error('doom start', e); }
 
-        // difficulty / episode / "new game" in the settings start a new game
-        settings.onChange((k, v) => {
+        /* ---------- main menu ---------- */
+        function menu() {
+            const st = (started && !err && game.state()) || {};
+            let info;
+            if (err) info = 'Doom stopped: ' + (err.message || err);
+            else if (moving()) info = 'Parked only - the game waits while you drive';
+            else if (st.gamestate === GS.LEVEL && (saved || frames)) {
+                const lvl = 'E' + Math.floor(st.level / 10) + 'M' + (st.level % 10);
+                info = (saved ? 'Saved game: ' : 'Game: ') + lvl + ', health ' + st.health + ' %';
+            } else info = 'In the game, BACK returns here and saves';
+            ui.text('BTN_PLAY', saved ? 'Continue' : 'Play');
+            ui.text('MENU_INFO', info);
+        }
+        ui.onClick('BTN_PLAY', () => ui.open('GAME'));
+        ui.onClick('BTN_NEW', () => {
             if (!started || err) return;
-            if (k === 'skill' || k === 'episode') { game.newGame(skill(), episode()); say('New game: episode ' + episode() + ', ' + SKILLS[skill()]); }
-            if (k === 'newgame' && v === 'new') { game.newGame(skill(), episode()); say('New game: episode ' + episode() + ', ' + SKILLS[skill()]); settings.set('newgame', 'continue'); }
+            game.newGame(skill(), episode());
+            log.info('new game: episode ' + episode() + ', ' + SKILLS[skill()]);
+            ui.open('GAME');
         });
+        menu();
+        setInterval(() => { if (ui.isVisible('MAIN')) menu(); }, 2000);
 
         /* ---------- controls ---------- */
         const ctl = new Controls(game, {
@@ -78,129 +119,76 @@ mgu.run({
             // the buttons around the controller: only logged (the HMI uses them itself)
             statusPushButtonsState: (() => { let n = 0, last = ''; return (v) => { const s = JSON.stringify(v); if (s !== last && n++ < 20) log.info('buttons ' + s); last = s; }; })(),
         }, log).then((s) => log.info('controller ' + (s.error ? 'error: ' + s.error : 'subscribed')));
-        const BTNS = ['BTN_OPTS', 'BTN_BACK', 'BTN_TL', 'BTN_WL', 'BTN_STAND', 'BTN_WALK', 'BTN_WR', 'BTN_TR', 'BTN_WEAPON'];
+        const BTNS = ['BTN_BACK', 'BTN_TL', 'BTN_WL', 'BTN_STAND', 'BTN_WALK', 'BTN_WR', 'BTN_TR', 'BTN_WEAPON'];
         BTNS.forEach((b) => {
             const c = ui.rhmi && ui.rhmi.getByName(b);
             if (c && c.on) c.on('focus', (ev) => { if (ev && typeof ev.value === 'boolean') ctl.barFocus(b, ev.value); });
-            ui.onClick(b, () => { if (ctl.barClick(b) === 'settings') ui.open('SETTINGS'); });
+            ui.onClick(b, () => ctl.barClick(b));
         });
 
-        /* ---------- run while shown and parked; save when it stops ---------- */
-        const shown = () => ui.isVisible('MAIN') && (!ui.hasFocus || ui.hasFocus('MAIN'));
+        /* ---------- run while the game screen is up and the car is parked; save when it stops ---------- */
+        const shown = () => ui.isVisible('GAME') && (!ui.hasFocus || ui.hasFocus('GAME'));
         let going = false;
         function sync() {
             const go = started && !err && !moving() && shown();
             if (go !== going) {
                 going = go;
-                if (!go) { ctl.enable(false); if (game.save(SLOT)) log.info('saved'); game.pause(true); }
-                else { game.pause(false); ctl.enable(true); }
+                if (!go) {
+                    ctl.enable(false);
+                    if (game.save(SLOT)) { saved = true; log.info('saved'); }
+                    game.pause(true);
+                    menu();
+                } else { game.pause(false); ctl.enable(true); }
             }
             ctl.apply();
+            applyDetail();
         }
         setInterval(sync, 200);
         if (ui.onFocus) ui.onFocus(() => sync());
         process.on('exit', () => { try { if (going) game.save(SLOT); } catch (e) { /* exiting */ } });
 
-        /* ---------- drawing ---------- */
-        function message() {
-            if (err) return ['Doom stopped: ' + (err.message || err), true];
-            if (moving()) return ['Parked only - the game waits while you drive', true];
-            if (!frames) return ['Loading...', false];
-            return null;
-        }
-        function lines(t) {
-            const st = game.state() || {};
-            const hp = st.health != null ? st.health : null;
-            const lvl = st.level ? 'E' + Math.floor(st.level / 10) + 'M' + (st.level % 10) : '--';
-            const where = st.gamestate === GS.LEVEL ? lvl : st.gamestate === GS.INTERMISSION ? 'Level done' : st.gamestate === GS.FINALE ? 'Episode done' : '--';
-            return [
-                ['Level', where],
-                ['Health', hp == null ? '--' : st.playerstate === PST.DEAD ? 'Dead - press' : hp + ' %', hp != null && hp < 30 ? t.crit : t.text],
-                ['Difficulty', SKILLS[skill()]],
-                ['Game', !started || err ? 'Stopped' : moving() ? 'Parked only' : going ? 'Running' : 'Paused, saved', going ? '#2fd27a' : t.warn],
-            ];
-        }
-        // controls panel: what each input does, the active one lit
-        function controlsList() {
-            const s = ctl.status();
-            if (s.live) {
-                return [
-                    ['Turn', 'Aim', false],
-                    ['Push up / down', 'Walk', s.push === 'N' || s.push === 'S'],
-                    ['Push left / right', 'Sidestep', s.push === 'E' || s.push === 'W'],
-                    ['Press', 'Fire / open', s.fire],
-                    ['Press twice', 'Weapon', false],
-                ];
+        /* ---------- drawing: the game alone on the whole screen ---------- */
+        // the status bar is 4:3 (960 wide): beside it, Doom's border texture, 160 x 32 game pixels a side
+        function sideStrip(flat) {
+            if (!flat) return;
+            const sw = 160, sh = 32, px = new Uint8Array(sw * sh * 4);
+            for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+                const s = ((y & 63) * 64 + (x & 63)) * 4, d = (y * sw + x) * 4;
+                px[d] = flat[s]; px[d + 1] = flat[s + 1]; px[d + 2] = flat[s + 2]; px[d + 3] = 255;
             }
-            const names = { BTN_OPTS: 'Settings', BTN_BACK: 'Back up', BTN_TL: 'Turn left', BTN_WL: 'Walk left', BTN_STAND: 'Stand', BTN_WALK: 'Walk', BTN_WR: 'Walk right', BTN_TR: 'Turn right', BTN_WEAPON: 'Weapon' };
-            return BTNS.map((b) => [null, names[b], s.focused === b]);
+            setImage(SIDE, sw, sh, px);
         }
-
-        // full-screen GPU layout: drawn in screen pixels, the game 4:3 over the whole height
         let sr = null;
-        function drawFull(cv, t, pl) {
-            const SW = pl.w, SH = pl.h, TOP = 80, LEFT = 84;
-            if (!sr || sr.w !== SW) sr = new Recorder(SW, SH);
-            sr.reset();
-            const gh = SH - TOP, gw = Math.round(gh * 4 / 3), gx = LEFT + Math.round((SW - LEFT - gw) / 2);
-            sr.fillRect(LEFT, TOP, SW - LEFT, gh, '#000000');
-            if (frames) sr.image(IMG, gx, TOP, gw, gh);
-            const m = message();
-            if (m) {
-                sr.fillRect(gx, TOP, gw, gh, [0, 0, 0, frames ? 170 : 255]);
-                sr.text(m[0], gx + gw / 2, TOP + gh / 2 + 10, 28, m[1] ? t.warn : t.text, { align: 'center', font: 'bold' });
-            } else if (note && Date.now() - noteT < 4000) {
-                sr.fillRect(gx, TOP + gh - 56, gw, 56, [0, 0, 0, 160]);
-                sr.text(note, gx + gw / 2, TOP + gh - 20, 24, t.text, { align: 'center', font: 'bold' });
-            }
-            // left: status, and the Settings tap target over the HMI's (hidden) first bar button
-            const lx = LEFT + 16, lw = gx - LEFT - 32;
-            let y = TOP + 52;
-            sr.text('DOOM', lx, y, 34, t.accent, { font: 'bold', spacing: 4 });
-            y += 56;
-            lines(t).forEach(([a, b, c]) => {
-                sr.text(a, lx, y, 20, t.dim);
-                sr.text(String(b), lx, y + 34, 30, c || t.text, { font: 'bold' });
-                y += 84;
-            });
-            const bx = 132, bw = Math.min(lw - (bx - lx), 300), by = 612, bh = 80;
-            sr.strokeRoundRect(bx, by, bw, bh, 14, 2, G.withAlpha(t.text, 0.35));
-            sr.text('Settings', bx + bw / 2, by + 36, 26, t.text, { align: 'center', font: 'bold' });
-            sr.text(ctl.status().live ? 'tap here' : 'tap, or press here', bx + bw / 2, by + 64, 17, t.dim, { align: 'center' });
-            // right: controls
-            const rx = gx + gw + 24, rw = SW - rx - 16;
-            y = TOP + 52;
-            sr.text(ctl.status().live ? 'CONTROLLER' : 'CONTROLLER POSITION', rx, y, 20, t.dim, { font: 'bold', spacing: 2 });
-            y += 26;
-            const list = controlsList();
-            const rowH = list.length > 6 ? 58 : 100;
-            list.forEach(([a, b, on]) => {
-                if (on) sr.roundRect(rx - 10, y, rw, rowH - 8, 10, G.withAlpha(t.accent, 0.35));
-                if (a) { sr.text(a, rx, y + 30, 19, t.dim); sr.text(b, rx, y + 66, 28, t.text, { font: 'bold' }); }
-                else sr.text(b, rx, y + rowH / 2 + 6, 24, on ? t.text : t.dim, { font: on ? 'bold' : undefined });
-                y += rowH;
-            });
-            cv.xf(1, 0, 0).append(sr).xf();
-        }
-        // standard layout / software: the game 4:3 in the app's image area
-        function drawPlain(cv, t) {
-            const TOPY = G.TOP, GH = G.BOTTOM - G.TOP, GW = Math.round(GH * 4 / 3), GX = Math.round((W - GW) / 2);
-            if (frames) cv.image(IMG, GX, TOPY, GW, GH);
-            const m = message();
-            if (m) {
-                cv.fillRect(GX, TOPY, GW, GH, [0, 0, 0, frames ? 170 : 255]);
-                cv.text(m[0], GX + GW / 2, TOPY + GH / 2 + 10, 28, m[1] ? t.warn : t.text, { align: 'center', font: 'bold' });
-            }
-            let y = TOPY + 40;
-            lines(t).forEach(([a, b, c]) => { cv.text(a, 40, y, 20, t.dim); cv.text(String(b), 40, y + 32, 28, c || t.text, { font: 'bold' }); y += 80; });
-        }
         function render() {
-            const t = ctx.theme(), cv = ctx.canvas(W, H).clear('#000000');
-            if (cv.place && cv.place.full) drawFull(cv, t, cv.place); else drawPlain(cv, t);
-            G.frame(cv, t, [], 0, []);
-            return ui.image('MAIN_GFX', cv);
+            const cv = ctx.canvas(W, H).clear('#000000');
+            const pl = cv.place;
+            const stop = err ? 'Doom stopped' : moving() ? 'Parked only - the game waits while you drive' : !frames ? 'Loading...' : null;
+            if (pl && pl.full) {
+                // screen pixels: the whole display is ours (1920 x 720)
+                if (!sr || sr.w !== pl.w || sr.h !== pl.h) sr = new Recorder(pl.w, pl.h);
+                sr.reset();
+                sr.fillRect(0, 0, pl.w, pl.h, '#000000');
+                const gw = Math.round(pl.h * 4 / 3), gx = Math.round((pl.w - gw) / 2);
+                const vh = Math.round(pl.h * 168 / 200);       // the 3D view: all but the status bar
+                if (stop) sr.text(stop, pl.w / 2, pl.h / 2 + 10, 30, '#ffffff', { align: 'center', font: 'bold' });
+                else if (hasView) {
+                    sr.image(VIEW, 0, 0, pl.w, vh);
+                    if (gx > 0) { sr.image(SIDE, 0, vh, gx, pl.h - vh); sr.image(SIDE, gx + gw, vh, pl.w - gx - gw, pl.h - vh); }
+                    sr.image(IMG, gx, 0, gw, pl.h);
+                } else sr.image(IMG, gx, 0, gw, pl.h);
+                cv.xf(1, 0, 0).append(sr).xf();
+            } else {
+                // software / standard layout: the game in the app's image area
+                const gw = Math.round(H * 4 / 3);
+                if (stop) cv.text(stop, W / 2, H / 2, 28, '#ffffff', { align: 'center', font: 'bold' });
+                else {
+                    if (hasView) cv.image(VIEW, 0, 0, W, Math.round(H * 168 / 200));
+                    cv.image(IMG, Math.round((W - gw) / 2), 0, gw, H);
+                }
+            }
+            return ui.image('GAME_GFX', cv);
         }
-        ctx.loop('MAIN', 35, render);
+        ctx.loop('GAME', 35, render);
         log.info('doom app started');
     },
 });

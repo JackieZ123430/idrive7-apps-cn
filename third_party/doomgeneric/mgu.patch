@@ -1,41 +1,63 @@
-diff --git a/doomgeneric/i_video.c b/doomgeneric/i_video.c
-index 84bebde..5785aec 100644
---- a/doomgeneric/i_video.c
-+++ b/doomgeneric/i_video.c
-@@ -184,6 +184,9 @@ void cmap_to_fb(uint8_t *out, uint8_t *in, int in_pixels)
-             pix = (c.r << s_Fb.red.offset) |
-                   (c.g << s_Fb.green.offset) |
-                   (c.b << s_Fb.blue.offset);
-+#ifdef MGU_RGBA
-+            pix |= 0xff000000u;              /* opaque */
-+#endif
+diff --git a/doomgeneric/d_main.c b/doomgeneric/d_main.c
+index 9012e5f..14fe023 100644
+--- a/doomgeneric/d_main.c
++++ b/doomgeneric/d_main.c
+@@ -44,6 +44,7 @@
  
- #ifdef SYS_BIG_ENDIAN
-             pix = swapLE32(pix);
-@@ -239,9 +242,16 @@ void I_InitGraphics (void)
- 		s_Fb.red.length = 8;
- 		s_Fb.transp.length = 8;
+ #include "f_finale.h"
+ #include "f_wipe.h"
++#include "mgu_hires.h"
  
-+#ifdef MGU_RGBA
-+		/* MGU: bytes R, G, B, A in memory = GL_RGBA, uploaded to the GPU as they are */
-+		s_Fb.red.offset = 0;
-+		s_Fb.green.offset = 8;
-+		s_Fb.blue.offset = 16;
-+#else
- 		s_Fb.blue.offset = 0;
- 		s_Fb.green.offset = 8;
- 		s_Fb.red.offset = 16;
-+#endif
- 		s_Fb.transp.offset = 24;
- 	}
+ #include "m_argv.h"
+ #include "m_config.h"
+@@ -196,13 +197,9 @@ void D_Display (void)
+     }
  
-
+     // save the current screen if about to wipe
+-    if (gamestate != wipegamestate)
+-		{
+-		wipe = true;
+-		wipe_StartScreen(0, 0, SCREENWIDTH, SCREENHEIGHT);
+-    }
+-    else
+-    	wipe = false;
++    // no screen melt in the iDrive app: it waits for time to pass inside one call, which would
++    // hold up the app (JavaScript runs the game one tic per call)
++    wipe = false;
+ 
+     if (gamestate == GS_LEVEL && gametic)
+     	HU_Erase();
+@@ -240,8 +237,15 @@ void D_Display (void)
+     I_UpdateNoBlit ();
+     
+     // draw the view directly
++    mgu_view_drawn = false;
+     if (gamestate == GS_LEVEL && !automapactive && gametic)
++    {
+     	R_RenderPlayerView (&players[displayplayer]);
++        // the view went to its own buffer (mgu_hires.h): on the screen, mark the part it covers
++        // see-through, so messages / menus drawn next lie over it
++        memset (I_VideoBuffer, MGU_SEETHROUGH, SCREENWIDTH * (SCREENHEIGHT - 32));
++        mgu_view_drawn = true;
++    }
+ 
+     if (gamestate == GS_LEVEL && gametic)
+     	HU_Drawer ();
+@@ -288,7 +292,7 @@ void D_Display (void)
+ 			y = 4;
+ 		else
+ 			y = viewwindowy+4;
+-		V_DrawPatchDirect(viewwindowx + (scaledviewwidth - 68) / 2, y,
++		V_DrawPatchDirect((SCREENWIDTH - 68) / 2, y,
+ 							  W_CacheLumpName (DEH_String("M_PAUSE"), PU_CACHE));
+     }
+ 
 diff --git a/doomgeneric/doomgeneric_mgu.c b/doomgeneric/doomgeneric_mgu.c
 new file mode 100644
-index 0000000..5d91b6a
+index 0000000..be7e7b8
 --- /dev/null
 +++ b/doomgeneric/doomgeneric_mgu.c
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,154 @@
 +/*
 + * doomgeneric_mgu.c - platform layer for the iDrive (MGU) app: Doom runs as WebAssembly inside
 + * the app's Node.js process. JavaScript gives the time, feeds the keys and takes each frame
@@ -51,6 +73,11 @@ index 0000000..5d91b6a
 +#include "g_game.h"
 +#include "p_saveg.h"
 +#include "m_controls.h"
++#include "i_video.h"
++#include "r_main.h"
++#include "w_wad.h"
++#include "z_zone.h"
++#include "mgu_hires.h"
 +
 +#define IMPORT(name) __attribute__((import_module("env"), import_name(#name)))
 +#define EXPORT(name) __attribute__((export_name(#name)))
@@ -106,7 +133,50 @@ index 0000000..5d91b6a
 +}
 +
 +void DG_Init(void) {}
-+void DG_DrawFrame(void) { frames++; js_frame(); }
++/* the 3D view in full resolution (mgu_hires.h): r_buffer (palette indexes) -> RGBA, each frame */
++extern struct color colors[256];
++static uint32_t view_rgba[RW_MAX * RH_MAX];
++static int view_on;
++static void view_convert(void) {
++    uint32_t pal[256];
++    int i, x, y;
++    for (i = 0; i < 256; i++)
++        pal[i] = 0xff000000u | ((uint32_t)colors[i].b << 16) | ((uint32_t)colors[i].g << 8) | colors[i].r;
++    for (y = 0; y < r_height; y++) {
++        const uint8_t *in = r_buffer + y * RPITCH;
++        uint32_t *out = view_rgba + y * r_width;
++        for (x = 0; x < r_width; x++) out[x] = pal[in[x]];
++    }
++}
++void DG_DrawFrame(void) {
++    view_on = mgu_view_drawn;
++    if (view_on) view_convert();
++    frames++; js_frame();
++}
++EXPORT(mgu_view_ptr) uint32_t mgu_view_ptr(void) { return (uint32_t)(uintptr_t)view_rgba; }
++EXPORT(mgu_view_w) int mgu_view_w(void) { return r_width; }
++EXPORT(mgu_view_h) int mgu_view_h(void) { return r_height; }
++EXPORT(mgu_view_on) int mgu_view_on(void) { return view_on; }
++/* render size of the 3D view (applied from the next frame) */
++EXPORT(mgu_set_res) void mgu_set_res(int w, int h) {
++    if (w < 320) w = 320; if (w > RW_MAX) w = RW_MAX;
++    if (h < 100) h = 100; if (h > RH_MAX) h = RH_MAX;
++    r_width = w & ~1; r_height = h & ~1;
++    R_SetViewSize(10, 0);
++}
++/* a 64 x 64 flat (e.g. the status bar border FLOOR7_2) as RGBA, for the app to tile; 0 if missing */
++static uint32_t flat_rgba[64 * 64];
++EXPORT(mgu_flat) uint32_t mgu_flat(void) {
++    int lump = W_CheckNumForName("FLOOR7_2"), i;
++    const uint8_t *src;
++    if (lump < 0) return 0;
++    src = W_CacheLumpNum(lump, PU_STATIC);
++    for (i = 0; i < 64 * 64; i++) {
++        struct color c = colors[src[i]];
++        flat_rgba[i] = 0xff000000u | ((uint32_t)c.b << 16) | ((uint32_t)c.g << 8) | c.r;
++    }
++    return (uint32_t)(uintptr_t)flat_rgba;
++}
 +void DG_SleepMs(uint32_t ms) { (void)ms; }       /* JS paces the ticks; never block the event loop */
 +uint32_t DG_GetTicksMs(void) { return js_ticks(); }
 +int DG_GetKey(int *pressed, unsigned char *key) {
@@ -142,3 +212,769 @@ index 0000000..5d91b6a
 +    if (episode < 1) episode = 1; if (episode > 4) episode = 4;
 +    G_DeferedInitNew((skill_t)(skill - 1), episode, 1);
 +}
+diff --git a/doomgeneric/i_video.c b/doomgeneric/i_video.c
+index 84bebde..d988851 100644
+--- a/doomgeneric/i_video.c
++++ b/doomgeneric/i_video.c
+@@ -84,7 +84,7 @@ struct color colors[256];
+ 
+ #else  // CMAP256
+ 
+-static struct color colors[256];
++struct color colors[256];           // (not static: the iDrive app's view conversion uses it too)
+ 
+ 
+ #endif  // CMAP256
+@@ -153,6 +153,11 @@ void cmap_to_rgb565(uint16_t * out, uint8_t * in, int in_pixels)
+     }
+ }
+ 
++#ifdef MGU_RGBA
++#include "mgu_hires.h"
++static int mgu_seethrough_line;     /* this line is over the 3D view */
++#endif
++
+ void cmap_to_fb(uint8_t *out, uint8_t *in, int in_pixels)
+ {
+     int i, k;
+@@ -184,6 +189,14 @@ void cmap_to_fb(uint8_t *out, uint8_t *in, int in_pixels)
+             pix = (c.r << s_Fb.red.offset) |
+                   (c.g << s_Fb.green.offset) |
+                   (c.b << s_Fb.blue.offset);
++#ifdef MGU_RGBA
++            /* opaque, except the see-through marking over the 3D view (mgu_hires.h) */
++            /* (all zero: the GPU renderer blends premultiplied alpha) */
++            if (mgu_seethrough_line && *in == MGU_SEETHROUGH)
++                pix = 0;
++            else
++                pix |= 0xff000000u;
++#endif
+ 
+ #ifdef SYS_BIG_ENDIAN
+             pix = swapLE32(pix);
+@@ -239,9 +252,16 @@ void I_InitGraphics (void)
+ 		s_Fb.red.length = 8;
+ 		s_Fb.transp.length = 8;
+ 
++#ifdef MGU_RGBA
++		/* MGU: bytes R, G, B, A in memory = GL_RGBA, uploaded to the GPU as they are */
++		s_Fb.red.offset = 0;
++		s_Fb.green.offset = 8;
++		s_Fb.blue.offset = 16;
++#else
+ 		s_Fb.blue.offset = 0;
+ 		s_Fb.green.offset = 8;
+ 		s_Fb.red.offset = 16;
++#endif
+ 		s_Fb.transp.offset = 24;
+ 	}
+ 
+@@ -359,6 +379,9 @@ void I_FinishUpdate (void)
+             }
+ #else
+             //cmap_to_rgb565((void*)line_out, (void*)line_in, SCREENWIDTH);
++#ifdef MGU_RGBA
++            mgu_seethrough_line = mgu_view_drawn && (SCREENHEIGHT - 1 - y) < SCREENHEIGHT - 32;
++#endif
+             cmap_to_fb((void*)line_out, (void*)line_in, SCREENWIDTH);
+ #endif
+             line_out += (SCREENWIDTH * fb_scaling * (s_Fb.bits_per_pixel/8)) + x_offset_end;
+diff --git a/doomgeneric/mgu_hires.h b/doomgeneric/mgu_hires.h
+new file mode 100644
+index 0000000..9605771
+--- /dev/null
++++ b/doomgeneric/mgu_hires.h
+@@ -0,0 +1,26 @@
++//
++// mgu_hires.h - the iDrive app's high-resolution 3D view.
++//
++// The 3D view is drawn into its own buffer (r_buffer, up to RW_MAX x RH_MAX, size chosen at run
++// time with r_width / r_height) instead of the 320 x 200 screen. The status bar, menus, messages,
++// intermission and automap stay in the 320 x 200 screen (I_VideoBuffer), where the part the view
++// covers is filled with MGU_SEETHROUGH, a colour none of those graphics use: the app draws the
++// view under that layer. The view keeps Doom's vertical field of view and widens the horizontal
++// one to the buffer's shape (hor+), with Doom's 1.2-tall pixels (the app stretches it to 1.2).
++//
++
++#ifndef MGU_HIRES_H
++#define MGU_HIRES_H
++
++#include "doomtype.h"
++
++#define RW_MAX          1920
++#define RH_MAX          640
++#define RPITCH          RW_MAX          // bytes per row of r_buffer
++#define MGU_SEETHROUGH  16              // palette index unused by STCFN*, M_*, ST*, WI* graphics
++
++extern int r_width, r_height;           // 3D view size (set before R_SetViewSize)
++extern byte r_buffer[RW_MAX * RH_MAX];
++extern boolean mgu_view_drawn;          // the last frame drew the 3D view
++
++#endif
+diff --git a/doomgeneric/r_defs.h b/doomgeneric/r_defs.h
+index a64ac84..6c55a0e 100644
+--- a/doomgeneric/r_defs.h
++++ b/doomgeneric/r_defs.h
+@@ -22,6 +22,7 @@
+ 
+ 
+ // Screenwidth.
++#include "mgu_hires.h"
+ #include "doomdef.h"
+ 
+ // Some more or less basic data types
+@@ -430,15 +431,15 @@ typedef struct
+   
+   // leave pads for [minx-1]/[maxx+1]
+   
+-  byte		pad1;
++  unsigned short	pad1;
+   // Here lies the rub for all
+   //  dynamic resize/change of resolution.
+-  byte		top[SCREENWIDTH];
+-  byte		pad2;
+-  byte		pad3;
++  unsigned short	top[RW_MAX];
++  unsigned short	pad2;
++  unsigned short	pad3;
+   // See above.
+-  byte		bottom[SCREENWIDTH];
+-  byte		pad4;
++  unsigned short	bottom[RW_MAX];
++  unsigned short	pad4;
+ 
+ } visplane_t;
+ 
+diff --git a/doomgeneric/r_draw.c b/doomgeneric/r_draw.c
+index 9271bcd..a70c633 100644
+--- a/doomgeneric/r_draw.c
++++ b/doomgeneric/r_draw.c
+@@ -35,11 +35,12 @@
+ 
+ // State.
+ #include "doomstat.h"
++#include "mgu_hires.h"
+ 
+ 
+ // ?
+-#define MAXWIDTH			1120
+-#define MAXHEIGHT			832
++#define MAXWIDTH			RW_MAX
++#define MAXHEIGHT			RH_MAX
+ 
+ // status bar height at bottom of screen
+ #define SBARHEIGHT		32
+@@ -61,6 +62,11 @@ int		viewheight;
+ int		viewwindowx;
+ int		viewwindowy; 
+ byte*		ylookup[MAXHEIGHT]; 
++
++// the 3D view's own buffer and size (mgu_hires.h)
++byte		r_buffer[RW_MAX * RH_MAX];
++int		r_width = 1920, r_height = 504;
++boolean		mgu_view_drawn;
+ int		columnofs[MAXWIDTH]; 
+ 
+ // Color tables for different players,
+@@ -113,9 +119,9 @@ void R_DrawColumn (void)
+ 	return; 
+ 				 
+ #ifdef RANGECHECK 
+-    if ((unsigned)dc_x >= SCREENWIDTH
++    if ((unsigned)dc_x >= RPITCH
+ 	|| dc_yl < 0
+-	|| dc_yh >= SCREENHEIGHT) 
++	|| dc_yh >= RH_MAX) 
+ 	I_Error ("R_DrawColumn: %i to %i at %i", dc_yl, dc_yh, dc_x); 
+ #endif 
+ 
+@@ -138,7 +144,7 @@ void R_DrawColumn (void)
+ 	//  using a lighting/special effects LUT.
+ 	*dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
+ 	
+-	dest += SCREENWIDTH; 
++	dest += RPITCH; 
+ 	frac += fracstep;
+ 	
+     } while (count--); 
+@@ -178,26 +184,26 @@ void R_DrawColumn (void)
+     while (count >= 8) 
+     { 
+ 	dest[0] = colormap[source[frac>>25]]; 
+-	dest[SCREENWIDTH] = colormap[source[(frac+fracstep)>>25]]; 
+-	dest[SCREENWIDTH*2] = colormap[source[(frac+fracstep2)>>25]]; 
+-	dest[SCREENWIDTH*3] = colormap[source[(frac+fracstep3)>>25]];
++	dest[RPITCH] = colormap[source[(frac+fracstep)>>25]]; 
++	dest[RPITCH*2] = colormap[source[(frac+fracstep2)>>25]]; 
++	dest[RPITCH*3] = colormap[source[(frac+fracstep3)>>25]];
+ 	
+ 	frac += fracstep4; 
+ 
+-	dest[SCREENWIDTH*4] = colormap[source[frac>>25]]; 
+-	dest[SCREENWIDTH*5] = colormap[source[(frac+fracstep)>>25]]; 
+-	dest[SCREENWIDTH*6] = colormap[source[(frac+fracstep2)>>25]]; 
+-	dest[SCREENWIDTH*7] = colormap[source[(frac+fracstep3)>>25]]; 
++	dest[RPITCH*4] = colormap[source[frac>>25]]; 
++	dest[RPITCH*5] = colormap[source[(frac+fracstep)>>25]]; 
++	dest[RPITCH*6] = colormap[source[(frac+fracstep2)>>25]]; 
++	dest[RPITCH*7] = colormap[source[(frac+fracstep3)>>25]]; 
+ 
+ 	frac += fracstep4; 
+-	dest += SCREENWIDTH*8; 
++	dest += RPITCH*8; 
+ 	count -= 8;
+     } 
+ 	
+     while (count > 0)
+     { 
+ 	*dest = colormap[source[frac>>25]]; 
+-	dest += SCREENWIDTH; 
++	dest += RPITCH; 
+ 	frac += fracstep; 
+ 	count--;
+     } 
+@@ -221,9 +227,9 @@ void R_DrawColumnLow (void)
+ 	return; 
+ 				 
+ #ifdef RANGECHECK 
+-    if ((unsigned)dc_x >= SCREENWIDTH
++    if ((unsigned)dc_x >= RPITCH
+ 	|| dc_yl < 0
+-	|| dc_yh >= SCREENHEIGHT)
++	|| dc_yh >= RH_MAX)
+     {
+ 	
+ 	I_Error ("R_DrawColumn: %i to %i at %i", dc_yl, dc_yh, dc_x);
+@@ -243,8 +249,8 @@ void R_DrawColumnLow (void)
+     {
+ 	// Hack. Does not work corretly.
+ 	*dest2 = *dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
+-	dest += SCREENWIDTH;
+-	dest2 += SCREENWIDTH;
++	dest += RPITCH;
++	dest2 += RPITCH;
+ 	frac += fracstep; 
+ 
+     } while (count--);
+@@ -255,7 +261,7 @@ void R_DrawColumnLow (void)
+ // Spectre/Invisibility.
+ //
+ #define FUZZTABLE		50 
+-#define FUZZOFF	(SCREENWIDTH)
++#define FUZZOFF	(RPITCH)
+ 
+ 
+ int	fuzzoffset[FUZZTABLE] =
+@@ -302,8 +308,8 @@ void R_DrawFuzzColumn (void)
+ 	return; 
+ 
+ #ifdef RANGECHECK 
+-    if ((unsigned)dc_x >= SCREENWIDTH
+-	|| dc_yl < 0 || dc_yh >= SCREENHEIGHT)
++    if ((unsigned)dc_x >= RPITCH
++	|| dc_yl < 0 || dc_yh >= RH_MAX)
+     {
+ 	I_Error ("R_DrawFuzzColumn: %i to %i at %i",
+ 		 dc_yl, dc_yh, dc_x);
+@@ -331,7 +337,7 @@ void R_DrawFuzzColumn (void)
+ 	if (++fuzzpos == FUZZTABLE) 
+ 	    fuzzpos = 0;
+ 	
+-	dest += SCREENWIDTH;
++	dest += RPITCH;
+ 
+ 	frac += fracstep; 
+     } while (count--); 
+@@ -367,8 +373,8 @@ void R_DrawFuzzColumnLow (void)
+     x = dc_x << 1;
+     
+ #ifdef RANGECHECK 
+-    if ((unsigned)x >= SCREENWIDTH
+-	|| dc_yl < 0 || dc_yh >= SCREENHEIGHT)
++    if ((unsigned)x >= RPITCH
++	|| dc_yl < 0 || dc_yh >= RH_MAX)
+     {
+ 	I_Error ("R_DrawFuzzColumn: %i to %i at %i",
+ 		 dc_yl, dc_yh, dc_x);
+@@ -398,8 +404,8 @@ void R_DrawFuzzColumnLow (void)
+ 	if (++fuzzpos == FUZZTABLE) 
+ 	    fuzzpos = 0;
+ 	
+-	dest += SCREENWIDTH;
+-	dest2 += SCREENWIDTH;
++	dest += RPITCH;
++	dest2 += RPITCH;
+ 
+ 	frac += fracstep; 
+     } while (count--); 
+@@ -433,9 +439,9 @@ void R_DrawTranslatedColumn (void)
+ 	return; 
+ 				 
+ #ifdef RANGECHECK 
+-    if ((unsigned)dc_x >= SCREENWIDTH
++    if ((unsigned)dc_x >= RPITCH
+ 	|| dc_yl < 0
+-	|| dc_yh >= SCREENHEIGHT)
++	|| dc_yh >= RH_MAX)
+     {
+ 	I_Error ( "R_DrawColumn: %i to %i at %i",
+ 		  dc_yl, dc_yh, dc_x);
+@@ -459,7 +465,7 @@ void R_DrawTranslatedColumn (void)
+ 	// Thus the "green" ramp of the player 0 sprite
+ 	//  is mapped to gray, red, black/indigo. 
+ 	*dest = dc_colormap[dc_translation[dc_source[frac>>FRACBITS]]];
+-	dest += SCREENWIDTH;
++	dest += RPITCH;
+ 	
+ 	frac += fracstep; 
+     } while (count--); 
+@@ -482,9 +488,9 @@ void R_DrawTranslatedColumnLow (void)
+     x = dc_x << 1;
+ 				 
+ #ifdef RANGECHECK 
+-    if ((unsigned)x >= SCREENWIDTH
++    if ((unsigned)x >= RPITCH
+ 	|| dc_yl < 0
+-	|| dc_yh >= SCREENHEIGHT)
++	|| dc_yh >= RH_MAX)
+     {
+ 	I_Error ( "R_DrawColumn: %i to %i at %i",
+ 		  dc_yl, dc_yh, x);
+@@ -510,8 +516,8 @@ void R_DrawTranslatedColumnLow (void)
+ 	//  is mapped to gray, red, black/indigo. 
+ 	*dest = dc_colormap[dc_translation[dc_source[frac>>FRACBITS]]];
+ 	*dest2 = dc_colormap[dc_translation[dc_source[frac>>FRACBITS]]];
+-	dest += SCREENWIDTH;
+-	dest2 += SCREENWIDTH;
++	dest += RPITCH;
++	dest2 += RPITCH;
+ 	
+ 	frac += fracstep; 
+     } while (count--); 
+@@ -598,8 +604,8 @@ void R_DrawSpan (void)
+ #ifdef RANGECHECK
+     if (ds_x2 < ds_x1
+ 	|| ds_x1<0
+-	|| ds_x2>=SCREENWIDTH
+-	|| (unsigned)ds_y>SCREENHEIGHT)
++	|| ds_x2>=RPITCH
++	|| (unsigned)ds_y>RH_MAX)
+     {
+ 	I_Error( "R_DrawSpan: %i to %i at %i",
+ 		 ds_x1,ds_x2,ds_y);
+@@ -727,8 +733,8 @@ void R_DrawSpanLow (void)
+ #ifdef RANGECHECK
+     if (ds_x2 < ds_x1
+ 	|| ds_x1<0
+-	|| ds_x2>=SCREENWIDTH
+-	|| (unsigned)ds_y>SCREENHEIGHT)
++	|| ds_x2>=RPITCH
++	|| (unsigned)ds_y>RH_MAX)
+     {
+ 	I_Error( "R_DrawSpan: %i to %i at %i",
+ 		 ds_x1,ds_x2,ds_y);
+@@ -780,24 +786,14 @@ R_InitBuffer
+ { 
+     int		i; 
+ 
+-    // Handle resize,
+-    //  e.g. smaller view windows
+-    //  with border and/or status bar.
+-    viewwindowx = (SCREENWIDTH-width) >> 1; 
+-
+-    // Column offset. For windows.
++    // the view has its own buffer (mgu_hires.h); on the 320 x 200 screen it covers everything
++    // above the status bar
++    viewwindowx = 0;
++    viewwindowy = 0;
+     for (i=0 ; i<width ; i++) 
+-	columnofs[i] = viewwindowx + i;
+-
+-    // Samw with base row offset.
+-    if (width == SCREENWIDTH) 
+-	viewwindowy = 0; 
+-    else 
+-	viewwindowy = (SCREENHEIGHT-SBARHEIGHT-height) >> 1; 
+-
+-    // Preclaculate all row offsets.
++	columnofs[i] = i;
+     for (i=0 ; i<height ; i++) 
+-	ylookup[i] = I_VideoBuffer + (i+viewwindowy)*SCREENWIDTH; 
++	ylookup[i] = r_buffer + i*RPITCH; 
+ } 
+  
+  
+@@ -828,7 +824,7 @@ void R_FillBackScreen (void)
+     // If we are running full screen, there is no need to do any of this,
+     // and the background buffer can be freed if it was previously in use.
+ 
+-    if (scaledviewwidth == SCREENWIDTH)
++    if (1)      // the view always covers the screen above the status bar (mgu_hires.h)
+     {
+         if (background_buffer != NULL)
+         {
+@@ -945,8 +941,7 @@ void R_DrawViewBorder (void)
+     int		ofs;
+     int		i; 
+  
+-    if (scaledviewwidth == SCREENWIDTH) 
+-	return; 
++    return;     // no border: the view covers the screen above the status bar (mgu_hires.h)
+   
+     top = ((SCREENHEIGHT-SBARHEIGHT)-viewheight)/2; 
+     side = (SCREENWIDTH-scaledviewwidth)/2; 
+diff --git a/doomgeneric/r_main.c b/doomgeneric/r_main.c
+index 22278fe..1542df0 100644
+--- a/doomgeneric/r_main.c
++++ b/doomgeneric/r_main.c
+@@ -22,6 +22,7 @@
+ 
+ 
+ 
++#include "mgu_hires.h"
+ #include <stdlib.h>
+ #include <math.h>
+ 
+@@ -59,6 +60,7 @@ int			centery;
+ fixed_t			centerxfrac;
+ fixed_t			centeryfrac;
+ fixed_t			projection;
++fixed_t			r_maxscale = 64*FRACUNIT;
+ 
+ // just for profiling purposes
+ int			framecount;	
+@@ -95,7 +97,7 @@ int			viewangletox[FINEANGLES/2];
+ // The xtoviewangleangle[] table maps a screen pixel
+ // to the lowest viewangle that maps back to x ranges
+ // from clipangle to -clipangle.
+-angle_t			xtoviewangle[SCREENWIDTH+1];
++angle_t			xtoviewangle[RW_MAX+1];
+ 
+ lighttable_t*		scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
+ lighttable_t*		scalelightfixed[MAXLIGHTSCALE];
+@@ -486,13 +488,13 @@ fixed_t R_ScaleFromGlobalAngle (angle_t visangle)
+     {
+ 	scale = FixedDiv (num, den);
+ 
+-	if (scale > 64*FRACUNIT)
+-	    scale = 64*FRACUNIT;
++	if (scale > r_maxscale)
++	    scale = r_maxscale;
+ 	else if (scale < 256)
+ 	    scale = 256;
+     }
+     else
+-	scale = 64*FRACUNIT;
++	scale = r_maxscale;
+ 	
+     return scale;
+ }
+@@ -550,14 +552,16 @@ void R_InitTextureMapping (void)
+     //
+     // Calc focallength
+     //  so FIELDOFVIEW angles covers SCREENWIDTH.
+-    focallength = FixedDiv (centerxfrac,
+-			    finetangent[FINEANGLES/4+FIELDOFVIEW/2] );
++    // (mgu_hires.h: the projection sets the field of view, wider than 90 degrees on a wide view)
++    fixed_t		tanlimit;
++    focallength = projection;
++    tanlimit = FixedDiv (centerxfrac, focallength) + FRACUNIT;
+ 	
+     for (i=0 ; i<FINEANGLES/2 ; i++)
+     {
+-	if (finetangent[i] > FRACUNIT*2)
++	if (finetangent[i] > tanlimit)
+ 	    t = -1;
+-	else if (finetangent[i] < -FRACUNIT*2)
++	else if (finetangent[i] < -tanlimit)
+ 	    t = viewwidth+1;
+ 	else
+ 	{
+@@ -675,25 +679,25 @@ void R_ExecuteSetViewSize (void)
+ 
+     setsizeneeded = false;
+ 
+-    if (setblocks == 11)
+-    {
+-	scaledviewwidth = SCREENWIDTH;
+-	viewheight = SCREENHEIGHT;
+-    }
+-    else
+-    {
+-	scaledviewwidth = setblocks*32;
+-	viewheight = (setblocks*168/10)&~7;
+-    }
+-    
+-    detailshift = setdetail;
+-    viewwidth = scaledviewwidth>>detailshift;
++    // mgu_hires.h: the view is r_width x r_height, in its own buffer, always above the status bar
++    // (setblocks / setdetail are ignored). Doom's vertical field of view (half height 84 at a
++    // projection of 160) is kept; the horizontal one follows the view's shape.
++    if (r_width < 64) r_width = 64;
++    if (r_width > RW_MAX) r_width = RW_MAX;
++    if (r_height < 64) r_height = 64;
++    if (r_height > RH_MAX) r_height = RH_MAX;
++    scaledviewwidth = r_width;
++    viewheight = r_height;
++    detailshift = 0;
++    viewwidth = scaledviewwidth;
+ 	
+     centery = viewheight/2;
+     centerx = viewwidth/2;
+     centerxfrac = centerx<<FRACBITS;
+     centeryfrac = centery<<FRACBITS;
+-    projection = centerxfrac;
++    projection = (fixed_t) (((int64_t) centeryfrac * 160) / 84);
++    // nearest wall scale: Doom's 64 at 168 rows, grown with the view
++    r_maxscale = (fixed_t) (((int64_t) 64 * FRACUNIT * viewheight) / 168);
+ 
+     if (!detailshift)
+     {
+@@ -715,8 +719,9 @@ void R_ExecuteSetViewSize (void)
+     R_InitTextureMapping ();
+     
+     // psprite scales
+-    pspritescale = FRACUNIT*viewwidth/SCREENWIDTH;
+-    pspriteiscale = FRACUNIT*SCREENWIDTH/viewwidth;
++    // weapon: scaled with the view's height (168 rows = 1), centred
++    pspritescale = (fixed_t) (((int64_t) FRACUNIT * viewheight) / 168);
++    pspriteiscale = (fixed_t) (((int64_t) FRACUNIT * 168) / viewheight);
+     
+     // thing clipping
+     for (i=0 ; i<viewwidth ; i++)
+@@ -727,7 +732,7 @@ void R_ExecuteSetViewSize (void)
+     {
+ 	dy = ((i-viewheight/2)<<FRACBITS)+FRACUNIT/2;
+ 	dy = abs(dy);
+-	yslope[i] = FixedDiv ( (viewwidth<<detailshift)/2*FRACUNIT, dy);
++	yslope[i] = FixedDiv (projection, dy);
+     }
+ 	
+     for (i=0 ; i<viewwidth ; i++)
+@@ -743,7 +748,7 @@ void R_ExecuteSetViewSize (void)
+ 	startmap = ((LIGHTLEVELS-1-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
+ 	for (j=0 ; j<MAXLIGHTSCALE ; j++)
+ 	{
+-	    level = startmap - j*SCREENWIDTH/(viewwidth<<detailshift)/DISTMAP;
++	    level = startmap - j*160/(projection>>FRACBITS)/DISTMAP;
+ 	    
+ 	    if (level < 0)
+ 		level = 0;
+diff --git a/doomgeneric/r_plane.c b/doomgeneric/r_plane.c
+index ea1611c..e715121 100644
+--- a/doomgeneric/r_plane.c
++++ b/doomgeneric/r_plane.c
+@@ -19,6 +19,7 @@
+ //
+ 
+ 
++#include "mgu_hires.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+@@ -49,7 +50,7 @@ visplane_t*		floorplane;
+ visplane_t*		ceilingplane;
+ 
+ // ?
+-#define MAXOPENINGS	SCREENWIDTH*64
++#define MAXOPENINGS	RW_MAX*64
+ short			openings[MAXOPENINGS];
+ short*			lastopening;
+ 
+@@ -59,15 +60,15 @@ short*			lastopening;
+ //  floorclip starts out SCREENHEIGHT
+ //  ceilingclip starts out -1
+ //
+-short			floorclip[SCREENWIDTH];
+-short			ceilingclip[SCREENWIDTH];
++short			floorclip[RW_MAX];
++short			ceilingclip[RW_MAX];
+ 
+ //
+ // spanstart holds the start of a plane span
+ // initialized to 0 at start
+ //
+-int			spanstart[SCREENHEIGHT];
+-int			spanstop[SCREENHEIGHT];
++int			spanstart[RH_MAX];
++int			spanstop[RH_MAX];
+ 
+ //
+ // texture mapping
+@@ -75,15 +76,15 @@ int			spanstop[SCREENHEIGHT];
+ lighttable_t**		planezlight;
+ fixed_t			planeheight;
+ 
+-fixed_t			yslope[SCREENHEIGHT];
+-fixed_t			distscale[SCREENWIDTH];
++fixed_t			yslope[RH_MAX];
++fixed_t			distscale[RW_MAX];
+ fixed_t			basexscale;
+ fixed_t			baseyscale;
+ 
+-fixed_t			cachedheight[SCREENHEIGHT];
+-fixed_t			cacheddistance[SCREENHEIGHT];
+-fixed_t			cachedxstep[SCREENHEIGHT];
+-fixed_t			cachedystep[SCREENHEIGHT];
++fixed_t			cachedheight[RH_MAX];
++fixed_t			cacheddistance[RH_MAX];
++fixed_t			cachedxstep[RH_MAX];
++fixed_t			cachedystep[RH_MAX];
+ 
+ 
+ 
+@@ -197,8 +198,8 @@ void R_ClearPlanes (void)
+     angle = (viewangle-ANG90)>>ANGLETOFINESHIFT;
+ 	
+     // scale will be unit scale at SCREENWIDTH/2 distance
+-    basexscale = FixedDiv (finecosine[angle],centerxfrac);
+-    baseyscale = -FixedDiv (finesine[angle],centerxfrac);
++    basexscale = FixedDiv (finecosine[angle],projection);
++    baseyscale = -FixedDiv (finesine[angle],projection);
+ }
+ 
+ 
+@@ -243,7 +244,7 @@ R_FindPlane
+     check->height = height;
+     check->picnum = picnum;
+     check->lightlevel = lightlevel;
+-    check->minx = SCREENWIDTH;
++    check->minx = RW_MAX;
+     check->maxx = -1;
+     
+     memset (check->top,0xff,sizeof(check->top));
+@@ -290,7 +291,7 @@ R_CheckPlane
+     }
+ 
+     for (x=intrl ; x<= intrh ; x++)
+-	if (pl->top[x] != 0xff)
++	if (pl->top[x] != 0xffff)
+ 	    break;
+ 
+     if (x > intrh)
+@@ -428,8 +429,8 @@ void R_DrawPlanes (void)
+ 
+ 	planezlight = zlight[light];
+ 
+-	pl->top[pl->maxx+1] = 0xff;
+-	pl->top[pl->minx-1] = 0xff;
++	pl->top[pl->maxx+1] = 0xffff;
++	pl->top[pl->minx-1] = 0xffff;
+ 		
+ 	stop = pl->maxx + 1;
+ 
+diff --git a/doomgeneric/r_plane.h b/doomgeneric/r_plane.h
+index 57b50e5..e4ddf01 100644
+--- a/doomgeneric/r_plane.h
++++ b/doomgeneric/r_plane.h
+@@ -21,6 +21,7 @@
+ #define __R_PLANE__
+ 
+ 
++#include "mgu_hires.h"
+ #include "r_data.h"
+ 
+ 
+@@ -34,11 +35,11 @@ typedef void (*planefunction_t) (int top, int bottom);
+ extern planefunction_t	floorfunc;
+ extern planefunction_t	ceilingfunc_t;
+ 
+-extern short		floorclip[SCREENWIDTH];
+-extern short		ceilingclip[SCREENWIDTH];
++extern short		floorclip[RW_MAX];
++extern short		ceilingclip[RW_MAX];
+ 
+-extern fixed_t		yslope[SCREENHEIGHT];
+-extern fixed_t		distscale[SCREENWIDTH];
++extern fixed_t		yslope[RH_MAX];
++extern fixed_t		distscale[RW_MAX];
+ 
+ void R_InitPlanes (void);
+ void R_ClearPlanes (void);
+diff --git a/doomgeneric/r_state.h b/doomgeneric/r_state.h
+index 2a60e2f..7543c38 100644
+--- a/doomgeneric/r_state.h
++++ b/doomgeneric/r_state.h
+@@ -21,6 +21,7 @@
+ #define __R_STATE__
+ 
+ // Need data structure definitions.
++#include "mgu_hires.h"
+ #include "d_player.h"
+ #include "r_data.h"
+ 
+@@ -106,7 +107,7 @@ extern player_t*	viewplayer;
+ extern angle_t		clipangle;
+ 
+ extern int		viewangletox[FINEANGLES/2];
+-extern angle_t		xtoviewangle[SCREENWIDTH+1];
++extern angle_t		xtoviewangle[RW_MAX+1];
+ //extern fixed_t		finetangent[FINEANGLES/2];
+ 
+ extern fixed_t		rw_distance;
+diff --git a/doomgeneric/r_things.c b/doomgeneric/r_things.c
+index 74e7369..d979d2d 100644
+--- a/doomgeneric/r_things.c
++++ b/doomgeneric/r_things.c
+@@ -19,6 +19,7 @@
+ 
+ 
+ 
++#include "mgu_hires.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+@@ -72,8 +73,8 @@ lighttable_t**	spritelights;
+ 
+ // constant arrays
+ //  used for psprite clipping and initializing clipping
+-short		negonearray[SCREENWIDTH];
+-short		screenheightarray[SCREENWIDTH];
++short		negonearray[RW_MAX];
++short		screenheightarray[RW_MAX];
+ 
+ 
+ //
+@@ -292,7 +293,7 @@ void R_InitSprites (char** namelist)
+ {
+     int		i;
+ 	
+-    for (i=0 ; i<SCREENWIDTH ; i++)
++    for (i=0 ; i<RW_MAX ; i++)
+     {
+ 	negonearray[i] = -1;
+     }
+@@ -832,8 +833,8 @@ void R_SortVisSprites (void)
+ //
+ // R_DrawSprite
+ //
+-static short		clipbot[SCREENWIDTH];
+-static short		cliptop[SCREENWIDTH];
++static short		clipbot[RW_MAX];
++static short		cliptop[RW_MAX];
+ void R_DrawSprite (vissprite_t* spr)
+ {
+     drawseg_t*		ds;
+diff --git a/doomgeneric/r_things.h b/doomgeneric/r_things.h
+index 256a5eb..df7d453 100644
+--- a/doomgeneric/r_things.h
++++ b/doomgeneric/r_things.h
+@@ -22,6 +22,7 @@
+ 
+ 
+ 
++#include "mgu_hires.h"
+ #define MAXVISSPRITES  	128
+ 
+ extern vissprite_t	vissprites[MAXVISSPRITES];
+@@ -30,8 +31,8 @@ extern vissprite_t	vsprsortedhead;
+ 
+ // Constant arrays used for psprite clipping
+ //  and initializing clipping.
+-extern short		negonearray[SCREENWIDTH];
+-extern short		screenheightarray[SCREENWIDTH];
++extern short		negonearray[RW_MAX];
++extern short		screenheightarray[RW_MAX];
+ 
+ // vars for R_DrawMaskedColumn
+ extern short*		mfloorclip;

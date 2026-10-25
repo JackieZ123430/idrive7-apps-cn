@@ -159,7 +159,8 @@ def build_ui(spec):
     xml = ['<?xml version="1.0" encoding="UTF-8"?>', '<application>']
     ui = {'schemaVersion': '1.3.0', 'containers': {}}
     screens = list(spec.get('screens', []))
-    if spec.get('settings'):
+    # a "menu" screen with "settings": true shows the settings itself: no separate settings screen
+    if spec.get('settings') and not any(sc.get('settings') is True for sc in screens):
         screens.append({'name': 'SETTINGS', 'kind': 'settings', 'title': 'Settings'})
     state_ids = {}
     for scr in screens:
@@ -188,6 +189,27 @@ def build_ui(spec):
         strings[s] = text
         return {cell: {'value': s, 'type': 'StringId'}}
 
+    def settings_items(items):
+        for s in spec['settings']:
+            name = 'SET_' + s['key'].upper()
+            if s['type'] == 'bool':
+                items.append(comp('checkbox', name, rows=[text_row('SET_' + s['key'], s['label'])]))
+            elif s['type'] in ('choice', 'number'):
+                # a drop-down with every value, as BMW's parking app settings: rows = options
+                # (ItemText), HeaderText = the setting, SelectedItem = the chosen row (mgu.js sets it)
+                values, labels = setting_options(s)
+                did = nid()
+                items.append((did, [f'            <component id="{did}" type="dropDownMenu"/>'], {
+                    'type': 'dropDownMenu', 'name': name,
+                    'rows': [{'ItemText': {'value': hmi_text(lb), 'type': 'Text'}} for lb in labels],
+                    'cells': {'HeaderText': {'value': hmi_text(s['label']), 'type': 'Text'},
+                              'SelectedItem': {'value': values.index(s['default']) if s['default'] in values else 0, 'type': 'UInt'}},
+                }))
+            else:
+                strings[sid(app, 'SET_' + s['key'])] = s['label']
+                items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
+                                                        'Text2ndRow': {'value': '', 'type': 'Text'}}]))
+
     for scr in screens:
         cid = nid()
         state_ids[scr['name']] = cid
@@ -195,7 +217,8 @@ def build_ui(spec):
         # canvas = M Laptimer's state; menus = the state BMW uses for its
         # clickable lists (LT_State_Wide only renders a single text block)
         # settings: the wide state (full screen width), as BMW's own settings lists
-        widget = 'LT_State_Laptimer' if kind == 'canvas' else 'LT_State_Wide' if kind == 'settings' else 'LT_State_Regular_ContentHidden'
+        # menu: an app's own main menu (buttons, then its settings), in the same wide state
+        widget = 'LT_State_Laptimer' if kind == 'canvas' else 'LT_State_Wide' if kind in ('settings', 'menu') else 'LT_State_Regular_ContentHidden'
         cont = {'type': 'state', 'name': scr['name'], 'components': {}}
         x = [f'    <container id="{cid}" type="state" widget="{widget}">']
         if main_id is not None and scr.get('parent', True):
@@ -215,27 +238,9 @@ def build_ui(spec):
                 groups.append(('Bar', bar))
         elif kind == 'settings':
             items = []
-            for s in spec['settings']:
-                name = 'SET_' + s['key'].upper()
-                if s['type'] == 'bool':
-                    items.append(comp('checkbox', name, rows=[text_row('SET_' + s['key'], s['label'])]))
-                elif s['type'] in ('choice', 'number'):
-                    # a drop-down with every value, as BMW's parking app settings: rows = options
-                    # (ItemText), HeaderText = the setting, SelectedItem = the chosen row (mgu.js sets it)
-                    values, labels = setting_options(s)
-                    did = nid()
-                    items.append((did, [f'            <component id="{did}" type="dropDownMenu"/>'], {
-                        'type': 'dropDownMenu', 'name': name,
-                        'rows': [{'ItemText': {'value': hmi_text(lb), 'type': 'Text'}} for lb in labels],
-                        'cells': {'HeaderText': {'value': hmi_text(s['label']), 'type': 'Text'},
-                                  'SelectedItem': {'value': values.index(s['default']) if s['default'] in values else 0, 'type': 'UInt'}},
-                    }))
-                else:
-                    strings[sid(app, 'SET_' + s['key'])] = s['label']
-                    items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
-                                                            'Text2ndRow': {'value': '', 'type': 'Text'}}]))
+            settings_items(items)
             groups.append(('List', items))
-        else:   # list: components from "items"
+        else:   # list / menu: components from "items" (a menu adds the settings after them)
             items = []
             for it in scr.get('items', []):
                 kindi, name = it[0], it[1]
@@ -249,6 +254,8 @@ def build_ui(spec):
                 else:
                     rows = [text_row(name, label)] if label else [{'Text': {'value': '', 'type': 'Text'}}]
                 items.append(comp(kindi, name, rows=rows))
+            if kind == 'menu' and scr.get('settings'):
+                settings_items(items)
             groups.append(('List', items))
         tid = nid()
         groups.append(('Titlebar', [(tid, [f'            <component id="{tid}" type="title"/>'],

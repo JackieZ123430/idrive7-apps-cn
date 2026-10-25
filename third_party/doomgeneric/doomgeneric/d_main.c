@@ -44,6 +44,7 @@
 
 #include "f_finale.h"
 #include "f_wipe.h"
+#include "mgu_hires.h"
 
 #include "m_argv.h"
 #include "m_config.h"
@@ -196,13 +197,9 @@ void D_Display (void)
     }
 
     // save the current screen if about to wipe
-    if (gamestate != wipegamestate)
-		{
-		wipe = true;
-		wipe_StartScreen(0, 0, SCREENWIDTH, SCREENHEIGHT);
-    }
-    else
-    	wipe = false;
+    // no screen melt in the iDrive app: it waits for time to pass inside one call, which would
+    // hold up the app (JavaScript runs the game one tic per call)
+    wipe = false;
 
     if (gamestate == GS_LEVEL && gametic)
     	HU_Erase();
@@ -240,8 +237,15 @@ void D_Display (void)
     I_UpdateNoBlit ();
     
     // draw the view directly
+    mgu_view_drawn = false;
     if (gamestate == GS_LEVEL && !automapactive && gametic)
+    {
     	R_RenderPlayerView (&players[displayplayer]);
+        // the view went to its own buffer (mgu_hires.h): on the screen, mark the part it covers
+        // see-through, so messages / menus drawn next lie over it
+        memset (I_VideoBuffer, MGU_SEETHROUGH, SCREENWIDTH * (SCREENHEIGHT - 32));
+        mgu_view_drawn = true;
+    }
 
     if (gamestate == GS_LEVEL && gametic)
     	HU_Drawer ();
@@ -288,7 +292,7 @@ void D_Display (void)
 			y = 4;
 		else
 			y = viewwindowy+4;
-		V_DrawPatchDirect(viewwindowx + (scaledviewwidth - 68) / 2, y,
+		V_DrawPatchDirect((SCREENWIDTH - 68) / 2, y,
 							  W_CacheLumpName (DEH_String("M_PAUSE"), PU_CACHE));
     }
 
