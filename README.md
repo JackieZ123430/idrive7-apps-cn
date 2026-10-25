@@ -18,8 +18,8 @@
 
 Real electric range, battery health and a charge log for plug-in hybrids. A sport cluster with
 boost, fuel pressures, ignition timing, misfires and tyre data. Shift lights and a full-screen
-tach, a virtual dyno, brake and drag timers, a G-meter, an oil warm-up guide and a fault-code
-scanner / cleaner. They run on the car's own app platform, use the HMI's real buttons and
+tach, a virtual dyno, brake and drag timers, a G-meter, an oil warm-up guide, a fault-code
+scanner / cleaner, the car's service items, and Doom for when you're parked. They run on the car's own app platform, use the HMI's real buttons and
 settings menus, read live vehicle data and survive reboots. Everything can be removed again
 with one command.
 
@@ -106,6 +106,10 @@ More in [How apps draw](#44-how-apps-draw-remote-hmi-rhmi) and [`kit/renderd`](k
 <td><img src="docs/screens/dtc_scanner.png" alt="Fault Scanner"><br><b>Fault Scanner</b>: fault codes of every control unit, with their texts</td>
 <td><img src="docs/screens/redline.png" alt="Redline"><br><b>Redline</b>: G20-style rev bar, big gear, shift scoring</td>
 </tr>
+<tr>
+<td><img src="docs/screens/service.png" alt="Service"><br><b>Service</b>: what is due when, reset after your own service, inspection dates</td>
+<td><img src="docs/screens/doom.png" alt="Doom"><br><b>Doom</b>: Freedoom on the iDrive controller, parked only, saves itself</td>
+</tr>
 </table>
 
 <sub>Every animation is recorded offline from the app's built-in demo drive through the engine's
@@ -147,9 +151,11 @@ the unit and kept across reboots.
 | **Drag Timer** | 0-50, 0-100, 100-200, 0-200 km/h and ¼ mile (or mph equivalents), with interpolated splits, optional one-foot rollout, a live speed trace and saved best times. |
 | **G-Force** | Friction circle with a fading trail and a grip envelope that grows as you use more grip in each direction. Live lateral/longitudinal bars, session peaks per direction, time spent above 0.5 g, all-time records. The g numbers update at the *G-force display rate* (10 a second by default); the dot and trail move at full frame rate. |
 | **Warm-Up** | Oil and coolant gauges and a warm-up calculator: minutes and clock time until oil and coolant reach working temperature, from the measured warm-up rate (typical rates until enough is measured, "engine off" when a hybrid drives electric), projected on a temperature trend graph. A safe rev limit that rises with oil temperature, and a turbo cool-down countdown after hard driving (high rpm or high power: 30 s to 3 min of gentle driving, depending on how long you drove hard). |
-| **M Vitals** | A sport cluster: rpm, boost, speed with the gear (D / S / M + number), power from the iDrive sport display (its % × your car's max power, so stock or tuned engines both read right; kW, hp or PS) and torque, coolant and oil temperature, g-forces and more, over several pages, with peak values.  A Fuel & ignition page shows intake air temperature (IAT), high-pressure fuel (HPFP / rail) and low-pressure fuel (LPFP) pressure, ignition timing and the misfire counter of every cylinder (this driving cycle, OBD service 06), read from the DME over UDS / OBD (standard OBD data IDs, adjustable in `app.json` config.dme), plus how much warmer the intake air is than outside; the Thermals page adds the gearbox temperature from the gearbox unit (EGS, config.dme.egs). Each of these has an Auto / Show / Hide setting, and the tiles share the screen: whatever the car doesn't answer is left out. Tyre pressures (against the car's target) and temperatures are shown large on the Chassis page; its xDrive card can be set to Auto (shown once the car reports all-wheel drive), Show or Hide for rear-wheel-drive cars. Boost, gearbox oil temperature, the tyre card and tyre temperatures have the same Auto / Show / Hide setting: Auto shows them once the car has sent real data, and a hidden item gives its space to the others. Values outside a plausible range (a tyre at 255 °C) and fields that never change (gearbox oil stuck at 0 °C) count as no data; the raw values the car sends for these go to the log (`raw tyre temperature`, `raw gearbox oil`, `raw FES boost`), to calibrate `app.json` config.scaling. Boost comes from the sport display, or, when that sends nothing usable, from the DME over OBD (charge / manifold pressure minus outside air pressure, candidates in config.dme.boost); the setting Boost from picks one by hand. Dials run from blue to red as they near the redline / boost limit. |
+| **M Vitals** | A sport cluster: rpm, boost, speed with the gear (D / S / M + number), power from the iDrive sport display (its % × your car's max power, so stock or tuned engines both read right; kW, hp or PS) and torque, coolant and oil temperature, g-forces and more, over several pages, with peak values.  A Fuel & ignition page shows intake air temperature (IAT), high-pressure fuel (HPFP / rail) and low-pressure fuel (LPFP) pressure, ignition timing and the misfire counter of every cylinder (this driving cycle, OBD service 06), read from the DME over UDS / OBD (standard OBD data IDs, adjustable in `app.json` config.dme), plus how much warmer the intake air is than outside; the Thermals page adds the gearbox temperature from the gearbox unit (EGS, config.dme.egs). Each of these has an Auto / Show / Hide setting, and the tiles share the screen: whatever the car doesn't answer is left out. Tyre pressures (against the car's target) and temperatures are shown large on the Chassis page; its xDrive card can be set to Auto (shown once the car reports all-wheel drive), Show or Hide for rear-wheel-drive cars. When the car's own torque split signal sends nothing, the card reads the torque going to the front axle from the transfer case unit (LMV, UDS `22 DB32`, `app.json` config.xdrive) and estimates the split from engine torque and the gear; the card says where its number comes from. Boost, gearbox oil temperature, the tyre card and tyre temperatures have the same Auto / Show / Hide setting: Auto shows them once the car has sent real data, and a hidden item gives its space to the others. Values outside a plausible range (a tyre at 255 °C) and fields that never change (gearbox oil stuck at 0 °C) count as no data; the raw values the car sends for these go to the log (`raw tyre temperature`, `raw gearbox oil`, `raw FES boost`), to calibrate `app.json` config.scaling. Boost comes from the sport display, or, when that sends nothing usable, from the DME over OBD (charge / manifold pressure minus outside air pressure, candidates in config.dme.boost); the setting Boost from picks one by hand. Dials run from blue to red as they near the redline / boost limit. |
 | **Fault Scanner** | Scans every control unit for stored fault codes (UDS over the head unit's diagnostic gateway), shows them per module with status, shows live Check Control messages, and can clear fault memories (two-press confirm). Fault texts come from your car's own coding-tool export (`kit/tools/dtc_texts.py`), a few hand-written ones, and, if you import one, a fault text database for every control unit (`kit/tools/dtc_texts.py --db`): units with faults are then asked their SGBD index (UDS 22 F1 50), which picks their texts and their name. Only English texts are imported (one with German in it is left out, and that fault shows no text). A fault code list (CSV, `kit/tools/dtc_texts.py --codes`) fills in faults that still have none, for the units its texts belong to. Fault text tables (the `dtc_scanner_*.json` files, `kit/tools/dtc_tables.py`, after `--db`) add a text for each unit type and each address. The build packs the whole database into one compressed file (`dtc_db.pack`: about 19 MB of texts in 3.7 MB, `kit/tools/pack_data.py`), and the app only unpacks the few KB that hold the codes it shows. The repository ships the fault text tables already packed (`apps/dtc_scanner/dtc_db.pack`: the tables and the SGBD index, used with permission); a local `dtc_db/` folder you import replaces it. Imported databases and car exports stay out of git. |
 | **eDrive** | For plug-in hybrids / EVs: real electric range that adapts to how your car is driven: the charge above the point where the engine starts, divided by what the car uses per km for driving (learned from electric-only driving, last ~60 km) plus what climate control and the on-board electrics draw per hour (heating when cold, A/C when hot, learned per outside-temperature band while standing or creeping with the engine off). The climate draw costs range by the hour, so it costs more of it in slow traffic; the screen shows it in kW and the km it costs. Until it has learned, the range comes from the outside temperature (a full battery gives 50 km at 20 °C, 40-45 km at 10 °C, 30-38 km at 0 °C, 20-30 km at -10 °C, scaled to your own 20 °C range), shown with its low-high spread, battery health (SOH: how much a full charge holds compared to new, in % and kWh) and the energy in the battery now (kWh; the battery size when new is a setting, e.g. 12 kWh for a 330e / 530e, 24 kWh for an X5 45e). Also shows the last HV battery charge (+%, kWh, km added; a charge done while the head unit slept shows at the next start) and the 12 V battery voltage. A charge log page lists every charge (date, % and kWh added, range added, cost from your electricity price, 0.25 €/kWh by default) with monthly / all-time totals and a 14-day chart. On a car without a hybrid system it detects that the battery unit never answers and shows only the 12 V battery (or set Hybrid system = No). Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
+| **Service** | The car's service items (CBS) as the instrument cluster counts them: engine oil, brake pads, brake fluid, microfilter, vehicle check and the rest, each with distance and date left, coloured like BMW's own screen (green / yellow / red), with tiles for the next service and how many items are due. **Reset item** (press twice to confirm) after you did a service yourself, so the car stops reminding you; **Inspection dates** sets the legal inspection (HU) and emissions test (AU) due dates. The data lives in the cluster, not the head unit: the app uses the head unit's own CBS interfaces, and the reset only works on cars whose cluster offers it to the head unit (the app says so when yours doesn't; then reset it in the cluster's own menu). Every request and answer is logged. |
+| **Doom** | Freedoom: Phase 1 (four episodes, free game data) running in the head unit as WebAssembly, drawn by the GPU renderer at full height with no button bar. **Turn the controller to aim, push it to walk and sidestep, press to fire and open doors, press twice for the next weapon** (read straight from the controller signal; without it, as on the VM, the controller position along a hidden bar picks the move). Parked only: it pauses while the car moves, when you leave the screen or a popup / call covers it, and saves itself each time, so it carries on where you stopped. Settings (tap *Settings* at the bottom left of the touchscreen): difficulty, episode, new game, walk / run, aim speed and direction. GPL-2.0, see [Doom licences](#doom-licences). |
 
 On the VM or a bench unit without vehicle data, every app switches to a built-in demo drive
 after 5 seconds (launch, pull through the gears, a hard stop, corners, an engine warming up from
@@ -568,10 +574,11 @@ all 33 HMI languages, manifest, permissions and runner.
 
 | Key | Meaning |
 |---|---|
-| `loggingId` | 4-character log tag, **unique per app** (BMW apps use `OA1x`, the apps here `OA93`-`OA9B`) |
-| `iconGlyph` | tile icon drawn by `make_icon.js`: `gauge`, `flag`, `engine`, `rpm`, `dyno`, `brake`, `temp`, `gforce`, `battery`, or up to ~3 letters |
-| `signals` | `interface → { field: flags }`; `r` = read once at start (needs a getter), `s` = subscribe to changes (needs a notifier). Optional `_instances`, `_methods`, `_broadcasts` |
-| `screens` | `canvas` screens: one big image + up to 4 buttons. `BTN_SETTINGS` opens the settings screen generated from `settings` |
+| `loggingId` | 4-character log tag, **unique per app** (BMW apps use `OA1x`, the apps here `OA93`-`OA9F`) |
+| `iconGlyph` | tile icon drawn by `make_icon.js`: `gauge`, `flag`, `engine`, `rpm`, `dyno`, `brake`, `temp`, `gforce`, `battery`, `service`, `doom`, or up to ~3 letters |
+| `signals` | `interface → { field: flags }`; `r` = read once at start (needs a getter), `s` = subscribe to changes (needs a notifier), `w` = write (its setter, `ctx.signals.set`). Optional `_instances`, `_methods`, `_broadcasts` |
+| `screens` | `canvas` screens: one big image + up to 4 buttons. `BTN_SETTINGS` opens the settings screen generated from `settings`. `"bar": false`: the kit draws no button bar on that screen and the content gets the full height (a game); the buttons still exist in the HMI under the picture, for controller focus and taps |
+| `assets` | files the build downloads into the app folder and packs, checked by SHA-256: `[{ "file", "sha256", "url" }]`, for a zip also `"zipSha256"`, `"zipMember"` (Doom's game data). `.wasm`, `.wad`, `LICENSE` and `NOTICE` files in the app folder are packed as they are |
 | `settings` | `choice`, `number` (stepped through `steps`) and `bool`, saved in the app's `data/settings.json`. Shown in this order: the app's own settings first, the screen ones (theme, display rate, layout, renderer, demo) last. `"markDefault": true` adds " (default)" to the default's row; `"reset": n` moves every car to the default once when `n` changes (for a new default) |
 
 **Check your flags against the catalog.** The unit's installer refuses `r` on a field without a
@@ -621,7 +628,7 @@ mgu.run({
 | `ctx.canvas(w, h)` | the surface to draw one frame on (reused; pass it to `ui.image`). Use 1600 x 520: page tabs via `G.frame`, page content between `G.TOP` (44) and `G.BOTTOM` (512) |
 | `ctx.loop(screen, fps, fn)` | render loop that runs only while that screen is shown: once per display refresh with the GPU renderer, `fps` times a second without; returns `{stop()}` |
 | `ctx.theme()` | current colour theme (`bg`, `text`, `dim`, `accent`, `warn`, `crit`, `cold`, ...) |
-| `ctx.signals` | raw SOME/IP access: `watch(iface, instance, handlers)`, `proxy`, `call` |
+| `ctx.signals` | raw SOME/IP access: `watch(iface, instance, handlers)`, `proxy`, `call`, `set(proxy, field, value)` (needs `w`) |
 | `ctx.log` | `info/warn/error` → system log + `data/<id>.log` |
 | `ctx.dataDir` | the app's writable folder (persistent) |
 
@@ -629,7 +636,9 @@ mgu.run({
 `arc(cx, cy, r0, r1, a0, a1, color, {round, ramp})`, `circle`, `line`, `polyline`, `quad`,
 `fillUnder`, `rampRect`, `clip`/`noclip`, `alpha`,
 `text(str, x, baselineY, size, color, {font, align, spacing})` (returns its width),
-`textWidth`, `blit(layer, x, y)`. No pixel reads: draw static parts once with
+`textWidth`, `blit(layer, x, y)`, `image(id, x, y, w, h)` (a pixel image, e.g. a game frame:
+`setImage(id, w, h, rgba)` from `kit/record`, uploaded to the GPU again only when it changes),
+`xf(1, 0, 0)` ... `xf()` (draw in screen pixels; `cv.place` says where the frame lands). No pixel reads: draw static parts once with
 `G.layer(key, w, h, (c) => ...)` and blit them each frame (cached on the GPU).
 
 **Templates** (`kit/runtime/gauges.js`, all take the theme `t`): `panel`, `radial`, `needle`,
@@ -684,6 +693,9 @@ The signals these apps use, with the scaling applied by `car.js` (raw × factor 
 | Longitudinal / lateral acceleration | `vehicle.CDS2` · `statusLongitudinalAccelerationMassCenter` / `statusLateralAccelerationMassCenter` | × 0.002 − 65 m/s² |
 | Gear | `vehicle.VehicleInformation` · `statusGearboxDrive.statusActualGearDrive` | enum: R = 1, N/P = 2, 1st = 3 … 10th = 12 (event only) |
 | Engine torque | `vehicle.FES` · `statusActualValueTorque2.actualValueTorqueCrankshaft` | raw 4095 = invalid |
+| iDrive controller | `controlelements.FrontCCU` · `statusRotaryEncoderState` | `frontRotaryEncoderOperation` = knob counter (16 bit, wraps), `frontRotaryEncoderPushButton` = press (`DREHGEBER_KURZ/LANG_GEDRUECKT`), `frontRotaryEncoderDeflection` = push N / E / S / W (`NORD_KURZ_GEDRUECKT` ...), `MITTELSTELLUNG` = centre. Enums arrive by name; all `SIGNAL_UNGUELTIG` = no controller (VM). The HMI acts on the controller too |
+| Controller buttons | `controlelements.FrontCCU` · `statusPushButtonsState` | `frontOperationButton1..8`: short / long press, touched. Used by the HMI itself (MENU, BACK, ...) |
+| Service items | `KombiInterface_2` · `cbsDataServiceList` | the cluster's list: id, name, colour, distance and date as text |
 
 Many more are in the catalog: boost, steering angle, yaw rate, wheel speeds, pedal positions,
 battery, ambient temperature, the instrument-cluster interface and more. Use `sigdoc.py` to
@@ -720,7 +732,8 @@ explore it.
 - **Offline cars stay offline.** These apps don't need the internet, but they can't fix a
   missing TCB connection or unlock BMW's online services.
 - **Physical buttons.** Apps see some steering-wheel buttons (scroll-wheel press, voice,
-  volume), but not every button in the car is visible to them.
+  volume) and the iDrive controller (knob, press, push), but the HMI keeps acting on them too:
+  BACK, MENU and OPTION still leave or cover the app.
 - Calculated values (dyno power, brake distance) are as good as the car's speed and
   acceleration sensors. Compare against known figures and do runs on flat road.
 
@@ -730,6 +743,8 @@ explore it.
 
 ```
 apps/<id>/            app.json + main.js (+ helpers) per app
+apps/doom/            Doom: doom-core.js (WebAssembly runner, files over Node fs), controls.js
+                      (controller -> keys), doom.wasm (built from third_party/doomgeneric), GPL-2.0
 kit/runtime/          app runtime: mgu.js (platform glue), record.js + display.js + renderd.js
                       (GPU path), canvas.js (software path), gauges.js, themes.js,
                       car.js (signals + demo), sim.js (demo drive), signals.js (SOME/IP),
@@ -742,6 +757,8 @@ kit/tools/            build.py, make_kit.py, preview.js, make_gif.sh, make_icon.
 deploy/               make-car-kit.sh/.cmd, push-to-car.sh/.ps1, mgu-app-install.sh, mainapp-patch.js
 deploy/car/           deploy-car.sh (runs on the unit) + its README
 docs/                 RHMI widget reference, screenshots (docs/screens), animations (docs/media)
+third_party/doomgeneric/  Doom's engine source (GPL-2.0) with the changes for the app (mgu.patch,
+                      MGU.md) and build.sh, which builds apps/doom/doom.wasm
 ```
 
 Not in the repository, on purpose:
@@ -753,3 +770,15 @@ Not in the repository, on purpose:
 
 BMW's interface generator (needed at install time) is likewise **loaded from the unit's own
 firmware** by `kit/tools/oapgen/gen.js`, so no BMW code is shipped here.
+
+### Doom licences
+
+The repository is MIT-licensed, except the Doom app: `apps/doom` contains `doom.wasm`, the
+[doomgeneric](https://github.com/ozkl/doomgeneric) engine (GPL-2.0) compiled to WebAssembly, so
+the app as a whole is distributed under the GPL-2.0 (`apps/doom/LICENSE`, `apps/doom/NOTICE`).
+Its complete source, with the changes made for the app, is in `third_party/doomgeneric`;
+`third_party/doomgeneric/build.sh` rebuilds `doom.wasm` from it byte for byte (zig 0.13 +
+binaryen 119). The game data, [Freedoom: Phase 1](https://freedoom.github.io) 0.13.0 (BSD
+licence, included in `NOTICE`), is not in the repository: `build.py` downloads it and checks its
+SHA-256. Doom is a trademark of id Software; Freedoom and this app are not affiliated with id
+Software.

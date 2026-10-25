@@ -1,0 +1,235 @@
+{
+  "id": "doom",
+  "title": "Doom",
+  "description": "Doom (Freedoom: Phase 1) on the iDrive - parked only. Turn the controller to aim, push it to walk, press to fire. Saves itself when you leave",
+  "version": "1.1.1",
+  "vendor": "custom",
+  "loggingId": "OA9F",
+  "iconGlyph": "doom",
+  "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.controlelements.FrontCCU": {
+      "statusRotaryEncoderState": "rs",
+      "statusPushButtonsState": "rs"
+    }
+  },
+  "assets": [
+    {
+      "file": "freedoom1.wad",
+      "sha256": "7323bcc168c5a45ff10749b339960e98314740a734c30d4b9f3337001f9e703d",
+      "url": "https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip",
+      "zipSha256": "3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59",
+      "zipMember": "freedoom-0.13.0/freedoom1.wad"
+    }
+  ],
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Doom",
+      "bar": false,
+      "buttons": [
+        [
+          "BTN_OPTS",
+          "Settings"
+        ],
+        [
+          "BTN_BACK",
+          "Back up"
+        ],
+        [
+          "BTN_TL",
+          "Turn left"
+        ],
+        [
+          "BTN_WL",
+          "Walk left"
+        ],
+        [
+          "BTN_STAND",
+          "Stand"
+        ],
+        [
+          "BTN_WALK",
+          "Walk"
+        ],
+        [
+          "BTN_WR",
+          "Walk right"
+        ],
+        [
+          "BTN_TR",
+          "Turn right"
+        ],
+        [
+          "BTN_WEAPON",
+          "Weapon"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "skill",
+      "label": "Difficulty (starts a new game)",
+      "type": "choice",
+      "default": "3",
+      "options": [
+        [
+          "1",
+          "I'm too young to die"
+        ],
+        [
+          "2",
+          "Hey, not too rough"
+        ],
+        [
+          "3",
+          "Hurt me plenty"
+        ],
+        [
+          "4",
+          "Ultra-Violence"
+        ],
+        [
+          "5",
+          "Nightmare!"
+        ]
+      ]
+    },
+    {
+      "key": "episode",
+      "label": "Episode (starts a new game)",
+      "type": "choice",
+      "default": "1",
+      "options": [
+        [
+          "1",
+          "1: Outpost Outbreak"
+        ],
+        [
+          "2",
+          "2: Military Labs"
+        ],
+        [
+          "3",
+          "3: Event Horizon"
+        ],
+        [
+          "4",
+          "4: Double Impact"
+        ]
+      ]
+    },
+    {
+      "key": "newgame",
+      "label": "Game",
+      "type": "choice",
+      "default": "continue",
+      "options": [
+        [
+          "continue",
+          "Continue (saved when you leave)"
+        ],
+        [
+          "new",
+          "Start a new game now"
+        ]
+      ]
+    },
+    {
+      "key": "run",
+      "label": "Move speed",
+      "type": "choice",
+      "default": "run",
+      "options": [
+        [
+          "walk",
+          "Walk"
+        ],
+        [
+          "run",
+          "Run"
+        ]
+      ]
+    },
+    {
+      "key": "aim",
+      "label": "Aim speed (controller turn)",
+      "type": "choice",
+      "default": "normal",
+      "options": [
+        [
+          "slow",
+          "Slow"
+        ],
+        [
+          "normal",
+          "Normal"
+        ],
+        [
+          "fast",
+          "Fast"
+        ]
+      ]
+    },
+    {
+      "key": "aimdir",
+      "label": "Aim direction",
+      "type": "choice",
+      "default": "normal",
+      "options": [
+        [
+          "normal",
+          "Normal"
+        ],
+        [
+          "reversed",
+          "Reversed"
+        ]
+      ]
+    },
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_red",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "Renderer",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 fps (default)"
+        ],
+        [
+          "software",
+          "Software"
+        ]
+      ]
+    }
+  ]
+}
