@@ -146,17 +146,42 @@ mgu.run({
          * Off, only the on-board electrics draw (model.auxRate). A reading stretch during which it was
          * switched on or off teaches nothing ('mixed'), so neither draw learns the other's. */
         const zones = { climate: {}, ac: {} };
+        const rawClimate = { climate: '', ac: '' };      // last values as received (Diagnostics page)
         const onZone = (what, on, zone) => {
             if (typeof on !== 'boolean') return;
             const z = zones[what];
             if (zone === 'ALL_ZONES') zone = 0;                          // enums may come as names
             if (!zone) Object.keys(z).forEach((k) => delete z[k]);      // ALL_ZONES (0) sets every zone
             z[zone || 0] = on;
-            const any = Object.keys(z).some((k) => z[k]);
-            if (what === 'climate') {
-                if (live.climate !== null && any !== live.climate) { seg.climateMixed = true; log.info('climate control ' + (any ? 'on' : 'off')); }
-                live.climate = any;
-            } else live.ac = any;
+        };
+        /** every entry holding `key`, however the list arrives (plain, wrapped in the field's name, single) */
+        const entries = (v, key, out) => {
+            out = out || [];
+            if (v && typeof v === 'object') {
+                if (typeof v[key] === 'boolean') out.push(v);
+                else Object.keys(v).forEach((k) => entries(v[k], key, out));
+            }
+            return out;
+        };
+        /* Climate counts as on (costing range) when the system is on and the A/C is on, or it is cold
+         * enough that it heats. Automatic climate keeps the system itself on almost always, so that
+         * alone would never change - the A/C button is what the driver switches. */
+        const climateNow = () => {
+            const sys = Object.keys(zones.climate).length ? Object.keys(zones.climate).some((k) => zones.climate[k]) : null;
+            const ac = Object.keys(zones.ac).length ? Object.keys(zones.ac).some((k) => zones.ac[k]) : null;
+            live.ac = ac;
+            if (sys === false) return false;
+            if (ac === null) return sys;
+            return ac || (G.isNum(live.ambient) && live.ambient < 10);
+        };
+        const onClimate = (what, key, v) => {
+            const raw = JSON.stringify(v);
+            if (raw !== rawClimate[what]) { rawClimate[what] = raw; log.info('climate ' + what + ': ' + raw); }
+            entries(v, key).forEach((e) => onZone(what, e[key], e.operationZone));
+            const now = climateNow();
+            if (now === null) return;
+            if (live.climate !== null && now !== live.climate) { seg.climateMixed = true; log.info('climate control ' + (now ? 'on' : 'off')); }
+            live.climate = now;
         };
         /** Climate during the stretch since the last charge reading: true / false / null / 'mixed'. */
         const stretchClimate = () => (seg.climateMixed ? 'mixed' : seg.climate);
@@ -174,10 +199,10 @@ mgu.run({
             statusEngineSpeed2: (v) => { const r = sc('rpm', v.actualValueRPMEngineCrankshaft); if (r !== null && r >= 0 && r < 12000) onRpm(r); },
         }, log).then((s) => log.info('rpm ' + (s.error ? 'error: ' + s.error : 'subscribed')));
         ctx.signals.watch('de.bmw.infotainment.climate.climatemaster.ClimateMaster', '1', {
-            // both are lists, one entry per zone (a single entry may also come unwrapped)
-            statusClimateSystemOn: (v) => [].concat(v || []).forEach((e) => onZone('climate', e && e.airConditioningOn, e && e.operationZone)),
-            statusAirCondAC: (v) => [].concat(v || []).forEach((e) => onZone('ac', e && e.acButton, e && e.operationZone)),
-        }, log).then((s) => log.info('climate ' + (s.error ? 'error: ' + s.error : 'subscribed')));
+            // both are lists, one entry per zone
+            statusClimateSystemOn: (v) => onClimate('climate', 'airConditioningOn', v),
+            statusAirCondAC: (v) => onClimate('ac', 'acButton', v),
+        }, log, { pollMs: 10000 }).then((s) => log.info('climate ' + (s.error ? 'error: ' + s.error : 'subscribed')));
 
         // connect in the background: the screen must not wait for the diagnostic link
         const diag = new Diag(ctx.signals, log);
@@ -565,6 +590,8 @@ mgu.run({
                 + '  ·  climate ' + (live.climate === null ? 'n/a' : live.climate ? 'on' : 'off') + (live.ac ? ' (A/C)' : ''), 48, 121, 24, t.text, { font: 'label' });
             const cols = [48, 160, 260, 380, 820, 1000, 1290];
             ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS', 'READ'].forEach((h, i) => cv.text(h, cols[i], 167, 22, t.dim, { font: 'bold', spacing: 1 }));
+            const cr = 'climate system ' + (rawClimate.climate || 'nothing received') + '   A/C ' + (rawClimate.ac || 'nothing received');
+            cv.text(cr.length > 130 ? cr.slice(0, 129) + "…" : cr, 48, 146, 18, t.dim, { font: 'label' });
             cv.fillRect(48, 178, 1504, 1, t.tick);
             let y = 214;
             VALUES.forEach((key) => (cfg[key] || []).forEach((c, i) => {
