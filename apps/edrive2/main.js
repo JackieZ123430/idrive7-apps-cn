@@ -293,6 +293,53 @@ mgu.run({
         scheduleSlow();
         settings.onChange((k) => { if (k === 'powerPoll') schedulePower(); if (k === 'slowPoll') scheduleSlow(); });
 
+        /* ---------- identifier scan (Scan page) ----------
+         * Asks the battery unit for every identifier in SCAN_RANGES (one at a time, between the other reads)
+         * and keeps the ones that answer. Replies holding a 2-byte value that reads as a cell voltage
+         * (3.0-4.3 V at 1 mV) or a pack voltage (200-460 V at 0.01 V) are flagged, so the right
+         * identifiers for a car can be found and put into app.json. Saved, and written to the log. */
+        const SCAN_RANGES = [[0xDD00, 0xDDFF], [0xDF00, 0xDFFF], [0xD600, 0xD6FF], [0x6300, 0x63FF]];
+        const SCAN_FILE = path.join(ctx.dataDir, 'scan.json');
+        const scan = { running: false, done: 0, total: SCAN_RANGES.reduce((a, r) => a + r[1] - r[0] + 1, 0), hits: [], noReply: 0, t: 0 };
+        try { const old = JSON.parse(fs.readFileSync(SCAN_FILE, 'utf8')); if (old && old.hits) Object.assign(scan, { hits: old.hits, done: old.done, t: old.t, noReply: old.noReply || 0 }); } catch (e) { /* none yet */ }
+        async function runScan() {
+            if (scan.running || !diag.available) return;
+            Object.assign(scan, { running: true, done: 0, hits: [], noReply: 0, t: Date.now() });
+            log.info('scan: battery unit 0x' + hex(cfg.ecu) + ', ' + scan.total + ' identifiers');
+            for (const [a, b] of SCAN_RANGES) {
+                for (let did = a; did <= b; did++) {
+                    if (!scan.running) return;
+                    await exclusive(async () => {
+                        const accept = (u) => (u[0] === 0x62 && ((u[1] << 8) | u[2]) === did) || (u[0] === 0x7F && u[1] === 0x22);
+                        let u = null;
+                        try { u = await diag.physical(cfg.ecu, 0x22, [did >> 8, did & 255], 1500, accept); } catch (e) { /* link error: counts as no reply */ }
+                        if (!u) scan.noReply++;
+                        else if (u[0] === 0x62) {
+                            const hit = { did: hex(did >> 8) + hex(did & 255), bytes: u.slice(3) };
+                            scan.hits.push(hit);
+                            log.info('scan: ' + hit.did + ' = ' + hit.bytes.map((x) => hex(x)).join(' '));
+                        }
+                    });
+                    scan.done++;
+                    // a unit that stops answering (asleep, link lost): stop rather than wait 1.5 s x hundreds
+                    if (scan.noReply >= 25 && scan.noReply === scan.done) { log.warn('scan: no replies, stopped'); scan.running = false; break; }
+                }
+            }
+            scan.running = false;
+            try { fs.writeFileSync(SCAN_FILE, JSON.stringify({ hits: scan.hits, done: scan.done, t: scan.t, noReply: scan.noReply })); } catch (e) { log.warn('scan save: ' + e); }
+            log.info('scan done: ' + scan.hits.length + ' identifiers answer');
+        }
+        /** What a reply might hold: [{ at, kind, value }] for 2-byte words that read as a cell or a pack voltage. */
+        function guesses(bytes) {
+            const out = [];
+            for (let i = 0; i + 1 < bytes.length; i++) {
+                const w = bytes[i] * 256 + bytes[i + 1];
+                if (w >= 3000 && w <= 4300) out.push({ at: i, kind: 'cell', value: w / 1000 });
+                if (w >= 20000 && w <= 46000) out.push({ at: i, kind: 'pack', value: w / 100 });
+            }
+            return out;
+        }
+
         /* ---------- climate: estimates and the measured standing draw ---------- */
         const comfortKw = (d) => {
             const seats = Object.keys(d.seats || {}).reduce((a, k) => a + (d.seats[k] ? SEAT_KW[d.seats[k]] : 0), 0);
@@ -379,12 +426,15 @@ mgu.run({
         }
 
         /* ---------- pages ---------- */
-        const pages = () => ['power', 'battery', 'climate'].concat(settings.get('diagPage') ? ['diag', 'signals'] : []);
-        const NAMES = { power: 'Power', battery: 'Battery', climate: 'Climate', diag: 'Diagnostics', signals: 'Signals' };
+        const pages = () => ['power', 'battery', 'climate'].concat(settings.get('diagPage') ? ['diag', 'scan', 'signals'] : []);
+        const NAMES = { power: 'Power', battery: 'Battery', climate: 'Climate', diag: 'Diagnostics', scan: 'Scan', signals: 'Signals' };
         let page = 0;
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; return render(); });
         ui.onClick('BTN_PREV', () => { const n = pages().length; page = (page + n - 1) % n; return render(); });
-        ui.onClick('BTN_RESET', () => { Object.assign(trip, { out: 0, regen: 0, charged: 0, peakOut: 0, peakIn: 0, since: Date.now() }); return render(); });
+        ui.onClick('BTN_RESET', () => {
+            if (pages()[page] === 'scan') { scan.running = false; setTimeout(runScan, 2000); return render(); }
+            Object.assign(trip, { out: 0, regen: 0, charged: 0, peakOut: 0, peakIn: 0, since: Date.now() }); return render();
+        });
 
         /** Centre-zero power bar: regen / charge to the left, drive to the right, scaled to the limits. */
         function powerBar(cv, t, x, y, w, kw, lim) {
@@ -601,24 +651,57 @@ mgu.run({
             const cols = [48, 200, 290, 380, 900, 1290];
             ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS'].forEach((h, i) => cv.text(h, cols[i], 156, 20, t.dim, { font: 'bold', spacing: 1 }));
             cv.fillRect(48, 168, 1504, 1, t.tick);
-            let y = 204;
+            const nRows = Object.keys(Object.assign({}, cfg.fast, cfg.slow)).reduce((a, k) => a + ((cfg.fast[k] || cfg.slow[k]) || []).length, 0);
+            const rowH = Math.min(36, Math.floor(270 / Math.max(1, nRows))), fz = rowH >= 30 ? 20 : 16;
+            let y = 168 + Math.max(26, rowH);
             const groups = Object.assign({}, cfg.fast, cfg.slow);
             Object.keys(groups).forEach((name) => (groups[name] || []).forEach((c, i) => {
                 const p = primary(c), r = reader.raws[reader.key(p)], ecu = c.ecu == null ? cfg.ecu : c.ecu;
                 const used = pick[name] === i && r && r.ok;
-                cv.text(name + (used ? ' *' : ''), cols[0], y, 22, used ? GO : t.text, { font: 'bold' });
-                cv.text('0x' + hex(ecu), cols[1], y, 20, t.text, { font: 'label' });
-                cv.text(c.did, cols[2], y, 20, t.text, { font: 'label' });
+                cv.text(name + (used ? ' *' : ''), cols[0], y, fz + 2, used ? GO : t.text, { font: 'bold' });
+                cv.text('0x' + hex(ecu), cols[1], y, fz, t.text, { font: 'label' });
+                cv.text(c.did, cols[2], y, fz, t.text, { font: 'label' });
                 const b = r ? r.bytes || '-' : '-';
-                cv.text(b.length > 46 ? b.slice(0, 45) + '…' : b, cols[3], y, 18, t.dim, { font: 'label' });
+                cv.text(b.length > 46 ? b.slice(0, 45) + '…' : b, cols[3], y, fz - 2, t.dim, { font: 'label' });
                 const dec = r && r.fields ? Object.keys(r.fields).map((k) => k + ' ' + (G.isNum(r.fields[k]) ? +r.fields[k].toFixed(3) : 'n/a')).join('  ')
                     : r && G.isNum(r.value) ? String(+r.value.toFixed(3)) : '-';
-                cv.text(dec.length > 34 ? dec.slice(0, 33) + '…' : dec, cols[4], y, 18, t.text, { font: 'label' });
+                cv.text(dec.length > 34 ? dec.slice(0, 33) + '…' : dec, cols[4], y, fz - 2, t.text, { font: 'label' });
                 const why = r ? (r.ok ? 'OK' : r.why) : 'not read';
-                cv.text(why.length > 22 ? why.slice(0, 21) + '…' : why, cols[5], y, 18, r && r.ok ? GO : r ? t.warn : t.dim, { font: 'label' });
-                y += 36;
+                cv.text(why.length > 22 ? why.slice(0, 21) + '…' : why, cols[5], y, fz - 2, r && r.ok ? GO : r ? t.warn : t.dim, { font: 'label' });
+                y += rowH;
             }));
             cv.text('A value n/a or wrong? Adjust config.battery in apps/edrive2/app.json and rebuild. Regen shown while accelerating: powerSign 1.', 48, 492, 18, t.dim);
+        }
+
+        function renderScan(cv, t, d) {
+            if (!scan.running && !scan.t && diag.available) runScan();
+            G.panel(cv, t, 24, 44, 1552, 468, 'Identifier scan: battery unit 0x' + hex(cfg.ecu));
+            const pct = Math.round(scan.done / scan.total * 100);
+            cv.text(scan.running ? 'SCANNING  ' + pct + ' %  (' + scan.done + ' / ' + scan.total + ')  -  stay on this page, car in READY'
+                : scan.t ? 'DONE  ·  ' + scan.hits.length + ' identifiers answer  ·  ' + new Date(scan.t).toLocaleString() + '  ·  Reset drive totals = scan again'
+                : diag.available ? 'starting...' : 'no diagnostic link yet', 1552, 80, 20, scan.running ? t.warn : t.dim, { font: 'bold', align: 'right' });
+            const cells = [], packs = [];
+            scan.hits.forEach((h) => guesses(h.bytes).forEach((g) => (g.kind === 'cell' ? cells : packs).push(h.did + '@' + g.at + ' ' + (g.kind === 'cell' ? g.value.toFixed(3) : g.value.toFixed(1)))));
+            const block = (y, label, list) => {
+                cv.text(label + ' (' + list.length + ')', 48, y, 20, t.dim, { font: 'bold', spacing: 1 });
+                const txt = list.join('   ') || '-';
+                for (let i = 0, line = 0; i < txt.length && line < 3; line++) {
+                    let j = Math.min(txt.length, i + 150);
+                    if (j < txt.length) { const k = txt.lastIndexOf('   ', j); if (k > i) j = k; }
+                    cv.text(txt.slice(i, j).trim(), 48, y + 30 + line * 26, 18, t.text, { font: 'label' });
+                    i = j;
+                }
+            };
+            block(126, 'LOOK LIKE CELL VOLTAGES (V)', cells);
+            block(236, 'LOOK LIKE PACK VOLTAGE (V)', packs);
+            cv.fillRect(48, 330, 1504, 1, t.tick);
+            cv.text('ALL THAT ANSWER (identifier: bytes)', 48, 358, 20, t.dim, { font: 'bold', spacing: 1 });
+            const all = scan.hits.map((h) => h.did + ':' + h.bytes.length).join('  ');
+            for (let i = 0, line = 0; i < all.length && line < 4; line++) {
+                cv.text(all.slice(i, i + 170), 48, 388 + line * 24, 17, t.text, { font: 'label' });
+                i += 170;
+            }
+            cv.text('Take a photo of this page when it says DONE. Every reply is also saved in the app\'s data folder (scan.json).', 48, 498, 18, t.dim);
         }
 
         function renderSignals(cv, t, d) {
@@ -647,7 +730,7 @@ mgu.run({
             const cv = ctx.canvas(W, H).clear(t.bg);
             const pg = pages();
             if (page >= pg.length) page = 0;
-            ({ power: renderPower, battery: renderBattery, climate: renderClimate, diag: renderDiag, signals: renderSignals })[pg[page]](cv, t, d);
+            ({ power: renderPower, battery: renderBattery, climate: renderClimate, diag: renderDiag, scan: renderScan, signals: renderSignals })[pg[page]](cv, t, d);
             G.frame(cv, t, pg.map((p) => NAMES[p]), page, [d.demo && { text: 'DEMO' }]);
             return ui.image('MAIN_GFX', cv);
         }
