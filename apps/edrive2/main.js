@@ -320,40 +320,75 @@ mgu.run({
         settings.onChange((k) => { if (k === 'powerPoll') schedulePower(); if (k === 'slowPoll') scheduleSlow(); });
 
         /* ---------- identifier scan (Scan page) ----------
-         * Asks the battery unit for every identifier in SCAN_RANGES (one at a time, between the other reads)
-         * and keeps the ones that answer. Replies holding a 2-byte value that reads as a cell voltage
-         * (3.0-4.3 V at 1 mV) or a pack voltage (200-460 V at 0.01 V) are flagged, so the right
-         * identifiers for a car can be found and put into app.json. Saved, and written to the log. */
-        const SCAN_RANGES = [[0xDD00, 0xDDFF], [0xDF00, 0xDFFF], [0xD600, 0xD6FF], [0x6300, 0x63FF]];
-        const SCAN_FILE = path.join(ctx.dataDir, 'scan.json');
-        const scan = { running: false, done: 0, total: SCAN_RANGES.reduce((a, r) => a + r[1] - r[0] + 1, 0), hits: [], noReply: 0, t: 0 };
-        try { const old = JSON.parse(fs.readFileSync(SCAN_FILE, 'utf8')); if (old && old.hits) Object.assign(scan, { hits: old.hits, done: old.done, t: old.t, noReply: old.noReply || 0 }); } catch (e) { /* none yet */ }
+         * Asks one control unit ("scanUnit": the battery unit, or the IHKA climate unit that runs the HV
+         * heater and the electric A/C compressor) for every identifier in its ranges, one at a time between
+         * the other reads, and keeps the ones that answer. Each unit keeps its last two scans
+         * (scan_<unit>.json, scan_<unit>_prev.json): what changed between them is listed, so a value can be
+         * found by scanning with something off, then on (heater, A/C). Battery replies holding a 2-byte value
+         * that reads as a cell voltage (3.0-4.3 V at 1 mV) or a pack voltage (200-460 V at 0.01 V) are flagged. */
+        const SCAN_UNITS = {
+            7: { name: 'battery unit (SME)', ranges: [[0xDD00, 0xDDFF], [0xDF00, 0xDFFF], [0xD600, 0xD6FF], [0x6300, 0x63FF]] },
+            120: { name: 'climate unit (IHKA)', ranges: [[0xD000, 0xDFFF], [0x4000, 0x41FF]] },
+        };
+        const scanUnit = () => (SCAN_UNITS[+settings.get('scanUnit')] ? +settings.get('scanUnit') : 7);
+        const scanFile = (u, prev) => path.join(ctx.dataDir, 'scan_' + hex(u) + (prev ? '_prev' : '') + '.json');
+        const readScan = (f) => { try { const o = JSON.parse(fs.readFileSync(f, 'utf8')); return o && o.hits ? o : null; } catch (e) { return null; } };
+        const scan = { unit: 0, running: false, done: 0, total: 0, hits: [], noReply: 0, t: 0, prev: null };
+        function loadScan() {
+            const u = scanUnit();
+            if (scan.running && scan.unit === u) return;
+            scan.running = false;
+            // the scan from before 1.1.2 (battery only) was scan.json
+            const cur = readScan(scanFile(u)) || (u === 7 ? readScan(path.join(ctx.dataDir, 'scan.json')) : null);
+            Object.assign(scan, { unit: u, total: SCAN_UNITS[u].ranges.reduce((a, r) => a + r[1] - r[0] + 1, 0), hits: [], done: 0, t: 0, noReply: 0 }, cur || {});
+            scan.prev = readScan(scanFile(u, true));
+        }
+        loadScan();
+        settings.onChange((k) => { if (k === 'scanUnit') loadScan(); });
         async function runScan() {
             if (scan.running || !diag.available) return;
-            Object.assign(scan, { running: true, done: 0, hits: [], noReply: 0, t: Date.now() });
-            log.info('scan: battery unit 0x' + hex(cfg.ecu) + ', ' + scan.total + ' identifiers');
-            for (const [a, b] of SCAN_RANGES) {
+            const u = scanUnit(), unit = SCAN_UNITS[u];
+            loadScan();
+            if (scan.t) { try { fs.writeFileSync(scanFile(u, true), JSON.stringify({ hits: scan.hits, done: scan.done, t: scan.t, noReply: scan.noReply })); } catch (e) { /* ok */ } }
+            scan.prev = scan.t ? { hits: scan.hits, t: scan.t } : scan.prev;
+            Object.assign(scan, { unit: u, running: true, done: 0, hits: [], noReply: 0, t: Date.now() });
+            log.info('scan: ' + unit.name + ' 0x' + hex(u) + ', ' + scan.total + ' identifiers');
+            for (const [a, b] of unit.ranges) {
                 for (let did = a; did <= b; did++) {
-                    if (!scan.running) return;
+                    if (!scan.running || scan.unit !== u) return;
                     await exclusive(async () => {
-                        const accept = (u) => (u[0] === 0x62 && ((u[1] << 8) | u[2]) === did) || (u[0] === 0x7F && u[1] === 0x22);
-                        let u = null;
-                        try { u = await diag.physical(cfg.ecu, 0x22, [did >> 8, did & 255], 1500, accept); } catch (e) { /* link error: counts as no reply */ }
-                        if (!u) scan.noReply++;
-                        else if (u[0] === 0x62) {
-                            const hit = { did: hex(did >> 8) + hex(did & 255), bytes: u.slice(3) };
+                        const accept = (r) => (r[0] === 0x62 && ((r[1] << 8) | r[2]) === did) || (r[0] === 0x7F && r[1] === 0x22);
+                        let r = null;
+                        try { r = await diag.physical(u, 0x22, [did >> 8, did & 255], 1500, accept); } catch (e) { /* link error: counts as no reply */ }
+                        if (!r) scan.noReply++;
+                        else if (r[0] === 0x62) {
+                            const hit = { did: hex(did >> 8) + hex(did & 255), bytes: r.slice(3) };
                             scan.hits.push(hit);
-                            log.info('scan: ' + hit.did + ' = ' + hit.bytes.map((x) => hex(x)).join(' '));
+                            log.info('scan ' + hex(u) + ': ' + hit.did + ' = ' + hit.bytes.map((x) => hex(x)).join(' '));
                         }
                     });
                     scan.done++;
-                    // a unit that stops answering (asleep, link lost): stop rather than wait 1.5 s x hundreds
+                    // a unit that doesn't answer (not fitted, asleep, link lost): stop rather than wait 1.5 s x thousands
                     if (scan.noReply >= 25 && scan.noReply === scan.done) { log.warn('scan: no replies, stopped'); scan.running = false; break; }
                 }
             }
             scan.running = false;
-            try { fs.writeFileSync(SCAN_FILE, JSON.stringify({ hits: scan.hits, done: scan.done, t: scan.t, noReply: scan.noReply })); } catch (e) { log.warn('scan save: ' + e); }
+            try { fs.writeFileSync(scanFile(u), JSON.stringify({ hits: scan.hits, done: scan.done, t: scan.t, noReply: scan.noReply })); } catch (e) { log.warn('scan save: ' + e); }
             log.info('scan done: ' + scan.hits.length + ' identifiers answer');
+        }
+        /** Bytes that differ from the previous scan: ["D1A2@3 00>5A", ...]. */
+        function changes() {
+            if (!scan.prev || !scan.prev.hits) return null;
+            const old = {}; scan.prev.hits.forEach((h) => { old[h.did] = h.bytes; });
+            const out = [];
+            scan.hits.forEach((h) => {
+                const o = old[h.did];
+                if (!o) return;
+                for (let i = 0; i < Math.max(o.length, h.bytes.length); i++) {
+                    if (o[i] !== h.bytes[i]) out.push(h.did + '@' + i + ' ' + (o[i] == null ? '--' : hex(o[i])) + '>' + (h.bytes[i] == null ? '--' : hex(h.bytes[i])));
+                }
+            });
+            return out;
         }
         /** What a reply might hold: [{ at, kind, value }] for 2-byte words that read as a cell or a pack voltage. */
         function guesses(bytes) {
@@ -767,13 +802,14 @@ mgu.run({
 
         function renderScan(cv, t, d) {
             if (!scan.running && !scan.t && diag.available) runScan();
-            G.panel(cv, t, 24, 44, 1552, 468, 'Identifier scan: battery unit 0x' + hex(cfg.ecu));
+            G.panel(cv, t, 24, 44, 1552, 468, 'Scan: ' + SCAN_UNITS[scan.unit].name + ' 0x' + hex(scan.unit));
             const pct = Math.round(scan.done / scan.total * 100);
+            const ago = (ms) => (ms < 90000 ? 'just now' : ms < 5400000 ? Math.round(ms / 60000) + ' min ago' : Math.round(ms / 3600000) + ' h ago');
             cv.text(scan.running ? 'SCANNING  ' + pct + ' %  (' + scan.done + ' / ' + scan.total + ')  -  stay on this page, car in READY'
-                : scan.t ? 'DONE  ·  ' + scan.hits.length + ' identifiers answer  ·  ' + new Date(scan.t).toLocaleString() + '  ·  Reset drive totals = scan again'
+                : scan.t ? 'DONE ' + ago(Date.now() - scan.t) + '  ·  ' + scan.hits.length + ' answer' + (scan.noReply >= 25 && !scan.hits.length ? ' (unit not answering)' : '') + '  ·  Reset drive totals = scan again'
                 : diag.available ? 'starting...' : 'no diagnostic link yet', 1552, 80, 20, scan.running ? t.warn : t.dim, { font: 'bold', align: 'right' });
-            const cells = [], packs = [];
-            scan.hits.forEach((h) => guesses(h.bytes).forEach((g) => (g.kind === 'cell' ? cells : packs).push(h.did + '@' + g.at + ' ' + (g.kind === 'cell' ? g.value.toFixed(3) : g.value.toFixed(1)))));
+            const cells = [], packs = [], ch = changes();
+            if (scan.unit === 7) scan.hits.forEach((h) => guesses(h.bytes).forEach((g) => (g.kind === 'cell' ? cells : packs).push(h.did + '@' + g.at + ' ' + (g.kind === 'cell' ? g.value.toFixed(3) : g.value.toFixed(1)))));
             const block = (y, label, list) => {
                 cv.text(label + ' (' + list.length + ')', 48, y, 20, t.dim, { font: 'bold', spacing: 1 });
                 const txt = list.join('   ') || '-';
@@ -784,8 +820,13 @@ mgu.run({
                     i = j;
                 }
             };
-            block(126, 'LOOK LIKE CELL VOLTAGES (V)', cells);
-            block(236, 'LOOK LIKE PACK VOLTAGE (V)', packs);
+            if (scan.unit === 7) {
+                block(126, 'LOOK LIKE CELL VOLTAGES (V)', cells);
+                block(236, 'LOOK LIKE PACK VOLTAGE (V)', packs);
+            } else {
+                block(126, ch ? 'CHANGED SINCE THE SCAN ' + ago(Date.now() - scan.prev.t).toUpperCase() + ' (identifier@byte old>new)' : 'CHANGED SINCE THE LAST SCAN: scan again with the heater / A/C switched differently', ch || []);
+                cv.text('Heater: scan with the climate OFF, then set HI and scan again. A/C: OFF, then LO with A/C on.', 48, 300, 18, t.dim);
+            }
             cv.fillRect(48, 330, 1504, 1, t.tick);
             cv.text('ALL THAT ANSWER (identifier: bytes)', 48, 358, 20, t.dim, { font: 'bold', spacing: 1 });
             const all = scan.hits.map((h) => h.did + ':' + h.bytes.length).join('  ');
@@ -793,7 +834,7 @@ mgu.run({
                 cv.text(all.slice(i, i + 170), 48, 388 + line * 24, 17, t.text, { font: 'label' });
                 i += 170;
             }
-            cv.text('Take a photo of this page when it says DONE. Every reply is also saved in the app\'s data folder (scan.json).', 48, 498, 18, t.dim);
+            cv.text('Take a photo when it says DONE. Settings > Scan unit picks the unit. Replies are saved in the app\'s data folder (scan_' + hex(scan.unit) + '.json).', 48, 498, 18, t.dim);
         }
 
         function renderSignals(cv, t, d) {
