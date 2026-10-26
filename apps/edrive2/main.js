@@ -309,7 +309,45 @@ mgu.run({
                     } catch (e) { log.warn(name + ': ' + e); }
                 });
             }
+            await readProbes();
         }
+
+        /* ---------- climate unit values being identified (config.probes) ----------
+         * Raw numbers from the IHKA that follow the A/C compressor (D8D2) and the heater (D8D3). Their unit isn't
+         * known yet, so they are shown raw on the Climate page, and every reading taken while the climate draw is
+         * measured (standing, engine off, not plugged in) is kept with it in probes.json: enough of those pairs
+         * give the scale, after which "factor" in app.json turns them into kW. */
+        const PROBES = (ctx.spec.config && ctx.spec.config.probes) || [];
+        const probe = {};                                   // name -> { raw, t }
+        const PROBE_FILE = path.join(ctx.dataDir, 'probes.json');
+        let samples = [];
+        try { samples = JSON.parse(fs.readFileSync(PROBE_FILE, 'utf8')) || []; } catch (e) { /* none yet */ }
+        async function readProbes() {
+            if (!PROBES.length) return;
+            for (const pr of PROBES) {
+                await exclusive(async () => {
+                    try {
+                        const v = await reader.read({ ecu: pr.ecu, did: pr.did, at: pr.at || 0, bytes: pr.bytes || 1 });
+                        if (v !== null) probe[pr.name] = { raw: v, t: Date.now() };
+                    } catch (e) { /* not this time */ }
+                });
+            }
+            const d = data(), cp = climatePower(d, Date.now());
+            if (!d.demo && cp.how === 'measured' && PROBES.some((pr) => probe[pr.name] && Date.now() - probe[pr.name].t < 15000)) {
+                const c = comfortKw(d);
+                const row = { t: Date.now(), kw: +cp.kw.toFixed(3), blower: +blowerKw(d).toFixed(3), comfort: +(c.seats + c.wheel).toFixed(3), climate: d.climate, amb: d.ambient };
+                PROBES.forEach((pr) => { row[pr.name] = probe[pr.name] ? probe[pr.name].raw : null; });
+                samples.push(row);
+                if (samples.length > 600) samples = samples.slice(-600);
+                if (samples.length % 6 === 0) { try { fs.writeFileSync(PROBE_FILE, JSON.stringify(samples)); } catch (e) { /* ok */ } }
+            }
+        }
+        /** A probe's value now: { raw, kw (with a known factor) } or null. */
+        const probeNow = (name) => {
+            const pr = PROBES.find((x) => x.name === name), p = probe[name];
+            if (!pr || !p || Date.now() - p.t > 30000) return null;
+            return { raw: p.raw, kw: G.isNum(pr.factor) ? p.raw * pr.factor : null };
+        };
         let slowTimer = null;
         function scheduleSlow() {
             clearTimeout(slowTimer);
@@ -790,6 +828,13 @@ mgu.run({
             const pd = live.pd && live.pd.displayRepartitionDriveElectricPower !== 255 && typeof live.pd.displayRepartitionElectricSeatHeater !== 'string' ? live.pd : null;
             cv.text(pd ? 'CAR\'S POWER DISPLAY  drive ' + pd.displayRepartitionDriveElectricPower + '  ·  climate ' + pd.displayRepartitionAirConditioningElectricPower
                 + '  ·  seats ' + pd.displayRepartitionElectricSeatHeater : 'OUTSIDE  ' + fmtT(d.ambient, 0), 48, 484, 20, t.dim, { font: 'bold', spacing: 0.5 });
+            // the climate unit's own compressor / heater values (raw until their scale is known)
+            const pa = probeNow('ac'), ph = probeNow('heater');
+            if (pa || ph) {
+                const f = (p) => (!p ? '--' : G.isNum(p.kw) ? G.fmt(p.kw, 2) + ' kW' : String(p.raw));
+                cv.text('CLIMATE UNIT  A/C ' + f(pa) + '  ·  HEATER ' + f(ph) + ((pa && !G.isNum(pa.kw)) || (ph && !G.isNum(ph.kw)) ? '  (raw - ' + samples.length + ' samples)' : ''),
+                    900, 484, 20, t.dim, { font: 'bold', spacing: 0.5, align: 'right' });
+            }
 
             // ---- measured
             const x = 948, w = 628;
