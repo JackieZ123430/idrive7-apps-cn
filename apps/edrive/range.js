@@ -16,6 +16,9 @@
  *               Climate on while DRIVING teaches its draw too: what the stretch used above the same
  *               speed band with the climate off (st.driveOff) - so the heating's draw is learned
  *               from normal driving, not only from standing.
+ *   engine:     with the engine running the whole stretch, the battery's own use per km and speed
+ *               band (st.engineUse; negative = the engine charges it). Kept apart: it never goes
+ *               into the electric values above.
  *   comfort:    seat and steering-wheel heating (kW, estimated in main.js from their levels): on
  *               with or without the climate, so taken out of every stretch before it teaches
  *               anything, and added back for the range.
@@ -86,13 +89,42 @@ class RangeModel {
         return a > 0.1 && a < 15 ? a : null;
     }
 
-    /** What is learned per speed band: [{ band: 'v0', from, to, km, pctPerKm }] (Energy page). */
+    /**
+     * What is learned per speed band: [{ band: 'v0', from, to, km, pctPerKm, engineKm, enginePctPerKm }]
+     * (Energy page). enginePctPerKm: the battery's use with the engine running (negative = charging).
+     */
     bands() {
         const edges = [0].concat(SPEED_BANDS, [null]);
         return edges.slice(0, -1).map((from, i) => {
-            const b = this.st.drive && this.st.drive['v' + i];
-            return { band: 'v' + i, from, to: edges[i + 1], km: b ? b.km : 0, pctPerKm: b && b.km > 0.5 ? b.pct / b.km : null };
+            const b = this.st.drive && this.st.drive['v' + i], e = this.st.engineUse && this.st.engineUse['v' + i];
+            return { band: 'v' + i, from, to: edges[i + 1], km: b ? b.km : 0, pctPerKm: b && b.km > 0.5 ? b.pct / b.km : null,
+                engineKm: e ? e.km : 0, enginePctPerKm: e && e.km > 1 ? e.pct / e.km : null };
         });
+    }
+
+    /**
+     * One stretch with the engine running throughout: the battery's use (% of charge, negative = it
+     * charged) over km at its speed. Learned per speed band, apart from electric driving.
+     */
+    learnEngine(used, h, km) {
+        if (!isNum(used) || !(h > 0) || km < 0.05) return;
+        const E = this.st.engineUse || (this.st.engineUse = {}), band = speedBandOf(km / h);
+        const b = E[band] || (E[band] = { km: 0, pct: 0 });
+        b.km += km; b.pct += used;
+        fade(b, 'km', BAND_KM);
+        const A = this.st.engineAll || (this.st.engineAll = { km: 0, pct: 0 });
+        A.km += km; A.pct += used;
+        fade(A, 'km', LEARN_KM);
+    }
+
+    /** Battery use with the engine on at kmh: % per km (negative = charging), or null until learned. */
+    enginePctPerKm(kmh) {
+        const A = this.st.engineAll;
+        if (!A || A.km < 2) return null;
+        const all = A.pct / A.km, b = isNum(kmh) && this.st.engineUse && this.st.engineUse[speedBandOf(kmh)];
+        if (!b || !(b.km > 0.5)) return all;
+        const w = b.km / (b.km + BAND_PRIOR_KM);
+        return (b.pct / b.km) * w + all * (1 - w);
     }
 
     /**

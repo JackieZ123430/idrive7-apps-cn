@@ -133,7 +133,7 @@ mgu.run({
          * At the next reading, a stretch driven with the engine off adds its km and % used to
          * st.learn (km per %); an engine start while driving at a low charge is where this car
          * stops driving electric (st.engineStarts). */
-        const seg = { km: 0, engine: false, climate: null, climateMixed: false, comfort: 0 };
+        const seg = { km: 0, engine: false, engineAll: false, climate: null, climateMixed: false, comfort: 0 };
         let lastSpeedT = 0;
         const STOP_MS = 5 * 60000;       // standing longer than this is parking, not traffic: the pace stops
         const onSpeed = (kmh) => {
@@ -141,10 +141,12 @@ mgu.run({
             if (lastSpeedT && G.isNum(kmh)) {
                 const dt = G.clamp(now - lastSpeedT, 0, 2000);
                 seg.km += kmh * dt / 3600000;
-                // the pace: the last few minutes of driving, stops in traffic included (they cost the
-                // climate draw too); after PACE_KEEP without moving there is none
-                if (kmh > 3) live.lastMove = now;
-                if (now - live.lastMove < STOP_MS) {
+                // the pace: the last few minutes of ELECTRIC driving, stops in traffic included (they cost
+                // the climate draw too). Driving on the engine doesn't count (it says nothing about how
+                // you drive electric): after PACE_KEEP without electric driving the typical speed is used
+                const engineOn = G.isNum(live.rpm) && live.rpm > 400 && now - live.rpmT < 5000;
+                if (kmh > 3 && !engineOn) live.lastMove = now;
+                if (!engineOn && now - live.lastMove < STOP_MS) {
                     live.pace = live.pace === null ? kmh : live.pace + (kmh - live.pace) * (dt / 1000) / (dt / 1000 + PACE_TAU);
                 }
             }
@@ -155,6 +157,7 @@ mgu.run({
             const was = live.rpm;
             live.rpm = rpm; live.rpmT = Date.now();
             if (rpm > 400) seg.engine = true;
+            else if (rpm < 300) seg.engineAll = false;      // the engine stopped at some point in the stretch
             if (G.isNum(was) && was < 300 && rpm > 600 && G.isNum(live.speed) && live.speed > 3
                 && G.isNum(live.soc) && Date.now() - live.socT < 60000 && live.soc <= 20) {
                 st.engineStarts = (st.engineStarts || []).concat([Math.round(live.soc * 10) / 10]).slice(-5);
@@ -340,8 +343,11 @@ mgu.run({
             if (G.isNum(prev) && h < 120000 / 3600000 && !seg.engine && now - live.rpmT < 5000 && !st.session) {
                 // seat / steering-wheel heating over the stretch: the mean of its start and end
                 model.learn(prev - soc, h, seg.km, live.ambient, kwhPerPct(), stretchClimate(), (seg.comfort + comfortKw()) / 2);
+            } else if (G.isNum(prev) && h < 120000 / 3600000 && seg.engine && seg.engineAll && now - live.rpmT < 5000 && !st.session) {
+                // the engine ran the whole stretch: what the battery did meanwhile (drained or charged), on its own
+                model.learnEngine(prev - soc, h, seg.km);
             }
-            seg.km = 0; seg.engine = G.isNum(live.rpm) && live.rpm > 400;
+            seg.km = 0; seg.engine = G.isNum(live.rpm) && live.rpm > 400; seg.engineAll = seg.engine;
             seg.climate = live.climate; seg.climateMixed = false; seg.comfort = comfortKw();
             if (G.isNum(prev)) {
                 if (soc > prev + 0.3 && !moving) {
@@ -446,6 +452,7 @@ mgu.run({
                 socAge: live.socT ? now - live.socT : null, stale: !(live.socT && now - live.socT < maxAge),
                 v12: live.v12T && now - live.v12T < maxAge ? live.v12 : null, charge: lastCharge(),
                 climate: live.climate, ac: live.ac, pace: paceNow(), seats: live.seats, wheel: live.wheel,
+                engine: G.isNum(live.rpm) && live.rpm > 400 && now - live.rpmT < 5000, speed: live.speed,
                 blower: live.blower, blowerTop: live.blowerTop, batt: live.batt,
             };
         }
@@ -578,9 +585,18 @@ mgu.run({
             G.bar(cv, t, 48, 268, 672, 92, {
                 label: 'Full: ' + Math.round(D(e.full)) + ' ' + dU(), value: has ? D(e.mid) : null, unit: dU(), max: D(e.full), niceMax: true, ramp: 'hot',
             });
-            cv.text(e.learned ? 'at ' + (d.pace !== null && d.pace !== undefined ? 'your pace ' : 'a typical ') + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h')
-                + '  ·  from your last ' + Math.round(D(st.learn.km)) + ' ' + dU() + ' electric'
-                : 'estimate - learns as you drive electric', 48, 404, 24, t.dim);
+            const eu = d.engine ? model.enginePctPerKm(d.speed) : null;
+            if (d.engine) {
+                // engine running: what the battery does meanwhile (learned with the engine on)
+                const perU = MI() ? '%/mi' : '%/km', pk = G.isNum(eu) ? (MI() ? eu / KM_MI : eu) : null;
+                const lasts = G.isNum(eu) && eu > 0.02 && has ? '  ·  lasts ~' + Math.round(D(Math.max(0, d.soc - e.res) / eu)) + ' ' + dU() : '';
+                cv.text('ENGINE ON  ·  battery ' + (!G.isNum(pk) ? 'use learning' : pk < -0.005 ? 'charging +' + G.fmt(-pk, 2) + ' ' + perU
+                    : 'using ' + G.fmt(pk, 2) + ' ' + perU) + lasts, 48, 404, 24, t.warn, { font: 'bold' });
+            } else {
+                cv.text(e.learned ? 'at ' + (d.pace !== null && d.pace !== undefined ? 'your pace ' : 'a typical ') + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h')
+                    + '  ·  from your last ' + Math.round(D(st.learn.km)) + ' ' + dU() + ' electric'
+                    : 'estimate - learns as you drive electric', 48, 404, 24, t.dim);
+            }
             // climate control + on-board electrics: costs range by the hour (off: the on-board draw only)
             const ac = e.climate !== false && e.auxKw >= 1.5 ? t.warn : t.dim;
             const what = e.climate === false ? 'CLIMATE OFF  ·  ON-BOARD  ' : e.climate ? 'CLIMATE ON' + (d.ac ? ' (A/C)' : '') + '  ' : 'CLIMATE & ON-BOARD  ';
@@ -767,23 +783,29 @@ mgu.run({
 
             // ---- driving per speed band
             G.panel(cv, t, 24, 44, 740, 468, 'Driving by speed');
-            const bands = d.demo ? [1.35, 1.5, 1.75, 2.05, 2.5].map((p, i) => ({ from: [0, 35, 60, 85, 110][i], to: [35, 60, 85, 110, null][i], km: 25, pctPerKm: p }))
+            const bands = d.demo ? [1.35, 1.5, 1.75, 2.05, 2.5].map((p, i) => ({ from: [0, 35, 60, 85, 110][i], to: [35, 60, 85, 110, null][i], km: 25, pctPerKm: p,
+                engineKm: 20, enginePctPerKm: [-0.6, -0.4, -0.1, 0.15, 0.3][i] }))
                 : model.bands();
             const paceBand = G.isNum(e.pace) ? bands.findIndex((b) => e.pace >= b.from && (b.to === null || e.pace < b.to)) : -1;
             const top = Math.max(1, Math.max.apply(null, bands.map((b) => kwh100(b.pctPerKm) || 0)));
-            ['SPEED', per.toUpperCase(), 'LEARNED'].forEach((h, i) => cv.text(h, [48, 250, 740][i], 116, 20, t.dim, { font: 'bold', spacing: 1, align: i === 2 ? 'right' : 'left' }));
+            ['SPEED', 'ELECTRIC ' + per.toUpperCase(), 'WITH ENGINE', 'LEARNED'].forEach((h, i) => cv.text(h, [48, 230, 640, 740][i], 116, 18, t.dim,
+                { font: 'bold', spacing: 1, align: i >= 2 ? 'right' : 'left' }));
             bands.forEach((b, i) => {
                 const y = 160 + i * 52, v = kwh100(b.pctPerKm), now = i === paceBand;
                 const sp = (x) => Math.round(MI() ? x * KM_MI : x);
                 cv.text((b.to === null ? 'over ' + sp(b.from) : sp(b.from) + '-' + sp(b.to)) + ' ' + (MI() ? 'mph' : 'km/h'), 48, y, 24, now ? GO : t.text, { font: 'bold' });
-                cv.roundRect(250, y - 22, 330, 26, 6, withAlpha(t.track, 0.6));
-                if (G.isNum(v)) cv.rampRect(250, y - 22, Math.max(8, 330 * v / top), 26, 6, t.ramp || [t.accent]);
-                cv.text(G.isNum(v) ? G.fmt(U(v), 1) : '-', 594, y, 24, G.isNum(v) ? t.text : t.dim, { font: 'bold' });
-                cv.text(b.km >= 0.5 ? Math.round(D(b.km)) + ' ' + dU() : 'not yet', 740, y, 22, t.dim, { align: 'right' });
+                cv.roundRect(230, y - 22, 230, 26, 6, withAlpha(t.track, 0.6));
+                if (G.isNum(v)) cv.rampRect(230, y - 22, Math.max(8, 230 * v / top), 26, 6, t.ramp || [t.accent]);
+                cv.text(G.isNum(v) ? G.fmt(U(v), 1) : '-', 474, y, 24, G.isNum(v) ? t.text : t.dim, { font: 'bold' });
+                // with the engine on: + = the engine charges the battery, - = the battery is still used
+                const ev = kwh100(b.enginePctPerKm);
+                cv.text(G.isNum(ev) ? (ev < 0 ? '+' : '-') + G.fmt(Math.abs(U(ev)), 1) : '-', 640, y, 22, !G.isNum(ev) ? t.dim : ev < 0 ? GO : t.text, { font: 'bold', align: 'right' });
+                const lk = Math.max(b.km, b.engineKm || 0);
+                cv.text(lk >= 0.5 ? Math.round(D(lk)) + ' ' + dU() : 'not yet', 740, y, 20, t.dim, { align: 'right' });
             });
             cv.text(G.isNum(e.pace) ? (d.pace !== null && d.pace !== undefined ? 'your pace now ' : 'typical pace ') + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h')
                 + (G.isNum(e.perKm) ? '  ·  ' + G.fmt(U(kwh100(e.perKm)), 1) + ' ' + per + ' there' : '') : 'learns as you drive electric', 48, 444, 22, t.dim);
-            cv.text('a band with little driving leans on your overall use', 48, 486, 20, t.dim);
+            cv.text('with engine: + = charging the battery, - = still using it', 48, 486, 20, t.dim);
 
             // ---- where the power goes now
             const x0 = 788, w0 = 788;
