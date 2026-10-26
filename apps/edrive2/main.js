@@ -853,19 +853,9 @@ mgu.run({
             cv.fillRect(48, 352, 852, 1, t.panelEdge);
             cv.text(cp.how === 'estimated' ? 'ESTIMATED TOTAL' : cp.how === 'measured' ? 'TOTAL (MEASURED)' : 'TOTAL', 48, 392, 22, t.dim, { font: 'bold', spacing: 1.2 });
             cv.text(G.fmt(cp.how === 'estimated' ? cp.est : cp.kw, 2) + ' kW', 900, 392, 30, t.text, { font: 'bold', align: 'right' });
-            cv.text(u ? 'compressor and heater: what the climate unit reports  ·  standing still, the battery measures the total'
-                : acReported(d) ? 'the heater isn\'t reported: in the cold, the measured draw (right) is the one to trust'
-                : 'this car doesn\'t report the compressor: A/C & heater come from the battery, measured standing still', 48, 430, 18, t.dim);
             const pd = live.pd && live.pd.displayRepartitionDriveElectricPower !== 255 && typeof live.pd.displayRepartitionElectricSeatHeater !== 'string' ? live.pd : null;
             cv.text(pd ? 'CAR\'S POWER DISPLAY  drive ' + pd.displayRepartitionDriveElectricPower + '  ·  climate ' + pd.displayRepartitionAirConditioningElectricPower
                 + '  ·  seats ' + pd.displayRepartitionElectricSeatHeater : 'OUTSIDE  ' + fmtT(d.ambient, 0), 48, 484, 20, t.dim, { font: 'bold', spacing: 0.5 });
-            // the climate unit's own compressor / heater values (raw until their scale is known)
-            const pa = probeNow('ac'), ph = probeNow('heater');
-            if ((pa && !G.isNum(pa.kw)) || (ph && !G.isNum(ph.kw))) {
-                const f = (p) => (!p ? '--' : G.isNum(p.kw) ? G.fmt(p.kw, 2) + ' kW' : String(p.raw));
-                cv.text('CLIMATE UNIT  A/C ' + f(pa) + '  ·  HEATER ' + f(ph) + ((pa && !G.isNum(pa.kw)) || (ph && !G.isNum(ph.kw)) ? '  (raw - ' + samples.length + ' samples)' : ''),
-                    900, 484, 20, t.dim, { font: 'bold', spacing: 0.5, align: 'right' });
-            }
 
             // ---- measured
             const x = 948, w = 628;
