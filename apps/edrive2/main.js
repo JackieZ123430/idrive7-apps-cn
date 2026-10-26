@@ -376,19 +376,54 @@ mgu.run({
             try { fs.writeFileSync(scanFile(u), JSON.stringify({ hits: scan.hits, done: scan.done, t: scan.t, noReply: scan.noReply })); } catch (e) { log.warn('scan save: ' + e); }
             log.info('scan done: ' + scan.hits.length + ' identifiers answer');
         }
-        /** Bytes that differ from the previous scan: ["D1A2@3 00>5A", ...]. */
+        /* ---------- live comparison after a scan ----------
+         * Once a unit has been scanned, only the identifiers that answered are read again, every few seconds
+         * while the Scan page is shown (seconds, not minutes). The first of these reads (or the one after
+         * Reset) is the baseline; the bytes that differ from it now are listed, with how often they changed,
+         * so switching the heater or the A/C on shows which values follow it. Saved to scan_<unit>_live.json. */
+        const cmpState = { unit: 0, base: null, now: {}, flips: {}, t: 0, busy: false, cycles: 0 };
+        function rebase() { Object.assign(watch, { unit: scan.unit, base: null, now: {}, flips: {}, t: Date.now(), cycles: 0 }); }
+        async function watchCycle() {
+            if (cmpState.busy || scan.running || !scan.t || !scan.hits.length || !diag.available || pages()[page] !== 'scan') return;
+            if (cmpState.unit !== scan.unit) rebase();
+            cmpState.busy = true;
+            const now = {};
+            for (const h of scan.hits) {
+                if (scan.running || pages()[page] !== 'scan') break;
+                const did = parseInt(h.did, 16);
+                await exclusive(async () => {
+                    const accept = (r) => (r[0] === 0x62 && ((r[1] << 8) | r[2]) === did) || (r[0] === 0x7F && r[1] === 0x22);
+                    let r = null;
+                    try { r = await diag.physical(scan.unit, 0x22, [did >> 8, did & 255], 1500, accept); } catch (e) { /* skip */ }
+                    if (r && r[0] === 0x62) now[h.did] = r.slice(3);
+                });
+            }
+            if (!cmpState.base) cmpState.base = now;
+            else {
+                Object.keys(now).forEach((k) => {
+                    const a = cmpState.now[k], b = now[k];
+                    if (a) b.forEach((x, i) => { if (a[i] !== x) cmpState.flips[k + '@' + i] = (cmpState.flips[k + '@' + i] || 0) + 1; });
+                });
+            }
+            cmpState.now = now; cmpState.cycles++;
+            try { fs.writeFileSync(scanFile(scan.unit).replace('.json', '_live.json'), JSON.stringify({ t: cmpState.t, base: cmpState.base, now: cmpState.now, flips: cmpState.flips })); } catch (e) { /* ok */ }
+            cmpState.busy = false;
+        }
+        setInterval(() => { watchCycle().catch((e) => { cmpState.busy = false; log.warn('watch: ' + e); }); }, 3000);
+        /** Bytes that differ from the baseline now: ["D1A2@3 00>5A x2", ...] (x = how many reads it changed in). */
         function changes() {
-            if (!scan.prev || !scan.prev.hits) return null;
-            const old = {}; scan.prev.hits.forEach((h) => { old[h.did] = h.bytes; });
+            if (!cmpState.base || cmpState.unit !== scan.unit) return null;
             const out = [];
-            scan.hits.forEach((h) => {
-                const o = old[h.did];
+            Object.keys(cmpState.now).forEach((k) => {
+                const o = cmpState.base[k], n = cmpState.now[k];
                 if (!o) return;
-                for (let i = 0; i < Math.max(o.length, h.bytes.length); i++) {
-                    if (o[i] !== h.bytes[i]) out.push(h.did + '@' + i + ' ' + (o[i] == null ? '--' : hex(o[i])) + '>' + (h.bytes[i] == null ? '--' : hex(h.bytes[i])));
+                for (let i = 0; i < Math.max(o.length, n.length); i++) {
+                    if (o[i] !== n[i]) out.push({ k: k + '@' + i, txt: k + '@' + i + ' ' + (o[i] == null ? '--' : hex(o[i])) + '>' + (n[i] == null ? '--' : hex(n[i])), f: cmpState.flips[k + '@' + i] || 0 });
                 }
             });
-            return out;
+            // steady changes first: values that flip at every read (timers, counters) are noise and go last
+            out.sort((a, b) => a.f - b.f);
+            return out.map((c) => c.txt);
         }
         /** What a reply might hold: [{ at, kind, value }] for 2-byte words that read as a cell or a pack voltage. */
         function guesses(bytes) {
@@ -507,7 +542,12 @@ mgu.run({
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; return render(); });
         ui.onClick('BTN_PREV', () => { const n = pages().length; page = (page + n - 1) % n; return render(); });
         ui.onClick('BTN_RESET', () => {
-            if (pages()[page] === 'scan') { scan.running = false; setTimeout(runScan, 2000); return render(); }
+            if (pages()[page] === 'scan') {
+                // a scan from the last week: Reset = new baseline for the live comparison; else scan again
+                if (scan.t && !scan.running && Date.now() - scan.t < 7 * 86400000 && scan.hits.length) rebase();
+                else { scan.running = false; setTimeout(runScan, 2000); }
+                return render();
+            }
             Object.assign(trip, { out: 0, regen: 0, charged: 0, peakOut: 0, peakIn: 0, since: Date.now() }); return render();
         });
 
@@ -806,7 +846,7 @@ mgu.run({
             const pct = Math.round(scan.done / scan.total * 100);
             const ago = (ms) => (ms < 90000 ? 'just now' : ms < 5400000 ? Math.round(ms / 60000) + ' min ago' : Math.round(ms / 3600000) + ' h ago');
             cv.text(scan.running ? 'SCANNING  ' + pct + ' %  (' + scan.done + ' / ' + scan.total + ')  -  stay on this page, car in READY'
-                : scan.t ? 'DONE ' + ago(Date.now() - scan.t) + '  ·  ' + scan.hits.length + ' answer' + (scan.noReply >= 25 && !scan.hits.length ? ' (unit not answering)' : '') + '  ·  Reset drive totals = scan again'
+                : scan.t ? 'DONE ' + ago(Date.now() - scan.t) + '  ·  ' + scan.hits.length + ' answer' + (scan.noReply >= 25 && !scan.hits.length ? ' (unit not answering)' : '') + '  ·  Reset drive totals = new baseline'
                 : diag.available ? 'starting...' : 'no diagnostic link yet', 1552, 80, 20, scan.running ? t.warn : t.dim, { font: 'bold', align: 'right' });
             const cells = [], packs = [], ch = changes();
             if (scan.unit === 7) scan.hits.forEach((h) => guesses(h.bytes).forEach((g) => (g.kind === 'cell' ? cells : packs).push(h.did + '@' + g.at + ' ' + (g.kind === 'cell' ? g.value.toFixed(3) : g.value.toFixed(1)))));
@@ -824,8 +864,8 @@ mgu.run({
                 block(126, 'LOOK LIKE CELL VOLTAGES (V)', cells);
                 block(236, 'LOOK LIKE PACK VOLTAGE (V)', packs);
             } else {
-                block(126, ch ? 'CHANGED SINCE THE SCAN ' + ago(Date.now() - scan.prev.t).toUpperCase() + ' (identifier@byte old>new)' : 'CHANGED SINCE THE LAST SCAN: scan again with the heater / A/C switched differently', ch || []);
-                cv.text('Heater: scan with the climate OFF, then set HI and scan again. A/C: OFF, then LO with A/C on.', 48, 300, 18, t.dim);
+                block(126, ch ? 'CHANGED SINCE RESET ' + ago(Date.now() - cmpState.t).toUpperCase() + ' (identifier@byte before>now)  ·  live, read ' + cmpState.cycles + 'x' : 'LIVE COMPARISON: starts when the scan is done', ch || []);
+                cv.text('Climate OFF, press Reset drive totals, then set HI (heater) or LO with A/C: the values that follow it show up here.', 48, 300, 18, t.dim);
             }
             cv.fillRect(48, 330, 1504, 1, t.tick);
             cv.text('ALL THAT ANSWER (identifier: bytes)', 48, 358, 20, t.dim, { font: 'bold', spacing: 1 });
