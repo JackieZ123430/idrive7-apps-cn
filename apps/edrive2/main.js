@@ -181,7 +181,8 @@ mgu.run({
             },
         }, 'battery temperature', { pollMs: 30000 });
         watch('de.bmw.infotainment.lsc.LSCDataSink', {
-            statusHighVoltageStorage: (v) => { rawSeen('HV storage', v); const x = one(v, 'actualValueVoltageHighVoltageStorage'); if (G.isNum(x) && x > 150 && x < 500) { live.lscV = x; live.lscVT = Date.now(); } },
+            statusHighVoltageStorage: (v) => { rawSeen('HV storage', v); let x = one(v, 'actualValueVoltageHighVoltageStorage'); if (G.isNum(x) && x > 1500) x /= 10;       // 0.1 V on the X5 45e
+                if (G.isNum(x) && x > 150 && x < 500) { live.lscV = x; live.lscVT = Date.now(); } },
         }, 'HV storage');
 
         /* ---------- UDS: candidates with several fields on one reply ---------- */
@@ -392,11 +393,25 @@ mgu.run({
             if (now - savedAt > 60000) save();
         }
         /** Climate power now: { kw, how } - measured while standing, else the sum of what the car reports / estimates. */
+        // the last measured climate draw, used while driving as long as the climate setting stays the same
+        let lastMeasured = null;
+        /** The car's compressor power, when it really reports it (the X5 45e sends 0 with the A/C running). */
+        const acReported = (d) => G.isNum(d.acKw) && (d.acKw > 0.05 || d.climate !== 'ac');
         function climatePower(d, now) {
-            const c = comfortKw(d), est = (G.isNum(d.acKw) ? d.acKw : 0) + blowerKw(d) + c.seats + c.wheel;
+            const c = comfortKw(d), est = (acReported(d) ? d.acKw : 0) + blowerKw(d) + c.seats + c.wheel;
             const draw = standingDraw(d, now);
-            if (draw !== null) return { kw: Math.max(0, draw - baseline()), how: 'measured', draw, est };
-            return { kw: d.climate === false && !c.seats && !c.wheel ? 0 : est, how: 'estimated', draw: null, est };
+            if (draw !== null) {
+                const kw = Math.max(0, draw - baseline());
+                if (!d.demo) lastMeasured = { kw, t: now, climate: d.climate, comfort: c.seats + c.wheel };
+                return { kw, how: 'measured', draw, est };
+            }
+            if (d.climate === false && !c.seats && !c.wheel) return { kw: 0, how: 'estimated', draw: null, est };
+            const lm = lastMeasured;
+            if (lm && lm.climate === d.climate && now - lm.t < 30 * 60000) {
+                // the last measurement, with the seat / wheel heating switched on or off since then
+                return { kw: Math.max(0, lm.kw - lm.comfort + c.seats + c.wheel), how: 'last measured', draw: null, est, ago: now - lm.t };
+            }
+            return { kw: est, how: 'estimated', draw: null, est };
         }
         setInterval(() => {
             const d = data(), now = Date.now();
@@ -483,17 +498,24 @@ mgu.run({
             cv.text((lim && G.isNum(lim.out) ? 'BATTERY MAX ' : '') + lbl(outMax), x + w, y + h + 30, 18, t.dim, { font: 'bold', align: 'right' });
         }
 
-        /** Bars of kW per sample over the last `secs`, around a zero line. */
+        /**
+         * kW over the last `secs` around a zero line, each reading drawn at its own time until the next one
+         * (a step), so the trace scrolls smoothly at any read rate. A gap of over 4 s (no reading) stays empty.
+         */
         function powerTrace(cv, t, x, y, w, h, pts, secs, top, bottom) {
-            const now = Date.now(), y0 = y + h * top / (top + bottom);
-            cv.fillRect(x, Math.round(y0), w, 1, withAlpha(t.tick, 0.8));
-            const n = Math.round(secs), bw = w / n, buckets = new Array(n).fill(null);
-            pts.forEach(([ts, v]) => { const i = n - 1 - Math.floor((now - ts) / 1000); if (i >= 0 && i < n) buckets[i] = v; });
-            buckets.forEach((v, i) => {
-                if (!G.isNum(v) || Math.abs(v) < 0.05) return;
+            const now = Date.now(), y0 = Math.round(y + h * top / (top + bottom));
+            const X = (ts) => x + w - (now - ts) / (secs * 1000) * w;
+            cv.fillRect(x, y0, w, 1, withAlpha(t.tick, 0.8));
+            cv.clip(x, y, w, h);
+            for (let i = 0; i < pts.length; i++) {
+                const [ts, v] = pts[i], next = i + 1 < pts.length ? pts[i + 1][0] : now;
+                if (!G.isNum(v) || Math.abs(v) < 0.05 || next - ts > 4000) continue;
+                const xa = Math.max(x, X(ts)), xb = Math.min(x + w, X(next));
+                if (xb <= x || xb - xa < 0.5) continue;
                 const hh = G.clamp(v / (v > 0 ? top : bottom), -1, 1) * (v > 0 ? y0 - y : y + h - y0);
-                cv.fillRect(x + i * bw, v > 0 ? y0 - hh : y0, Math.max(1, bw - 1), Math.abs(hh), v > 0 ? withAlpha(t.text, 0.75) : withAlpha(GO, 0.85));
-            });
+                cv.fillRect(xa, v > 0 ? y0 - hh : y0, xb - xa, Math.abs(hh), v > 0 ? withAlpha(t.text, 0.75) : withAlpha(GO, 0.85));
+            }
+            cv.noclip();
             cv.text(secs >= 120 ? Math.round(secs / 60) + ' min ago' : secs + ' s ago', x, y + h + 22, 16, t.dim);
             cv.text('now', x + w, y + h + 22, 16, t.dim, { align: 'right' });
         }
@@ -666,7 +688,10 @@ mgu.run({
             ['', 'NOW', 'KW'].forEach((h, i) => cv.text(h, [48, 560, 900][i], 120, 18, t.dim, { font: 'bold', spacing: 1.2, align: i === 2 ? 'right' : 'left' }));
             const seatTxt = Object.keys(d.seats || {}).filter((k) => d.seats[k]).map((k) => ({ DR: 'driver', PS: 'passenger', DRR: 'rear left', PSR: 'rear right' }[k] + ' ' + d.seats[k])).join(', ');
             const rows = [
-                ['A/C compressor', G.isNum(d.acKw) ? (d.acKw > 0.05 ? 'running (car\'s value)' : 'off') : 'not reported', d.acKw],
+                acReported(d)
+                    ? ['A/C compressor', d.acKw > 0.05 ? 'running (car\'s value)' : 'off', d.acKw]
+                    : ['A/C & heater', cp.how === 'estimated' ? 'measured when standing' : cp.how === 'measured' ? 'measured' : 'last measured ' + Math.max(1, Math.round(cp.ago / 60000)) + ' min ago',
+                        cp.how === 'estimated' ? null : Math.max(0, cp.kw - (d.climate === false ? 0 : blowerKw(d)) - c.seats - c.wheel)],
                 ['Blower', G.isNum(d.blower) ? (d.blower > 0 ? 'level ' + d.blower + ' (est.)' : 'off') : 'n/a', d.climate === false ? 0 : blowerKw(d)],
                 ['Seat heating', seatTxt ? seatTxt + ' (est.)' : 'off', c.seats],
                 ['Steering wheel', d.wheel === null || d.wheel === undefined ? 'n/a' : d.wheel ? 'on (est.)' : 'off', c.wheel],
@@ -679,23 +704,25 @@ mgu.run({
                 cv.text(G.isNum(kw) ? G.fmt(kw, kw < 1 ? 2 : 1) : '-', 900, y, 26, G.isNum(kw) && kw >= 1.5 ? t.warn : t.text, { font: 'bold', align: 'right' });
             });
             cv.fillRect(48, 352, 852, 1, t.panelEdge);
-            cv.text('ESTIMATED TOTAL', 48, 392, 22, t.dim, { font: 'bold', spacing: 1.2 });
-            cv.text(G.fmt(cp.est, 2) + ' kW', 900, 392, 30, t.text, { font: 'bold', align: 'right' });
-            cv.text('the heater isn\'t reported: in the cold, the measured draw (right) is the one to trust', 48, 430, 18, t.dim);
-            const pd = live.pd;
+            cv.text(cp.how === 'estimated' ? 'ESTIMATED TOTAL' : 'TOTAL', 48, 392, 22, t.dim, { font: 'bold', spacing: 1.2 });
+            cv.text(G.fmt(cp.how === 'estimated' ? cp.est : cp.kw, 2) + ' kW', 900, 392, 30, t.text, { font: 'bold', align: 'right' });
+            cv.text(acReported(d) ? 'the heater isn\'t reported: in the cold, the measured draw (right) is the one to trust'
+                : 'this car doesn\'t report the compressor: A/C & heater come from the battery, measured standing still', 48, 430, 18, t.dim);
+            const pd = live.pd && live.pd.displayRepartitionDriveElectricPower !== 255 && typeof live.pd.displayRepartitionElectricSeatHeater !== 'string' ? live.pd : null;
             cv.text(pd ? 'CAR\'S POWER DISPLAY  drive ' + pd.displayRepartitionDriveElectricPower + '  ·  climate ' + pd.displayRepartitionAirConditioningElectricPower
                 + '  ·  seats ' + pd.displayRepartitionElectricSeatHeater : 'OUTSIDE  ' + fmtT(d.ambient, 0), 48, 484, 20, t.dim, { font: 'bold', spacing: 0.5 });
 
             // ---- measured
             const x = 948, w = 628;
             G.panel(cv, t, x, 44, w, 468, 'Climate power');
-            const kw = cp.kw, kcol = cp.how === 'measured' ? (kw >= 2 ? t.warn : t.text) : t.dim;
+            const kw = cp.kw, kcol = cp.how !== 'estimated' ? (kw >= 2 ? t.warn : t.text) : t.dim;
             const vw = cv.text(G.fmt(kw, kw < 10 ? 1 : 0), x + 24, 196, 104, cp.how === 'measured' ? kcol : t.text, { font: 'num' });
             cv.text('kW', x + 34 + vw, 196, 34, t.dim, { font: 'bold' });
-            cv.text(cp.how === 'measured' ? 'MEASURED' : 'ESTIMATED', x + w - 24, 116, 20, cp.how === 'measured' ? GO : t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
+            cv.text(cp.how.toUpperCase(), x + w - 24, 116, 20, cp.how !== 'estimated' ? GO : t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
             const lines = cp.how === 'measured'
                 ? ['battery gives ' + G.fmt(cp.draw, 2) + ' kW standing still', '- on-board electrics ' + G.fmt(baseline(), 2) + ' kW' + (G.isNum(st.baseKw) ? ' (learned)' : ' (typical)')]
-                : ['measured while standing with the engine off', 'and not plugged in; while driving, estimated'];
+                : cp.how === 'last measured' ? ['measured ' + Math.max(1, Math.round(cp.ago / 60000)) + ' min ago, standing still', 'the same climate setting since then']
+                : ['measured while standing with the engine off', 'and not plugged in; then kept while driving'];
             lines.forEach((l, i) => cv.text(l, x + w - 24, 152 + i * 28, 20, t.dim, { align: 'right' }));
             // last 10 minutes
             const tr = d.demo ? demoHistory(CLIMATE_TRACE_S, 5, (x) => climatePower(x, now).kw) : climTrace, top = Math.max(1, ...tr.map((p) => p[1])) * 1.15;
