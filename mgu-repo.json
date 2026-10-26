@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "apps": {
+    "path": "apps/*",
+    "manifest": "app.json",
+    "mguHmi": ["ID7"],
+    "build": {
+      "python": "kit/tools/build.py",
+      "args": ["{id}"],
+      "sdk": "oap-sdk",
+      "output": "dist/{id}@{version}.tgz",
+      "network": ["doom"]
+    }
+  },
+  "tools": [
+    {
+      "id": "idrive7-renderd",
+      "path": "kit/renderd/prebuilt",
+      "version": "1.0.0",
+      "title": "GPU renderer",
+      "description": "Draws the apps at 60 fps with the GPU; without it they draw in software",
+      "provides": "renderer",
+      "mguHmi": ["ID7"],
+      "service": {
+        "exec": "mgu-renderd",
+        "args": ["--group", "{app_gid}"],
+        "user": "dynamic",
+        "groups": ["mgu_wayland", "video", "tm_oap_app"],
+        "environment": { "XDG_RUNTIME_DIR": "/run/wayland" },
+        "runtimeDirectory": "mgu-renderd",
+        "after": ["winston.service"],
+        "wantedBy": "oapcontroller.service"
+      }
+    },
+    {
+      "id": "mgu-inputgate",
+      "path": "kit/renderd/prebuilt",
+      "version": "1.0.0",
+      "title": "Controller gate",
+      "description": "Lets a full-screen app such as Doom have the iDrive controller; loads into the HMI at the next start",
+      "needs": ["renderer"],
+      "optional": true,
+      "mguHmi": ["ID7"],
+      "preload": {
+        "library": "mgu-inputgate.so",
+        "unit": "hmi.service",
+        "process": "HmiMain3D",
+        "strikes": 2,
+        "checkAfterSeconds": 120,
+        "healthySeconds": 60
+      }
+    }
+  ]
+}

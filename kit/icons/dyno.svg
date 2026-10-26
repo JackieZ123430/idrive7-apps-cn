@@ -1,0 +1,27 @@
+<!-- accent: #ff3b2f -->
+<defs>
+  <linearGradient id="y-chrome" x1="0" y1="0" x2="0.2" y2="1"><stop offset="0" stop-color="#f7f9fb"/><stop offset="0.22" stop-color="#c4cbd3"/><stop offset="0.48" stop-color="#6c757f"/>
+    <stop offset="0.62" stop-color="#2e3339"/><stop offset="0.85" stop-color="#7d8790"/><stop offset="1" stop-color="#c9d0d7"/></linearGradient>
+  <linearGradient id="y-screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16202b"/><stop offset="1" stop-color="#05070a"/></linearGradient>
+  <linearGradient id="y-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff3b2f" stop-opacity="0.55"/><stop offset="1" stop-color="#ff3b2f" stop-opacity="0"/></linearGradient>
+  <linearGradient id="y-glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/><stop offset="0.5" stop-color="#ffffff" stop-opacity="0.02"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+  <filter id="y-blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.6"/></filter>
+  <filter id="y-blur3" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4"/></filter>
+  <clipPath id="y-clip"><rect x="20" y="26" width="102" height="80" rx="6"/></clipPath>
+</defs>
+<rect x="12" y="18" width="118" height="96" rx="12" fill="url(#y-chrome)"/>
+<rect x="16" y="22" width="110" height="88" rx="9" fill="#030405"/>
+<rect x="20" y="26" width="102" height="80" rx="6" fill="url(#y-screen)"/>
+<g clip-path="url(#y-clip)">
+  <path d="M24 40 H118" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/><path d="M24 56 H118" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/><path d="M24 72 H118" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/><path d="M24 88 H118" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/><path d="M42 30 V102" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/><path d="M60 30 V102" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/><path d="M78 30 V102" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/><path d="M96 30 V102" stroke="#ffffff" stroke-width="0.7" opacity="0.12"/>
+  <path d="M24 100 C42 96 54 76 68 58 C80 42 96 32 118 36 V106 H24 Z" fill="url(#y-area)"/>
+  <path d="M24 76 C30 58 40 46 56 44 C76 42 96 50 118 70" fill="none" stroke="#2a8cff" stroke-width="4.5" filter="url(#y-blur)"/>
+  <path d="M24 76 C30 58 40 46 56 44 C76 42 96 50 118 70" fill="none" stroke="#7cc0ff" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M24 100 C42 96 54 76 68 58 C80 42 96 32 118 36" fill="none" stroke="#ff3b2f" stroke-width="5" filter="url(#y-blur)"/>
+  <path d="M24 100 C42 96 54 76 68 58 C80 42 96 32 118 36" fill="none" stroke="#ff8a7a" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="104" cy="33" r="7" fill="#ff5a3a" filter="url(#y-blur3)"/>
+  <circle cx="104" cy="33" r="3" fill="#ffffff"/>
+  <path d="M20 26 H122 V54 Q70 40 20 70 Z" fill="url(#y-glass)"/>
+</g>
+<rect x="56" y="114" width="30" height="8" rx="2" fill="url(#y-chrome)"/>
+<rect x="42" y="121" width="58" height="6" rx="3" fill="url(#y-chrome)"/>

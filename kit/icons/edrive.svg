@@ -1,0 +1,25 @@
+<!-- accent: #1c69d4 -->
+<defs>
+  <linearGradient id="e-case" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f9fb"/><stop offset="0.22" stop-color="#c4cbd3"/><stop offset="0.48" stop-color="#6c757f"/>
+    <stop offset="0.62" stop-color="#2e3339"/><stop offset="0.85" stop-color="#7d8790"/><stop offset="1" stop-color="#c9d0d7"/></linearGradient>
+  <linearGradient id="e-inner" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#020304"/><stop offset="1" stop-color="#171c22"/></linearGradient>
+  <linearGradient id="e-fill" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#b8ffd8"/><stop offset="0.22" stop-color="#46e891"/><stop offset="0.68" stop-color="#12a254"/><stop offset="1" stop-color="#075c30"/>
+  </linearGradient>
+  <linearGradient id="e-bolt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="#e3f3ff"/><stop offset="1" stop-color="#9fd2ff"/></linearGradient>
+  <filter id="e-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"/></filter>
+  <filter id="e-blur2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect x="16" y="45" width="96" height="52" rx="11" fill="url(#e-case)"/>
+<rect x="112" y="59" width="11" height="24" rx="3.5" fill="url(#e-case)"/>
+<rect x="21.5" y="50.5" width="85" height="41" rx="7" fill="url(#e-inner)"/>
+<rect x="25" y="54" width="58" height="34" rx="4.5" fill="#2bd67a" filter="url(#e-blur)" opacity="0.75"/>
+<rect x="25" y="54" width="58" height="34" rx="4.5" fill="url(#e-fill)"/>
+<rect x="43.5" y="54" width="2" height="34" fill="#053a1d" opacity="0.55"/>
+<rect x="63.5" y="54" width="2" height="34" fill="#053a1d" opacity="0.55"/>
+<rect x="27" y="56" width="54" height="8" rx="4" fill="#ffffff" opacity="0.28"/>
+<rect x="20" y="47.5" width="88" height="9" rx="4.5" fill="#ffffff" opacity="0.2"/>
+<path d="M82 20 L58 74 H73 L63 120 L96 60 H80 L92 20 Z" fill="#4aa8ff" filter="url(#e-blur)" opacity="0.95"/>
+<path d="M82 20 L58 74 H73 L63 120 L96 60 H80 L92 20 Z" fill="#7cc4ff" filter="url(#e-blur2)" opacity="0.8"/>
+<path d="M82 20 L58 74 H73 L63 120 L96 60 H80 L92 20 Z" fill="url(#e-bolt)" stroke="#0d3a6e" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M83.5 23 L62.5 71 H66 L86 25 Z" fill="#ffffff" opacity="0.9"/>
