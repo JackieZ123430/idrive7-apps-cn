@@ -249,7 +249,7 @@ mgu.run({
         const engineOn = () => G.isNum(live.rpm) && live.rpm > 400 && Date.now() - live.rpmT < 5000;
 
         /* ---------- power: fast reads, drive totals, traces ---------- */
-        const trip = { out: 0, regen: 0, charged: 0, peakOut: 0, peakIn: 0, since: Date.now() };
+        const trip = { out: 0, regen: 0, charged: 0, climate: 0, peakOut: 0, peakIn: 0, since: Date.now() };
         const trace = [], climTrace = [], tempTrace = [];
         const push = (arr, keep, v) => { const now = Date.now(); arr.push([now, v]); while (arr.length && now - arr[0][0] > keep * 1000) arr.shift(); };
         let iFail = 0, iTry = 0, vTick = 0;
@@ -257,7 +257,12 @@ mgu.run({
             if (live.kwT && G.isNum(live.kw)) {
                 const h = Math.min(now - live.kwT, 3 * Math.max(BG_POWER_S, settings.get('powerPoll')) * 1000) / 3600000;
                 const moving = G.isNum(live.speed) && live.speed > 1;
-                if (kw > 0) trip.out += kw * h;
+                if (kw > 0) {
+                    trip.out += kw * h;
+                    // the part of it the climate took (compressor, heater, blower, seats, pumps): never more than the battery gave
+                    const cl = climatePower(data(), now).kw;
+                    if (G.isNum(cl) && cl > 0) trip.climate += Math.min(cl, kw) * h;
+                }
                 else if (moving) trip.regen -= kw * h;
                 else trip.charged -= kw * h;
             }
@@ -611,7 +616,7 @@ mgu.run({
                 else { scan.running = false; setTimeout(runScan, 2000); }
                 return render();
             }
-            Object.assign(trip, { out: 0, regen: 0, charged: 0, peakOut: 0, peakIn: 0, since: Date.now() }); return render();
+            Object.assign(trip, { out: 0, regen: 0, charged: 0, climate: 0, peakOut: 0, peakIn: 0, since: Date.now() }); return render();
         });
 
         /** Centre-zero power bar: regen / charge to the left, drive to the right, scaled to the limits. */
@@ -675,7 +680,7 @@ mgu.run({
             // ---- this drive
             const x = 1048, w = 528;
             G.panel(cv, t, x, 44, w, 270, 'This drive');
-            const tp = d.demo ? { out: 2.84, regen: 0.61, charged: 0, peakOut: 61, peakIn: 24, since: Date.now() - 23 * 60000 } : trip;
+            const tp = d.demo ? { out: 2.84, regen: 0.61, charged: 0, climate: 0.48, peakOut: 61, peakIn: 24, since: Date.now() - 23 * 60000 } : trip;
             const col = (cx, label, v, c) => {
                 cv.text(label, cx, 116, 20, t.dim, { font: 'bold', spacing: 1.2 });
                 const ww = cv.text(G.fmt(v, v >= 10 ? 1 : 2), cx, 170, 46, c, { font: 'num' });
@@ -685,9 +690,21 @@ mgu.run({
             col(x + 200, 'REGEN', tp.regen, GO);
             col(x + 370, 'NET', tp.out - tp.regen, t.text);
             cv.fillRect(x + 24, 196, w - 48, 1, t.panelEdge);
-            cv.text('PEAK  ' + G.fmt(tp.peakOut, 0) + ' kW out  ·  ' + G.fmt(tp.peakIn, 0) + ' kW regen', x + 24, 236, 22, t.text, { font: 'bold', spacing: 1 });
+            // what the energy used went to: driving (motor and on-board electrics) vs. climate
+            const clim = Math.min(tp.climate || 0, tp.out), drive = Math.max(0, tp.out - clim);
+            const cp2 = tp.out > 0.005 ? clim / tp.out : 0, dp = tp.out > 0.005 ? 1 - cp2 : 0;
+            const pct = (f) => (tp.out > 0.005 ? Math.round(f * 100) + ' %' : '--');
+            cv.text('DRIVING  ' + G.fmt(drive, 2) + ' kWh  ' + pct(dp), x + 24, 228, 20, t.text, { font: 'bold', spacing: 1 });
+            cv.text('CLIMATE  ' + G.fmt(clim, 2) + ' kWh  ' + pct(cp2), x + w - 24, 228, 20, t.warn, { font: 'bold', spacing: 1, align: 'right' });
+            const bx = x + 24, bw = w - 48;
+            cv.roundRect(bx, 240, bw, 14, 5, withAlpha(t.track, 0.9));
+            if (tp.out > 0.005) {
+                if (dp > 0.005) cv.roundRect(bx, 240, Math.max(4, bw * dp), 14, 5, withAlpha(t.text, 0.8));
+                if (cp2 > 0.005) cv.roundRect(bx + bw * dp, 240, Math.max(4, bw * cp2), 14, 5, t.warn);
+            }
             const mins = Math.round((Date.now() - tp.since) / 60000);
-            cv.text((tp.charged > 0.05 ? 'charged ' + G.fmt(tp.charged, 2) + ' kWh  ·  ' : '') + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago') + '  ·  Reset in the menu', x + 24, 280, 20, t.dim);
+            cv.text('peak ' + G.fmt(tp.peakOut, 0) + ' kW out · ' + G.fmt(tp.peakIn, 0) + ' kW regen  ·  ' + (tp.charged > 0.05 ? 'charged ' + G.fmt(tp.charged, 2) + ' kWh  ·  ' : '')
+                + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago'), x + 24, 288, 18, t.dim);
 
             // ---- battery at a glance
             G.panel(cv, t, x, 330, w, 182, 'Battery');
