@@ -109,7 +109,9 @@ monitor reboots the whole unit for an aborted HMI. The guard (`mgu-inputgate-gua
 before the HMI) copies the preload line to `/run/mgu-inputgate.env`, which the drop-in reads
 with `EnvironmentFile=`, and counts the start; `mgu-inputgate-check.service` resets the count once
 the HMI has run with the gate for a minute (checked 2 minutes after the start). Two starts in a
-row without that: the guard leaves the gate out until it is installed again.
+row without that: the guard leaves the gate out until it is installed again. Neither unit ever goes inactive
+(the guard has `RemainAfterExit=yes`, the check keeps running after it is done): on this firmware
+the lifecycle manager reboots the head unit when a service stops, not only when the HMI does.
 
 `inputgate/vsomeip-include/` holds the vsomeip 3.1 compat interface headers it is compiled
 against (MPL-2.0, as in their file headers).

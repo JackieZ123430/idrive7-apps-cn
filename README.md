@@ -555,6 +555,7 @@ the internet.
    (`mgu-inputgate-guard.service`) that runs just before the HMI. If the HMI didn't come up healthy
    with the gate twice in a row (`mgu-inputgate-check.service` confirms it 2 minutes after each
    start), the guard leaves it out by itself; installing again gives it a fresh try.
+   (Both stay active for good: the head unit reboots when any service stops.)
    `sh deploy-car.sh status` shows `controller gate: loaded`, `set up, loads the next time the
    head unit starts` or `left out by the boot guard`. `NO_INPUTGATE=1` skips this step.
 7. **Restarts the app platform** once. The HMI reloads the Apps list in about 1-2 minutes.

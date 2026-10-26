@@ -502,11 +502,12 @@ boot)
 check)   # (mgu-inputgate-check.service, after the HMI) the HMI has run with the gate for a minute
     sleep 120
     p=$(pidof HmiMain3D 2>/dev/null | cut -d' ' -f1)
-    [ -n "$p" ] && grep -q mgu-inputgate "/proc/$p/maps" 2>/dev/null && systemctl is-active -q hmi.service || exit 0
-    up=$(cut -d. -f1 /proc/uptime); st=$(cut -d')' -f2 "/proc/$p/stat" | awk '{print $20}')
-    [ $((up - st / 100)) -ge 60 ] || exit 0
-    echo 0 > "$N"; sync
-    echo "controller gate: HMI healthy with it"
+    if [ -n "$p" ] && grep -q mgu-inputgate "/proc/$p/maps" 2>/dev/null && systemctl is-active -q hmi.service; then
+        up=$(cut -d. -f1 /proc/uptime); st=$(cut -d')' -f2 "/proc/$p/stat" | awk '{print $20}')
+        if [ $((up - st / 100)) -ge 60 ]; then echo 0 > "$N"; sync; echo "controller gate: HMI healthy with it"; fi
+    fi
+    # never exit: the head unit's lifecycle reboots the unit when a service stops
+    while :; do sleep 86400; done
     ;;
 esac
 exit 0
@@ -524,6 +525,8 @@ Before=hmi.service
 
 [Service]
 Type=oneshot
+# stays "active" after it ran: a service that stops makes the head unit's lifecycle reboot the unit
+RemainAfterExit=yes
 TimeoutStartSec=10
 ExecStart=/bin/sh $GATE_GUARD boot
 UNIT
@@ -537,6 +540,7 @@ After=hmi.service
 RequiresMountsFor=$RENDERD_DIR
 
 [Service]
+# runs on after the check (never exits): a service that stops makes the head unit reboot
 Type=simple
 ExecStart=/bin/sh $GATE_GUARD check
 UNIT
@@ -601,7 +605,8 @@ install_inputgate() {
     [ -d "$RENDERD_DIR" ] || die "install the renderer first (sh $0 renderd)"
     rm -f "/run/systemd/system/$GATE_DROPIN_NAME"      # (older installers tried it from /run)
     cp "$src" "$GATE_SO.new" && chmod 755 "$GATE_SO.new" && chown 0:0 "$GATE_SO.new" && mv "$GATE_SO.new" "$GATE_SO" || die "copy failed"
-    gate_guard_text > "$GATE_GUARD" && chmod 755 "$GATE_GUARD" || die "cannot write $GATE_GUARD"
+    # (new file + rename: a running copy keeps reading its own)
+    gate_guard_text > "$GATE_GUARD.new" && chmod 755 "$GATE_GUARD.new" && mv "$GATE_GUARD.new" "$GATE_GUARD" || die "cannot write $GATE_GUARD"
     gate_env_text > "$RENDERD_DIR/inputgate.env" || die "cannot write $RENDERD_DIR/inputgate.env"
     echo 0 > "$RENDERD_DIR/inputgate.strikes"          # installing again = a fresh try
     gate_unit_text > "$TMP.unit" && gate_check_text > "$TMP.check" && gate_dropin_text > "$TMP.gate" || die "tmp"
@@ -615,8 +620,9 @@ install_inputgate() {
         else say "controller gate set up - it loads the next time the head unit starts (the HMI is not restarted now: on a car that reboots the head unit)"; fi
         return 0
     fi
-    # --now (VM / bench only): restart the HMI with it (its start runs the guard first), take it
-    # out again if the HMI isn't healthy
+    # --now (VM / bench only): restart the HMI with it (the guard first), take it out again if
+    # the HMI isn't healthy
+    systemctl restart "$GATE_UNIT" 2>/dev/null
     say "restarting the HMI with the controller gate (VM / bench: on a car this reboots the head unit)..."
     systemctl restart hmi.service 2>/dev/null || say "(systemctl reported an error stopping the old HMI - normal, it stops with SIGABRT)"
     if ! hmi_healthy; then
