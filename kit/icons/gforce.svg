@@ -1,0 +1,25 @@
+<!-- accent: #ff8a1f -->
+<defs>
+  <linearGradient id="g-chrome" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#f7f9fb"/><stop offset="0.22" stop-color="#c4cbd3"/><stop offset="0.48" stop-color="#6c757f"/>
+    <stop offset="0.62" stop-color="#2e3339"/><stop offset="0.85" stop-color="#7d8790"/><stop offset="1" stop-color="#c9d0d7"/></linearGradient>
+  <radialGradient id="g-face" cx="0.5" cy="0.45" r="0.6"><stop offset="0" stop-color="#1d2a38"/><stop offset="0.8" stop-color="#090d12"/><stop offset="1" stop-color="#020304"/></radialGradient>
+  <radialGradient id="g-dot" cx="0.42" cy="0.38" r="0.65"><stop offset="0" stop-color="#ffffff"/><stop offset="0.35" stop-color="#ffc06a"/><stop offset="0.8" stop-color="#ff6a00"/><stop offset="1" stop-color="#a33a00"/></radialGradient>
+  <linearGradient id="g-trail" gradientUnits="userSpaceOnUse" x1="70" y1="70" x2="96" y2="50"><stop offset="0" stop-color="#ff8a1f" stop-opacity="0"/><stop offset="1" stop-color="#ffb04a" stop-opacity="1"/></linearGradient>
+  <linearGradient id="g-glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.25"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+  <filter id="g-blur" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4"/></filter>
+  <filter id="g-blur2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="1.6"/></filter>
+</defs>
+<circle cx="70" cy="70" r="56" fill="url(#g-chrome)"/>
+<circle cx="70" cy="70" r="51" fill="#06080a"/>
+<circle cx="70" cy="70" r="49" fill="url(#g-face)"/>
+<circle cx="70" cy="70" r="42" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.3"/>
+<circle cx="70" cy="70" r="28" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.22"/>
+<circle cx="70" cy="70" r="14" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.18"/>
+<path d="M24 70 H116 M70 24 V116" stroke="#ffffff" stroke-width="0.8" opacity="0.2"/>
+<path d="M36 80 C30 50 60 30 88 32 C110 36 114 66 106 88 C94 110 50 110 36 80 Z" fill="#ff8a1f" opacity="0.1" stroke="#ff9a3a" stroke-width="1" stroke-opacity="0.45"/>
+<path d="M70 70 C76 78 86 80 92 74 C98 68 99 60 96 50" fill="none" stroke="url(#g-trail)" stroke-width="5" stroke-linecap="round" filter="url(#g-blur2)"/>
+<path d="M70 70 C76 78 86 80 92 74 C98 68 99 60 96 50" fill="none" stroke="url(#g-trail)" stroke-width="2.6" stroke-linecap="round"/>
+<circle cx="96" cy="50" r="13" fill="#ff7a10" filter="url(#g-blur)"/>
+<circle cx="96" cy="50" r="7.5" fill="url(#g-dot)"/>
+<circle cx="70" cy="70" r="2.2" fill="#ffffff" opacity="0.7"/>
+<path d="M23 64 A47 47 0 0 1 117 64 Q70 48 23 64 Z" fill="url(#g-glass)"/>

@@ -1,0 +1,30 @@
+<!-- accent: #ff4a00 -->
+<defs>
+  <radialGradient id="k-bone" gradientUnits="userSpaceOnUse" cx="62" cy="48" r="62">
+    <stop offset="0" stop-color="#fffaf0"/><stop offset="0.4" stop-color="#e8dcc6"/><stop offset="0.75" stop-color="#a4927a"/><stop offset="1" stop-color="#4e4234"/>
+  </radialGradient>
+  <linearGradient id="k-horn" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#d9ccb4"/><stop offset="0.6" stop-color="#7a6a54"/><stop offset="1" stop-color="#2a2219"/></linearGradient>
+  <radialGradient id="k-eye" cx="0.5" cy="0.5" r="0.55"><stop offset="0" stop-color="#fff2c0"/><stop offset="0.3" stop-color="#ffb000"/><stop offset="0.65" stop-color="#ff2a00"/><stop offset="1" stop-color="#3a0000"/></radialGradient>
+  <linearGradient id="k-fire" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd23a"/><stop offset="0.35" stop-color="#ff7a00"/><stop offset="0.75" stop-color="#d42000" stop-opacity="0.7"/><stop offset="1" stop-color="#7a0000" stop-opacity="0"/></linearGradient>
+  <filter id="k-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3"/></filter>
+  <filter id="k-blur2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.4"/></filter>
+</defs>
+<path d="M4 140 C14 112 8 96 22 80 C24 98 32 102 34 92 C36 76 46 72 44 56 C56 70 54 84 60 86 C62 72 72 66 70 50 C82 62 86 78 84 88 C92 80 92 66 100 60 C102 76 110 82 106 96 C116 88 118 76 124 72 C130 92 120 110 136 140 Z" fill="url(#k-fire)" filter="url(#k-blur)"/>
+<path d="M50 50 C38 44 28 30 26 12 C36 24 46 30 58 36 Z" fill="url(#k-horn)"/>
+<path d="M90 50 C102 44 112 30 114 12 C104 24 94 30 82 36 Z" fill="url(#k-horn)"/>
+<g>
+  <ellipse cx="70" cy="58" rx="31" ry="29" fill="url(#k-bone)"/>
+  <path d="M44 70 Q44 98 58 106 H82 Q96 98 96 70 Z" fill="url(#k-bone)"/>
+</g>
+<path d="M58 34 Q64 44 60 52" fill="none" stroke="#5e5040" stroke-width="1.2" opacity="0.6"/>
+<ellipse cx="52" cy="84" rx="7" ry="5" fill="#4e4234" opacity="0.35" filter="url(#k-blur2)"/>
+<ellipse cx="88" cy="84" rx="7" ry="5" fill="#4e4234" opacity="0.35" filter="url(#k-blur2)"/>
+<path d="M47 60 L66 67 L64 80 Q52 82 47 74 Z" fill="#120403"/>
+<path d="M93 60 L74 67 L76 80 Q88 82 93 74 Z" fill="#120403"/>
+<ellipse cx="57" cy="72" rx="9" ry="7" fill="#ff2a00" filter="url(#k-blur)" opacity="0.9"/>
+<ellipse cx="83" cy="72" rx="9" ry="7" fill="#ff2a00" filter="url(#k-blur)" opacity="0.9"/>
+<ellipse cx="57" cy="72" rx="5.5" ry="4.5" fill="url(#k-eye)"/>
+<ellipse cx="83" cy="72" rx="5.5" ry="4.5" fill="url(#k-eye)"/>
+<path d="M70 82 L64.5 92 H75.5 Z" fill="#160604"/>
+<rect x="55" y="95" width="30" height="9" rx="2" fill="#160604"/>
+<rect x="56.4" y="95.5" width="3.6" height="8" rx="1" fill="url(#k-bone)"/><rect x="61.15" y="95.5" width="3.6" height="8" rx="1" fill="url(#k-bone)"/><rect x="65.9" y="95.5" width="3.6" height="8" rx="1" fill="url(#k-bone)"/><rect x="70.65" y="95.5" width="3.6" height="8" rx="1" fill="url(#k-bone)"/><rect x="75.4" y="95.5" width="3.6" height="8" rx="1" fill="url(#k-bone)"/><rect x="80.15" y="95.5" width="3.6" height="8" rx="1" fill="url(#k-bone)"/>

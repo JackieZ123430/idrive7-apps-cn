@@ -1,0 +1,30 @@
+<!-- accent: #f0a020 -->
+<defs>
+  <linearGradient id="s-chrome" gradientUnits="userSpaceOnUse" x1="0" y1="-19" x2="0" y2="19">
+    <stop offset="0" stop-color="#5d666f"/><stop offset="0.16" stop-color="#f9fbfc"/><stop offset="0.34" stop-color="#c7ced5"/><stop offset="0.5" stop-color="#6f7882"/>
+    <stop offset="0.66" stop-color="#e3e8ec"/><stop offset="0.86" stop-color="#8f98a1"/><stop offset="1" stop-color="#3c4249"/>
+  </linearGradient>
+  <mask id="s-cut" maskUnits="userSpaceOnUse" x="-80" y="-40" width="160" height="80">
+    <rect x="-80" y="-40" width="160" height="80" fill="#fff"/>
+    <path d="M44 -8 H80 V8 H44 A4 4 0 0 1 40 4 V-4 A4 4 0 0 1 44 -8 Z" fill="#000"/>
+    <circle cx="-40" cy="0" r="6.5" fill="#000"/>
+  </mask>
+  <radialGradient id="s-oil" cx="0.36" cy="0.6" r="0.75">
+    <stop offset="0" stop-color="#fff4c2"/><stop offset="0.28" stop-color="#ffcb34"/><stop offset="0.7" stop-color="#d47800"/><stop offset="1" stop-color="#7a3a00"/>
+  </radialGradient>
+  <filter id="s-blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4"/></filter>
+</defs>
+<g transform="translate(68 76) rotate(-45)">
+  <g mask="url(#s-cut)">
+    <rect x="-40" y="-8.5" width="80" height="17" rx="7" fill="url(#s-chrome)"/>
+    <circle cx="44" cy="0" r="19" fill="url(#s-chrome)"/>
+    <circle cx="-40" cy="0" r="14" fill="url(#s-chrome)"/>
+  </g>
+  <rect x="-24" y="-2.2" width="46" height="4.4" rx="2.2" fill="#4a5158" opacity="0.55"/>
+  <rect x="-24" y="1.2" width="46" height="1.2" rx="0.6" fill="#ffffff" opacity="0.5"/>
+  <circle cx="-40" cy="0" r="6.5" fill="none" stroke="#2b3036" stroke-width="1.2" opacity="0.7"/>
+</g>
+<path d="M33 12 C33 12 16 33 16 44 A17 17 0 0 0 50 44 C50 33 33 12 33 12 Z" fill="#ffb21f" filter="url(#s-blur)" opacity="0.7"/>
+<path d="M33 12 C33 12 16 33 16 44 A17 17 0 0 0 50 44 C50 33 33 12 33 12 Z" fill="url(#s-oil)" stroke="#6b3300" stroke-width="1" stroke-opacity="0.6"/>
+<ellipse cx="25" cy="43" rx="3" ry="7.5" transform="rotate(18 25 43)" fill="#ffffff" opacity="0.75"/>
+<circle cx="41" cy="51" r="2" fill="#ffffff" opacity="0.45"/>

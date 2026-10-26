@@ -630,7 +630,7 @@ all 33 HMI languages, manifest, permissions and runner.
 | Key | Meaning |
 |---|---|
 | `loggingId` | 4-character log tag, **unique per app** (BMW apps use `OA1x`, the apps here `OA93`-`OA9F`) |
-| `iconGlyph` | tile icon drawn by `make_icon.js`: `gauge`, `flag`, `engine`, `rpm`, `dyno`, `brake`, `temp`, `gforce`, `battery`, `wrench`, `doom`, or up to ~3 letters |
+| `iconGlyph` | tile icon drawn by `make_icon.js` when the app has no `icon.png`: `gauge`, `flag`, `engine`, `rpm`, `dyno`, `brake`, `temp`, `gforce`, `battery`, `wrench`, `doom`, or up to ~3 letters. An `icon.png` (140 x 140, transparent) in the app folder is used instead: the shipped apps' icons are drawn as SVG in `kit/icons/<app>.svg` and rendered with `python3 kit/tools/render_icons.py` (needs Pillow and Chromium / Chrome; `--sheet out.png` makes a preview) |
 | `signals` | `interface → { field: flags }`; `r` = read once at start (needs a getter), `s` = subscribe to changes (needs a notifier), `w` = write (its setter, `ctx.signals.set`). Optional `_instances`, `_methods`, `_broadcasts` |
 | `screens` | `canvas` screens: one big image + up to 4 buttons. `BTN_SETTINGS` opens the settings screen generated from `settings`. `"bar": false`: the kit draws no button bar on that screen and the content gets the full height (a game); the buttons still exist in the HMI under the picture, for controller focus and taps. `"chrome": false`: no header, bar or panels at all, the whole display is the app's (`cv.place.full`). `"kind": "menu"` with `"items"` (`["button", NAME, label]`, `["text", NAME, label]`): an HMI list screen; `"settings": true` adds every setting to it (then no separate settings screen is made) |
 | `assets` | files the build downloads into the app folder and packs, checked by SHA-256: `[{ "file", "sha256", "url" }]`, for a zip also `"zipSha256"`, `"zipMember"` (Doom's game data). `.wasm`, `.wad`, `LICENSE` and `NOTICE` files in the app folder are packed as they are |
@@ -808,8 +808,9 @@ kit/runtime/          app runtime: mgu.js (platform glue), record.js + display.j
 kit/renderd/          mgu-renderd: the GPU renderer service (C, GLES2, Wayland/ivi);
                       prebuilt/ = the ready binary + the source fingerprint it was built from
 kit/platform/         permissions template used by build.py
-kit/tools/            build.py, make_kit.py, preview.js, make_gif.sh, make_icon.js, bake_fonts.py,
-                      extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
+kit/tools/            build.py, make_kit.py, preview.js, make_gif.sh, make_icon.js, render_icons.py,
+                      bake_fonts.py, extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
+kit/icons/            the apps' tile icons as SVG (render_icons.py -> apps/<app>/icon.png)
 deploy/               make-car-kit.sh/.cmd, push-to-car.sh/.ps1, mgu-app-install.sh, mainapp-patch.js
 deploy/car/           deploy-car.sh (runs on the unit) + its README
 docs/                 RHMI widget reference, screenshots (docs/screens), animations (docs/media)

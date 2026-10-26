@@ -1,0 +1,12 @@
+<!-- accent: #ffb000 -->
+<defs>
+  <linearGradient id="t-amber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2b8"/><stop offset="0.25" stop-color="#ffd040"/><stop offset="0.7" stop-color="#ff9a00"/><stop offset="1" stop-color="#b85a00"/></linearGradient>
+  <radialGradient id="t-lens" cx="0.5" cy="0.4" r="0.6"><stop offset="0" stop-color="#3a2a10"/><stop offset="0.7" stop-color="#120d06"/><stop offset="1" stop-color="#050403"/></radialGradient>
+  <filter id="t-blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="5"/></filter>
+  <filter id="t-blur2" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="1.8"/></filter>
+</defs>
+<path d="M58 36 H74 V44 H84 V50 H98 L104 56 V64 H110 V56 H118 V96 H110 V86 H104 V92 L98 98 H52 L44 90 V84 H34 V94 H22 V54 H34 V64 H44 V50 H50 V44 H58 Z" fill="#ffa000" filter="url(#t-blur)" opacity="0.95"/>
+<path d="M58 36 H74 V44 H84 V50 H98 L104 56 V64 H110 V56 H118 V96 H110 V86 H104 V92 L98 98 H52 L44 90 V84 H34 V94 H22 V54 H34 V64 H44 V50 H50 V44 H58 Z" fill="#ffc030" filter="url(#t-blur2)" opacity="0.8"/>
+<path d="M58 36 H74 V44 H84 V50 H98 L104 56 V64 H110 V56 H118 V96 H110 V86 H104 V92 L98 98 H52 L44 90 V84 H34 V94 H22 V54 H34 V64 H44 V50 H50 V44 H58 Z" fill="url(#t-amber)" stroke="#8a4500" stroke-width="1.4" stroke-linejoin="round"/>
+<path d="M60 40 H72 V46 H60 Z M24 58 H32 V60 H24 Z" fill="#ffffff" opacity="0.55"/>
+<path d="M48 52 H96 L100 56 V58 H48 Z" fill="#ffffff" opacity="0.35"/>
