@@ -8,17 +8,28 @@
  *            car formats in its own language and units); cbsDataSBA - the summary (next service).
  *   Details: requestCBSServiceHint(id) - the item's service hint text, as the iDrive's detail view.
  *
- * Read-only: the head unit offers no service reset on these cars (the reset is done in the
- * instrument cluster / by the workshop), so this app doesn't write anything.
+ * Reset (setting "Service reset", off by default): the instrument cluster's own CBS reset over UDS,
+ * byte for byte what the workshop tool's CBS_RESET job sends (taken from a reset on a G20 330e):
+ *   which items may be reset : 22 10 02 -> 3 bytes per item: id, reason it is blocked (0 = none), reserve
+ *   reset one item           : 2E 10 01  01 <id> 64 1F 8000 0F FF 0F 3F FF 00
+ *                              (1 item, availability 100 %, service count +1, everything else unchanged:
+ *                              the cluster works out the new date / distance itself)
+ *   check                    : 22 10 01 -> 12 bytes per item: id, .., [5] availability %, [4]&0x1F count
+ * Only brake fluid (0x03) and the vehicle check (0x64) - the items kept in the cluster that were tried -
+ * and only when the cluster itself reports no reason against it. Choose, then confirm within 15 s.
  */
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
+const { Diag, hex, NRC } = require('./kit/diag');
 
 const W = 1600, H = 520, PER_PAGE = 5;
 const GO = '#2fd27a';
 const KOMBI = 'de.bmw.infotainment.KombiInterface_2';
 const COLORS = { DEFAULT: 0, RED: 1, YELLOW: 2, GREEN: 3, ORANGE: 4 };
+const KOMBI_ECU = 0x60;
+const RESETTABLE = { 0x03: 'Brake fluid', 0x64: 'Vehicle check' };
+const CONFIRM_MS = 15000;
 
 /**
  * the object holding `key` somewhere inside v (unions arrive wrapped in their member's name). With
@@ -107,6 +118,77 @@ mgu.run({
             changed();
         }
 
+        /* ---------- reset (the cluster's own CBS reset, see the top of this file) ---------- */
+        let diag = null, reset = null;          // reset: { items: [{id, name}], i, at, busy }
+        const showMsg = (s) => { hint = null; msg = s; log.info("msg: " + s); changed(); };
+        const nrc = (r) => (r && r[0] === 0x7F ? 'refused: ' + (NRC[r[2]] || '0x' + hex(r[2])) : 'no answer from the instrument cluster');
+        async function link() {
+            if (!diag) { diag = new Diag(sig, log); await diag.init(); }
+            if (!diag.p) throw new Error('no diagnostic link (' + (diag.error || 'not available') + ')');
+            return diag;
+        }
+        /** the cluster's CBS record: { id: {avail, count} } */
+        async function readCbs(d) {
+            const r = await d.physical(KOMBI_ECU, 0x22, [0x10, 0x01], 5000, (u) => u[0] !== 0x62 || u[1] === 0x10);
+            if (!r || r[0] !== 0x62) throw new Error(nrc(r));
+            const out = {};
+            for (let i = 3; i + 12 <= r.length; i += 12) out[r[i]] = { avail: r[i + 5], count: r[i + 4] & 0x1F };
+            return out;
+        }
+        async function pickReset() {
+            if (settings.get('resetOn') !== true) return showMsg('Reset is off - turn on "Service reset" in Settings');
+            if (useDemo()) return showMsg('No reset in demo mode');
+            if (reset && reset.busy) return;
+            if (reset && reset.items.length && Date.now() - reset.at < CONFIRM_MS) {     // next item
+                reset.i = (reset.i + 1) % reset.items.length;
+                reset.at = Date.now();
+                return showMsg('Reset ' + reset.items[reset.i].name + '?  Press "Confirm reset" (15 s)');
+            }
+            showMsg('Asking the instrument cluster what can be reset...');
+            try {
+                const d = await link();
+                const r = await d.physical(KOMBI_ECU, 0x22, [0x10, 0x02], 5000, (u) => u[0] !== 0x62 || u[1] === 0x10);
+                if (!r || r[0] !== 0x62) throw new Error(nrc(r));
+                const items = [];
+                for (let i = 3; i + 3 <= r.length; i += 3) {
+                    if (RESETTABLE[r[i]] && r[i + 1] === 0) items.push({ id: r[i], name: RESETTABLE[r[i]] });
+                }
+                log.info('resettable: ' + brief(items) + ' (reply ' + r.map((x) => hex(x)).join(' ') + ')');
+                if (!items.length) { reset = null; return showMsg('The instrument cluster allows no reset right now'); }
+                reset = { items, i: 0, at: Date.now(), busy: false };
+                showMsg('Reset ' + items[0].name + '?  Press "Confirm reset" (15 s)'
+                    + (items.length > 1 ? ', "Choose reset" for the next item' : ''));
+            } catch (e) {
+                reset = null;
+                log.warn('reset list: ' + e);
+                showMsg('Reset not available: ' + (e.message || e));
+            }
+        }
+        async function doReset() {
+            if (!reset || !reset.items.length || reset.busy) return showMsg('Press "Choose reset" first');
+            if (Date.now() - reset.at > CONFIRM_MS) { reset = null; return showMsg('Too late - press "Choose reset" again'); }
+            const it = reset.items[reset.i];
+            reset.busy = true;
+            showMsg('Resetting ' + it.name + '...');
+            try {
+                const d = await link();
+                const before = (await readCbs(d).catch(() => ({})))[it.id];
+                const r = await d.physical(KOMBI_ECU, 0x2E,
+                    [0x10, 0x01, 0x01, it.id, 0x64, 0x1F, 0x80, 0x00, 0x0F, 0xFF, 0x0F, 0x3F, 0xFF, 0x00], 6000,
+                    (u) => u[0] !== 0x6E || u[1] === 0x10);
+                log.info('reset ' + it.name + ': ' + (r ? r.map((x) => hex(x)).join(' ') : 'no reply'));
+                if (!r || r[0] !== 0x6E) throw new Error(nrc(r));
+                const after = (await readCbs(d).catch(() => ({})))[it.id];
+                showMsg(it.name + ' reset' + (after ? ': ' + after.avail + ' %' + (before ? ', service ' + before.count + ' -> ' + after.count : '') : '')
+                    + ' - the list updates within a minute');
+            } catch (e) {
+                log.warn('reset ' + it.name + ': ' + e);
+                showMsg(it.name + ' NOT reset: ' + (e.message || e));
+            } finally {
+                reset = null;
+            }
+        }
+
         /* ---------- drawing ---------- */
         const pages = () => (settings.get('diagPage') ? ['Service', 'Diagnostics'] : ['Service']);
         const COL = (t, c) => [t.dim, t.crit, t.warn, GO, t.warn][c] || t.dim;
@@ -132,11 +214,17 @@ mgu.run({
             tile(cv, t, 804, 374, 'Due soon', String(soon), 'items', soon ? t.warn : GO);
             tile(cv, t, 1198, 378, 'Due now', String(red), 'items', red ? t.crit : GO);
             G.panel(cv, t, 24, 176, 1552, 336, 'Service requirements' + (its.length > PER_PAGE ? '  ' + (Math.floor(sel / PER_PAGE) + 1) + '/' + Math.ceil(its.length / PER_PAGE) : ''));
+            // the bottom line: an item's details, or what the last button did (reset)
+            const line = hint ? hint.name + ':  ' + hint.text : msg;
+            if (line) {
+                cv.roundRect(40, 470, 1520, 38, 8, withAlpha(t.accent, 0.12));
+                cv.text(fit(cv, line, 22, 1490), 56, 496, 22, t.text);
+            }
             if (!its.length) {
                 cv.text('Waiting for the service data from the instrument cluster (ignition on)...', 800, 369, 28, t.dim, { align: 'center' });
                 return;
             }
-            const per = hint ? PER_PAGE - 1 : PER_PAGE;          // the details line takes the last row
+            const per = line ? PER_PAGE - 1 : PER_PAGE;          // the bottom line takes the last row
             const first = Math.floor(sel / per) * per;
             its.slice(first, first + per).forEach((it, i) => {
                 const y = 232 + i * 55, col = COL(t, it.colour);
@@ -150,10 +238,6 @@ mgu.run({
                     cv.text(LBL[it.colour], 1425, y + 31, 20, col, { align: 'center', font: 'bold', spacing: 0.5 });
                 }
             });
-            if (hint) {
-                cv.roundRect(40, 470, 1520, 38, 8, withAlpha(t.accent, 0.12));
-                cv.text(fit(cv, hint.name + ':  ' + hint.text, 22, 1490), 56, 496, 22, t.text);
-            } else if (msg) cv.text(msg, 1552, 212, 22, t.dim, { align: 'right' });
         }
 
         function drawDiag(cv, t) {
@@ -183,8 +267,10 @@ mgu.run({
             await ui.image('MAIN_GFX', cv);
         }
 
-        ui.onClick('BTN_SELECT', () => { const n = items().length; if (n) sel = (sel + 1) % n; hint = null; changed(); });
-        ui.onClick('BTN_DETAILS', () => { details(); });
+        ui.onClick('BTN_SELECT', () => { const n = items().length; if (n) sel = (sel + 1) % n; hint = null; msg = ''; changed(); });
+        ui.onClick('BTN_DETAILS', () => { msg = ''; details(); });
+        ui.onClick('BTN_RESET_PICK', () => { pickReset(); });
+        ui.onClick('BTN_RESET_GO', () => { doReset(); });
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; changed(); });
 
         ctx.loop('MAIN', 2, () => render(false));

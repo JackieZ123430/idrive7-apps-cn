@@ -1,8 +1,8 @@
 {
   "id": "service",
   "title": "Service",
-  "description": "Service requirements from the instrument cluster: oil, brakes, brake fluid, vehicle check, inspection - distance, date and details",
-  "version": "1.1.1",
+  "description": "Service requirements from the instrument cluster: oil, brakes, brake fluid, vehicle check, inspection - distance, date, details; brake fluid and vehicle check reset",
+  "version": "1.2.0",
   "vendor": "custom",
   "loggingId": "OA96",
   "iconGlyph": "wrench",
@@ -11,6 +11,11 @@
       "cbsDataServiceList": "rs",
       "cbsDataSBA": "rs",
       "_methods": ["requestCBSServiceHint"]
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": ["sendTasuRequest"],
+      "_broadcasts": ["sendTasuResponse"]
     }
   },
   "screens": [
@@ -21,12 +26,15 @@
       "buttons": [
         ["BTN_SELECT", "Next item"],
         ["BTN_DETAILS", "Details"],
+        ["BTN_RESET_PICK", "Choose reset"],
+        ["BTN_RESET_GO", "Confirm reset"],
         ["BTN_PAGE", "Next page"],
         ["BTN_SETTINGS", "Settings"]
       ]
     }
   ],
   "settings": [
+    {"key": "resetOn", "label": "Service reset (brake fluid, vehicle check)", "type": "bool", "default": false},
     {"key": "diagPage", "label": "Diagnostics page", "type": "bool", "default": false},
     {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
      "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
