@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "1.9.4",
+  "version": "2.0.0",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -20,7 +20,8 @@
       "ExteriorTemperature": "s"
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
-      "statusCarSpeed2": "rs"
+      "statusCarSpeed2": "rs",
+      "highVoltageStorageInfoToExternal": "s"
     },
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs"
@@ -33,6 +34,24 @@
       "statusACFront": "rs",
       "statusAirConditionDRStatus": "rs",
       "statusActualValuePowerACCompressor": "rs"
+    },
+    "de.bmw.infotainment.climate.Climate": {
+      "statusSeatHeatingDR": "rs",
+      "statusSeatHeatingPS": "rs",
+      "statusSeatHeatingDRR": "rs",
+      "statusSeatHeatingPSR": "rs"
+    },
+    "de.bmw.body.steeringwheelcomfort.SteeringWheelClimate": {
+      "heatingState": "rs"
+    },
+    "de.bmw.infotainment.KombiIF": {
+      "statusDisplayElectricalPowerDistribution": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.Efficiencytainment2": {
+      "statusBatteryTemperature": "rs"
+    },
+    "de.bmw.infotainment.lsc.LSCDataSink": {
+      "statusHighVoltageStorage": "s"
     }
   },
   "screens": [
@@ -444,6 +463,12 @@
       "chargeMinPct": 3
     },
     "scaling": {
+    "batteryTemp": {
+      "factor": 1,
+      "offset": -40,
+      "invalid": 255,
+      "comment": "HV battery temperature (Efficiencytainment2.statusBatteryTemperature, avg / min / max): raw on the Signals page - adjust if it doesn't match"
+    },
       "ambient": {
         "factor": 0.5,
         "offset": -40,
