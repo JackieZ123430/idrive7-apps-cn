@@ -108,7 +108,7 @@ More in [How apps draw](#44-how-apps-draw-remote-hmi-rhmi) and [`kit/renderd`](k
 </tr>
 <tr>
 <td><img src="docs/screens/service.png" alt="Service"><br><b>Service</b>: service requirements, next service, details per item</td>
-<td><img src="docs/screens/doom.png" alt="Doom"><br><b>Doom</b>: Freedoom in full resolution across the whole screen, on the iDrive controller, parked only, saves itself</td>
+<td><img src="docs/screens/doom.png" alt="Doom"><br><b>Doom</b>: Freedoom in full resolution across the whole screen, on the iDrive controller, saves itself</td>
 </tr>
 </table>
 
@@ -155,7 +155,7 @@ the unit and kept across reboots.
 | **Fault Scanner** | Scans every control unit for stored fault codes (UDS over the head unit's diagnostic gateway), shows them per module with status, shows live Check Control messages, and can clear fault memories (two-press confirm). Fault texts come from your car's own coding-tool export (`kit/tools/dtc_texts.py`), a few hand-written ones, and, if you import one, a fault text database for every control unit (`kit/tools/dtc_texts.py --db`): units with faults are then asked their SGBD index (UDS 22 F1 50), which picks their texts and their name. Only English texts are imported (one with German in it is left out, and that fault shows no text). A fault code list (CSV, `kit/tools/dtc_texts.py --codes`) fills in faults that still have none, for the units its texts belong to. Fault text tables (the `dtc_scanner_*.json` files, `kit/tools/dtc_tables.py`, after `--db`) add a text for each unit type and each address. The build packs the whole database into one compressed file (`dtc_db.pack`: about 19 MB of texts in 3.7 MB, `kit/tools/pack_data.py`), and the app only unpacks the few KB that hold the codes it shows. The repository ships the fault text tables already packed (`apps/dtc_scanner/dtc_db.pack`: the tables and the SGBD index, used with permission); a local `dtc_db/` folder you import replaces it. Imported databases and car exports stay out of git. |
 | **eDrive** | For plug-in hybrids / EVs: real electric range that adapts to how your car is driven: the charge above the point where the engine starts, divided by what the car uses per km for driving (learned from electric-only driving, last ~60 km) plus what climate control and the on-board electrics draw per hour (heating when cold, A/C when hot, learned per outside-temperature band while standing or creeping with the engine off). Driving is learned per speed band (under 35, 35-60, 60-85, 85-110, over 110 km/h) and the range uses your current pace, so motorway driving shows less range than town. The climate's draw is also learned while driving (what it uses above the same speed with the climate off), seat and steering-wheel heating are counted from their levels, and an Energy page shows use per speed band, where the power goes now (driving, climate, seats, wheel, on-board, with the km each costs), the car's own power distribution figures and the HV battery temperature (also on the Range page). The climate draw costs range by the hour, so it costs more of it in slow traffic; the screen shows it in kW and the km it costs. Whether climate control is on comes from the car itself (ClimateMaster `statusClimateSystemOn`): switched off, only the on-board electrics (learned separately, typically 0.3 kW) are taken off and the range goes up; switched on, it goes down again (shown as CLIMATE ON / CLIMATE OFF, with A/C when the A/C button is on). Until it has learned, the range comes from the outside temperature (a full battery gives 50 km at 20 °C, 40-45 km at 10 °C, 30-38 km at 0 °C, 20-30 km at -10 °C, scaled to your own 20 °C range), shown with its low-high spread, battery health (SOH: how much a full charge holds compared to new, in % and kWh) and the energy in the battery now (kWh; the battery size when new is a setting, e.g. 12 kWh for a 330e / 530e, 24 kWh for an X5 45e). Also shows the last HV battery charge (+%, kWh, km added; a charge done while the head unit slept shows at the next start) and the 12 V battery voltage. A charge log page lists every charge (date, % and kWh added, range added, cost from your electricity price, 0.25 €/kWh by default) with monthly / all-time totals and a 14-day chart. On a car without a hybrid system it detects that the battery unit never answers and shows only the 12 V battery (or set Hybrid system = No). Charge and SOH are read from the battery control unit over UDS; a Diagnostics page shows the raw replies so the DIDs can be adjusted per model in `app.json`. |
 | **Service** | The car's service requirements (BMW Condition Based Service) as the iDrive's own *Vehicle status > Service requirements* shows them: engine oil, brakes, brake fluid, vehicle check, inspection and the rest, each with the distance and date the car gives (in its own language and units), coloured green / yellow / red, a summary of the next service, and the item's service hint text as details. Read from the instrument cluster (`KombiInterface_2`). Read-only: these cars offer the head unit no service reset (that is done in the cluster's own menu or by a workshop). |
-| **Doom** | Freedoom: Phase 1 (four episodes, free game data) running in the head unit as WebAssembly. The engine draws the 3D view in full resolution across the whole screen (1920 x 504, Doom's vertical field of view widened to the screen), with the status bar, menus and messages on top at 4:3; 35 fps on the VM. A main menu (Play / Continue, New game, all settings) comes first; the game then has the screen to itself with no header or button bar, and BACK returns to the menu. **Turn the controller to aim, push it to walk and sidestep, press to fire and open doors, press twice for the next weapon.** While you play, the game has the controller to itself: the HMI ignores the knob, press and tilt, so pushing forward no longer opens the HMI's pull-down menu and pushing left no longer leaves the game. BACK, MENU and the touchscreen always work. This uses the controller gate that `deploy-car.sh` loads into the HMI (see [5.1](#51-what-deploy-carsh-install-does)). Without the gate, the game reads the controller signal itself and the HMI reacts to it too. Parked only: it pauses while the car moves, when you leave the screen or a popup / call covers it, and saves itself each time, so it carries on where you stopped. Settings, in the main menu: difficulty, episode, move speed (slow walk by default, walk, run), aim speed and direction, render resolution (full / medium / low). GPL-2.0, see [Doom licences](#doom-licences). |
+| **Doom** | Freedoom: Phase 1 (four episodes, free game data) running in the head unit as WebAssembly. The engine draws the 3D view in full resolution across the whole screen (1920 x 504, Doom's vertical field of view widened to the screen), with the status bar, menus and messages on top at 4:3; 35 fps on the VM. A main menu (Play / Continue, New game, all settings) comes first; the game then has the screen to itself with no header or button bar, and BACK returns to the menu. **Turn the controller to aim, push it to walk and sidestep, press to fire and open doors, press twice for the next weapon.** While you play, the game has the controller to itself: the HMI ignores the knob, press and tilt, so pushing forward no longer opens the HMI's pull-down menu and pushing left no longer leaves the game. BACK, MENU and the touchscreen always work. This uses the controller gate that `deploy-car.sh` loads into the HMI (see [5.1](#51-what-deploy-carsh-install-does)). Without the gate, the game reads the controller signal itself and the HMI reacts to it too. It pauses when you leave the screen or a popup / call covers it, and saves itself each time, so it carries on where you stopped. Settings, in the main menu: difficulty, episode, move speed (slow walk by default, walk, run), aim speed and direction, render resolution (full / medium / low). GPL-2.0, see [Doom licences](#doom-licences). |
 
 On the VM or a bench unit without vehicle data, every app switches to a built-in demo drive
 after 5 seconds (launch, pull through the gears, a hard stop, corners, an engine warming up from
@@ -326,11 +326,13 @@ four differences:
    little longer. Nothing to do on your side.
 3. **It needs the GPU renderer for the full screen.** The kit installs `mgu-renderd` anyway. If
    it isn't running, Doom falls back to a smaller picture inside the normal app area.
-4. **The HMI restarts once more during install, for the controller gate.** `deploy-car.sh install`
-   loads `mgu-inputgate.so` into the HMI, so the game can have the controller to itself (see
-   [5.1](#51-what-deploy-carsh-install-does)). The screen goes dark for a few seconds. If the HMI
-   doesn't come back healthy with it, the installer takes it out again by itself. Don't want it?
-   Install with `NO_INPUTGATE=1 sh deploy-car.sh install`. Doom then still works, but the HMI also
+4. **The head unit reboots once at the end of the install, for the controller gate.**
+   `deploy-car.sh install` sets up `mgu-inputgate.so` to load into the HMI, so the game can have
+   the controller to itself (see [5.1](#51-what-deploy-carsh-install-does)). It loads when the
+   head unit starts, so the install ends with a reboot: the screen goes black for about a minute,
+   then everything comes back by itself and Doom is ready. If the HMI fails to come up with it,
+   it is left out by itself. Rather reboot later? `NO_REBOOT=1 sh deploy-car.sh install`: it then
+   loads at your next drive. Don't want it at all? `NO_INPUTGATE=1 sh deploy-car.sh install`. Doom then still works, but the HMI also
    reacts to the controller (pushing forward opens its pull-down menu).
 
 ```sh
@@ -340,8 +342,7 @@ HU=root@<unit-ip> PORT=22 KEY=~/.ssh/id_mgu deploy/push-to-car.sh install
 ```
 
 On the car: **Apps → Doom** opens the main menu (Play / Continue, New game, settings). Starting
-it the first time takes a few seconds while the head unit compiles the engine. The game runs
-only while parked. Saves stay in the app's data folder, so they survive reinstalls of the same
+it the first time takes a few seconds while the head unit compiles the engine. Saves stay in the app's data folder, so they survive reinstalls of the same
 app, but not `restore`.
 
 ### 3.5 Back to stock
@@ -542,16 +543,25 @@ the internet.
 5. **Installs the GPU renderer** `mgu-renderd` (kit/renderd) as a systemd service that starts
    with the app platform. It runs as a throwaway user with only the compositor, GPU and app
    groups. If it can't be installed the apps still work, drawn in software.
-6. **Loads the controller gate** `mgu-inputgate.so` into the HMI with a systemd drop-in for
-   `hmi.service` (other preloads are kept), and restarts the HMI once. While a full-screen app asks
+6. **Sets up the controller gate** `mgu-inputgate.so` to load into the HMI (a systemd drop-in for
+   `hmi.service`; other preloads are kept). While a full-screen app asks
    for the controller (Doom while you play), the HMI gets the knob, press and tilt as "untouched",
    and the app gets the real events through the renderer. The buttons (BACK, MENU, ...) and the
    touchscreen are never held back. It holds only while the renderer keeps a marker file
    (`/run/mgu-renderd/inputgate`) fresh for an app that is on screen and asking. App closed or
-   crashed, popup, renderer gone: the HMI has the controller back within 0.7 s. If the HMI doesn't
-   come back healthy after the restart, the drop-in is removed again by itself.
-   `NO_INPUTGATE=1` skips this step.
+   crashed, popup, renderer gone: the HMI has the controller back within 0.7 s.
+   The HMI is never restarted for it: it stops with SIGABRT, and the head unit answers an aborted
+   HMI by rebooting the whole unit. So the gate loads at the next start, through a small guard
+   (`mgu-inputgate-guard.service`) that runs just before the HMI. If the HMI didn't come up healthy
+   with the gate twice in a row (`mgu-inputgate-check.service` confirms it 2 minutes after each
+   start), the guard leaves it out by itself; installing again gives it a fresh try.
+   (Both stay active for good: the head unit reboots when any service stops.)
+   `sh deploy-car.sh status` shows `controller gate: loaded`, `set up, loads the next time the
+   head unit starts` or `left out by the boot guard`. `NO_INPUTGATE=1` skips this step.
 7. **Restarts the app platform** once. The HMI reloads the Apps list in about 1-2 minutes.
+   If the controller gate was just set up, the head unit **reboots** instead, 10 s after the
+   install is done: that loads the gate and restarts everything else too. `NO_REBOOT=1` skips the
+   reboot (the gate then loads at the next drive).
 
 Files it touches:
 
@@ -565,6 +575,8 @@ Files it touches:
 /var/opt/mgu-renderd/                                    (new) the GPU renderer
 /etc/systemd/system/mgu-renderd.service                  (new) its service (+ oapcontroller.service.wants link)
 /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf  (new) loads the controller gate into the HMI
+/etc/systemd/system/mgu-inputgate-guard.service          (new) decides at each start whether it loads
+/etc/systemd/system/mgu-inputgate-check.service          (new) confirms the HMI is healthy with it
 ```
 
 ### 5.2 The provisioning hook

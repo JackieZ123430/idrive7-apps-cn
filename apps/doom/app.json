@@ -1,8 +1,8 @@
 {
   "id": "doom",
   "title": "Doom",
-  "description": "Doom (Freedoom: Phase 1) on the iDrive - parked only. Main menu with all settings; the game drawn in full resolution across the whole screen, on the controller; BACK returns to the menu and saves",
-  "version": "1.4.0",
+  "description": "Doom (Freedoom: Phase 1) on the iDrive. Main menu with all settings; the game drawn in full resolution across the whole screen, on the controller; BACK returns to the menu and saves",
+  "version": "1.4.1",
   "vendor": "custom",
   "loggingId": "OA9F",
   "iconGlyph": "doom",

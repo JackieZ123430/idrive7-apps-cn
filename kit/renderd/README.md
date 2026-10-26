@@ -98,10 +98,20 @@ touches it every 0.2 s while an app that is shown and not hung has sent `GRAB 1`
 crashing, the renderer stopping, a clock jump backwards) opens it.
 
 ```sh
-sh mgu-app-install.sh inputgate --persist   # copy next to the renderer, drop-in, restart the HMI (undoes itself if the HMI isn't healthy after)
-sh mgu-app-install.sh inputgate             # same, gone after a reboot (/run drop-in)
-sh mgu-app-install.sh inputgate-remove      # restarts the HMI without it
+sh mgu-app-install.sh inputgate             # copy next to the renderer + boot guard: loads at the next head-unit start
+sh mgu-app-install.sh inputgate --now       # VM / bench only: restart the HMI with it now (on a car that reboots the unit)
+sh mgu-app-install.sh inputgate-status      # loaded / set up / left out by the boot guard
+sh mgu-app-install.sh inputgate-remove      # take it out (the HMI drops it at the next start; --now: restart it)
 ```
+
+The HMI is never restarted on a car: `hmi.service` stops with SIGABRT and the head unit's crash
+monitor reboots the whole unit for an aborted HMI. The guard (`mgu-inputgate-guard.service`,
+before the HMI) copies the preload line to `/run/mgu-inputgate.env`, which the drop-in reads
+with `EnvironmentFile=`, and counts the start; `mgu-inputgate-check.service` resets the count once
+the HMI has run with the gate for a minute (checked 2 minutes after the start). Two starts in a
+row without that: the guard leaves the gate out until it is installed again. Neither unit ever goes inactive
+(the guard has `RemainAfterExit=yes`, the check keeps running after it is done): on this firmware
+the lifecycle manager reboots the head unit when a service stops, not only when the HMI does.
 
 `inputgate/vsomeip-include/` holds the vsomeip 3.1 compat interface headers it is compiled
 against (MPL-2.0, as in their file headers).

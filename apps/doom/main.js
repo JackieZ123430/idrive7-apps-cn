@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Doom - Freedoom: Phase 1 on the iDrive, for when you're parked.
+ * Doom - Freedoom: Phase 1 on the iDrive.
  *
  * The game is doomgeneric (GPL-2, see LICENSE / NOTICE in this folder) compiled to WebAssembly
  * (doom.wasm, built by third_party/doomgeneric/build.sh) and run here at 35 tics a second
@@ -17,8 +17,8 @@
  * Controls (controls.js): turn the controller to aim, push it to walk / sidestep, press to fire
  * and open doors, press twice for the next weapon.
  *
- * The game runs only while GAME is on screen and the car is parked; whenever it stops (BACK,
- * MENU, a popup or call, driving off, the app closing) it saves, and Play carries on from there.
+ * The game runs only while GAME is on screen; whenever it stops (BACK, MENU, a popup or call,
+ * the app closing) it saves, and Play carries on from there.
  */
 const path = require('path');
 const mgu = require('./kit/mgu');
@@ -28,24 +28,11 @@ const { Controls } = require('./controls');
 
 const W = 1600, H = 520, IMG = 1, VIEW = 2, SIDE = 3, SLOT = 0;
 const DETAIL = { full: [1920, 504], medium: [1440, 378], low: [960, 252] };
-const MAX_KMH = 3;
 const SKILLS = ['', 'Too young to die', 'Not too rough', 'Hurt me plenty', 'Ultra-Violence', 'Nightmare!'];
 
 mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
-
-        /* ---------- parked only ---------- */
-        // only a real speed counts: the VM / a bench sends none or "invalid" (65535) -> playable.
-        // A real speed that then goes quiet for 5 s counts as moving (safe side).
-        let speed = null, validT = 0;
-        ctx.signals.watch('de.bmw.infotainment.vehicle.Vehicle2', '1', {
-            statusCarSpeed2: (v) => {
-                const k = v && v.speedVehicleCentreOfGravity;
-                if (typeof k === 'number' && k !== 65535) { speed = k * 0.015625; validT = Date.now(); }
-            },
-        }, log).then((s) => log.info('speed ' + (s.error ? 'error: ' + s.error : 'subscribed')));
-        const moving = () => speed !== null && (Date.now() - validT > 5000 || speed > MAX_KMH);
 
         /* ---------- the game ---------- */
         const skill = () => Number(settings.get('skill')) || 3;
@@ -98,7 +85,6 @@ mgu.run({
             const st = (started && !err && game.state()) || {};
             let info;
             if (err) info = 'Doom stopped: ' + (err.message || err);
-            else if (moving()) info = 'Parked only - the game waits while you drive';
             else if (st.gamestate === GS.LEVEL && (saved || frames)) {
                 const lvl = 'E' + Math.floor(st.level / 10) + 'M' + (st.level % 10);
                 info = (saved ? 'Saved game: ' : 'Game: ') + lvl + ', health ' + st.health + ' %';
@@ -140,11 +126,11 @@ mgu.run({
             ui.onClick(b, () => ctl.barClick(b));
         });
 
-        /* ---------- run while the game screen is up and the car is parked; save when it stops ---------- */
+        /* ---------- run while the game screen is up; save when it stops ---------- */
         const shown = () => ui.isVisible('GAME') && (!ui.hasFocus || ui.hasFocus('GAME'));
         let going = false;
         function sync() {
-            const go = started && !err && !moving() && shown();
+            const go = started && !err && shown();
             if (go !== going) {
                 going = go;
                 // the controller to the game alone while it runs (the HMI's pull-down / back on
@@ -179,7 +165,7 @@ mgu.run({
         function render() {
             const cv = ctx.canvas(W, H).clear('#000000');
             const pl = cv.place;
-            const stop = err ? 'Doom stopped' : moving() ? 'Parked only - the game waits while you drive' : !frames ? 'Loading...' : null;
+            const stop = err ? 'Doom stopped' : !frames ? 'Loading...' : null;
             if (pl && pl.full) {
                 // screen pixels: the whole display is ours (1920 x 720)
                 if (!sr || sr.w !== pl.w || sr.h !== pl.h) sr = new Recorder(pl.w, pl.h);

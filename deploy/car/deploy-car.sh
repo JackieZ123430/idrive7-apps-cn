@@ -15,6 +15,9 @@
 #                                  persistent across reboots
 #                               3. installs/updates every apps/*.mgu
 #                               4. restarts the app platform once and verifies
+#                               5. reboots the head unit if the controller gate
+#                                  (Doom) was just set up: it loads at start
+#                                  (NO_REBOOT=1: not now, at the next drive)
 #   sh deploy-car.sh restore    puts every touched file back exactly as it was
 #                               before the FIRST install (the "stock" backup),
 #                               removes the installed apps and the hook.
@@ -32,8 +35,10 @@
 #   /etc/systemd/system/mgu-renderd.service                  (new) its unit, started with
 #   /etc/systemd/system/oapcontroller.service.wants/mgu-renderd.service   oapcontroller
 #   /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf  (new) loads the controller gate
-#                               (/var/opt/mgu-renderd/mgu-inputgate.so) into the HMI, so Doom can
-#                               have the iDrive controller (NO_INPUTGATE=1: skip it)
+#   /etc/systemd/system/mgu-inputgate-{guard,check}.service  (new) (/var/opt/mgu-renderd/
+#                               mgu-inputgate.so) into the HMI from the next head-unit start, so
+#                               Doom can have the iDrive controller; the guard leaves it out if the
+#                               HMI fails to come up with it twice (NO_INPUTGATE=1: skip it)
 # MainApp's own /usr/lib/oap-mainapp/src/main.js is never written: the patched
 # copy is bind-mounted over it at boot, and only while that file is unchanged
 # (after a firmware update the hook switches itself off).
@@ -54,6 +59,7 @@ PATCH_DIR=$OAP/_mgu_custom
 NODE=${NODE:-/usr/bin/node}
 BK_LOCAL=$SELF_DIR/backups
 BK_UNIT=/var/opt/public/mgu_custom_backup
+REBOOT=0
 APP_UID_MIN=12203      # MainApp's app uid range starts here (ours are told apart below)
 LOG=$SELF_DIR/deploy-car.log
 
@@ -66,7 +72,9 @@ etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf
 var/opt/mgu-renderd
 etc/systemd/system/mgu-renderd.service
 etc/systemd/system/oapcontroller.service.wants/mgu-renderd.service
-etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf"
+etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf
+etc/systemd/system/mgu-inputgate-guard.service
+etc/systemd/system/mgu-inputgate-check.service"
 
 say()  { echo "[deploy-car] $*"; echo "$(date '+%F %T') $*" >> "$LOG" 2>/dev/null; }
 warn() { say "WARNING: $*"; }
@@ -215,27 +223,44 @@ cmd_install() {
     if [ -f "$SELF_DIR/mgu-renderd" ]; then
         sh "$INSTALLER" renderd --persist || warn "GPU renderer not installed - apps use software rendering"
         # controller gate: full-screen apps (Doom) get the iDrive controller to themselves.
-        # Restarts the HMI once; takes itself out again if the HMI doesn't come back healthy.
+        # Loads the next time the head unit starts (an HMI restart reboots a car's head unit).
         if [ -f "$SELF_DIR/mgu-inputgate.so" ] && [ "${NO_INPUTGATE:-0}" != 1 ]; then
             sh "$INSTALLER" inputgate --persist || warn "controller gate not installed - Doom works, but the HMI also reacts to the controller"
+            # it loads when the head unit starts: reboot at the end (NO_REBOOT=1: at the next drive)
+            sh "$INSTALLER" inputgate-status | grep -q "loads the next time" && REBOOT=1
         fi
     fi
     # WITH_HMI=1: the HMI as well, in the same go - one restart that also drops the old screens and
     # tiles the HMI keeps in memory (instead of the app platform now and the HMI separately later)
-    if [ "${WITH_HMI:-0}" = 1 ]; then
+    if [ "$REBOOT" = 1 ] && [ "${NO_REBOOT:-0}" != 1 ]; then
+        say "(the head unit reboots at the end - that restarts the app platform and the HMI too)"
+    elif [ "${WITH_HMI:-0}" = 1 ]; then
         say "restarting the HMI and the app platform (screen goes black, ~1-2 min)"
         systemctl restart hmi.service || warn "HMI restart failed - the old screens go at the next reboot"
         sleep 5
     else
         say "restarting the app platform (screen reloads, ~1-2 min)"
     fi
-    systemctl restart oapcontroller.service
-    sleep 5
-    systemctl is-active oapcontroller.service >/dev/null 2>&1 || warn "oapcontroller not active after restart"
+    if [ "$REBOOT" != 1 ] || [ "${NO_REBOOT:-0}" = 1 ]; then
+        systemctl restart oapcontroller.service
+        sleep 5
+        systemctl is-active oapcontroller.service >/dev/null 2>&1 || warn "oapcontroller not active after restart"
+    fi
     grep -q " $MAINJS " /proc/mounts && say "hook active" || warn "hook NOT active"
     [ -f "$DROPIN" ] && say "hook persistent ($DROPIN)" || warn "drop-in missing - hook won't survive a reboot"
     sh "$INSTALLER" list
     say "done. Undo everything with: sh $0 restore"
+    if [ "$REBOOT" = 1 ]; then
+        if [ "${NO_REBOOT:-0}" = 1 ]; then
+            say "NO_REBOOT=1: the controller gate loads the next time the head unit starts"
+        else
+            # an HMI restart alone would reboot the unit anyway (its crash monitor), so do it cleanly
+            say "rebooting the head unit in 10 s to load the controller gate (screen black ~1 min, then"
+            say "everything comes back by itself; check afterwards with: sh $0 status)"
+            sleep 10; sync
+            systemctl reboot || reboot
+        fi
+    fi
 }
 
 cmd_restore() {
@@ -323,13 +348,14 @@ cmd_restore() {
         rmdir /etc/systemd/system/oapcontroller.service.wants 2>/dev/null
     fi
     rm -f /run/systemd/system/mgu-renderd.service
-    # the controller gate's HMI drop-in (older backups don't list it); the HMI restart below drops it
-    if [ -e /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf ]; then
+    # the controller gate's units (older backups don't list them); the HMI restart below drops it
+    if [ -e /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf ] || [ -e /etc/systemd/system/mgu-inputgate-guard.service ] || [ -e /etc/systemd/system/mgu-inputgate-check.service ]; then
         rootfs_rw || die "cannot remount / rw"
-        rm -f /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf; rmdir /etc/systemd/system/hmi.service.d 2>/dev/null
+        rm -f /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf /etc/systemd/system/mgu-inputgate-guard.service /etc/systemd/system/mgu-inputgate-check.service
+        rmdir /etc/systemd/system/hmi.service.d 2>/dev/null
         say "  removed the controller gate"
     fi
-    rm -f /run/systemd/system/hmi.service.d/zz-mgu-inputgate.conf
+    rm -f /run/systemd/system/hmi.service.d/zz-mgu-inputgate.conf /run/mgu-inputgate.env
     systemctl daemon-reload
     rootfs_ro
     [ "$(md5sum "$MAINJS" | cut -d' ' -f1)" = "$(cat "$B/mainjs.md5")" ] || warn "MainApp main.js differs from backup time (firmware update?)"
@@ -347,8 +373,7 @@ cmd_status() {
     grep -q " $MAINJS " /proc/mounts && echo "hook: active" || echo "hook: off"
     [ -f "$DROPIN" ] && echo "hook: persistent" || echo "hook: not persistent"
     echo "renderer: $(systemctl is-active mgu-renderd.service 2>/dev/null)$([ -f /etc/systemd/system/mgu-renderd.service ] && echo ', persistent')"
-    p=$(pidof HmiMain3D 2>/dev/null | cut -d' ' -f1)
-    echo "controller gate: $([ -n "$p" ] && grep -q mgu-inputgate "/proc/$p/maps" 2>/dev/null && echo loaded || echo 'not loaded')$([ -f /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf ] && echo ', persistent')"
+    [ -f "$INSTALLER" ] && sh "$INSTALLER" inputgate-status
     [ -f "$INSTALLER" ] && sh "$INSTALLER" list
     b=$(find_backup stock) && echo "stock backup: $b" || echo "stock backup: none"
 }
