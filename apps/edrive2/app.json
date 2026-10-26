@@ -2,7 +2,7 @@
   "id": "edrive2",
   "title": "eDrive Live",
   "description": "Live HV battery power (kW), cell temperatures and voltages, power limits and climate / HVAC power use - set up for the X5 xDrive45e (G05 PHEV)",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "vendor": "custom",
   "loggingId": "OA9D",
   "iconGlyph": "battery",
@@ -104,6 +104,8 @@
           {"did": "DDBC", "fields": {"pct": {"bytes": 2, "factor": 0.1, "min": 0, "max": 100}}}
         ],
         "cellV": [
+          {"did": "DFA5", "array": {"bytes": 2, "factor": 0.001, "min": 2.5, "max": 4.4},
+           "note": "every cell's voltage, 2 bytes each (96 on the X5 45e): found with the Scan page"},
           {"did": "DDBF", "fields": {"min": {"at": 0, "bytes": 2, "factor": 0.001, "min": 2.5, "max": 4.4},
                                      "max": {"at": 2, "bytes": 2, "factor": 0.001, "min": 2.5, "max": 4.4}}}
         ],

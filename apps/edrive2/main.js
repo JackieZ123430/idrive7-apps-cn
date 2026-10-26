@@ -42,6 +42,14 @@ const BLOWER_KW = [0.03, 0.32];         // blower: about [0] + [1] x (level / to
 const BASELINE_KW = 0.35;               // on-board electrics while parked, until learned
 const STAND_MS = 10000;                 // standing this long before the draw counts as "standing"
 
+/** Demo: 96 cells a few mV apart, two of them a little weak. */
+function demoCells(s) {
+    const cells = [];
+    for (let i = 0; i < 96; i++) cells.push(3.722 + 0.004 * Math.sin(i * 1.7) + 0.003 * Math.cos(i * 0.31 + s / 60) - (i === 37 ? 0.016 : i === 70 ? 0.009 : 0));
+    const min = Math.min(...cells), max = Math.max(...cells);
+    return { cells, min, max, avg: cells.reduce((a, v) => a + v, 0) / 96, minAt: cells.indexOf(min) + 1, maxAt: cells.indexOf(max) + 1 };
+}
+
 /** Demo: a drive with a stop every 40 s; climate on with the A/C. */
 class Demo {
     constructor() { this.t0 = Date.now() - 600000; }      // ten minutes in: the traces have a history
@@ -53,7 +61,7 @@ class Demo {
         const v = 352 - kw * 0.12;
         return {
             kw, v, a: -kw * 1000 / v, speed: standing ? 0 : 55 + 20 * Math.sin(s / 9), engine: false,
-            soc: 64 - (s / 60) % 30, cellV: { min: 3.712, max: 3.731 }, cellT: { min: 21.4 + 2.5 * Math.sin(s / 500), max: 23.9 + 2.8 * Math.sin(s / 500), avg: 22.5 + 2.6 * Math.sin(s / 500) },
+            soc: 64 - (s / 60) % 30, cellV: demoCells(s), cellT: { min: 21.4 + 2.5 * Math.sin(s / 500), max: 23.9 + 2.8 * Math.sin(s / 500), avg: 22.5 + 2.6 * Math.sin(s / 500) },
             coolant: 20.8 + 2 * Math.sin(s / 520),
             limits: { chargeA: 165, dischargeA: 330 }, ambient: 29, climate: 'ac', blower: 4, blowerTop: 8,
             acKw: 1.15 + 0.2 * Math.sin(s / 7), seats: { DR: 1 }, wheel: false,
@@ -182,14 +190,31 @@ mgu.run({
         diag.init();
         const reader = new DidReader(diag, { ecu: cfg.ecu });
         const pick = {};
-        const fieldsOf = (c) => Object.keys(c.fields || {});
-        const primary = (c) => Object.assign({ ecu: c.ecu, did: c.did }, c.fields[fieldsOf(c)[0]]);
+        const fieldsOf = (c) => (c.array ? ['min', 'max', 'avg'] : Object.keys(c.fields || {}));
+        const primary = (c) => Object.assign({ ecu: c.ecu, did: c.did }, c.array || c.fields[fieldsOf(c)[0]]);
         /** One candidate: { field: value } (a field outside its min..max is null), or null when it doesn't answer. */
         async function readFields(c) {
             const p = primary(c), v0 = await reader.read(p);
             if (v0 === null) return null;
             const r = reader.raws[reader.key(p)], bytes = r.bytes.split(' ').map((x) => parseInt(x, 16));
             const out = {};
+            if (c.array) {
+                // every value in the reply (one per cell): the ones outside min..max count as missing
+                const f = c.array, n = f.bytes || 1, cells = [];
+                for (let at = 3; at + n <= bytes.length; at += n) {
+                    let raw = 0;
+                    for (let j = 0; j < n; j++) raw = raw * 256 + bytes[at + j];
+                    const v = raw * (f.factor == null ? 1 : f.factor) + (f.offset || 0);
+                    cells.push((f.min != null && v < f.min) || (f.max != null && v > f.max) ? null : v);
+                }
+                const ok = cells.filter(G.isNum);
+                if (ok.length < cells.length / 2) return null;
+                out.cells = cells;
+                out.min = Math.min(...ok); out.max = Math.max(...ok); out.avg = ok.reduce((a, v) => a + v, 0) / ok.length;
+                out.minAt = cells.indexOf(out.min) + 1; out.maxAt = cells.indexOf(out.max) + 1;
+                r.fields = { cells: ok.length, min: out.min, max: out.max };
+                return out;
+            }
             fieldsOf(c).forEach((k, i) => {
                 if (i === 0) { out[k] = v0; return; }
                 const f = c.fields[k], at = 3 + (f.at || 0), n = f.bytes || 1;
@@ -426,8 +451,8 @@ mgu.run({
         }
 
         /* ---------- pages ---------- */
-        const pages = () => ['power', 'battery', 'climate'].concat(settings.get('diagPage') ? ['diag', 'scan', 'signals'] : []);
-        const NAMES = { power: 'Power', battery: 'Battery', climate: 'Climate', diag: 'Diagnostics', scan: 'Scan', signals: 'Signals' };
+        const pages = () => ['power', 'battery', 'cells', 'climate'].concat(settings.get('diagPage') ? ['diag', 'scan', 'signals'] : []);
+        const NAMES = { power: 'Power', battery: 'Battery', cells: 'Cells', climate: 'Climate', diag: 'Diagnostics', scan: 'Scan', signals: 'Signals' };
         let page = 0;
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; return render(); });
         ui.onClick('BTN_PREV', () => { const n = pages().length; page = (page + n - 1) % n; return render(); });
@@ -439,7 +464,7 @@ mgu.run({
         /** Centre-zero power bar: regen / charge to the left, drive to the right, scaled to the limits. */
         function powerBar(cv, t, x, y, w, kw, lim) {
             const outMax = Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'));
-            const inMax = Math.max(10, lim && G.isNum(lim.in) ? lim.in : settings.get('gaugeKw') * 0.5);
+            const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
             const span = outMax + inMax, x0 = x + w * inMax / span, h = 30;
             const X = (v) => x0 + G.clamp(v, -inMax, outMax) / span * w;
             cv.roundRect(x, y, w, h, 6, withAlpha(t.track, 0.9));
@@ -453,7 +478,8 @@ mgu.run({
             for (let v = -Math.floor(inMax / 20) * 20; v <= outMax; v += 20) if (v) cv.fillRect(Math.round(X(v)), y + h + 2, 2, 8, t.tick);
             cv.text('0', x0, y + h + 30, 18, t.dim, { align: 'center', font: 'bold' });
             const lbl = (v) => G.fmt(v, 0) + ' kW';
-            cv.text((lim && G.isNum(lim.in) ? 'REGEN MAX ' : '') + '-' + lbl(inMax), x, y + h + 30, 18, lim && G.isNum(lim.in) ? GO : t.dim, { font: 'bold' });
+            const inLim = lim && G.isNum(lim.in) && lim.in >= 15;
+            cv.text((inLim ? 'REGEN MAX ' : '') + '-' + lbl(inMax), x, y + h + 30, 18, inLim ? GO : t.dim, { font: 'bold' });
             cv.text((lim && G.isNum(lim.out) ? 'BATTERY MAX ' : '') + lbl(outMax), x + w, y + h + 30, 18, t.dim, { font: 'bold', align: 'right' });
         }
 
@@ -526,6 +552,45 @@ mgu.run({
         /** Cell temperature colours: cold packs give less power and regen, hot ones get limited. */
         const tempColor = (t, c) => (!G.isNum(c) ? t.dim : c < 5 ? t.cold : c > 45 ? t.crit : c > 38 ? t.warn : t.text);
 
+        /** Every cell's voltage: the lowest and highest marked, scaled to the spread. */
+        function renderCells(cv, t, d) {
+            const cv0 = d.cellV, cells = cv0 && cv0.cells;
+            G.panel(cv, t, 24, 44, 1552, 468, 'Cell voltages' + (cells ? '  (' + cells.length + ' cells)' : ''));
+            if (!cells) {
+                cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', 800, 290, 26, t.dim, { align: 'center' });
+                return;
+            }
+            const spread = (cv0.max - cv0.min) * 1000, scol = spread > 100 ? t.crit : spread > 50 ? t.warn : GO;
+            const head = (x, label, v, c, sub) => {
+                cv.text(label, x, 104, 18, t.dim, { font: 'bold', spacing: 1.2 });
+                cv.text(v, x, 146, 36, c, { font: 'bold' });
+                if (sub) cv.text(sub, x, 172, 18, t.dim);
+            };
+            head(48, 'LOWEST', G.fmt(cv0.min, 3) + ' V', t.warn, 'cell ' + cv0.minAt);
+            head(330, 'HIGHEST', G.fmt(cv0.max, 3) + ' V', t.accent2 || t.text, 'cell ' + cv0.maxAt);
+            head(612, 'AVERAGE', G.fmt(cv0.avg, 3) + ' V', t.text, G.isNum(d.v) ? 'pack ' + G.fmt(d.v, 1) + ' V' : '');
+            head(894, 'SPREAD', G.fmt(spread, 0) + ' mV', scol, spread > 100 ? 'out of balance' : spread > 50 ? 'a bit high (normal under load)' : 'well balanced');
+            cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 1) + ' %' : '', 1552, 146, 36, t.text, { font: 'bold', align: 'right' });
+            cv.text('CHARGE', 1552, 104, 18, t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
+            // bars: from a floor below the lowest cell, so the differences show
+            const x0 = 96, w = 1456, top = 200, base = 456, n = cells.length, bw = w / n;
+            const pad = Math.max(0.005, (cv0.max - cv0.min) * 0.6), lo = cv0.min - pad, hi = cv0.max + pad * 0.4;
+            const Y = (v) => base - (v - lo) / (hi - lo) * (base - top);
+            [lo, (lo + hi) / 2, hi].forEach((v) => {
+                cv.fillRect(x0, Math.round(Y(v)), w, 1, withAlpha(t.tick, 0.35));
+                cv.text(G.fmt(v, 3), x0 - 8, Y(v) + 6, 16, t.dim, { align: 'right' });
+            });
+            cv.fillRect(x0, Math.round(Y(cv0.avg)), w, 1, withAlpha(t.text, 0.5));
+            cells.forEach((v, i) => {
+                if (!G.isNum(v)) return;
+                const c = i + 1 === cv0.minAt ? t.warn : i + 1 === cv0.maxAt ? (t.accent2 || t.text) : withAlpha(t.text, 0.7);
+                cv.fillRect(x0 + i * bw + 1, Y(v), Math.max(1, bw - 2), base - Y(v), c);
+            });
+            for (let i = 0; i < n; i += 12) cv.text(String(i + 1), x0 + i * bw + bw / 2, base + 24, 16, t.dim, { align: 'center' });
+            cv.text(String(n), x0 + (n - 1) * bw + bw / 2, base + 24, 16, t.dim, { align: 'center' });
+            cv.text('cell', x0 - 8, base + 24, 16, t.dim, { align: 'right' });
+        }
+
         function renderBattery(cv, t, d) {
             const ct = cellTemps(d);
             // ---- cell temperatures
@@ -566,8 +631,8 @@ mgu.run({
                 const ww = cv.text(G.isNum(v) ? G.fmt(v, 3) : '--', cx, 178, 52, G.isNum(v) ? t.text : t.dim, { font: 'num' });
                 cv.text('V', cx + 6 + ww, 178, 24, t.dim);
             };
-            cell(x + 24, 'LOWEST CELL', cvv && cvv.min);
-            cell(x + 280, 'HIGHEST CELL', cvv && cvv.max);
+            cell(x + 24, 'LOWEST CELL' + (cvv && cvv.minAt ? '  #' + cvv.minAt : ''), cvv && cvv.min);
+            cell(x + 280, 'HIGHEST CELL' + (cvv && cvv.maxAt ? '  #' + cvv.maxAt : ''), cvv && cvv.max);
             const spread = cvv && G.isNum(cvv.min) && G.isNum(cvv.max) ? (cvv.max - cvv.min) * 1000 : null;
             const scol = !G.isNum(spread) ? t.dim : spread > 100 ? t.crit : spread > 50 ? t.warn : GO;
             cv.text('SPREAD', x + w - 24, 120, 20, t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
@@ -730,7 +795,7 @@ mgu.run({
             const cv = ctx.canvas(W, H).clear(t.bg);
             const pg = pages();
             if (page >= pg.length) page = 0;
-            ({ power: renderPower, battery: renderBattery, climate: renderClimate, diag: renderDiag, scan: renderScan, signals: renderSignals })[pg[page]](cv, t, d);
+            ({ power: renderPower, battery: renderBattery, cells: renderCells, climate: renderClimate, diag: renderDiag, scan: renderScan, signals: renderSignals })[pg[page]](cv, t, d);
             G.frame(cv, t, pg.map((p) => NAMES[p]), page, [d.demo && { text: 'DEMO' }]);
             return ui.image('MAIN_GFX', cv);
         }
