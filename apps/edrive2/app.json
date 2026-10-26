@@ -2,7 +2,7 @@
   "id": "edrive2",
   "title": "eDrive Live",
   "description": "Live HV battery power (kW), cell temperatures and voltages, power limits and climate / HVAC power use - set up for the X5 xDrive45e (G05 PHEV)",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "vendor": "custom",
   "loggingId": "OA9D",
   "iconGlyph": "battery",
@@ -126,8 +126,8 @@
       }
     },
     "probes": [
-      {"name": "ac", "ecu": 120, "did": "D8D2", "at": 1, "bytes": 2, "note": "IHKA: 0 with the A/C off, 1000 on (X5 45e). Unit not known yet: add factor (kW per count) once known"},
-      {"name": "heater", "ecu": 120, "did": "D8D3", "at": 1, "bytes": 2, "note": "IHKA: 0 with the heater off, 144 on HIGH (X5 45e). Unit not known yet"}
+      {"name": "ac", "ecu": 120, "did": "D8D2", "at": 1, "bytes": 2, "factor": 0.001, "note": "IHKA: A/C compressor power in W (X5 45e: 280-680 W on LO)"},
+      {"name": "heater", "ecu": 120, "did": "D8D3", "at": 1, "bytes": 2, "factor": 0.001, "note": "IHKA: HV heater power in W (X5 45e: 5520 W on HIGH, matched the battery measurement)"}
     ],
     "scanKnown": {
       "comment": "identifiers that answered a full scan on the X5 45e: the live comparison reads these when the unit has no saved scan",

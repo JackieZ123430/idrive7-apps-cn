@@ -65,6 +65,7 @@ class Demo {
             coolant: 20.8 + 2 * Math.sin(s / 520),
             limits: { chargeA: 165, dischargeA: 330 }, ambient: 29, climate: 'ac', blower: 4, blowerTop: 8,
             acKw: 1.15 + 0.2 * Math.sin(s / 7), seats: { DR: 1 }, wheel: false,
+            unit: { ac: 0.55 + 0.05 * Math.sin(s / 7), heater: 0 },
         };
     }
 }
@@ -509,14 +510,34 @@ mgu.run({
         let lastMeasured = null;
         /** The car's compressor power, when it really reports it (the X5 45e sends 0 with the A/C running). */
         const acReported = (d) => G.isNum(d.acKw) && (d.acKw > 0.05 || d.climate !== 'ac');
+        /** What the climate unit itself reports for its compressor and heater (kW), or null. */
+        function unitKw(d) {
+            if (d.demo) return d.unit || null;
+            const a = probeNow('ac'), h = probeNow('heater');
+            if ((!a || !G.isNum(a.kw)) && (!h || !G.isNum(h.kw))) return null;
+            return { ac: a && G.isNum(a.kw) ? a.kw : 0, heater: h && G.isNum(h.kw) ? h.kw : 0 };
+        }
+        /** The rest of the climate draw with the climate on (pumps, fans, the unit itself): learned while measuring. */
+        const otherKw = () => (G.isNum(st.otherKw) ? st.otherKw : 0.3);
         function climatePower(d, now) {
-            const c = comfortKw(d), est = (acReported(d) ? d.acKw : 0) + blowerKw(d) + c.seats + c.wheel;
+            const c = comfortKw(d), u = unitKw(d), on = d.climate !== false;
+            const est = u ? u.ac + u.heater + (on ? blowerKw(d) + otherKw() : 0) + c.seats + c.wheel
+                : (acReported(d) ? d.acKw : 0) + blowerKw(d) + c.seats + c.wheel;
             const draw = standingDraw(d, now);
             if (draw !== null) {
                 const kw = Math.max(0, draw - baseline());
-                if (!d.demo) lastMeasured = { kw, t: now, climate: d.climate, comfort: c.seats + c.wheel };
-                return { kw, how: 'measured', draw, est };
+                if (!d.demo) {
+                    lastMeasured = { kw, t: now, climate: d.climate, comfort: c.seats + c.wheel };
+                    // pumps / fans: what the measurement holds beyond the compressor, heater, blower and seats
+                    if (u && on) {
+                        const o = G.clamp(kw - u.ac - u.heater - blowerKw(d) - c.seats - c.wheel, 0, 1.5);
+                        st.otherKw = G.isNum(st.otherKw) ? st.otherKw + (o - st.otherKw) * 0.1 : o;
+                    }
+                }
+                return { kw, how: 'measured', draw, est, u };
             }
+            // driving: the climate unit's own figures when it has them
+            if (u) return { kw: est, how: 'climate unit', draw: null, est, u };
             if (d.climate === false && !c.seats && !c.wheel) return { kw: 0, how: 'estimated', draw: null, est };
             const lm = lastMeasured;
             if (lm && lm.climate === d.climate && now - lm.t < 30 * 60000) {
@@ -804,7 +825,15 @@ mgu.run({
             cv.text(state, 900, 80, 22, d.climate ? t.text : t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
             ['', 'NOW', 'KW'].forEach((h, i) => cv.text(h, [48, 560, 900][i], 120, 18, t.dim, { font: 'bold', spacing: 1.2, align: i === 2 ? 'right' : 'left' }));
             const seatTxt = Object.keys(d.seats || {}).filter((k) => d.seats[k]).map((k) => ({ DR: 'driver', PS: 'passenger', DRR: 'rear left', PSR: 'rear right' }[k] + ' ' + d.seats[k])).join(', ');
-            const rows = [
+            const u = cp.u || unitKw(d), on = d.climate !== false;
+            const rows = u ? [
+                ['A/C compressor', u.ac > 0.02 ? 'climate unit' : 'off', u.ac],
+                ['Heater', u.heater > 0.02 ? 'climate unit' : 'off', u.heater],
+                ['Blower', G.isNum(d.blower) ? (d.blower > 0 ? 'level ' + d.blower + ' (est.)' : 'off') : 'n/a', on ? blowerKw(d) : 0],
+                ['Seat & wheel heating', [seatTxt, d.wheel ? 'wheel' : ''].filter(Boolean).join(', ') || 'off', c.seats + c.wheel],
+                ['Pumps & fans', on ? (cp.how === 'measured' ? 'measured' : G.isNum(st.otherKw) ? 'learned' : 'typical') : 'off',
+                    on ? (cp.how === 'measured' ? Math.max(0, cp.kw - u.ac - u.heater - blowerKw(d) - c.seats - c.wheel) : otherKw()) : 0],
+            ] : [
                 acReported(d)
                     ? ['A/C compressor', d.acKw > 0.05 ? 'running (car\'s value)' : 'off', d.acKw]
                     : ['A/C & heater', cp.how === 'estimated' ? 'measured when standing' : cp.how === 'measured' ? 'measured' : 'last measured ' + Math.max(1, Math.round(cp.ago / 60000)) + ' min ago',
@@ -813,24 +842,26 @@ mgu.run({
                 ['Seat heating', seatTxt ? seatTxt + ' (est.)' : 'off', c.seats],
                 ['Steering wheel', d.wheel === null || d.wheel === undefined ? 'n/a' : d.wheel ? 'on (est.)' : 'off', c.wheel],
             ];
+            const step = rows.length > 4 ? 38 : 48;
             rows.forEach(([name, note, kw], i) => {
-                const y = 166 + i * 48;
-                if (i % 2 === 0) cv.roundRect(40, y - 32, 868, 44, 8, withAlpha(t.track, 0.5));
+                const y = 160 + i * step;
+                if (i % 2 === 0) cv.roundRect(40, y - step + 14, 868, step - 4, 8, withAlpha(t.track, 0.5));
                 cv.text(name, 48, y, 26, t.text, { font: 'bold' });
                 cv.text(note, 560, y, 20, t.dim);
                 cv.text(G.isNum(kw) ? G.fmt(kw, kw < 1 ? 2 : 1) : '-', 900, y, 26, G.isNum(kw) && kw >= 1.5 ? t.warn : t.text, { font: 'bold', align: 'right' });
             });
             cv.fillRect(48, 352, 852, 1, t.panelEdge);
-            cv.text(cp.how === 'estimated' ? 'ESTIMATED TOTAL' : 'TOTAL', 48, 392, 22, t.dim, { font: 'bold', spacing: 1.2 });
+            cv.text(cp.how === 'estimated' ? 'ESTIMATED TOTAL' : cp.how === 'measured' ? 'TOTAL (MEASURED)' : 'TOTAL', 48, 392, 22, t.dim, { font: 'bold', spacing: 1.2 });
             cv.text(G.fmt(cp.how === 'estimated' ? cp.est : cp.kw, 2) + ' kW', 900, 392, 30, t.text, { font: 'bold', align: 'right' });
-            cv.text(acReported(d) ? 'the heater isn\'t reported: in the cold, the measured draw (right) is the one to trust'
+            cv.text(u ? 'compressor and heater: what the climate unit reports  ·  standing still, the battery measures the total'
+                : acReported(d) ? 'the heater isn\'t reported: in the cold, the measured draw (right) is the one to trust'
                 : 'this car doesn\'t report the compressor: A/C & heater come from the battery, measured standing still', 48, 430, 18, t.dim);
             const pd = live.pd && live.pd.displayRepartitionDriveElectricPower !== 255 && typeof live.pd.displayRepartitionElectricSeatHeater !== 'string' ? live.pd : null;
             cv.text(pd ? 'CAR\'S POWER DISPLAY  drive ' + pd.displayRepartitionDriveElectricPower + '  ·  climate ' + pd.displayRepartitionAirConditioningElectricPower
                 + '  ·  seats ' + pd.displayRepartitionElectricSeatHeater : 'OUTSIDE  ' + fmtT(d.ambient, 0), 48, 484, 20, t.dim, { font: 'bold', spacing: 0.5 });
             // the climate unit's own compressor / heater values (raw until their scale is known)
             const pa = probeNow('ac'), ph = probeNow('heater');
-            if (pa || ph) {
+            if ((pa && !G.isNum(pa.kw)) || (ph && !G.isNum(ph.kw))) {
                 const f = (p) => (!p ? '--' : G.isNum(p.kw) ? G.fmt(p.kw, 2) + ' kW' : String(p.raw));
                 cv.text('CLIMATE UNIT  A/C ' + f(pa) + '  ·  HEATER ' + f(ph) + ((pa && !G.isNum(pa.kw)) || (ph && !G.isNum(ph.kw)) ? '  (raw - ' + samples.length + ' samples)' : ''),
                     900, 484, 20, t.dim, { font: 'bold', spacing: 0.5, align: 'right' });
@@ -845,6 +876,7 @@ mgu.run({
             cv.text(cp.how.toUpperCase(), x + w - 24, 116, 20, cp.how !== 'estimated' ? GO : t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
             const lines = cp.how === 'measured'
                 ? ['battery gives ' + G.fmt(cp.draw, 2) + ' kW standing still', '- on-board electrics ' + G.fmt(baseline(), 2) + ' kW' + (G.isNum(st.baseKw) ? ' (learned)' : ' (typical)')]
+                : cp.how === 'climate unit' ? ['compressor + heater as the climate unit reports,', 'with blower, seats and pumps / fans (learned)']
                 : cp.how === 'last measured' ? ['measured ' + Math.max(1, Math.round(cp.ago / 60000)) + ' min ago, standing still', 'the same climate setting since then']
                 : ['measured while standing with the engine off', 'and not plugged in; then kept while driving'];
             lines.forEach((l, i) => cv.text(l, x + w - 24, 152 + i * 28, 20, t.dim, { align: 'right' }));
