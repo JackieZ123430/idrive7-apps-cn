@@ -90,8 +90,8 @@
       "powerSign": -1,
       "fast": {
         "hvV": [
+          {"did": "DDB4", "fields": {"v": {"bytes": 2, "factor": 0.01, "min": 150, "max": 500}}, "note": "confirmed on the X5 45e"},
           {"did": "DD68", "fields": {"v": {"bytes": 2, "factor": 0.01, "min": 150, "max": 500}}},
-          {"did": "DDB4", "fields": {"v": {"bytes": 2, "factor": 0.01, "min": 150, "max": 500}}},
           {"did": "DD66", "fields": {"v": {"bytes": 2, "factor": 0.01, "min": 150, "max": 500}}},
           {"did": "DDEF", "fields": {"v": {"bytes": 2, "factor": 1, "min": 150, "max": 500}}}
         ],
