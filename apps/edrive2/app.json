@@ -1,0 +1,130 @@
+{
+  "id": "edrive2",
+  "title": "eDrive Live",
+  "description": "Live HV battery power (kW), cell temperatures and voltages, power limits and climate / HVAC power use - set up for the X5 xDrive45e (G05 PHEV)",
+  "version": "1.0.0",
+  "vendor": "custom",
+  "loggingId": "OA9D",
+  "iconGlyph": "battery",
+  "signals": {
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": ["sendTasuRequest"],
+      "_broadcasts": ["sendTasuResponse"]
+    },
+    "de.bmw.infrastructure.EnvironmentalInformation": {
+      "ExteriorTemperature": "s"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.climate.climatemaster.ClimateMaster": {
+      "statusClimateSystemOn": "rs",
+      "statusAirCondAC": "rs"
+    },
+    "de.bmw.infotainment.climate.Climate2": {
+      "statusACFront": "rs",
+      "statusAirConditionDRStatus": "rs",
+      "statusActualValuePowerACCompressor": "rs"
+    },
+    "de.bmw.infotainment.climate.Climate": {
+      "statusSeatHeatingDR": "rs",
+      "statusSeatHeatingPS": "rs",
+      "statusSeatHeatingDRR": "rs",
+      "statusSeatHeatingPSR": "rs"
+    },
+    "de.bmw.body.steeringwheelcomfort.SteeringWheelClimate": {
+      "heatingState": "rs"
+    },
+    "de.bmw.infotainment.KombiIF": {
+      "statusDisplayElectricalPowerDistribution": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.Efficiencytainment2": {
+      "statusBatteryTemperature": "rs"
+    },
+    "de.bmw.infotainment.lsc.LSCDataSink": {
+      "statusHighVoltageStorage": "s"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "eDrive Live",
+      "buttons": [
+        ["BTN_PAGE", "Next page"],
+        ["BTN_PREV", "Previous page"],
+        ["BTN_RESET", "Reset drive totals"],
+        ["BTN_SETTINGS", "Settings"]
+      ]
+    }
+  ],
+  "settings": [
+    {"key": "designKwh", "label": "Battery size when new (gross)", "type": "number", "unit": "kWh", "default": 24,
+     "steps": [9.2, 10.4, 11.2, 12, 14.1, 17.7, 19.4, 24, 25.7, 42.2]},
+    {"key": "gaugeKw", "label": "Power gauge up to (until the car reports its limits)", "type": "number", "unit": "kW", "default": 100,
+     "steps": [60, 80, 100, 120, 150]},
+    {"key": "powerPoll", "label": "Read power every", "type": "number", "unit": "s", "default": 1,
+     "steps": [0.5, 1, 2, 5]},
+    {"key": "slowPoll", "label": "Read cells, temperatures, limits every", "type": "number", "unit": "s", "default": 5,
+     "steps": [2, 5, 10, 30]},
+    {"key": "tempUnit", "label": "Temperature unit", "type": "choice", "default": "f",
+     "options": [["f", "Fahrenheit"], ["c", "Celsius"]]},
+    {"key": "diagPage", "label": "Diagnostics pages (UDS replies, raw signals)", "type": "bool", "default": false},
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+  ],
+  "config": {
+    "comment": "Values from the HV battery unit (SME, ecu 7) with UDS ReadDataByIdentifier (0x22). Each value has a list of candidates; the first that answers with a plausible number is used. A candidate is { ecu (optional, decimal), did, fields }: every field is { at, bytes, factor, offset, signed, min, max } on the same reply (at 0 = first data byte after the DID), and the first field decides whether the reply counts. The DIDs are the BMW SME identifiers as OVMS decodes them on the i3 (DD68 pack voltage, DD69 pack current, DDBF cell voltages min / max, DDC0 cell core temperatures min / max / mean, DD6C coolant, DD7D current limits); G-series PHEV units are expected to share them, but check the Diagnostics page in the car and adjust here if a value shows n/a. powerSign: kW = V x A / 1000 x powerSign, + = the battery gives power (driving), - = it takes it (regen, charging). The SME reports DD69 positive while charging, hence -1: if the app shows regen while you accelerate, set it to 1.",
+    "battery": {
+      "ecu": 7,
+      "powerSign": -1,
+      "fast": {
+        "hvV": [
+          {"did": "DD68", "fields": {"v": {"bytes": 2, "factor": 0.01, "min": 150, "max": 500}}}
+        ],
+        "hvI": [
+          {"did": "DD69", "fields": {"a": {"bytes": 4, "factor": 0.01, "signed": true, "min": -800, "max": 800}}}
+        ]
+      },
+      "slow": {
+        "soc": [
+          {"did": "DDBC", "fields": {"pct": {"bytes": 2, "factor": 0.1, "min": 0, "max": 100}}}
+        ],
+        "cellV": [
+          {"did": "DDBF", "fields": {"min": {"at": 0, "bytes": 2, "factor": 0.001, "min": 2.5, "max": 4.4},
+                                     "max": {"at": 2, "bytes": 2, "factor": 0.001, "min": 2.5, "max": 4.4}}}
+        ],
+        "cellT": [
+          {"did": "DDC0", "fields": {"min": {"at": 0, "bytes": 2, "factor": 0.01, "signed": true, "min": -40, "max": 80},
+                                     "max": {"at": 2, "bytes": 2, "factor": 0.01, "signed": true, "min": -40, "max": 80},
+                                     "avg": {"at": 4, "bytes": 2, "factor": 0.01, "signed": true, "min": -40, "max": 80}}}
+        ],
+        "coolant": [
+          {"did": "DD6C", "fields": {"t": {"bytes": 2, "factor": 0.01, "signed": true, "min": -40, "max": 100}}}
+        ],
+        "limits": [
+          {"did": "DD7D", "fields": {"chargeA": {"at": 0, "bytes": 2, "factor": 0.1, "min": 0, "max": 1000},
+                                     "dischargeA": {"at": 2, "bytes": 2, "factor": 0.1, "min": 0, "max": 1000}}}
+        ]
+      }
+    },
+    "scaling": {
+      "batteryTemp": {"factor": 1, "offset": -40, "invalid": 255,
+        "comment": "the car's own HV battery temperature (Efficiencytainment2.statusBatteryTemperature avg / min / max), used when DDC0 doesn't answer"},
+      "ambient": {"factor": 0.5, "offset": -40, "invalid": 255},
+      "rpm": {"factor": 0.25, "offset": 0, "invalid": 65535},
+      "acPower": {"factor": 0.001, "offset": 0, "invalid": 65535, "max": 8,
+        "comment": "Climate2.statusActualValuePowerACCompressor -> kW. Assumed to come in W: check the raw value on the Signals page with the A/C on (an electric compressor uses ~0.5-4 kW) and adjust factor if needed"}
+    }
+  }
+}
