@@ -476,6 +476,9 @@ mgu.run({
         }
         const PW = (kw) => (G.isNum(kw) ? kw * ({ kw: 1, hp: 1.34102, ps: 1.35962 }[settings.get('powerUnit')] || 1) : null);
         const pwU = () => ({ kw: 'kW', hp: 'hp', ps: 'PS' }[settings.get('powerUnit')] || 'kW');
+        // torque: the car sends Nm; lb-ft on request (1 Nm = 0.737562 lb-ft)
+        const TQ = (nm) => (G.isNum(nm) ? (settings.get('torqueUnit') === 'lbft' ? nm * 0.737562 : nm) : null);
+        const tqU = () => (settings.get('torqueUnit') === 'lbft' ? 'lb-ft' : 'Nm');
 
         /**
          * { letter, num, est } for the gear readout, or null without any gear information.
@@ -535,7 +538,7 @@ mgu.run({
                     label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax, niceMax: true, ramp: 'hot',
                     peak: showPk && G.isNum(pk.power) ? PW(pk.power) : null,
                 });
-                G.bar(cv, t, x, y + gap, w, 92, { label: 'Torque', value: d.torque, unit: 'Nm', max: 900, niceMax: true, ramp: 'hot', peak: showPk ? pk.torque : null });
+                G.bar(cv, t, x, y + gap, w, 92, { label: 'Torque', value: TQ(d.torque), unit: tqU(), max: TQ(900), niceMax: true, ramp: 'hot', peak: showPk ? TQ(pk.torque) : null });
             };
             if (shown('boost')) {
                 const psi = settings.get('pressUnit') === 'psi', pmax = psi ? 36 : 2.5;
@@ -682,7 +685,7 @@ mgu.run({
                 G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
                 // where the split came from when it isn't the car's own torque split
                 // under the mode: front axle torque and where the split came from, when it isn't the car's own
-                const note = G.isNum(sp.nm) ? 'front ' + G.fmt(sp.nm, 0) + ' Nm (transfer case)'
+                const note = G.isNum(sp.nm) ? 'front ' + G.fmt(TQ(sp.nm), 0) + ' ' + tqU() + ' (transfer case)'
                     : sp.from ? 'from ' + sp.from : !G.isNum(rear) ? 'car sends no torque split' : '';
                 if (note) cv.text(note, ax + 24, 232, 20, t.dim);
             }
