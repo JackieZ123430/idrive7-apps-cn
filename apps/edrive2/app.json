@@ -125,6 +125,10 @@
         ]
       }
     },
+    "scanKnown": {
+      "comment": "identifiers that answered a full scan on the X5 45e: the live comparison reads these when the unit has no saved scan",
+      "120": ["D8C3", "D8C4", "D8C5", "D8C7", "D8CB", "D8CC", "D8CD", "D8D0", "D8D2", "D8D3", "D8D5", "D8D7", "D8D8", "D8D9", "D8DB", "D8DD", "D8DE", "D8DF", "D8E1", "D8E2", "D905", "D918", "D9A7", "D9AC", "D9AD", "4020", "4021", "4022", "4023", "4024", "4026", "4027", "4036", "4038", "4039", "403C", "403D"]
+    },
     "scaling": {
       "batteryTemp": {"factor": 1, "offset": -40, "invalid": 255,
         "comment": "the car's own HV battery temperature (Efficiencytainment2.statusBatteryTemperature avg / min / max), used when DDC0 doesn't answer"},

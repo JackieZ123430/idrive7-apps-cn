@@ -340,7 +340,11 @@ mgu.run({
             scan.running = false;
             // the scan from before 1.1.2 (battery only) was scan.json
             const cur = readScan(scanFile(u)) || (u === 7 ? readScan(path.join(ctx.dataDir, 'scan.json')) : null);
-            Object.assign(scan, { unit: u, total: SCAN_UNITS[u].ranges.reduce((a, r) => a + r[1] - r[0] + 1, 0), hits: [], done: 0, t: 0, noReply: 0 }, cur || {});
+            // no saved scan: the identifiers known to answer on this car (config.scanKnown), so the live
+            // comparison can start without the long scan
+            const known = !cur && ctx.spec.config && ctx.spec.config.scanKnown && ctx.spec.config.scanKnown[String(u)];
+            const kn = known ? { hits: known.map((did) => ({ did, bytes: [] })), t: Date.now(), done: 0, known: true } : null;
+            Object.assign(scan, { unit: u, total: SCAN_UNITS[u].ranges.reduce((a, r) => a + r[1] - r[0] + 1, 0), hits: [], done: 0, t: 0, noReply: 0, known: false }, cur || kn || {});
             scan.prev = readScan(scanFile(u, true));
         }
         loadScan();
@@ -382,7 +386,7 @@ mgu.run({
          * Reset) is the baseline; the bytes that differ from it now are listed, with how often they changed,
          * so switching the heater or the A/C on shows which values follow it. Saved to scan_<unit>_live.json. */
         const cmpState = { unit: 0, base: null, now: {}, flips: {}, t: 0, busy: false, cycles: 0 };
-        function rebase() { Object.assign(watch, { unit: scan.unit, base: null, now: {}, flips: {}, t: Date.now(), cycles: 0 }); }
+        function rebase() { Object.assign(cmpState, { unit: scan.unit, base: null, now: {}, flips: {}, t: Date.now(), cycles: 0 }); }
         async function watchCycle() {
             if (cmpState.busy || scan.running || !scan.t || !scan.hits.length || !diag.available || pages()[page] !== 'scan') return;
             if (cmpState.unit !== scan.unit) rebase();
@@ -846,6 +850,7 @@ mgu.run({
             const pct = Math.round(scan.done / scan.total * 100);
             const ago = (ms) => (ms < 90000 ? 'just now' : ms < 5400000 ? Math.round(ms / 60000) + ' min ago' : Math.round(ms / 3600000) + ' h ago');
             cv.text(scan.running ? 'SCANNING  ' + pct + ' %  (' + scan.done + ' / ' + scan.total + ')  -  stay on this page, car in READY'
+                : scan.known ? scan.hits.length + ' identifiers known for this car  ·  Reset drive totals = new baseline'
                 : scan.t ? 'DONE ' + ago(Date.now() - scan.t) + '  ·  ' + scan.hits.length + ' answer' + (scan.noReply >= 25 && !scan.hits.length ? ' (unit not answering)' : '') + '  ·  Reset drive totals = new baseline'
                 : diag.available ? 'starting...' : 'no diagnostic link yet', 1552, 80, 20, scan.running ? t.warn : t.dim, { font: 'bold', align: 'right' });
             const cells = [], packs = [], ch = changes();
@@ -869,7 +874,7 @@ mgu.run({
             }
             cv.fillRect(48, 330, 1504, 1, t.tick);
             cv.text('ALL THAT ANSWER (identifier: bytes)', 48, 358, 20, t.dim, { font: 'bold', spacing: 1 });
-            const all = scan.hits.map((h) => h.did + ':' + h.bytes.length).join('  ');
+            const all = scan.hits.map((h) => h.did + ':' + (h.bytes.length || (cmpState.now[h.did] || []).length)).join('  ');
             for (let i = 0, line = 0; i < all.length && line < 4; line++) {
                 cv.text(all.slice(i, i + 170), 48, 388 + line * 24, 17, t.text, { font: 'label' });
                 i += 170;
