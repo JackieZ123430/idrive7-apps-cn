@@ -502,29 +502,43 @@ install_inputgate() {
     src=$SELF_DIR/mgu-inputgate.so
     [ -f "$src" ] || die "mgu-inputgate.so not found next to $0"
     [ -d "$RENDERD_DIR" ] || die "install the renderer first (sh $0 renderd)"
-    same=0; cmp -s "$src" "$GATE_SO" 2>/dev/null && same=1
+    p=$(pidof HmiMain3D 2>/dev/null | cut -d' ' -f1)
+    if cmp -s "$src" "$GATE_SO" 2>/dev/null && [ -n "$p" ] && grep -q mgu-inputgate "/proc/$p/maps" 2>/dev/null; then
+        gate_dropin_text > "$TMP.gate" || die "tmp"
+        if [ "${1:-}" != "--persist" ] || cmp -s "$TMP.gate" "/etc/systemd/system/$GATE_DROPIN_NAME"; then
+            rm -f "$TMP.gate"; say "controller gate unchanged and loaded"; return 0
+        fi
+        rm -f "$TMP.gate"
+    fi
     cp "$src" "$GATE_SO.new" && chmod 755 "$GATE_SO.new" && chown 0:0 "$GATE_SO.new" && mv "$GATE_SO.new" "$GATE_SO" || die "copy failed"
+    # 1. try it with a RUNTIME drop-in (/run: gone at the next boot, whatever happens below)
+    gate_dropin_remove
     gate_dropin_text > "$TMP.gate" || die "tmp"
+    mkdir -p /run/systemd/system/hmi.service.d && cp "$TMP.gate" "/run/systemd/system/$GATE_DROPIN_NAME" || die "cannot write the runtime drop-in"
+    systemctl daemon-reload
+    say "restarting the HMI to try the controller gate (the screen goes dark for a moment)..."
+    # the HMI often dies by a signal while it is being stopped, and systemctl then reports the
+    # restart as failed although it comes back up: what counts is the check below
+    systemctl restart hmi.service 2>/dev/null || say "(systemctl reported an error stopping the old HMI - normal, checking that it comes back...)"
+    if ! hmi_healthy; then
+        warn "the HMI did not come back healthy with the controller gate - taking it out again"
+        rm -f "$TMP.gate"
+        gate_dropin_remove
+        systemctl reset-failed hmi.service 2>/dev/null
+        systemctl restart hmi.service || warn "HMI restart without the gate failed too - reboot the head unit"
+        rm -f "$GATE_SO"
+        return 1
+    fi
+    # 2. only now, and only if asked, make it permanent (same text: no further restart)
     if [ "${1:-}" = "--persist" ]; then
+        rootfs_rw_do sh -c "mkdir -p /etc/systemd/system/hmi.service.d && cp '$TMP.gate' '/etc/systemd/system/$GATE_DROPIN_NAME'" || { rm -f "$TMP.gate"; warn "cannot write /etc/systemd/system/$GATE_DROPIN_NAME - the gate is loaded until the next reboot only"; return 0; }
         rm -f "/run/systemd/system/$GATE_DROPIN_NAME"
-        cmp -s "$TMP.gate" "/etc/systemd/system/$GATE_DROPIN_NAME" || same=0
-        rootfs_rw_do sh -c "mkdir -p /etc/systemd/system/hmi.service.d && cp '$TMP.gate' '/etc/systemd/system/$GATE_DROPIN_NAME'" || die "cannot write /etc/systemd/system/$GATE_DROPIN_NAME"
+        systemctl daemon-reload
+        say "controller gate loaded and persisted - full-screen apps can have the controller"
     else
-        mkdir -p /run/systemd/system/hmi.service.d && cp "$TMP.gate" "/run/systemd/system/$GATE_DROPIN_NAME" || die "cannot write the runtime drop-in"
-        same=0
+        say "controller gate loaded (until the next reboot) - full-screen apps can have the controller"
     fi
     rm -f "$TMP.gate"
-    systemctl daemon-reload
-    p=$(pidof HmiMain3D 2>/dev/null | cut -d' ' -f1)
-    if [ $same = 1 ] && [ -n "$p" ] && grep -q mgu-inputgate "/proc/$p/maps" 2>/dev/null; then say "controller gate unchanged and loaded"; return 0; fi
-    say "restarting the HMI to load the controller gate (the screen goes dark for a moment)..."
-    systemctl restart hmi.service
-    if hmi_healthy; then say "controller gate loaded - full-screen apps can have the controller"; return 0; fi
-    warn "the HMI did not come back healthy with the controller gate - taking it out again"
-    gate_dropin_remove
-    systemctl restart hmi.service
-    rm -f "$GATE_SO"
-    return 1
 }
 remove_inputgate() {
     had=0

@@ -548,8 +548,10 @@ the internet.
    and the app gets the real events through the renderer. The buttons (BACK, MENU, ...) and the
    touchscreen are never held back. It holds only while the renderer keeps a marker file
    (`/run/mgu-renderd/inputgate`) fresh for an app that is on screen and asking. App closed or
-   crashed, popup, renderer gone: the HMI has the controller back within 0.7 s. If the HMI doesn't
-   come back healthy after the restart, the drop-in is removed again by itself.
+   crashed, popup, renderer gone: the HMI has the controller back within 0.7 s. The gate is first
+   tried with a temporary drop-in (in `/run`, gone at the next boot) and made permanent only once
+   the HMI is back up and healthy with it; otherwise it is removed again by itself. `systemctl` may
+   report an error while the old HMI is stopped: that is normal, the check afterwards is what counts.
    `NO_INPUTGATE=1` skips this step.
 7. **Restarts the app platform** once. The HMI reloads the Apps list in about 1-2 minutes.
 
