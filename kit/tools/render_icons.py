@@ -4,15 +4,16 @@ render_icons.py [app ...] - the app tile icons (apps/<id>/icon.png, 140 x 140) f
 
 Each kit/icons/<id>.svg is the drawing for one app on a 140 x 140 canvas (its own <defs> + shapes),
 with an accent colour on its first line:  <!-- accent: #rrggbb -->
-This script puts it on the shared tile (dark glass with the accent's glow, rim light and gloss, like
-the head unit's own app icons), renders it at 4x with headless Chromium and scales it down, so the
-edges and gradients come out smooth. build.py packs apps/<id>/icon.png when it exists, so the
+This script renders it on a transparent background with a soft shadow (--tile: on a dark glass
+tile with the accent's glow, rim light and gloss instead), at 4x with headless Chromium, and scales
+it down, so the edges and gradients come out smooth. build.py packs apps/<id>/icon.png when it exists, so the
 rendered PNGs are committed and a normal build needs none of this.
 
 Needs: Pillow, and Chromium / Chrome (headless). Set CHROME=/path/to/chrome if it isn't found.
     python3 kit/tools/render_icons.py            # every icon
     python3 kit/tools/render_icons.py doom       # one
     python3 kit/tools/render_icons.py --sheet out.png   # also a preview sheet on black
+    python3 kit/tools/render_icons.py --tile --out DIR  # on the glass tile instead
 """
 import glob
 import os
@@ -29,6 +30,15 @@ ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))
 ICONS = os.path.join(ROOT, 'kit', 'icons')
 APPS = os.path.join(ROOT, 'apps')
 SIZE, SCALE = 140, 4
+
+BARE = '''
+<defs>
+  <filter id="tile-shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.75"/>
+  </filter>
+</defs>
+<g filter="url(#tile-shadow)">{art}</g>
+'''
 
 TILE = '''
 <defs>
@@ -74,27 +84,27 @@ def chrome():
     sys.exit('no Chromium / Chrome found - set CHROME=/path/to/it')
 
 
-def page(app):
+def page(app, bare=False):
     src = open(os.path.join(ICONS, app + '.svg'), encoding='utf-8').read()
     m = re.match(r'\s*<!--\s*accent:\s*(#[0-9a-fA-F]{6})\s*-->', src)
     accent = m.group(1) if m else '#2a8cff'
     art = src[m.end():] if m else src
     px = SIZE * SCALE
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{px}" height="{px}" viewBox="0 0 {SIZE} {SIZE}">'
-           + TILE.replace('{accent}', accent).replace('{art}', art) + '</svg>')
+           + (BARE if bare else TILE).replace('{accent}', accent).replace('{art}', art) + '</svg>')
     return f'<html><body style="margin:0;background:transparent;overflow:hidden">{svg}</body></html>'
 
 
-def render(app, tmp, exe):
+def render(app, tmp, exe, bare=False, outdir=None):
     html = os.path.join(tmp, app + '.html')
     big = os.path.join(tmp, app + '.png')
-    open(html, 'w', encoding='utf-8').write(page(app))
+    open(html, 'w', encoding='utf-8').write(page(app, bare))
     px = SIZE * SCALE
     subprocess.run([exe, '--no-sandbox', '--hide-scrollbars', '--default-background-color=00000000',
                     f'--window-size={px},{px}', f'--screenshot={big}', 'file://' + html],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
     im = Image.open(big).convert('RGBA').resize((SIZE, SIZE), Image.LANCZOS)
-    out = os.path.join(APPS, app, 'icon.png')
+    out = os.path.join(outdir, app + '.png') if outdir else os.path.join(APPS, app, 'icon.png')
     im.save(out, optimize=True)
     return out
 
@@ -102,6 +112,11 @@ def render(app, tmp, exe):
 def main():
     args = sys.argv[1:]
     sheet = None
+    bare = '--tile' not in args
+    if not bare: args.remove('--tile')
+    outdir = None
+    if '--out' in args:
+        i = args.index('--out'); outdir = args[i + 1]; del args[i:i + 2]; os.makedirs(outdir, exist_ok=True)
     if '--sheet' in args:
         i = args.index('--sheet'); sheet = args[i + 1]; del args[i:i + 2]
     apps = args or sorted(os.path.splitext(f)[0] for f in os.listdir(ICONS) if f.endswith('.svg'))
@@ -109,7 +124,7 @@ def main():
     outs = []
     with tempfile.TemporaryDirectory() as tmp:
         for a in apps:
-            outs.append(render(a, tmp, exe))
+            outs.append(render(a, tmp, exe, bare, outdir))
             print('icon', a, '->', os.path.relpath(outs[-1], ROOT))
     if sheet:
         # on black, as on the head unit: 1:1 and at 2x
