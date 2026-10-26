@@ -5,6 +5,7 @@
   "version": "1.4.1",
   "vendor": "custom",
   "loggingId": "OA9F",
+  "maxDiskUsage": 104857600,
   "iconGlyph": "doom",
   "signals": {
     "de.bmw.infotainment.vehicle.Vehicle2": {
