@@ -15,6 +15,8 @@
 #                                  persistent across reboots
 #                               3. installs/updates every apps/*.mgu
 #                               4. restarts the app platform once and verifies
+#                                  (REBOOT_NEXT=1: not - the caller reboots the head unit
+#                                  right after, which restarts it anyway: one restart, not two)
 #                               5. reboots the head unit if the controller gate
 #                                  (Doom) was just set up: it loads at start
 #                                  (NO_REBOOT=1: not now, at the next drive)
@@ -234,6 +236,8 @@ cmd_install() {
     # tiles the HMI keeps in memory (instead of the app platform now and the HMI separately later)
     if [ "$REBOOT" = 1 ] && [ "${NO_REBOOT:-0}" != 1 ]; then
         say "(the head unit reboots at the end - that restarts the app platform and the HMI too)"
+    elif [ "${REBOOT_NEXT:-0}" = 1 ]; then
+        say "no app platform restart now: the head unit is rebooted next (that restarts everything)"
     elif [ "${WITH_HMI:-0}" = 1 ]; then
         say "restarting the HMI and the app platform (screen goes black, ~1-2 min)"
         systemctl restart hmi.service || warn "HMI restart failed - the old screens go at the next reboot"
@@ -241,7 +245,7 @@ cmd_install() {
     else
         say "restarting the app platform (screen reloads, ~1-2 min)"
     fi
-    if [ "$REBOOT" != 1 ] || [ "${NO_REBOOT:-0}" = 1 ]; then
+    if { [ "$REBOOT" != 1 ] || [ "${NO_REBOOT:-0}" = 1 ]; } && [ "${REBOOT_NEXT:-0}" != 1 ]; then
         systemctl restart oapcontroller.service
         sleep 5
         systemctl is-active oapcontroller.service >/dev/null 2>&1 || warn "oapcontroller not active after restart"
