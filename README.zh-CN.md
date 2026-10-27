@@ -115,5 +115,3 @@ python kit/tools/test_zh.py
 字形生成器会校验字体 SHA-256，并检查中文字库的 GPU 纹理预算。生成后的 `cjk.json` 和译文一起提交。
 
 完整功能、安装实现和恢复细节请阅读 [英文详细文档](README.md)。
-
-[上游 PR 准备说明](docs/UPSTREAM-PR.md)：当前仅更新本 fork，尚未向原作者提交 PR。
