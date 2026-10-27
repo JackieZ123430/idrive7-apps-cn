@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Doom - Freedoom: Phase 1 on the iDrive.
+ * Doom - Freedoom: Phase 1 on the iDrive, for when you're parked (setting "Parked only", on by default).
  *
  * The game is doomgeneric (GPL-2, see LICENSE / NOTICE in this folder) compiled to WebAssembly
  * (doom.wasm, built by third_party/doomgeneric/build.sh) and run here at 35 tics a second
@@ -17,14 +17,16 @@
  * Controls (controls.js): turn the controller to aim, push it to walk / sidestep, press to fire
  * and open doors, press twice for the next weapon.
  *
- * The game runs only while GAME is on screen; whenever it stops (BACK, MENU, a popup or call,
- * the app closing) it saves, and Play carries on from there.
+ * The game runs only while GAME is on screen - and, with "Parked only" (the default), while the car
+ * stands; whenever it stops (BACK, MENU, a popup or call, driving off, the app closing) it saves,
+ * and Play carries on from there.
  */
 const path = require('path');
 const mgu = require('./kit/mgu');
 const { Recorder, setImage } = require('./kit/record');
 const { Doom, GS } = require('./doom-core');
 const { Controls } = require('./controls');
+const Parked = require('./kit/parked');
 
 const W = 1600, H = 520, IMG = 1, VIEW = 2, SIDE = 3, SLOT = 0;
 const DETAIL = { full: [1920, 504], medium: [1440, 378], low: [960, 252] };
@@ -33,6 +35,10 @@ const SKILLS = ['', 'Too young to die', 'Not too rough', 'Hurt me plenty', 'Ultr
 mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
+
+        /* ---------- parked only (setting, on by default): the game waits while the car drives ---------- */
+        const parked = Parked.watch(ctx, log);
+        const driving = () => settings.get('parkedOnly') !== false && parked.moving();
 
         /* ---------- the game ---------- */
         const skill = () => Number(settings.get('skill')) || 3;
@@ -85,6 +91,7 @@ mgu.run({
             const st = (started && !err && game.state()) || {};
             let info;
             if (err) info = 'Doom stopped: ' + (err.message || err);
+            else if (driving()) info = 'Parked only - the game waits while you drive (Settings: Parked only)';
             else if (st.gamestate === GS.LEVEL && (saved || frames)) {
                 const lvl = 'E' + Math.floor(st.level / 10) + 'M' + (st.level % 10);
                 info = (saved ? 'Saved game: ' : 'Game: ') + lvl + ', health ' + st.health + ' %';
@@ -130,8 +137,10 @@ mgu.run({
         const shown = () => ui.isVisible('GAME') && (!ui.hasFocus || ui.hasFocus('GAME'));
         let going = false;
         function sync() {
-            const go = started && !err && shown();
+            const go = started && !err && shown() && !driving();
             if (go !== going) {
+                // driving off with the game on screen: back to the menu, which says why it waits
+                if (!go && shown() && driving()) { log.info('car moving: game paused'); ui.open('MAIN'); }
                 going = go;
                 // the controller to the game alone while it runs (the HMI's pull-down / back on
                 // a tilt stay away); BACK and MENU still work. Needs mgu-inputgate.so (deploy-car.sh)

@@ -613,6 +613,17 @@ function gmeter(cv, t, cx, cy, r, g) {
  * page content gets the whole screen below it. Otherwise a slim tab bar (BAR_H) along the top.
  */
 const BAR_H = 36, TOP = 44, BOTTOM = 512;
+/**
+ * Tab widths: each name's width plus `pad`, at least `min`; when that doesn't fit in `room` the
+ * padding shrinks (down to `pad0`) and the minimum goes, so many tabs still show side by side.
+ */
+function tabWidths(cv, names, size, opt, min, pad, room, pad0) {
+    const tw = names.map((n) => cv.textWidth(n, size, opt));
+    const wide = tw.map((w) => Math.max(min, w + pad));
+    if (wide.reduce((a, b) => a + b, 0) <= room) return wide;
+    const p = Math.max(pad0, Math.min(pad, (room - tw.reduce((a, b) => a + b, 0)) / Math.max(1, names.length)));
+    return tw.map((w) => w + p);
+}
 function frame(cv, t, tabs, sel, badges) {
     if (cv.chrome) { cv.chrome.tabs = { tabs: tabs || [], sel, badges: (badges || []).filter(Boolean) }; return; }
     const W = cv.w, S = t.sel || t.accent;
@@ -620,9 +631,13 @@ function frame(cv, t, tabs, sel, badges) {
     cv.fillRect(0, 0, W, BAR_H, withAlpha('#ffffff', 0.07));
     cv.fillRect(0, BAR_H - 1, W, 1, withAlpha('#ffffff', 0.18));
     const opt = { align: 'center', font: 'bold', spacing: 1.5 };
+    const live = (badges || []).filter(Boolean);
+    const labels = (tabs || []).map((n) => upperText(n));
+    const badgesW = live.reduce((a, b) => a + Math.max(24 * 3.5, cv.textWidth(b.text, 18, opt) + 24) + 24 * 0.4, 0);
+    const widths = tabWidths(cv, labels, 20, opt, 150, 48, W - 32 - badgesW, 20);
     let x = 16;
-    (tabs || []).forEach((name, i) => {
-        const label = upperText(name), tw = Math.max(150, cv.textWidth(label, 20, opt) + 48), on = i === sel;
+    labels.forEach((label, i) => {
+        const tw = widths[i], on = i === sel;
         if (on) {
             cv.gradientRect(x, 0, tw, BAR_H, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.22)]]);
             cv.fillRect(x, BAR_H - 4, tw, 4, S);
@@ -664,7 +679,7 @@ function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat, compact) {
     cv.fillRect(x, y + h - 2, w, 2, withAlpha('#ffffff', 0.22));
     const right = badgeRow(cv, t, x + w - 16, y + (h - 30) / 2, 30, 18, badges || []);
     const names = (tabs || []).map((n) => upperText(n));
-    const tw = names.map((n) => Math.max(170, cv.textWidth(n, 20, opt) + 64));
+    const tw = tabWidths(cv, names, 20, opt, 170, 64, right - x - 20, 24);
     const tabsW = tw.reduce((a, b) => a + b, 0);
     let tx = x + 20;
     const tsize = 38, titleW = title ? cv.textWidth(title, tsize) : 0;
@@ -689,13 +704,13 @@ function headerCompact(cv, t, x, y, w, h, title, tabs, sel, badges) {
     const S = t.sel || t.accent, opt = { align: 'center', font: 'bold', spacing: 1.6 };
     const bopt = { align: 'center', font: 'bold', spacing: 1.5 };
     const names = (tabs || []).map((n) => upperText(n));
-    const tw = names.map((n) => Math.max(132, cv.textWidth(n, 18, opt) + 44));
-    const tabsW = tw.reduce((a, b) => a + b, 0);
     const bh = 30, bsize = 17;
     const bws = (badges || []).map((b) => Math.max(bh * 3.5, cv.textWidth(b.text, bsize, bopt) + bh));
     const badgesW = bws.reduce((a, b) => a + b + bh * 0.4, 0);
     const tsize = 32, titleW = title ? cv.textWidth(title, tsize) : 0;
     const room = w - 20 - (badgesW ? badgesW + 12 : 0);
+    const tw = tabWidths(cv, names, 18, opt, 132, 44, room - 20, 20);
+    const tabsW = tw.reduce((a, b) => a + b, 0);
     const showTitle = title && titleW + 32 + tabsW <= room;
     // only as wide as the content: the rest of the strip stays the HMI's
     let end = x + 20 + (showTitle ? titleW + 32 : 0);

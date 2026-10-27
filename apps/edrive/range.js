@@ -61,8 +61,17 @@ function curve(c, tC) {
 const auxKwTypical = (tC) => curve(AUX_KW, tC);
 const acKwTypical = (tC) => curve(AC_KW, tC);
 
+// with the engine on, the battery's own change per km is at most this (the engine charging it hard in
+// slow traffic is ~1.5 %/km); more comes from standing / creeping, where "per km" means nothing
+const ENGINE_MAX_PCT_KM = 3;
+
 class RangeModel {
-    constructor(st) { this.st = st; this.stoodH = Infinity; }
+    constructor(st) {
+        this.st = st; this.stoodH = Infinity;
+        // learned before 2.1: stretches of standing with the engine charging counted too (e.g. +18 %/km)
+        const A = st.engineAll;
+        if (A && A.km > 0 && Math.abs(A.pct / A.km) > ENGINE_MAX_PCT_KM) { delete st.engineAll; delete st.engineUse; }
+    }
 
     /**
      * % per km for driving alone, once there is enough of it (>= 5 km and 2 %); else null. With a
@@ -107,7 +116,8 @@ class RangeModel {
      * charged) over km at its speed. Learned per speed band, apart from electric driving.
      */
     learnEngine(used, h, km) {
-        if (!isNum(used) || !(h > 0) || km < 0.05) return;
+        // a real drive only: at least 300 m at 10 km/h or more on average, and a plausible change
+        if (!isNum(used) || !(h > 0) || km < 0.3 || km / h < 10 || Math.abs(used / km) > ENGINE_MAX_PCT_KM) return;
         const E = this.st.engineUse || (this.st.engineUse = {}), band = speedBandOf(km / h);
         const b = E[band] || (E[band] = { km: 0, pct: 0 });
         b.km += km; b.pct += used;

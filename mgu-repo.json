@@ -3,6 +3,7 @@
   "apps": {
     "path": "apps/*",
     "manifest": "app.json",
+    "icon": "icon.png",
     "mguHmi": ["ID7"],
     "build": {
       "python": "kit/tools/build.py",
