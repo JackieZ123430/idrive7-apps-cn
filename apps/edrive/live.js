@@ -569,14 +569,12 @@ module.exports = function live(ctx, sh) {
         const top = Math.max(20, ...trace.map((p) => p[1]), 0) * 1.1, bottom = Math.max(10, ...trace.map((p) => -p[1]), 0) * 1.1;
         const tr = d.demo ? demoHistory(TRACE_S, 1, (x) => x.kw) : trace;
         powerTrace(cv, t, 48, 316, lw - 48, 118, tr, TRACE_S, d.demo ? 60 : top, d.demo ? 25 : bottom);
-        const ct = cellTemps(d);
-        cv.text('CELLS  ' + (ct ? fmtT(ct.avg) + (G.isNum(ct.min) && G.isNum(ct.max) ? '  (' + G.fmt(T(ct.min), 0) + ' - ' + G.fmt(T(ct.max), 0) + ')' : '') : '--')
-            + '   ·   COOLANT  ' + fmtT(d.coolant, 1), 48, 494, 20, ct ? tempColor(t, ct.avg) : t.dim, { font: 'bold', spacing: 1 });
+        cv.text('COOLANT  ' + fmtT(d.coolant, 1) + '   ·   OUTSIDE  ' + fmtT(d.ambient, 0), 48, 494, 20, t.dim, { font: 'bold', spacing: 1 });
 
         // ---- every cell's voltage: the lowest and highest marked, scaled to the spread
         const x = 608, w = 968, r = x + w - 24;
         const cvv = d.cellV, cells = cvv && cvv.cells;
-        G.panel(cv, t, x, 44, w, 256, 'Cell voltage' + (cells ? '  (' + cells.length + ' cells)' : ''));
+        G.panel(cv, t, x, 44, w, 256, 'Cells' + (cells ? '  (' + cells.length + ')' : ''));
         const spread = cvv && G.isNum(cvv.min) && G.isNum(cvv.max) ? (cvv.max - cvv.min) * 1000 : null;
         const scol = !G.isNum(spread) ? t.dim : spread > 100 ? t.crit : spread > 50 ? t.warn : GO;
         const head = (hx, label, v, c, sub) => {
@@ -587,7 +585,10 @@ module.exports = function live(ctx, sh) {
         head(x + 24, 'LOWEST', cvv && G.isNum(cvv.min) ? G.fmt(cvv.min, 3) + ' V' : '--', t.warn, cvv && cvv.minAt ? 'cell ' + cvv.minAt : '');
         head(x + 234, 'HIGHEST', cvv && G.isNum(cvv.max) ? G.fmt(cvv.max, 3) + ' V' : '--', t.accent2 || t.text, cvv && cvv.maxAt ? 'cell ' + cvv.maxAt : '');
         head(x + 444, 'SPREAD', G.isNum(spread) ? G.fmt(spread, 0) + ' mV' : '--', scol,
-            G.isNum(spread) ? (spread > 100 ? 'out of balance' : spread > 50 ? 'a bit high (normal under load)' : 'well balanced') : '');
+            G.isNum(spread) ? (spread > 100 ? 'out of balance' : spread > 50 ? 'high (normal under load)' : 'well balanced') : '');
+        const ct = cellTemps(d);
+        head(x + 654, 'TEMPERATURE', ct ? fmtT(ct.avg) : '--', ct ? tempColor(t, ct.avg) : t.dim,
+            ct && G.isNum(ct.min) && G.isNum(ct.max) ? G.fmt(T(ct.min), 0) + ' - ' + G.fmt(T(ct.max), 0) + ' ' + tU() : '');
         cv.text('CHARGE', r, 112, 18, t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
         const pc = cv.text('%', r, 146, 20, t.dim, { font: 'bold', align: 'right' });
         cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 1) : '--', r - pc - 6, 146, 30, t.text, { font: 'bold', align: 'right' });
