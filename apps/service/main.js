@@ -16,7 +16,8 @@
  *                              the cluster works out the new date / distance itself)
  *   check                    : 22 10 01 -> 12 bytes per item: id, .., [5] availability %, [4]&0x1F count
  * Only brake fluid (0x03) and the vehicle check (0x64) - the items kept in the cluster that were tried -
- * and only when the cluster itself reports no reason against it. Choose, then confirm within 15 s.
+ * and only when the cluster itself reports no reason against it. Select the item with "Next item",
+ * press "Reset service", then "Reset service" again within 15 s to confirm.
  */
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
@@ -135,29 +136,34 @@ mgu.run({
             for (let i = 3; i + 12 <= r.length; i += 12) out[r[i]] = { avail: r[i + 5], count: r[i + 4] & 0x1F };
             return out;
         }
-        async function pickReset() {
+        /** "Reset service": the first press asks the cluster and arms the reset of the selected item; a
+         *  second press within 15 s confirms it. Anything else (Next item, Details) disarms it. */
+        async function resetPress() {
             if (settings.get('resetOn') !== true) return showMsg('Reset is off - turn on "Service reset" in Settings');
             if (useDemo()) return showMsg('No reset in demo mode');
             if (reset && reset.busy) return;
-            if (reset && reset.items.length && Date.now() - reset.at < CONFIRM_MS) {     // next item
-                reset.i = (reset.i + 1) % reset.items.length;
-                reset.at = Date.now();
-                return showMsg('Reset ' + reset.items[reset.i].name + '?  Press "Confirm reset" (15 s)');
-            }
+            if (reset && reset.item && Date.now() - reset.at < CONFIRM_MS) return doReset();
+            const its = items(), cur = its[sel];
             showMsg('Asking the instrument cluster what can be reset...');
             try {
                 const d = await link();
                 const r = await d.physical(KOMBI_ECU, 0x22, [0x10, 0x02], 5000, (u) => u[0] !== 0x62 || u[1] === 0x10);
                 if (!r || r[0] !== 0x62) throw new Error(nrc(r));
-                const items = [];
+                const ok = [];
                 for (let i = 3; i + 3 <= r.length; i += 3) {
-                    if (RESETTABLE[r[i]] && r[i + 1] === 0) items.push({ id: r[i], name: RESETTABLE[r[i]] });
+                    if (RESETTABLE[r[i]] && r[i + 1] === 0) ok.push(r[i]);
                 }
-                log.info('resettable: ' + brief(items) + ' (reply ' + r.map((x) => hex(x)).join(' ') + ')');
-                if (!items.length) { reset = null; return showMsg('The instrument cluster allows no reset right now'); }
-                reset = { items, i: 0, at: Date.now(), busy: false };
-                showMsg('Reset ' + items[0].name + '?  Press "Confirm reset" (15 s)'
-                    + (items.length > 1 ? ', "Choose reset" for the next item' : ''));
+                log.info('resettable: ' + ok.map((x) => hex(x)).join(',') + ' (reply ' + r.map((x) => hex(x)).join(' ') + ')');
+                if (!ok.length) { reset = null; return showMsg('The instrument cluster allows no reset right now'); }
+                // the selected item, if it is one that can be reset; else the only one there is
+                const id = cur && ok.includes(cur.id) ? cur.id : ok.length === 1 ? ok[0] : null;
+                if (id === null) {
+                    reset = null;
+                    return showMsg('Select ' + ok.map((x) => RESETTABLE[x]).join(' or ') + ' with "Next item", then "Reset service"');
+                }
+                const name = (cur && cur.id === id && cur.name) || RESETTABLE[id];
+                reset = { item: { id, name }, at: Date.now(), busy: false };
+                showMsg('Reset ' + name + '?  Press "Reset service" again to confirm (15 s)');
             } catch (e) {
                 reset = null;
                 log.warn('reset list: ' + e);
@@ -165,9 +171,7 @@ mgu.run({
             }
         }
         async function doReset() {
-            if (!reset || !reset.items.length || reset.busy) return showMsg('Press "Choose reset" first');
-            if (Date.now() - reset.at > CONFIRM_MS) { reset = null; return showMsg('Too late - press "Choose reset" again'); }
-            const it = reset.items[reset.i];
+            const it = reset.item;
             reset.busy = true;
             showMsg('Resetting ' + it.name + '...');
             try {
@@ -267,11 +271,17 @@ mgu.run({
             await ui.image('MAIN_GFX', cv);
         }
 
-        ui.onClick('BTN_SELECT', () => { const n = items().length; if (n) sel = (sel + 1) % n; hint = null; msg = ''; changed(); });
-        ui.onClick('BTN_DETAILS', () => { msg = ''; details(); });
-        ui.onClick('BTN_RESET_PICK', () => { pickReset(); });
-        ui.onClick('BTN_RESET_GO', () => { doReset(); });
-        ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; changed(); });
+        // Next item: through the list; after the last item the diagnostics page (when it is on), then back
+        ui.onClick('BTN_SELECT', () => {
+            const n = items().length;
+            reset = reset && reset.busy ? reset : null;         // any other button disarms a reset
+            hint = null; msg = '';
+            if (page > 0) { page = 0; sel = 0; } else if (n && sel + 1 < n) sel++;
+            else if (pages().length > 1) page = 1; else sel = 0;
+            changed();
+        });
+        ui.onClick('BTN_DETAILS', () => { reset = reset && reset.busy ? reset : null; msg = ''; details(); });
+        ui.onClick('BTN_RESET', () => { resetPress(); });
 
         ctx.loop('MAIN', 2, () => render(false));
         // back from Settings or a popup: draw again (this app only draws when something changed)

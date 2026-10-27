@@ -197,7 +197,8 @@ mgu.run({
                     cur && base && cur !== base ? pw(cur.peakP) - pw(base.peakP) : null);
                 bigStat(cv, t, 1192, 299, 'TORQUE', cur ? tq(cur.peakT) : null, tU(), cur ? '@ ' + cur.peakTrpm + ' RPM' : null, t.accent2,
                     cur && base && cur !== base ? tq(cur.peakT) - tq(base.peakT) : null);
-                let msg = cur ? 'estimate at the crank' : 'waiting for a pull';
+                // a dyno sheet shows power at the wheels too: the same pull without the drivetrain loss
+                let msg = cur ? 'crank (' + cur.loss + ' % loss)  ·  wheels ' + Math.round(pw(cur.peakP * (1 - cur.loss / 100))) + ' ' + pU() : 'waiting for a pull';
                 let col = t.dim;
                 if (live.state === 'done' && now < live.until) { msg = 'NEW RUN RECORDED'; col = GO; }
                 if (live.state === 'short' && now < live.until) { msg = 'pull too short'; col = t.warn; }
@@ -208,7 +209,7 @@ mgu.run({
         function drawRuns(cv, t) {
             const st = store();
             G.panel(cv, t, 24, 44, 1552, 468, 'Saved runs');
-            const cols = [48, 320, 560, 800, 1050, 1300];
+            const cols = [48, 320, 560, 800, 1050, 1430];
             ['WHEN', 'PEAK POWER', 'PEAK TORQUE', 'SPEED RANGE', 'SETUP', ''].forEach((h, i) => cv.text(h, cols[i], 127, 22, t.dim, { font: 'bold', spacing: 1 }));
             if (!st.runs.length) cv.text('No runs yet.', 48, 210, 26, t.dim);
             st.runs.slice(0, 8).forEach((r, i) => {
@@ -219,7 +220,7 @@ mgu.run({
                 cv.text(Math.round(pw(r.peakP)) + ' ' + pU() + ' @ ' + r.peakPrpm, cols[1], y, 24, t.accent, { font: 'bold' });
                 cv.text(Math.round(tq(r.peakT)) + ' ' + tU() + ' @ ' + r.peakTrpm, cols[2], y, 24, t.accent2, { font: 'bold' });
                 cv.text(Math.round(r.v0) + '-' + Math.round(r.v1) + ' km/h', cols[3], y, 24, t.text);
-                cv.text(r.weight + ' kg · ' + r.loss + '%', cols[4], y, 24, t.dim);
+                cv.text(r.weight + ' kg · ' + r.loss + '%  ·  wheels ' + Math.round(pw(r.peakP * (1 - r.loss / 100))) + ' ' + pU(), cols[4], y, 22, t.dim);
                 if (isBase) cv.text('BASELINE', cols[5], y, 22, t.text, { font: 'bold', spacing: 1 });
             });
         }

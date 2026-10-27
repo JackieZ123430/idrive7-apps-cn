@@ -61,6 +61,11 @@ const KM_MI = 0.621371;
 const VALUES = ['soc', 'soh', 'v12'];
 const V12_HIST = 120;            // 12 V samples kept (one per 30 s = 1 h)
 const RESERVE = 8;               // engine-start charge (%) until two engine starts have been seen
+// Low battery: the car holds the charge at about 5-11 % and drives as a hybrid - electric only up to
+// 62 km/h with light throttle (~18 %), the engine above; lifting off / braking recharge it. Engine starts
+// there come from speed / throttle, not from an empty battery, and the charge moves with regen: nothing
+// in this zone teaches the range, and the range counts down to its top.
+const HOLD_TOP = 11;
 
 /**
  * Range of a full battery by outside temperature, for a car doing 50 km at 20 °C:
@@ -159,7 +164,7 @@ mgu.run({
             if (rpm > 400) seg.engine = true;
             else if (rpm < 300) seg.engineAll = false;      // the engine stopped at some point in the stretch
             if (G.isNum(was) && was < 300 && rpm > 600 && G.isNum(live.speed) && live.speed > 3
-                && G.isNum(live.soc) && Date.now() - live.socT < 60000 && live.soc <= 20) {
+                && G.isNum(live.soc) && Date.now() - live.socT < 60000 && live.soc <= 20 && live.soc > HOLD_TOP) {
                 st.engineStarts = (st.engineStarts || []).concat([Math.round(live.soc * 10) / 10]).slice(-5);
                 log.info('engine started while driving at ' + live.soc.toFixed(1) + ' %');
                 save();
@@ -169,8 +174,8 @@ mgu.run({
         function reserve() {
             const s = settings.get('reserve');
             if (s != null && s !== 'auto' && isFinite(+s)) return +s;
-            const e = (st.engineStarts || []).slice().sort((a, b) => a - b);
-            return e.length >= 2 ? e[Math.floor(e.length / 2)] : RESERVE;
+            const e = (st.engineStarts || []).filter((x) => x > HOLD_TOP).sort((a, b) => a - b);
+            return Math.max(HOLD_TOP, e.length >= 2 ? e[Math.floor(e.length / 2)] : RESERVE);
         }
         /* ---------- climate control on / off (per zone: on when any zone is on) ----------
          * Off, only the on-board electrics draw (model.auxRate). A reading stretch during which it was
@@ -340,7 +345,9 @@ mgu.run({
             // since the last reading with the engine off throughout (and the car awake: rpm signal live):
             // standing / creeping teaches the climate + on-board draw per hour, driving the use per km
             const h = (now - (st.lastSocT || 0)) / 3600000;
-            if (G.isNum(prev) && h < 120000 / 3600000 && !seg.engine && now - live.rpmT < 5000 && !st.session) {
+            const held = G.isNum(prev) && Math.min(prev, soc) <= HOLD_TOP + 1;    // low-battery hybrid zone
+            if (held) { /* the car manages the charge here: nothing to learn */ }
+            else if (G.isNum(prev) && h < 120000 / 3600000 && !seg.engine && now - live.rpmT < 5000 && !st.session) {
                 // seat / steering-wheel heating over the stretch: the mean of its start and end
                 model.learn(prev - soc, h, seg.km, live.ambient, kwhPerPct(), stretchClimate(), (seg.comfort + comfortKw()) / 2);
             } else if (G.isNum(prev) && h < 120000 / 3600000 && seg.engine && seg.engineAll && now - live.rpmT < 5000 && !st.session) {
@@ -576,22 +583,34 @@ mgu.run({
 
             // ---- range: what is left until the engine starts
             G.panel(cv, t, 24, 44, 720, 468, 'Real electric range');
-            const rw = cv.text(has ? String(Math.round(D(e.mid))) : '--', 48, 206, 130, has ? t.text : t.dim, { font: 'num' });
-            cv.text(dU(), 62 + rw, 206, 40, t.dim, { font: 'bold' });
-            if (has) cv.text(Math.round(D(e.lo)) + ' - ' + Math.round(D(e.hi)) + ' ' + dU(), 720, 150, 30, t.text, { font: 'bold', align: 'right' });
-            cv.text('engine starts at ' + G.fmt(e.res, 0) + ' %', 720, 196, 26, t.dim, { align: 'right' });
+            const hold = has && d.soc <= HOLD_TOP + 0.5;       // low-battery hybrid zone
+            if (hold) {
+                cv.text('HYBRID', 48, 196, 96, t.warn, { font: 'bold' });
+                cv.text('battery held at 5-' + HOLD_TOP + ' %', 720, 196, 26, t.dim, { align: 'right' });
+            } else {
+                const rw = cv.text(has ? String(Math.round(D(e.mid))) : '--', 48, 206, 130, has ? t.text : t.dim, { font: 'num' });
+                cv.text(dU(), 62 + rw, 206, 40, t.dim, { font: 'bold' });
+                if (has) cv.text(Math.round(D(e.lo)) + ' - ' + Math.round(D(e.hi)) + ' ' + dU(), 720, 150, 30, t.text, { font: 'bold', align: 'right' });
+                cv.text('engine starts at ' + G.fmt(e.res, 0) + ' %', 720, 196, 26, t.dim, { align: 'right' });
+            }
             if (!has) cv.text(diagHint('no charge reading yet'), 48, 250, 24, t.dim);
             else if (d.stale) cv.text('charge read ' + ago(d.socAge), 48, 250, 24, t.warn);
             G.bar(cv, t, 48, 268, 672, 92, {
                 label: 'Full: ' + Math.round(D(e.full)) + ' ' + dU(), value: has ? D(e.mid) : null, unit: dU(), max: D(e.full), niceMax: true, ramp: 'hot',
             });
             const eu = d.engine ? model.enginePctPerKm(d.speed) : null;
-            if (d.engine) {
-                // engine running: what the battery does meanwhile (learned with the engine on)
-                const perU = MI() ? '%/mi' : '%/km', pk = G.isNum(eu) ? (MI() ? eu / KM_MI : eu) : null;
+            if (hold) {
+                // low battery: the car drives as a hybrid and keeps the charge at 5-11 %
+                cv.text('Low battery: electric only up to ' + Math.round(D(62)) + ' ' + (MI() ? 'mph' : 'km/h') + ' with light throttle',
+                    48, 386, 23, t.warn, { font: 'bold' });
+                cv.text('the engine takes over above  ·  lifting off and braking recharge', 48, 413, 21, t.dim);
+            } else if (d.engine) {
+                // engine running: what the battery does meanwhile (learned with the engine on), per 10 km / mi
+                const per10 = G.isNum(eu) ? (MI() ? eu / KM_MI : eu) * 10 : null, u10 = MI() ? '10 mi' : '10 km';
                 const lasts = G.isNum(eu) && eu > 0.02 && has ? '  ·  lasts ~' + Math.round(D(Math.max(0, d.soc - e.res) / eu)) + ' ' + dU() : '';
-                cv.text('ENGINE ON  ·  battery ' + (!G.isNum(pk) ? 'use learning' : pk < -0.005 ? 'charging +' + G.fmt(-pk, 2) + ' ' + perU
-                    : 'using ' + G.fmt(pk, 2) + ' ' + perU) + lasts, 48, 404, 24, t.warn, { font: 'bold' });
+                cv.text('ENGINE ON  ·  ' + (!G.isNum(per10) ? 'learning what the battery does meanwhile'
+                    : per10 < -0.05 ? 'the engine charges the battery: +' + G.fmt(-per10, 1) + ' % per ' + u10
+                        : 'the battery still helps: -' + G.fmt(per10, 1) + ' % per ' + u10 + lasts), 48, 404, 24, t.warn, { font: 'bold' });
             } else {
                 cv.text(e.learned ? 'at ' + (d.pace !== null && d.pace !== undefined ? 'your pace ' : 'a typical ') + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h')
                     + '  ·  from your last ' + Math.round(D(st.learn.km)) + ' ' + dU() + ' electric'
@@ -788,7 +807,7 @@ mgu.run({
                 : model.bands();
             const paceBand = G.isNum(e.pace) ? bands.findIndex((b) => e.pace >= b.from && (b.to === null || e.pace < b.to)) : -1;
             const top = Math.max(1, Math.max.apply(null, bands.map((b) => kwh100(b.pctPerKm) || 0)));
-            ['SPEED', 'ELECTRIC ' + per.toUpperCase(), 'WITH ENGINE', 'LEARNED'].forEach((h, i) => cv.text(h, [48, 230, 640, 740][i], 116, 18, t.dim,
+            ['SPEED', 'ELECTRIC ' + per.toUpperCase(), 'ENGINE ON', 'LEARNED'].forEach((h, i) => cv.text(h, [48, 230, 640, 740][i], 116, 18, t.dim,
                 { font: 'bold', spacing: 1, align: i >= 2 ? 'right' : 'left' }));
             bands.forEach((b, i) => {
                 const y = 160 + i * 52, v = kwh100(b.pctPerKm), now = i === paceBand;
@@ -797,15 +816,15 @@ mgu.run({
                 cv.roundRect(230, y - 22, 230, 26, 6, withAlpha(t.track, 0.6));
                 if (G.isNum(v)) cv.rampRect(230, y - 22, Math.max(8, 230 * v / top), 26, 6, t.ramp || [t.accent]);
                 cv.text(G.isNum(v) ? G.fmt(U(v), 1) : '-', 474, y, 24, G.isNum(v) ? t.text : t.dim, { font: 'bold' });
-                // with the engine on: + = the engine charges the battery, - = the battery is still used
+                // with the engine on: what happens to the battery (kWh per 100 km / mi)
                 const ev = kwh100(b.enginePctPerKm);
-                cv.text(G.isNum(ev) ? (ev < 0 ? '+' : '-') + G.fmt(Math.abs(U(ev)), 1) : '-', 640, y, 22, !G.isNum(ev) ? t.dim : ev < 0 ? GO : t.text, { font: 'bold', align: 'right' });
+                cv.text(G.isNum(ev) ? (ev < 0 ? 'charges ' : 'uses ') + G.fmt(Math.abs(U(ev)), 1) : '-', 640, y, 22, !G.isNum(ev) ? t.dim : ev < 0 ? GO : t.text, { font: 'bold', align: 'right' });
                 const lk = Math.max(b.km, b.engineKm || 0);
                 cv.text(lk >= 0.5 ? Math.round(D(lk)) + ' ' + dU() : 'not yet', 740, y, 20, t.dim, { align: 'right' });
             });
             cv.text(G.isNum(e.pace) ? (d.pace !== null && d.pace !== undefined ? 'your pace now ' : 'typical pace ') + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h')
                 + (G.isNum(e.perKm) ? '  ·  ' + G.fmt(U(kwh100(e.perKm)), 1) + ' ' + per + ' there' : '') : 'learns as you drive electric', 48, 444, 22, t.dim);
-            cv.text('with engine: + = charging the battery, - = still using it', 48, 486, 20, t.dim);
+            cv.text('ENGINE ON: charges = the engine fills the battery, uses = the battery still helps', 48, 486, 18, t.dim);
 
             // ---- where the power goes now
             const x0 = 788, w0 = 788;
@@ -814,10 +833,14 @@ mgu.run({
             const climKw = d.climate === false ? 0 : Math.max(0, e.auxKw - base), blow = d.climate === false ? 0 : Math.min(climKw, blowerKw(d));
             const seatKw = comfort - (d.wheel ? WHEEL_KW : 0), wheelKw = d.wheel ? WHEEL_KW : 0;
             const share = (kw) => (G.isNum(e.comfortKm) && comfort > 0 ? e.comfortKm * kw / comfort : null);
+            // driving: learned % per km at the pace; before that the typical range (all use per km) less
+            // what the climate, on-board electrics and seat heating draw
+            const driveKw = !G.isNum(e.pace) ? null : G.isNum(e.perKm) ? e.perKm * k * e.pace
+                : G.isNum(e.kpp) && e.kpp > 0 ? Math.max(0, (1 / e.kpp) * k * e.pace - e.auxKw - (comfort || 0)) : null;
             const seatTxt = Object.keys(d.seats || {}).filter((s2) => d.seats[s2]).map((s2) => ({ DR: 'driver', PS: 'pass.', DRR: 'rear L', PSR: 'rear R' }[s2] + ' ' + d.seats[s2])).join(', ');
             const rows = [
-                ['Driving', G.isNum(e.perKm) && G.isNum(e.pace) ? e.perKm * k * e.pace : null, null,
-                    G.isNum(e.pace) ? 'at ' + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h') : 'learns as you drive'],
+                ['Driving', driveKw, null,
+                    G.isNum(e.pace) ? 'at ' + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h') + (e.learned ? '' : ' (typical)') : 'learns as you drive'],
                 ['Climate (heating / A/C)', climKw, has && d.climate !== false ? e.climateKm : null,
                     d.climate === false ? 'off' : (e.auxLearned ? 'measured' : 'typical') + (blow > 0 ? ', blower ~' + G.fmt(blow, 2) + ' kW' : '')],
                 ['Seat heating', seatKw, has ? share(seatKw) : null, seatTxt ? seatTxt + ' (est.)' : 'off'],
@@ -833,10 +856,12 @@ mgu.run({
                 cv.text(note.length > 30 ? note.slice(0, 29) + '…' : note, x0 + 520, y, 19, t.dim);
             });
             // the car's own "power distribution" display (scaling not known yet: shown as sent)
-            const pd = live.pd;
-            cv.text(pd ? 'CAR SHOWS  drive ' + pd.displayRepartitionDriveElectricPower + '  ·  climate ' + pd.displayRepartitionAirConditioningElectricPower
-                + '  ·  seat bars ' + pd.displayRepartitionElectricSeatHeater + '  ·  climate boost ' + pd.displayRepartitionElectricRangeAirConditioningBoost
-                : 'CAR SHOWS  (no power distribution from the car yet)', x0 + 24, 444, 19, t.dim, { font: 'bold', spacing: 0.5 });
+            // (255 = the car doesn't send that value: left out; nothing at all: the line is left out)
+            const pd = live.pd || {};
+            const sent = [['drive', pd.displayRepartitionDriveElectricPower], ['climate', pd.displayRepartitionAirConditioningElectricPower],
+                ['seat bars', pd.displayRepartitionElectricSeatHeater], ['climate boost', pd.displayRepartitionElectricRangeAirConditioningBoost]]
+                .filter(([, v]) => G.isNum(v) && v !== 255);
+            if (sent.length) cv.text('CAR SHOWS  ' + sent.map(([n, v]) => n + ' ' + v).join('  ·  '), x0 + 24, 444, 19, t.dim, { font: 'bold', spacing: 0.5 });
             const bt = d.batt;
             cv.text('HV BATTERY  ' + (bt && G.isNum(bt.avg) ? Math.round(T(bt.avg)) + ' ' + tU() + (G.isNum(bt.min) && G.isNum(bt.max) ? '  (cells ' + Math.round(T(bt.min)) + ' - ' + Math.round(T(bt.max)) + ' ' + tU() + ')' : '') : '--')
                 + (bt && G.isNum(bt.avg) && bt.avg < 5 ? '  ·  cold: less range, slower charging' : ''), x0 + 24, 486, 22, bt && G.isNum(bt.avg) && bt.avg < 5 ? t.warn : t.text, { font: 'bold', spacing: 1 });

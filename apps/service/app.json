@@ -2,7 +2,7 @@
   "id": "service",
   "title": "Service",
   "description": "Service requirements from the instrument cluster: oil, brakes, brake fluid, vehicle check, inspection - distance, date, details; brake fluid and vehicle check reset",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "vendor": "custom",
   "loggingId": "OA96",
   "iconGlyph": "wrench",
@@ -26,9 +26,7 @@
       "buttons": [
         ["BTN_SELECT", "Next item"],
         ["BTN_DETAILS", "Details"],
-        ["BTN_RESET_PICK", "Choose reset"],
-        ["BTN_RESET_GO", "Confirm reset"],
-        ["BTN_PAGE", "Next page"],
+        ["BTN_RESET", "Reset service"],
         ["BTN_SETTINGS", "Settings"]
       ]
     }
