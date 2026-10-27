@@ -1,119 +1,118 @@
 [English](README.md) | **中文**
 
-# MGU Custom Apps 英文 / 简体中文双语版
+# MGU Custom Apps 中文安装包
 
-**汉化：小白科技杂物社 / Bilibili 小白151 / GitHub [JackieZ123430](https://github.com/JackieZ123430)**
-汉化仓库：[JackieZ123430/idrive7-apps-cn](https://github.com/JackieZ123430/idrive7-apps-cn)
-上游：[cauliflowermossgrape/idrive7-apps](https://github.com/cauliflowermossgrape/idrive7-apps)
+**汉化：抖音 小白科技杂物社 / BiliBili 小白151 / GitHub [JackieZ123430](https://github.com/JackieZ123430)**
 
-本仓库公开提供源码，不收取下载费或激活费。转载请保留上游许可证和汉化署名，见 [来源说明](NOTICE.zh-CN.md)。
+[本仓库](https://github.com/JackieZ123430/idrive7-apps-cn) · [上游项目](https://github.com/cauliflowermossgrape/idrive7-apps) · [署名与来源](NOTICE.zh-CN.md)
 
-## 汉化内容
+英文和中文分别构建、分别安装。**安装中文包就是中文，安装英文包就是英文，应用设置中没有语言切换选项。** 两种包更新同一组应用，不是重复安装两套应用。
 
-- 11 个应用默认英文；在各应用的 **Settings → Language / 语言 → 中文** 中切换为简体中文。
-- 语言选择会保存，重新打开应用后继续使用；原生菜单、自绘仪表和已有动态提示同步切换。
-- 从上一版中文包升级且未设置过语言时，默认英文，需要重新选择中文。
-- 自绘仪表使用开源 Noto Sans SC 字形，GPU 和软件渲染均支持中文；数字和单位沿用原样。
-- 原生 HMI 菜单通过 SDK 的 StringBundle / StringId 传输 Unicode，避免旧版 Text 通道乱码。
-- 每个应用的设置页底部保留“小白科技杂物社 / Bilibili 小白151 / GitHub JackieZ123430”署名。
-- 仅中文模式在画面右上角使用 12 px、约 25% 不透明度的小字署名“汉化：小白科技杂物社 · GitHub：JackieZ123430”；全屏时放在系统状态栏下方，标准布局避开演示标记。
-- 应用版本带 `-cn.3` 后缀，便于与上游版本区分。
+## 功能与汉化范围
 
-| 原应用 | 中文名称 |
-|---|---|
-| M Vitals | M 车辆仪表 |
-| Redline | 换挡转速 |
-| Virtual Dyno | 虚拟马力机 |
-| Brake Test | 制动测试 |
-| Drag Timer | 加速计时 |
-| G-Force | G 值仪表 |
-| Warm-Up | 暖机助手 |
-| eDrive | 电驱助手 |
-| Fault Scanner | 故障扫描 |
-| Service | 保养信息 |
-| Doom | 毁灭战士 |
+包含 M 车辆仪表、换挡转速、虚拟马力机、制动测试、加速计时、G 值仪表、暖机助手、电驱助手、故障扫描、保养信息和 Doom 共 11 个应用。
 
-此版本不更改车辆信号、诊断指令或设置的内部取值，不需要 BMW ID 登录。
-台架没有对应车辆数据时，可以在设置中开启演示数据。
+中文包包含菜单、按钮、设置、仪表标题及内置提示的简体中文译文，并附带绘制这些文字所需的开源中文字形。中文画面右上角使用 12 px、约 25% 不透明度的小字署名：
 
-## 离线预览
+**抖音：小白科技杂物社 · BiliBili：小白151 · GitHub：JackieZ123430**
 
-以下为演示数据的离线绘制效果，不是实车测试截图。右上角为低对比度汉化署名。
+英文包保留英文显示，不显示中文角落署名。原始版权及汉化贡献署名保留在文档、设置页和源码中。
 
-![M 车辆仪表中文预览](docs/screens/chinese-vitals-preview.png)
+- Doom 启动菜单和设置已汉化，游戏内部贴图和关卡文字保留原文。
+- 原厂故障码数据库、ECU 原始响应及车辆返回的说明保留原文；技术标识和诊断指令不翻译。
+- 自绘中文字库覆盖本版内置译文；车辆返回的任意中文长文本可能需要额外字形。原生 HMI 字符串使用车机自己的字体。
+- 台架缺少对应控制单元时，可在应用设置中启用演示数据。
+- 单个 HMI 字符串资源包按实机验证的 1024 条预算检查，本版预留 256 条动态资源，避免资源申请失败导致 Loading app。
 
-![默认英文预览](docs/screens/bilingual-english-preview.png)
+## 显示预览
 
-![暖机助手中文预览](docs/screens/chinese-warmup-preview.png)
+以下为离线演示数据预览，实际车机控件的字距、焦点和位置仍需实机验证。
 
-## 已知范围
+英文包：
 
-- HMI 单个字符串资源包限 1024 条。本版预留 256 条动态资源，构建时检查静态与动态资源总数，避免启动卡在 Loading app。
+![英文界面](docs/screens/bilingual-english-preview.png)
 
-- Doom 的启动菜单和设置已汉化，游戏内部贴图、关卡文字仍为原文。
-- 原厂故障码数据库、ECU 原始响应及车辆返回的说明保留原文；不将技术标识自动翻译成中文。
-- 自绘字库包含本版内置译文所需字符；车辆返回的任意中文长文本可能包含额外字形，原生 HMI 字符串不受此字形子集限制。
-- 中文底栏宽度按字形测量，但 HMI 的实际字宽与离线近似值可能不同。应在自己的车机验证按钮位置及控制器焦点。
-- 已完成本地构建、自动检查及离线预览，并在 `P18_23w44.2-1-3` 台架完成安装，验证保养应用可进入；其他应用功能、中文切换效果和其他固件仍需实机测试。
+中文包：
 
-## 安装前提
+![中文界面](docs/screens/chinese-warmup-preview.png)
 
-适用于 iDrive 7 MGU，需 root SSH。上游在 `P18_23w44.2` 固件测试；其他版本先执行兼容性检查。
-电脑需要 Python 3 和 Node.js 14 以上。预生成中文字库已提交，正常构建无需 Pillow、字体下载或编译 GPU 程序。
+## 构建两个安装包
 
-安装包包含 BMW 的原厂 SDK，因此本公开仓库只提供源码。请从自己的车机提取 SDK 后构建，不要将提取的 SDK 或含 SDK 的安装包上传到公开仓库。
+需要 Python 3、Node.js 14 以上，以及从自己车机提取的 BMW oap-sdk。已提交预生成字库和 GPU 渲染器，正常构建无需字体工具或 Docker。
 
-### Windows 构建
+原厂 SDK 不随公开仓库分发，也不要将含 SDK 的安装包公开上传。
 
-1. 下载本仓库源码并解压，或用 Git 克隆：
-
-   ```powershell
-   git clone https://github.com/JackieZ123430/idrive7-apps-cn.git
-   cd idrive7-apps-cn
-   ```
-
-2. 从车机下载任意原厂 OAP 应用的 `source/javascript/app.js`，保存到电脑，例如 `own-app.js`。
-   应用 UID 因车机而异，不要假定固定 UID。也可从车机 `/usr/lib/oap-mainapp/preinstalled_apps/` 下的原厂应用 tgz 解出 `javascript/app.js`。
-   具体提取流程见上游 README 的 Quick start。
+1. 从自己的原厂 OAP 应用中获取 `source/javascript/app.js`，保存为 `own-app.js`。各车机应用 UID 不同，也可从 `/usr/lib/oap-mainapp/preinstalled_apps/` 下原厂应用 tgz 中解出这个文件。详细路径和说明见英文 README。
 
    ```powershell
    node kit/tools/extract_sdk.js own-app.js oap-sdk
    ```
 
-3. 先构建暖机助手，便于检查中文显示：
+2. 构建英文包（默认）：
 
    ```powershell
-   node kit/tools/test_zh.js
-   python kit/tools/test_zh.py
-   python kit/tools/make_kit.py warmup
+   python kit/tools/make_kit.py --language en
    ```
 
-   构建全部应用：`python kit/tools/make_kit.py`。Doom 首次构建会下载并校验 Freedoom 游戏数据。
+   输出：`dist/mgu-custom-apps-en.tar.gz`。
 
-4. 用自己的车机 IP 和 SSH 私钥执行检查，再安装。下面的占位值需要替换：
+3. 构建中文包：
 
    ```powershell
-   powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 check -Key "C:\你的目录\id_rsa" -Ip "车机IP"
-   powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 install -Key "C:\你的目录\id_rsa" -Ip "车机IP"
+   python kit/tools/make_kit.py --language zh-CN
    ```
 
-`check` 检查 MainApp 补丁和应用接口兼容性；它会传输检查文件及生成临时文件，不会执行安装或重启服务。
-`install` 会备份配置、安装应用并重启应用平台；Doom 控制器插件首次启用时可能触发车机重启。恢复可使用相同脚本的 `restore` 命令，详见上游安装说明。
+   输出：`dist/mgu-custom-apps-zh-CN.tar.gz`。
 
-## 维护译文与字库
+   只构建一个应用可在命令末尾加应用 ID，例如 `python kit/tools/make_kit.py --language zh-CN warmup`。
 
-译文在 `kit/runtime/locales/zh-CN.tsv` 和生成的 `zh-CN.json`，应用静态菜单在各自 `app.json`。
-修改 TSV 后执行 `python kit/tools/sync_zh.py`，再检查、构建。
+英文构建同时保留兼容上游脚本的 `dist/mgu-custom-apps.tar.gz`。两个语言安装包分别保存在不同文件中，可以先后构建，不会互相覆盖。
 
-新增汉字需要重新生成字形（仅维护者需要 Pillow）：
+## Windows 安装
+
+适用于已具有 root SSH 的 iDrive 7 MGU。本项目部署应用，不刷写 MGU 固件。上游测试固件为 `P18_23w44.2`；本台架的 `P18_23w44.2-1-3` 已验证安装及保养应用启动，其他功能和版本需按实际设备测试。
+
+指定要安装的语言包、自己的 SSH 私钥和车机 IP，先执行检查：
 
 ```powershell
-python -m pip install Pillow
-python kit/tools/bake_cjk.py
-node kit/tools/test_zh.js
-python kit/tools/test_zh.py
+powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 check -Kit dist/mgu-custom-apps-zh-CN.tar.gz -Key "C:\你的目录\id_rsa" -Ip "车机IP"
 ```
 
-字形生成器会校验字体 SHA-256，并检查中文字库的 GPU 纹理预算。生成后的 `cjk.json` 和译文一起提交。
+检查通过后安装：
 
-完整功能、安装实现和恢复细节请阅读 [英文详细文档](README.md)。
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 install -Kit dist/mgu-custom-apps-zh-CN.tar.gz -Key "C:\你的目录\id_rsa" -Ip "车机IP"
+```
+
+要安装英文版，将 `-Kit` 后的文件换成 `dist/mgu-custom-apps-en.tar.gz`。安装器会备份配置并重启应用平台，首次设置 Doom 控制器插件可能重启车机。恢复使用同一脚本的 `restore` 命令；更多细节见 [英文原文档](README.md)。
+
+## 新增其他语言
+
+不需要复制一套应用代码或新增车机语言菜单。每种语言是构建时选择的译文文件：
+
+1. 在 `kit/runtime/locales/` 新增 UTF-8 JSON，例如 `fr.json`：
+
+   ```json
+   {
+     "Settings": "Paramètres",
+     "Next page": "Page suivante",
+     "Oil": "Huile"
+   }
+   ```
+
+2. 构建工具会自动发现新文件：`python kit/tools/make_kit.py --language fr`，生成 `dist/mgu-custom-apps-fr.tar.gz`。没有译文的文本保留英文。
+3. 检查该语言所需字形。含现有字库未覆盖的字符时需补充字库；右向左文字等还需相应排版支持，不能只放入译文就假定显示正确。
+4. 验证原生菜单、仪表排版、动态提示和资源总量。信号名、设置内部取值、故障码及协议字段保持原样。
+
+中文译文维护在 `kit/runtime/locales/zh-CN.tsv`，执行 `python kit/tools/sync_zh.py` 生成 JSON。新增汉字后，用 Pillow 和 `python kit/tools/bake_cjk.py` 重建中文字库，并保留字体许可证。
+
+## 检查与预览
+
+```powershell
+python kit/tools/test_zh.py
+node kit/tools/test_zh.js
+node kit/tools/test_zh.js dist/warmup/source/javascript/kit
+node kit/tools/preview.js dist/warmup preview
+```
+
+第三条检查当前已构建应用的固定语言和字形；第四条预览当前语言的应用。安装包包含的语言由构建参数决定，不读取旧版的语言设置。

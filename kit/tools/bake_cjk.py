@@ -32,7 +32,8 @@ def main():
     baker.FONTDIR = str(font.parent)
     words = json.loads((ROOT / 'kit/runtime/locales/zh-CN.json').read_text(encoding='utf-8'))
     # Only the app's own translated glyphs, ASCII and its units/symbols: never the full CJK block.
-    chars = ''.join(sorted(set(baker.TEXT + ''.join(words.values()) + '汉化：小白科技杂物社 · GitHub：JackieZ123430')))
+    credit_source = (ROOT / 'kit/runtime/credits.js').read_text(encoding='utf-8')
+    chars = ''.join(sorted(set(baker.TEXT + ''.join(words.values()) + credit_source)))
     atlas = baker.bake(font.name, (500,), 48, chars)
     # Prebuilt renderer packs 1024-wide atlases into two 4096-high columns.
     if atlas['atlasH'] > 2048:

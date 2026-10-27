@@ -1,34 +1,32 @@
-# Proposed upstream contribution: optional Simplified Chinese
+# Proposed upstream contribution: build-time language packs
 
-This document is a proposed PR description. No upstream pull request has been opened.
+The English README remains the upstream original, with only English / 中文 navigation added. English app metadata is canonical.
 
-## Result
+## Behavior
 
-Apps and the main README default to English. Each app has a persisted **Language / 语言** setting for English and Simplified Chinese. The Chinese README is reachable from the language links at the top of either document.
+Build one installation package per language. There is no runtime language selector or language migration. An English package displays English; a Chinese package displays Simplified Chinese. Both retain the same app IDs and update the same applications.
 
-## Implementation
+- `python kit/tools/make_kit.py --language en`
+- `python kit/tools/make_kit.py --language zh-CN`
 
-- Keep canonical app metadata, IDs, settings values, signal interfaces and diagnostic requests in English/original form.
-- Translate display strings at the software/GPU rendering and native HMI boundaries.
-- Use stable StringIds and the SDK's Unicode StringBundle API for static menus and dynamic text. Switching languages updates both existing static resources and remembered dynamic rows.
-- Preserve the language selection in each app's existing settings file. Gauge layer caches include the selected language, preventing stale labels after switching.
-- Reuse a shared subsetted Noto Sans SC atlas within the prebuilt renderer's existing texture budget; no renderer binary or firmware changes are needed.
-- English is the default even when the vehicle UI uses another language; users explicitly choose Chinese in each app.
+The generated archives are named `mgu-custom-apps-en.tar.gz` and `mgu-custom-apps-zh-CN.tar.gz`. The default English build also keeps the original `mgu-custom-apps.tar.gz` filename for existing deployment scripts.
 
-## Attribution for discussion
+## Extension
 
-Chinese contribution: **小白科技杂物社 / Bilibili 小白151 / GitHub JackieZ123430**.
+Additional UTF-8 `kit/runtime/locales/<language>.json` catalogs are automatically discovered by the build tools. Static menu resources and the embedded runtime catalog use the selected language only. New scripts/characters require suitable licensed fonts and layout validation. No business-logic fork or extra native UI controls are needed.
 
-The fork retains attribution in the README, NOTICE, source comments and settings. Its subtle corner attribution appears only in Chinese mode. Whether this corner text belongs upstream should be agreed with the maintainer; it is implemented in a separate `credits.js` module for easy adjustment.
+## Native resource limit
 
-## Resource limit
+The P18_23w44.2-1-3 bench accepts 1024 string resources and rejects a 1052-entry bundle. Reserve 256 dynamic resources and reject builds whose total exceeds 1024. Log SDK initialization errors and exit failed startup instead of leaving a live heartbeat behind the loading screen.
 
-On the P18_23w44.2-1-3 bench, native `createStringBundle` accepts 1024 entries and rejects a 1052-entry bundle with `INVALID_VALUE`. Reserve 256 dynamic entries and fail the build if the total exceeds 1024. Startup SDK errors are retained in the app log; rejected startup exits rather than keeping the loading screen alive.
+## Attribution
+
+Chinese contribution: 抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430. The Chinese package retains a small, subtle corner credit; the English package does not show that corner credit. The upstream maintainer can review the attribution presentation separately from the catalog/build changes.
 
 ## Validation
 
-- `node kit/tools/test_zh.js`: English defaults, persistence, two-way and rapid language changes, existing dynamic rows, English/Chinese credit visibility, glyph coverage, renderer measurements and texture budget.
-- `python kit/tools/test_zh.py`: all 11 layouts, English/Chinese resource-key parity, valid StringId references and a default English selector.
-- Build all 11 apps; preview English → Chinese → English without restarting the app.
+- Python checks all 22 English/Chinese layouts, unchanged protocol/configuration data, valid StringIds, resource budgets, absent language selectors and automatic discovery of additional locale files.
+- JavaScript checks fixed-language display behavior, generic catalogs, native Unicode handling, font coverage and corner-credit visibility.
+- Both language kits are built and previewed independently.
 
-Installed on a P18_23w44.2-1-3 bench; the Service app is confirmed to open after the string-resource fix. The remaining app functions, Chinese switching and physical HMI layout still require testing. Doom's in-game assets and the original fault-code database retain their original language. Extracted BMW SDK code and install packages are excluded from the public repository.
+The bench installation and Service startup are verified after the resource-limit correction; further functions and physical HMI layout still require testing. Extracted BMW SDK code and generated installation packages are excluded from the public repository.

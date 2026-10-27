@@ -1,20 +1,55 @@
-"""English canonical strings plus a Chinese table; no mutation of protocol/configuration data."""
-# 汉化维护：Bilibili 小白151 / GitHub JackieZ123430
+"""Fixed-language packages. Add a locales/<tag>.json catalog to build another language."""
+# Chinese contribution: 小白科技杂物社 / Bilibili 小白151 / GitHub JackieZ123430
+import copy
 import json
-import os
+from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-with open(os.path.join(ROOT, 'kit', 'runtime', 'locales', 'zh-CN.json'), encoding='utf-8') as f:
-    WORDS = json.load(f)
+ROOT = Path(__file__).resolve().parent.parent.parent
+LOCALES = ROOT / 'kit/runtime/locales'
 
 
-def text(value):
+def languages():
+    return ['en'] + sorted(p.stem for p in LOCALES.glob('*.json') if p.stem != 'en')
+
+
+def load_locale(language):
+    if language not in languages():
+        raise ValueError('Unknown language: ' + language)
+    return {} if language == 'en' else json.loads((LOCALES / (language + '.json')).read_text(encoding='utf-8'))
+
+
+def text(value, words):
     s = str(value)
-    return WORDS.get(s, s).replace(' (default)', '（默认）')
+    return words.get(s, s).replace(' (default)', ' ' + words.get('(default)', '(default)'))
 
 
-def unicode_resources(ui, strings):
-    """Every nonempty static Text cell gets a stable StringId for runtime language changes."""
+def package_version(version, language):
+    return version if language == 'en' else version + '-' + language.lower().replace('-', '.') + '.1'
+
+
+def localize_spec(spec, language):
+    words = load_locale(language)
+    s = copy.deepcopy(spec)
+    s['version'] = package_version(s['version'], language)
+    s['title'] = text(s['title'], words)
+    for screen in s.get('screens', []):
+        if 'title' in screen:
+            screen['title'] = text(screen['title'], words)
+        for button in screen.get('buttons', []):
+            button[1] = text(button[1], words)
+        for item in screen.get('items', []):
+            if len(item) > 2 and isinstance(item[2], str):
+                item[2] = text(item[2], words)
+    for setting in s.get('settings', []):
+        setting['label'] = text(setting['label'], words)
+        for option in setting.get('options', []):
+            option[1] = text(option[1], words)
+    return s
+
+
+def unicode_resources(ui, strings, language='en'):
+    """Localize static resources; give initial Text cells stable Unicode StringIds."""
+    words = load_locale(language)
     counter = [0]
 
     def visit(obj):
@@ -33,18 +68,11 @@ def unicode_resources(ui, strings):
                 visit(item)
 
     visit(ui)
-    # Reserved for HmiText's dynamic per-component/row/cell resources.
+    for key in strings:
+        strings[key] = text(strings[key], words)
+        if language == 'zh-CN' and key.endswith('_CN_CREDITS_TITLE'):
+            strings[key] = '抖音：小白科技杂物社 / BiliBili：小白151'
     for n in range(256):
         strings['SID_CN_DYNAMIC_%04d' % n] = ''
     if len(strings) > 1024:
-        raise ValueError('HMI string bundle exceeds 1024 resources; reduce static strings or dynamic slots')
-
-
-def resource_tables(strings):
-    # Dynamic slots must not be blanked when switching static resources.
-    english = {key: value for key, value in strings.items() if not key.startswith('SID_CN_DYNAMIC_')}
-    chinese = {key: text(value) for key, value in english.items()}
-    for key in chinese:
-        if key.endswith('_CN_CREDITS_TITLE'):
-            chinese[key] = '汉化：小白科技杂物社 / Bilibili 小白151'
-    return {'en': english, 'zh-CN': chinese}
+        raise ValueError('HMI string bundle exceeds the verified 1024-resource budget')

@@ -2,7 +2,7 @@
   "id": "warmup",
   "title": "Warm-Up",
   "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit and turbo cool-down",
-  "version": "1.4.4-cn.3",
+  "version": "1.4.4",
   "vendor": "custom",
   "loggingId": "OA9A",
   "iconGlyph": "temp",
@@ -32,22 +32,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "language",
-      "label": "Language / 语言",
-      "type": "choice",
-      "default": "en",
-      "options": [
-        [
-          "en",
-          "English"
-        ],
-        [
-          "zh-CN",
-          "中文"
-        ]
-      ]
-    },
     {
       "key": "warmOil",
       "label": "Oil is warm at",

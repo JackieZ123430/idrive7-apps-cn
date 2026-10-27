@@ -17,7 +17,7 @@ import json, os, re, shutil, sys, tarfile, uuid
 from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pack_data  # noqa: E402
-from localize import unicode_resources, resource_tables
+from localize import unicode_resources, localize_spec, load_locale, languages
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -212,7 +212,7 @@ def build_ui(spec):
         # Chinese localization: Bilibili 小白151 / GitHub JackieZ123430.
         # Keep attribution visible in every app without covering the live instruments.
         credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
-        strings[credit_title] = 'Chinese translation: Xiaobai / Bilibili 小白151'
+        strings[credit_title] = 'Douyin 小白科技杂物社 / BiliBili 小白151'
         strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
         items.append(comp('tworow', 'CN_CREDITS', rows=[{
             'Text1stRow': {'value': credit_title, 'type': 'StringId'},
@@ -314,8 +314,9 @@ def make_icon(spec, out):
     os.system(f'node "{os.path.join(HERE, "make_icon.js")}" "{spec.get("iconGlyph", spec["title"][:2])}" "{out}"')
 
 
-def build(app_id):
+def build(app_id, language='en'):
     spec = json.load(open(os.path.join(APPS, app_id, 'app.json'), encoding='utf-8'))
+    spec = localize_spec(spec, language)
     spec.setdefault('id', app_id)
     ver = spec['version']
     stage = os.path.join(DIST, app_id)
@@ -327,10 +328,9 @@ def build(app_id):
 
     manifest = manifest_for(json.loads(json.dumps(spec)))
     xml, uidesc, strings, state_ids = build_ui(spec)
-    unicode_resources(uidesc, strings)
+    unicode_resources(uidesc, strings, language)
     for lang, tbl in spec.get('strings', {}).items():
         strings.update(tbl)
-    translations = resource_tables(strings)
 
     # --- source/ (the npm package) ---
     pkg = {
@@ -375,10 +375,19 @@ def build(app_id):
             shutil.copytree(p, os.path.join(src, 'javascript', 'kit', f))
         else:
             shutil.copy(p, os.path.join(src, 'javascript', 'kit', f))
+    if language == 'zh-CN':
+        # Retain localization authorship in the installed Chinese entry code as plain comments.
+        entry = os.path.join(src, 'javascript', 'app.js')
+        credit = ('// 中文汉化署名：抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430\n'
+                  '// 汉化仓库：https://github.com/JackieZ123430/idrive7-apps-cn\n')
+        with open(entry, 'rb') as file:
+            body = file.read()
+        with open(entry, 'wb') as file:
+            file.write(credit.encode('utf-8') + body)
     rt_spec = {k: spec.get(k) for k in ('id', 'title', 'version', 'screens', 'settings', 'config')}
     rt_spec['stateIds'] = state_ids
     json.dump(rt_spec, open(os.path.join(src, 'javascript', 'kit', 'app-spec.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
-    json.dump(translations, open(os.path.join(src, 'javascript', 'kit', 'locale-strings.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
+    json.dump({'language': language, 'strings': load_locale(language)}, open(os.path.join(src, 'javascript', 'kit', 'locale.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(os.path.join(SDK, 'index.js'), os.path.join(src, 'node_modules', 'oap-sdk', 'index.js'))
     shutil.copy(os.path.join(SDK, 'package.json'), os.path.join(src, 'node_modules', 'oap-sdk', 'package.json'))
 
@@ -450,9 +459,14 @@ def build(app_id):
 
 
 def main():
-    ids = sys.argv[1:] or sorted(d for d in os.listdir(APPS) if os.path.exists(os.path.join(APPS, d, 'app.json')))
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--language', choices=languages(), default='en')
+    parser.add_argument('apps', nargs='*')
+    args = parser.parse_args()
+    ids = args.apps or sorted(d for d in os.listdir(APPS) if os.path.exists(os.path.join(APPS, d, 'app.json')))
     for i in ids:
-        build(i)
+        build(i, args.language)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 # 汉化署名与来源
 
-本仓库的简体中文汉化由 **小白科技杂物社 / Bilibili 小白151 / GitHub JackieZ123430** 维护。
+本仓库的简体中文汉化由 **抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430** 维护。
 
 - 汉化仓库：https://github.com/JackieZ123430/idrive7-apps-cn
 - 上游项目：https://github.com/cauliflowermossgrape/idrive7-apps

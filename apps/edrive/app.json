@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "2.0.1-cn.3",
+  "version": "2.0.1",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -80,22 +80,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "language",
-      "label": "Language / 语言",
-      "type": "choice",
-      "default": "en",
-      "options": [
-        [
-          "en",
-          "English"
-        ],
-        [
-          "zh-CN",
-          "中文"
-        ]
-      ]
-    },
     {
       "key": "range20",
       "label": "Electric range when full, 20 °C",

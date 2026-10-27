@@ -2,7 +2,7 @@
   "id": "service",
   "title": "Service",
   "description": "Service requirements from the instrument cluster: oil, brakes, brake fluid, vehicle check, inspection - distance, date and details",
-  "version": "1.1.1-cn.3",
+  "version": "1.1.1",
   "vendor": "custom",
   "loggingId": "OA96",
   "iconGlyph": "wrench",
@@ -27,22 +27,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "language",
-      "label": "Language / 语言",
-      "type": "choice",
-      "default": "en",
-      "options": [
-        [
-          "en",
-          "English"
-        ],
-        [
-          "zh-CN",
-          "中文"
-        ]
-      ]
-    },
     {"key": "diagPage", "label": "Diagnostics page", "type": "bool", "default": false},
     {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
      "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},

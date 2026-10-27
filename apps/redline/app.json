@@ -2,7 +2,7 @@
   "id": "redline",
   "title": "Redline",
   "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard",
-  "version": "1.8.1-cn.3",
+  "version": "1.8.1",
   "vendor": "custom",
   "loggingId": "OA97",
   "iconGlyph": "rpm",
@@ -33,22 +33,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "language",
-      "label": "Language / 语言",
-      "type": "choice",
-      "default": "en",
-      "options": [
-        [
-          "en",
-          "English"
-        ],
-        [
-          "zh-CN",
-          "中文"
-        ]
-      ]
-    },
     {"key": "redline", "label": "Redline", "type": "number", "unit": "rpm", "default": 7000,
      "steps": [5000, 5500, 6000, 6500, 7000, 7200, 7500, 7800, 8000, 8500, 9000]},
     {"key": "shiftBefore", "label": "Shift point before redline", "type": "number", "unit": "rpm", "default": 300,

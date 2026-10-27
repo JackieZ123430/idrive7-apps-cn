@@ -2,7 +2,7 @@
   "id": "gforce",
   "title": "G-Force",
   "description": "Friction circle with grip envelope, peak g per direction and session records",
-  "version": "1.4.1-cn.3",
+  "version": "1.4.1",
   "vendor": "custom",
   "loggingId": "OA9B",
   "iconGlyph": "gforce",
@@ -32,22 +32,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "language",
-      "label": "Language / 语言",
-      "type": "choice",
-      "default": "en",
-      "options": [
-        [
-          "en",
-          "English"
-        ],
-        [
-          "zh-CN",
-          "中文"
-        ]
-      ]
-    },
     {"key": "scale", "label": "Circle size", "type": "number", "unit": "g", "default": 1.5, "steps": [1.0, 1.5, 2.0]},
     {"key": "trail", "label": "Trail length", "type": "number", "unit": "s", "default": 4, "steps": [2, 4, 8, 15]},
     {"key": "flipLat", "label": "Swap left / right", "type": "bool", "default": false},

@@ -2,7 +2,7 @@
   "id": "dyno",
   "title": "Virtual Dyno",
   "description": "Power and torque curves from a full-throttle pull, saved and compared",
-  "version": "1.2.4-cn.3",
+  "version": "1.2.4",
   "vendor": "custom",
   "loggingId": "OA98",
   "iconGlyph": "dyno",
@@ -34,22 +34,6 @@
     }
   ],
   "settings": [
-    {
-      "key": "language",
-      "label": "Language / 语言",
-      "type": "choice",
-      "default": "en",
-      "options": [
-        [
-          "en",
-          "English"
-        ],
-        [
-          "zh-CN",
-          "中文"
-        ]
-      ]
-    },
     {"key": "weight", "label": "Weight with driver + fuel", "type": "number", "unit": "kg", "default": 1750,
      "steps": [1300, 1400, 1500, 1550, 1600, 1650, 1700, 1750, 1800, 1850, 1900, 1950, 2000, 2100, 2200, 2300, 2400, 2500]},
     {"key": "body", "label": "Body shape (air drag)", "type": "choice", "default": "coupe",
