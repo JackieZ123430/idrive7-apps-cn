@@ -238,10 +238,15 @@ module.exports = function live(ctx, sh) {
     const SLOW = ['soc', 'cellV', 'cellT', 'coolant', 'limits'];
     const slowFail = {}, slowLogT = {};
     const SLOW_KEEP = 10 * 60000;      // a value that stops answering is kept (dimmed) this long, then blank
+    // the pages with cells, temperatures and the climate unit's values (Battery, Battery unit, Scan): drawn this
+    // recently. Elsewhere (Range, Energy: only the power) those reads wait, so the power reads get the link
+    let pageDrawT = 0;
+    const pageShown = () => Date.now() - pageDrawT < SHOWN_MS;
     async function readSlow() {
         if (!diag.available || !shown()) return;
         for (const name of SLOW) {
             if (!(cfg.slow[name] || []).length) continue;
+            if (!pageShown() && name !== 'soc' && name !== 'limits') continue;
             await exclusive(async () => {
                 try {
                     let r = await readGroup(name, cfg.slow[name]);
@@ -265,7 +270,7 @@ module.exports = function live(ctx, sh) {
                 } catch (e) { log.warn(name + ': ' + e); }
             });
         }
-        await readProbes();
+        if (pageShown()) await readProbes();
     }
 
     /* ---------- climate unit values being identified (config.probes) ----------
@@ -929,7 +934,7 @@ module.exports = function live(ctx, sh) {
         },
         /** Draws page `name`; returns the data it showed. */
         draw(name, cv, t) {
-            lastDrawT = Date.now();
+            lastDrawT = pageDrawT = Date.now();
             const d = data();
             ({ battery: renderBattery, unit: renderUnit, scan: renderScan })[name](cv, t, d);
             return d;
