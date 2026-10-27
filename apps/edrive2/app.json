@@ -2,7 +2,7 @@
   "id": "edrive2",
   "title": "eDrive Live",
   "description": "Live HV battery power (kW), cell temperatures and voltages, power limits and climate / HVAC power use - set up for the X5 xDrive45e (G05 PHEV)",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "vendor": "custom",
   "loggingId": "OA9D",
   "iconGlyph": "battery",
@@ -50,17 +50,16 @@
     }
   },
   "startWidget": {
-    "comment": "Home-screen widget. Layout and cell names are those of BMW's Drive Recorder widget on this firmware: the drawn image goes into BackgroundImage1, the layout shows Title above it. If the image doesn't show or sits wrong, try another 'image' cell or adjust 'size' (pixels: one picture for both widget sizes, shown centred at its own size).",
+    "comment": "Home-screen widget. Layout and cell names are those of BMW's Drive Recorder widget on this firmware: the drawn image goes into BackgroundImage1, the layout shows Title above it. If the image doesn't show or sits wrong, try another 'image' cell or adjust 'size' (pixels: the HMI scales the picture to the big widget and crops it centred; 384 x 256 fits the G05).",
     "name": "eDrive Live",
     "layout": "LT_Table_OnlineApps_DriveRecorderWidget",
     "image": "BackgroundImage1",
-    "size": [420, 284],
+    "size": [384, 256],
     "cells": {
       "Title": ["eDrive Live", "Text"],
       "ErrorInfo": [false, "Bool"],
       "background": [true, "Bool"],
       "ProgressbarVisible": [false, "Bool"],
-      "TextCam": ["", "Text"],
       "TextRecordings": ["", "Text"]
     }
   },

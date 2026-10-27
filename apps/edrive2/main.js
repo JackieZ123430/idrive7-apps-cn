@@ -1041,11 +1041,6 @@ mgu.run({
             }
             cv.fillRect(Math.round(x0) - 1, y - 4, 3, h + 8, t.text);
         }
-        /* One picture for both widget sizes. The HMI shows it at its own pixel size, centred and
-         * cut to the widget (big about 430 x 290, small about 430 x 150; the layout's title sits on
-         * the top left of both). So: rows ~70-125 hold the small widget's title (status and V / A on
-         * the right of it), rows 125-215 what both sizes show (power, charge, the bar) and the rows
-         * outside that only the big widget (cells, this drive). */
         /* Small widget: the layout doesn't show the picture at that size (log: images pushed, nothing on
          * screen), so its own text lines and progress bar carry the numbers there; cleared on the big one. */
         const wtext = {};
@@ -1054,12 +1049,16 @@ mgu.run({
             const max = pw.kw > 0 ? Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'))
                 : Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
             const on = !inst.big;
+            const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip;
+            const amps = G.isNum(d.a) ? G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : '';
             const cells = {
-                TextRecordings: [on ? pw.text + ' kW  ' + pw.what + '  ' + (G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' %' : '') : '', 'Text'],
+                // one short line per text cell of the layout (each shows ~20 characters)
+                TextRecordings: [on ? pw.text + ' kW   ' + (G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' %' : '-- %') : '', 'Text'],
+                TextCam: [on ? pw.what + (G.isNum(d.v) ? '  ' + G.fmt(d.v, 0) + ' V  ' + amps : '') : '', 'Text'],
                 ProgressbarVisible: [on, 'Bool'],
                 Progress: [on && G.isNum(pw.kw) ? Math.round(G.clamp(Math.abs(pw.kw) / max, 0, 1) * 100) : 0, 'Float'],
-                TimeElapsed: [on ? pw.text + ' kW' : '', 'Text'],
-                TimeRemaining: [on && G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' %' : '', 'Text'],
+                TimeElapsed: [on ? 'Cells ' + (ct ? fmtT(ct.avg) : '--') : '', 'Text'],
+                TimeRemaining: [on ? 'Drive ' + G.fmt(tp.out - tp.regen, 2) + ' kWh' : '', 'Text'],
             };
             const prev = wtext[inst.spawnId] || (wtext[inst.spawnId] = {});
             Object.keys(cells).forEach((k) => {
@@ -1069,34 +1068,34 @@ mgu.run({
                 ctx.widget.set(inst.spawnId, k, cells[k][0], cells[k][1]);
             });
         }
+        /* Big widget picture. The HMI scales it to the widget and crops the overflow, centred: measured
+         * on the car, the big widget shows about 384 x 256 of it, with the layout's title on the top left
+         * (to about row 50). */
         function renderWidget(inst) {
             if (inst) widgetCells(inst);
-            const [w, h] = (ctx.spec.startWidget && ctx.spec.startWidget.size) || [420, 284];
+            const [w, h] = (ctx.spec.startWidget && ctx.spec.startWidget.size) || [384, 256];
             const key = w + 'x' + h;
             const cv = (wcan[key] = wcan[key] || new Canvas(w, h)).clear([0, 0, 0, 0]);
             const t = ctx.theme(), d = data(), pw = power(d, t), lim = limitsKw(d);
             const scol = pw.what === 'REGEN' || pw.what === 'CHARGING' ? GO : pw.kw === null ? t.dim : t.text;
-            const cy = h / 2, x0 = 14, x1 = w - 14;
-            // beside the title (both sizes)
-            cv.text(pw.what, x1, cy - 52, 20, scol, { font: 'bold', spacing: 1.5, align: 'right' });
+            const x0 = 16, x1 = w - 16, ky = Math.round(h * 0.55);
+            cv.text(pw.what, x1, 30, 18, scol, { font: 'bold', spacing: 1.5, align: 'right' });
             cv.text((G.isNum(d.v) ? G.fmt(d.v, 0) + ' V' : '-- V') + (G.isNum(d.a) ? '   ' + G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : ''),
-                x1, cy - 26, 17, t.dim, { align: 'right' });
-            // power and charge (both sizes)
-            const vw = cv.text(pw.text, x0, cy + 44, 72, pw.col, { font: 'num' });
-            cv.text('kW', x0 + 8 + vw, cy + 44, 24, t.dim, { font: 'bold' });
-            const sw = cv.text('%', x1, cy + 44, 22, t.dim, { font: 'bold', align: 'right' });
-            cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--', x1 - sw - 4, cy + 44, 48, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'right' });
-            widgetBar(cv, t, x0, cy + 58, w - 28, 14, pw.kw, lim);
-            // big widget only: below the bar
-            const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip, yb = cy + 102;
+                x1, 54, 16, t.dim, { align: 'right' });
+            const vw = cv.text(pw.text, x0, ky, 68, pw.col, { font: 'num' });
+            cv.text('kW', x0 + 8 + vw, ky, 22, t.dim, { font: 'bold' });
+            const sw = cv.text('%', x1, ky, 20, t.dim, { font: 'bold', align: 'right' });
+            cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--', x1 - sw - 4, ky, 44, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'right' });
+            if (d.engine || d.demo) cv.text(d.engine ? 'ENGINE ON' : 'DEMO', w / 2 + 30, ky - 4, 13, t.warn, { font: 'bold', spacing: 1, align: 'center' });
+            widgetBar(cv, t, x0, ky + 14, w - 32, 12, pw.kw, lim);
+            const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip, yb = h - 44;
             const colm = (x, label, v, c, align) => {
-                cv.text(label, x, yb, 14, t.dim, { font: 'bold', spacing: 1, align });
-                cv.text(v, x, yb + 28, 24, c, { font: 'bold', align });
+                cv.text(label, x, yb, 13, t.dim, { font: 'bold', spacing: 1, align });
+                cv.text(v, x, yb + 26, 22, c, { font: 'bold', align });
             };
             colm(x0, 'CELLS', ct ? fmtT(ct.avg) : '--', ct ? tempColor(t, ct.avg) : t.dim);
             colm(w / 2, 'THIS DRIVE', G.fmt(tp.out - tp.regen, 2) + ' kWh', t.text, 'center');
             colm(x1, 'REGEN', G.fmt(tp.regen, 2) + ' kWh', GO, 'right');
-            if (d.engine || d.demo) cv.text(d.engine ? 'ENGINE ON' : 'DEMO', w / 2 + 30, cy + 40, 14, t.warn, { font: 'bold', spacing: 1, align: 'center' });
             return cv;
         }
         if (ctx.widget) {
