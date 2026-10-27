@@ -243,7 +243,23 @@ mgu.run({
 
         // one request at a time on the diagnostic link: the fast and the slow reads take turns
         let chain = Promise.resolve();
-        const exclusive = (fn) => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
+        // a queue rather than a plain chain, so a power read (urgent) goes ahead of the slow reads that wait
+        const queue = [];
+        let pumping = false;
+        async function pump() {
+            if (pumping) return;
+            pumping = true;
+            while (queue.length) {
+                const j = queue.shift();
+                try { j.res(await j.fn()); } catch (e) { j.rej(e); }
+            }
+            pumping = false;
+        }
+        const exclusive = (fn, urgent) => new Promise((res, rej) => {
+            const j = { fn, res, rej };
+            if (urgent) queue.unshift(j); else queue.push(j);
+            pump();
+        });
         let lastDrawT = 0;
         const shown = () => Date.now() - lastDrawT < SHOWN_MS;
         const engineOn = () => G.isNum(live.rpm) && live.rpm > 400 && Date.now() - live.rpmT < 5000;
@@ -276,12 +292,15 @@ mgu.run({
             if (!diag.available || (iFail >= 3 && Date.now() - iTry < 30000)) return;
             await exclusive(async () => {
                 try {
-                    if (vTick++ % 5 === 0 || !G.isNum(live.v)) {
+                    // the pack voltage moves little: every 5 s is enough, so the current gets nearly every read
+                    if (!G.isNum(live.v) || Date.now() - live.vT > 5000) {
                         const r = await readGroup('hvV', cfg.fast.hvV);
                         if (r) { live.v = r[fieldsOf(cfg.fast.hvV[pick.hvV])[0]]; live.vT = Date.now(); }
                     }
                     iTry = Date.now();
                     const r = await readGroup('hvI', cfg.fast.hvI);
+                    rate.push([iTry, Date.now() - iTry]);
+                    while (rate.length && iTry - rate[0][0] > 10000) rate.shift();
                     if (!r) { iFail++; return; }
                     iFail = 0;
                     const a = r[fieldsOf(cfg.fast.hvI[pick.hvI])[0]], now = Date.now();
@@ -289,13 +308,17 @@ mgu.run({
                     const volts = live.vT && now - live.vT < 60000 ? live.v : live.lscVT && now - live.lscVT < 60000 ? live.lscV : null;
                     if (G.isNum(volts) && G.isNum(a)) onPower(volts * a / 1000 * (cfg.powerSign < 0 ? -1 : 1), now);
                 } catch (e) { log.warn('power: ' + e); }
-            });
+            }, true);
         }
+        /** Power reads in the last 10 s: [time, ms it took]. */
+        const rate = [];
+        const readRate = () => (rate.length > 1 ? { hz: (rate.length - 1) / ((rate[rate.length - 1][0] - rate[0][0]) / 1000), ms: rate.reduce((a, r) => a + r[1], 0) / rate.length } : null);
         let powerTimer = null;
         function schedulePower() {
             clearTimeout(powerTimer);
             const s = shown() ? settings.get('powerPoll') : Math.max(BG_POWER_S, settings.get('powerPoll'));
-            powerTimer = setTimeout(() => readPower().then(schedulePower, schedulePower), Math.max(250, s * 1000));
+            // 0.1 s: as fast as the battery unit answers (one read waits for the last)
+            powerTimer = setTimeout(() => readPower().then(schedulePower, schedulePower), Math.max(20, s * 1000 - (s <= 0.1 ? 1000 : 0)));
         }
         schedulePower();
 
@@ -597,7 +620,7 @@ mgu.run({
                 const why = d.demo ? 'DEMO' : !diag.available ? 'NO DIAGNOSTIC LINK' : iFail >= 3 ? (settings.get('diagPage') ? 'NO REPLY - SEE DIAGNOSTICS' : 'NO REPLY') : 'READING';
                 return { kw: null, text: '--', col: t.dim, what: why };
             }
-            const v = G.hold('edrive2.kw', d.kw, 250), a = Math.abs(v);
+            const v = G.hold('edrive2.kw', d.kw, 150), a = Math.abs(v);
             const moving = G.isNum(d.speed) && d.speed > 1;
             const what = v > IDLE_KW ? (moving ? 'DRIVING' : 'DRAWING') : v < -IDLE_KW ? (moving ? 'REGEN' : 'CHARGING') : 'IDLE';
             return { kw: v, text: (v < -IDLE_KW ? '-' : '') + G.fmt(a, a < 10 ? 1 : 0), col: v < -IDLE_KW ? GO : a >= 60 ? t.warn : t.text, what };
@@ -626,7 +649,7 @@ mgu.run({
             const span = outMax + inMax, x0 = x + w * inMax / span, h = 30;
             const X = (v) => x0 + G.clamp(v, -inMax, outMax) / span * w;
             cv.roundRect(x, y, w, h, 6, withAlpha(t.track, 0.9));
-            const sv = G.smooth('edrive2.bar', kw, 14);
+            const sv = G.smooth('edrive2.bar', kw, 22);
             if (G.isNum(sv) && Math.abs(sv) > 0.05) {
                 if (sv > 0) cv.rampRect(x0, y, X(sv) - x0, h, 4, t.hotRamp || t.ramp, x0, x + w - x0);
                 else cv.roundRect(X(sv), y, x0 - X(sv), h, 4, GO);
@@ -902,7 +925,8 @@ mgu.run({
         function renderDiag(cv, t, d) {
             G.panel(cv, t, 24, 44, 1552, 468, 'Battery unit (UDS)');
             const link = diag.p ? (diag.available ? 'link up' : 'link down') : 'no link (' + (diag.error || 'not started') + ')';
-            cv.text('UDS 22 ReadDataByIdentifier  ·  ' + link + '  ·  power sign ' + cfg.powerSign + '  ·  baseline ' + G.fmt(baseline(), 2) + ' kW (' + (st.baseN || 0) + ' samples)', 48, 112, 22, t.text, { font: 'label' });
+            const rr = readRate();
+            cv.text('UDS 22  ·  ' + link + '  ·  power read ' + (rr ? G.fmt(rr.hz, 1) + 'x/s, ' + G.fmt(rr.ms, 0) + ' ms each' : 'n/a') + '  ·  power sign ' + cfg.powerSign + '  ·  baseline ' + G.fmt(baseline(), 2) + ' kW (' + (st.baseN || 0) + ' samples)', 48, 112, 22, t.text, { font: 'label' });
             const cols = [48, 200, 290, 380, 900, 1290];
             ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS'].forEach((h, i) => cv.text(h, cols[i], 156, 20, t.dim, { font: 'bold', spacing: 1 }));
             cv.fillRect(48, 168, 1504, 1, t.tick);
