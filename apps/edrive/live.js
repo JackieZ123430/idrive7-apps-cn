@@ -591,33 +591,41 @@ module.exports = function live(ctx, sh) {
     /** Cell temperature colours: cold packs give less power and regen, hot ones get limited. */
     const tempColor = (t, c) => (!G.isNum(c) ? t.dim : c < 5 ? t.cold : c > 45 ? t.crit : c > 38 ? t.warn : t.text);
 
-    /** Battery: its power now, every cell's voltage, and this drive. */
-    function renderBattery(cv, t, d) {
-        // ---- power now: kW, what the pack does, V / A, a bar against the battery's limits, the last two minutes
-        const pw = power(d, t), lim = limitsKw(d), lw = 560, lr = 24 + lw - 24;
-        G.panel(cv, t, 24, 44, lw, 468, 'Battery power now');
-        const vw = cv.text(pw.text, 48, 196, 120, pw.col, { font: 'num' });
-        cv.text('kW', 60 + vw, 196, 38, t.dim, { font: 'bold' });
+    /** Battery power now: kW, what the pack does, V / A, a bar against the battery's limits and (room permitting) the last two minutes. */
+    function renderPowerPanel(cv, t, d, x, y, w, h) {
+        const pw = power(d, t), lim = limitsKw(d), r = x + w - 24, big = h >= 400;
+        G.panel(cv, t, x, y, w, h, 'Battery power now');
+        const ky = y + (big ? 152 : 118);
+        const vw = cv.text(pw.text, x + 24, ky, big ? 120 : 84, pw.col, { font: 'num' });
+        cv.text('kW', x + 34 + vw, ky, big ? 38 : 30, t.dim, { font: 'bold' });
         const pcol = pw.what === 'REGEN' || pw.what === 'CHARGING' ? GO : pw.kw === null ? t.dim : t.text;
-        cv.text(pw.what, lr, 116, 26, pcol, { font: 'bold', spacing: 2, align: 'right' });
-        cv.text(G.isNum(d.v) ? G.fmt(d.v, 0) + ' V' + (G.isNum(d.a) ? '  ·  ' + G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : '') : 'pack --', lr, 152, 22, t.dim, { align: 'right' });
-        if (d.engine) cv.text('ENGINE RUNNING', lr, 186, 20, t.warn, { font: 'bold', spacing: 1.5, align: 'right' });
-        powerBar(cv, t, 48, 226, lw - 48, pw.kw, lim);
-        const top = Math.max(20, ...trace.map((p) => p[1]), 0) * 1.1, bottom = Math.max(10, ...trace.map((p) => -p[1]), 0) * 1.1;
-        const tr = d.demo ? demoHistory(TRACE_S, 1, (x) => x.kw) : trace;
-        powerTrace(cv, t, 48, 316, lw - 48, 118, tr, TRACE_S, d.demo ? 60 : top, d.demo ? 25 : bottom);
-        cv.text('COOLANT  ' + fmtT(d.coolant, 1) + '   ·   OUTSIDE  ' + fmtT(d.ambient, 0), 48, 494, 20, t.dim, { font: 'bold', spacing: 1 });
+        cv.text(pw.what, r, y + 72, 26, pcol, { font: 'bold', spacing: 2, align: 'right' });
+        cv.text(G.isNum(d.v) ? G.fmt(d.v, 0) + ' V' + (G.isNum(d.a) ? '  ·  ' + G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : '') : 'pack --', r, y + 106, 22, t.dim, { align: 'right' });
+        if (d.engine) cv.text('ENGINE RUNNING', r, y + 138, 20, t.warn, { font: 'bold', spacing: 1.5, align: 'right' });
+        const by = ky + 30;
+        powerBar(cv, t, x + 24, by, w - 48, pw.kw, lim);
+        const ty = by + 70, th = y + h - 34 - ty;
+        if (th >= 40) {
+            const top = Math.max(20, ...trace.map((p) => p[1]), 0) * 1.1, bottom = Math.max(10, ...trace.map((p) => -p[1]), 0) * 1.1;
+            const tr = d.demo ? demoHistory(TRACE_S, 1, (q) => q.kw) : trace;
+            powerTrace(cv, t, x + 24, ty, w - 48, th, tr, TRACE_S, d.demo ? 60 : top, d.demo ? 25 : bottom);
+        }
+    }
 
-        // ---- every cell's voltage: the lowest and highest marked, scaled to the spread
+    /** Battery: its power now (left; Battery health under it is eDrive's, main.js: 24, 360, 560, 152) and every cell. */
+    function renderBattery(cv, t, d) {
+        renderPowerPanel(cv, t, d, 24, 44, 560, 300);
+
+        // ---- every cell's voltage: the lowest and highest marked, scaled to the spread; the cells' temperature
         const x = 608, w = 968, r = x + w - 24;
         const cvv = d.cellV, cells = cvv && cvv.cells;
-        G.panel(cv, t, x, 44, w, 256, 'Cells' + (cells ? '  (' + cells.length + ')' : ''));
+        G.panel(cv, t, x, 44, w, 468, 'Cells' + (cells ? '  (' + cells.length + ')' : ''));
         const spread = cvv && G.isNum(cvv.min) && G.isNum(cvv.max) ? (cvv.max - cvv.min) * 1000 : null;
         const scol = !G.isNum(spread) ? t.dim : spread > 100 ? t.crit : spread > 50 ? t.warn : GO;
         const head = (hx, label, v, c, sub) => {
             cv.text(label, hx, 112, 18, t.dim, { font: 'bold', spacing: 1.2 });
-            cv.text(v, hx, 146, 30, c, { font: 'bold' });
-            if (sub) cv.text(sub, hx, 168, 16, t.dim);
+            cv.text(v, hx, 148, 32, c, { font: 'bold' });
+            if (sub) cv.text(sub, hx, 172, 16, t.dim);
         };
         head(x + 24, 'LOWEST', cvv && G.isNum(cvv.min) ? G.fmt(cvv.min, 3) + ' V' : '--', t.warn, cvv && cvv.minAt ? 'cell ' + cvv.minAt : '');
         head(x + 234, 'HIGHEST', cvv && G.isNum(cvv.max) ? G.fmt(cvv.max, 3) + ' V' : '--', t.accent2 || t.text, cvv && cvv.maxAt ? 'cell ' + cvv.maxAt : '');
@@ -627,12 +635,12 @@ module.exports = function live(ctx, sh) {
         head(x + 654, 'TEMPERATURE', ct ? fmtT(ct.avg) : '--', ct ? tempColor(t, ct.avg) : t.dim,
             ct && G.isNum(ct.min) && G.isNum(ct.max) ? G.fmt(T(ct.min), 0) + ' - ' + G.fmt(T(ct.max), 0) + ' ' + tU() : '');
         cv.text('CHARGE', r, 112, 18, t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
-        const pc = cv.text('%', r, 146, 20, t.dim, { font: 'bold', align: 'right' });
-        cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 1) : '--', r - pc - 6, 146, 30, t.text, { font: 'bold', align: 'right' });
-        if (G.isNum(d.soc)) cv.text('~' + G.fmt(d.soc / 100 * settings.get('designKwh'), 1) + ' kWh', r, 168, 16, t.dim, { align: 'right' });
+        const pc = cv.text('%', r, 148, 20, t.dim, { font: 'bold', align: 'right' });
+        cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 1) : '--', r - pc - 6, 148, 32, d.stale && d.stale.soc ? t.dim : t.text, { font: 'bold', align: 'right' });
+        if (G.isNum(d.soc)) cv.text('~' + G.fmt(d.soc / 100 * settings.get('designKwh'), 1) + ' kWh', r, 172, 16, t.dim, { align: 'right' });
         if (cells) {
             // bars: from a floor below the lowest cell, so the differences show
-            const x0 = x + 80, bw0 = r - x0, btop = 184, base = 266, n = cells.length, bw = bw0 / n;
+            const x0 = x + 80, bw0 = r - x0, btop = 210, base = 420, n = cells.length, bw = bw0 / n;
             const pad = Math.max(0.005, (cvv.max - cvv.min) * 0.6), vlo = cvv.min - pad, vhi = cvv.max + pad * 0.4;
             const Y = (v) => base - (v - vlo) / (vhi - vlo) * (base - btop);
             [vlo, vhi].forEach((v) => {
@@ -647,16 +655,18 @@ module.exports = function live(ctx, sh) {
             });
             for (let i = 0; i < n; i += 12) cv.text(String(i + 1), x0 + i * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
             cv.text(String(n), x0 + (n - 1) * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
-        } else cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', x + w / 2, 236, 24, t.dim, { align: 'center' });
-
-        // (below the cells: eDrive's Battery health, drawn by main.js into x, 316, w, 196)
+        } else cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', x + w / 2, 300, 24, t.dim, { align: 'center' });
+        // the cells' temperature, where it comes from
+        cv.text('CELL TEMPERATURE  ' + (ct ? fmtT(ct.avg, 1) + (G.isNum(ct.min) && G.isNum(ct.max) ? '   (' + fmtT(ct.min) + ' - ' + fmtT(ct.max) + ')' : '') : '--'),
+            x + 24, 492, 20, ct ? tempColor(t, ct.avg) : t.dim, { font: 'bold', spacing: 1 });
+        if (ct) cv.text(ct.src + (d.stale && d.stale.cellT && ct.src.indexOf('battery unit') >= 0 ? ', read ' + Math.round(d.stale.cellT / 60000) + ' min ago' : ''), r, 492, 16, t.dim, { align: 'right' });
     }
 
     /** This drive: energy used, regen, net; what it went to (driving vs. climate); peaks. Wide (w >= 700) or tall. */
-    function renderTrip(cv, t, d, x, y0, w, h) {
+    function renderTrip(cv, t, d, x, y0, w, h, foot) {
         const r = x + w - 24;
         G.panel(cv, t, x, y0, w, h, 'This drive');
-        if (w < 700) return renderTripTall(cv, t, d, x, y0, w, h);
+        if (w < 700) return renderTripTall(cv, t, d, x, y0, w, h, foot);
         const tp = tripNow(d);
         const col = (cx, label, v, c) => {
             cv.text(label, cx, y0 + 72, 18, t.dim, { font: 'bold', spacing: 1.2 });
@@ -682,7 +692,7 @@ module.exports = function live(ctx, sh) {
             + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago') , x + 24, y0 + 168, 18, t.dim);
     }
     const tripNow = (d) => (d.demo ? { out: 2.84, regen: 0.61, charged: 0, climate: 0.48, peakOut: 61, peakIn: 24, since: Date.now() - 23 * 60000 } : trip);
-    function renderTripTall(cv, t, d, x, y0, w, h) {
+    function renderTripTall(cv, t, d, x, y0, w, h, foot) {
         const tp = tripNow(d), r = x + w - 24;
         const row = (y, label, v, c) => {
             cv.text(label, x + 24, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
@@ -702,9 +712,7 @@ module.exports = function live(ctx, sh) {
             if (dp > 0.005) cv.roundRect(x + 24, yb + 12, Math.max(4, sw * dp), 14, 5, withAlpha(t.text, 0.8));
             if (cp2 > 0.005) cv.roundRect(x + 24 + sw * dp, yb + 12, Math.max(4, sw * cp2), 14, 5, t.warn);
         }
-        const mins = Math.round((Date.now() - tp.since) / 60000);
-        cv.text('peak ' + G.fmt(tp.peakOut, 0) + ' kW out  ·  ' + G.fmt(tp.peakIn, 0) + ' kW regen', x + 24, y0 + 410, 18, t.dim);
-        cv.text((tp.charged > 0.05 ? 'charged ' + G.fmt(tp.charged, 2) + ' kWh  ·  ' : '') + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago'), x + 24, y0 + 440, 18, t.dim);
+        (foot || []).forEach(([txt, col], i) => cv.text(txt, x + 24, y0 + 412 + i * 30, 20, col || t.dim, { font: 'bold', spacing: 1 }));
     }
 
     function renderUnit(cv, t, d) {
@@ -871,7 +879,16 @@ module.exports = function live(ctx, sh) {
         DIAG: ['unit', 'scan'],
         NAMES: { battery: 'Battery', unit: 'Battery unit', scan: 'Scan' },
         /** This drive (energy used, regen, net, split, peaks) into a panel at x, y, w, h. */
-        drawTrip(cv, t, x, y, w, h) { renderTrip(cv, t, data(), x, y, w, h); },
+        drawTrip(cv, t, x, y, w, h, foot) { renderTrip(cv, t, data(), x, y, w, h, foot); },
+        /** The Battery page's power panel (kW, bar, the last two minutes) at x, y, w, h. */
+        drawPower(cv, t, x, y, w, h) { renderPowerPanel(cv, t, data(), x, y, w, h); },
+        /** A one-line "battery power now": label, kW and the bar (regen left, use right), no history. */
+        drawPowerBar(cv, t, x, y, w) {
+            const d = data(), pw = power(d, t);
+            cv.text('BATTERY POWER NOW', x, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
+            cv.text(pw.text + ' kW', x + w, y, 28, pw.col, { font: 'bold', align: 'right' });
+            powerBar(cv, t, x, y + 18, w, pw.kw, limitsKw(d));
+        },
         /** The battery's power now as the pages show it: { kw, text, col, what } (kw null: no reading). */
         powerNow(t) { return power(data(), t); },
         /**
