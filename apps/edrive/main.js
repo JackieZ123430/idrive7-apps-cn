@@ -48,8 +48,8 @@ const startLive = require('./live');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
-// the live pages (power, battery, cells, climate; the battery unit and scan with the diagnostics) are live.js's
-const PAGES_HYBRID = ['main', 'power', 'energy', 'battery', 'cells', 'climate', 'log', 'diag', 'unit', 'scan', 'signals'];
+// the live pages (power, battery; the battery unit and scan with the diagnostics) are live.js's
+const PAGES_HYBRID = ['main', 'power', 'energy', 'battery', 'log', 'diag', 'unit', 'scan', 'signals'];
 const PAGES_12V = ['main', 'diag', 'signals'];
 const DIAG_PAGES = ['diag', 'unit', 'scan', 'signals'];
 /** Comfort consumers, estimated from their levels (kW): seat heating per level 0..3, steering wheel. */
@@ -884,7 +884,11 @@ mgu.run({
             const x0 = 788, w0 = 788;
             G.panel(cv, t, x0, 44, w0, 468, 'Where the power goes now');
             const base = model.auxRate(d.ambient, k, false).rate * k;
-            const climKw = d.climate === false ? 0 : Math.max(0, e.auxKw - base), blow = d.climate === false ? 0 : Math.min(climKw, blowerKw(d));
+            // the climate: measured from the battery or the climate unit's figures (live.js) when there are, else the estimate
+            // (the measurement holds the seat and wheel heating too: they have rows of their own)
+            const lc = d.demo ? null : lv.climate();
+            const climKw = d.climate === false && !lc ? 0 : lc ? Math.max(0, lc.kw - comfort) : Math.max(0, e.auxKw - base);
+            const blow = d.climate === false ? 0 : Math.min(climKw, blowerKw(d));
             const seatKw = comfort - (d.wheel ? WHEEL_KW : 0), wheelKw = d.wheel ? WHEEL_KW : 0;
             const share = (kw) => (G.isNum(e.comfortKm) && comfort > 0 ? e.comfortKm * kw / comfort : null);
             // driving: learned % per km at the pace; before that the typical range (all use per km) less
@@ -896,7 +900,9 @@ mgu.run({
                 ['Driving', driveKw, null,
                     G.isNum(e.pace) ? 'at ' + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h') + (e.learned ? '' : ' (typical)') : 'learns as you drive'],
                 ['Climate (heating / A/C)', climKw, has && d.climate !== false ? e.climateKm : null,
-                    d.climate === false ? 'off' : (e.auxLearned ? 'measured' : 'typical') + (blow > 0 ? ', blower ~' + G.fmt(blow, 2) + ' kW' : '')],
+                    lc ? (lc.how === 'measured' ? 'from the battery' : lc.how === 'climate unit' ? 'climate unit' : 'measured before')
+                        + (blow > 0 ? ', blower ~' + G.fmt(blow, 2) + ' kW' : '')
+                        : d.climate === false ? 'off' : (e.auxLearned ? 'learned' : 'typical') + (blow > 0 ? ', blower ~' + G.fmt(blow, 2) + ' kW' : '')],
                 ['Seat heating', seatKw, has ? share(seatKw) : null, seatTxt ? seatTxt + ' (est.)' : 'off'],
                 ['Steering wheel', wheelKw, has ? share(wheelKw) : null, d.wheel === null || d.wheel === undefined ? 'n/a' : d.wheel ? 'on (est.)' : 'off'],
                 ['On-board electrics', base, null, 'screens, units, pumps'],
