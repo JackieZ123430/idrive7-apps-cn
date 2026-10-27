@@ -1,3 +1,5 @@
+**中文** | [English](README.en.md)
+
 # MGU Custom Apps 简体中文版
 
 **汉化：小白科技杂物社 / Bilibili 小白151 / GitHub [JackieZ123430](https://github.com/JackieZ123430)**
@@ -108,4 +110,4 @@ python kit/tools/test_zh.py
 
 字形生成器会校验字体 SHA-256，并检查中文字库的 GPU 纹理预算。生成后的 `cjk.json` 和译文一起提交。
 
-完整功能、安装实现和恢复细节请阅读 [上游原文档](README.md)。
+完整功能、安装实现和恢复细节请阅读 [英文详细文档](README.en.md)。
