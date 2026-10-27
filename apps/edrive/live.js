@@ -90,7 +90,7 @@ module.exports = function live(ctx, sh) {
     /* ---------- UDS: candidates with several fields on one reply ---------- */
     const pick = {};
     const fieldsOf = (c) => (c.array ? ['min', 'max', 'avg'] : Object.keys(c.fields || {}));
-    const primary = (c) => Object.assign({ ecu: c.ecu, did: c.did }, c.array || c.fields[fieldsOf(c)[0]]);
+    const primary = (c) => Object.assign({ ecu: c.ecu, did: c.did, timeoutMs: c.timeoutMs }, c.array || c.fields[fieldsOf(c)[0]]);
     /** One candidate: { field: value } (a field outside its min..max is null), or null when it doesn't answer. */
     async function readFields(c) {
         const p = primary(c), v0 = await reader.read(p);
@@ -147,7 +147,12 @@ module.exports = function live(ctx, sh) {
     const trip = { out: 0, regen: 0, charged: 0, climate: 0, peakOut: 0, peakIn: 0, since: Date.now() };
     const trace = [];
     const push = (arr, keep, v) => { const now = Date.now(); arr.push([now, v]); while (arr.length && now - arr[0][0] > keep * 1000) arr.shift(); };
-    let iFail = 0, iTry = 0, vTick = 0;
+    let iFail = 0, iTry = 0, vTick = 0, iOk = false, pMiss = 0, pLogT = 0;
+    /* measured consumption: the battery's own energy (out - regen) per km driven with the engine off,
+     * standing in traffic included - over the last USE_KM km (st.use, kept across restarts) and the
+     * last minute (useNow). This is what "range at this rate" on the Energy page divides by. */
+    const USE_KM = 10, NOW_S = 60, useNow = [];
+    const KW_KEEP = 15000;           // a missed power read: the last value stays (dimmed) this long
     function onPower(kw, now) {
         if (live.kwT && G.isNum(live.kw)) {
             const h = Math.min(now - live.kwT, 3 * Math.max(BG_POWER_S, settings.get('powerPoll')) * 1000) / 3600000;
@@ -160,6 +165,13 @@ module.exports = function live(ctx, sh) {
             }
             else if (moving) trip.regen -= kw * h;
             else trip.charged -= kw * h;
+            if (!engineOn() && G.isNum(L.speed) && !(kw < 0 && !moving)) {     // not while plugged in
+                const km = moving ? L.speed * h : 0, u = st.use || (st.use = { km: 0, kwh: 0 });
+                u.km += km; u.kwh += kw * h;
+                if (u.km > USE_KM) { u.kwh *= USE_KM / u.km; u.km = USE_KM; }
+                useNow.push([now, km, kw * h]);
+                while (useNow.length && now - useNow[0][0] > NOW_S * 1000) useNow.shift();
+            }
         }
         trip.peakOut = Math.max(trip.peakOut, kw);
         if (G.isNum(L.speed) && L.speed > 1) trip.peakIn = Math.max(trip.peakIn, -kw);
@@ -168,7 +180,8 @@ module.exports = function live(ctx, sh) {
         learnBaseline(kw, now);
     }
     async function readPower() {
-        if (!diag.available || (iFail >= 3 && Date.now() - iTry < 30000)) return;
+        // a car without the current identifier: only every 30 s. One that has answered keeps being asked
+        if (!diag.available || (!iOk && iFail >= 3 && Date.now() - iTry < 30000)) return;
         await exclusive(async () => {
             try {
                 // the pack voltage moves little: every 5 s is enough, so the current gets nearly every read
@@ -180,8 +193,13 @@ module.exports = function live(ctx, sh) {
                 const r = await readGroup('hvI', cfg.fast.hvI);
                 rate.push([iTry, Date.now() - iTry]);
                 while (rate.length && iTry - rate[0][0] > 10000) rate.shift();
-                if (!r) { iFail++; return; }
-                iFail = 0;
+                if (!r) {
+                    iFail++; pMiss++;
+                    const c = cfg.fast.hvI[pick.hvI || 0], raw = reader.raws[reader.key(primary(c))];
+                    if (Date.now() - pLogT > 30000) { pLogT = Date.now(); log.warn('power (' + c.did + ') missed ' + pMiss + 'x: ' + (raw ? raw.why : 'not read') + (G.isNum(L.speed) ? ' at ' + Math.round(L.speed) + ' km/h' : '')); }
+                    return;
+                }
+                iFail = 0; iOk = true;
                 const a = r[fieldsOf(cfg.fast.hvI[pick.hvI])[0]], now = Date.now();
                 live.a = a;
                 const volts = live.vT && now - live.vT < 60000 ? live.v : L.lscVT && now - L.lscVT < 60000 ? L.lscV : null;
@@ -197,20 +215,35 @@ module.exports = function live(ctx, sh) {
         clearTimeout(powerTimer);
         const s = shown() ? settings.get('powerPoll') : Math.max(BG_POWER_S, settings.get('powerPoll'));
         // 0.1 s: as fast as the battery unit answers (one read waits for the last)
-        powerTimer = setTimeout(() => readPower().then(schedulePower, schedulePower), Math.max(20, s * 1000 - (s <= 0.1 ? 1000 : 0)));
+        powerTimer = setTimeout(() => readPower().then(schedulePower, schedulePower), Math.max(60, s * 1000 - (s <= 0.1 ? 1000 : 0)));
     }
     schedulePower();
 
     /* ---------- slow reads (only while the screen is shown) ---------- */
     const SLOW = ['soc', 'cellV', 'cellT', 'coolant', 'limits'];
+    const slowFail = {}, slowLogT = {};
+    const SLOW_KEEP = 10 * 60000;      // a value that stops answering is kept (dimmed) this long, then blank
     async function readSlow() {
         if (!diag.available || !shown()) return;
         for (const name of SLOW) {
             if (!(cfg.slow[name] || []).length) continue;
             await exclusive(async () => {
                 try {
-                    const r = await readGroup(name, cfg.slow[name]);
-                    if (!r) return;
+                    let r = await readGroup(name, cfg.slow[name]);
+                    if (!r) {
+                        // busy or no reply (the battery unit is asked something ~10 times a second): once more
+                        await new Promise((res) => setTimeout(res, 150));
+                        r = await readGroup(name, cfg.slow[name]);
+                    }
+                    if (!r) {
+                        const c = cfg.slow[name][pick[name] || 0], raw = reader.raws[reader.key(primary(c))];
+                        slowFail[name] = (slowFail[name] || 0) + 1;
+                        if (Date.now() - (slowLogT[name] || 0) > 60000) {
+                            slowLogT[name] = Date.now();
+                            log.warn(name + ' (' + c.did + ') failed ' + slowFail[name] + 'x: ' + (raw ? raw.why + (raw.bytes ? ' [' + raw.bytes + ']' : '') : 'not read'));
+                        }
+                        return;
+                    }
                     const f = fieldsOf(cfg.slow[name][pick[name]]);
                     live[name] = f.length === 1 ? r[f[0]] : r;
                     live.slowT[name] = Date.now();
@@ -458,9 +491,11 @@ module.exports = function live(ctx, sh) {
     function data() {
         if (usingDemo()) return Object.assign(demo.sample(), { demo: true });
         const now = Date.now(), fresh = (t, s) => t && now - t < s * 1000;
-        const slowOk = (k) => fresh(live.slowT[k], Math.max(30, settings.get('slowPoll') * 4));
+        const slowOk = (k) => live.slowT[k] && now - live.slowT[k] < SLOW_KEEP;
+        const staleAfter = Math.max(30, settings.get('slowPoll') * 4) * 1000;
+        const stale = {}; SLOW.forEach((k) => { stale[k] = !!live.slowT[k] && now - live.slowT[k] > staleAfter ? now - live.slowT[k] : 0; });
         return {
-            demo: false, kw: fresh(live.kwT, Math.max(6, BG_POWER_S * 4)) ? live.kw : null,
+            demo: false, kw: live.kwT && now - live.kwT < KW_KEEP ? live.kw : null, kwAge: live.kwT ? now - live.kwT : null, stale,
             v: fresh(live.vT, 60) ? live.v : fresh(L.lscVT, 60) ? L.lscV : null, a: fresh(live.kwT, 10) ? live.a : null,
             speed: L.speed, engine: engineOn(), soc: slowOk('soc') ? live.soc : null,
             cellV: slowOk('cellV') ? live.cellV : null, cellT: slowOk('cellT') ? live.cellT : null, carT: L.batt,
@@ -494,7 +529,9 @@ module.exports = function live(ctx, sh) {
         const v = G.hold('live.kw', d.kw, 150), a = Math.abs(v);
         const moving = G.isNum(d.speed) && d.speed > 1;
         const what = v > IDLE_KW ? (moving ? 'DRIVING' : 'DRAWING') : v < -IDLE_KW ? (moving ? 'REGEN' : 'CHARGING') : 'IDLE';
-        return { kw: v, text: (v < -IDLE_KW ? '-' : '') + G.fmt(a, a < 10 ? 1 : 0), col: v < -IDLE_KW ? GO : a >= 60 ? t.warn : t.text, what };
+        // older than a couple of reads: the last value, dimmed, until a new one arrives
+        const old = !d.demo && G.isNum(d.kwAge) && d.kwAge > 1500;
+        return { kw: v, text: (v < -IDLE_KW ? '-' : '') + G.fmt(a, a < 10 ? 1 : 0), col: old ? t.dim : v < -IDLE_KW ? GO : a >= 60 ? t.warn : t.text, what, old };
     }
 
     /** Centre-zero power bar: regen / charge to the left, drive to the right, scaled to the limits. */
@@ -612,10 +649,15 @@ module.exports = function live(ctx, sh) {
             cv.text(String(n), x0 + (n - 1) * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
         } else cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', x + w / 2, 236, 24, t.dim, { align: 'center' });
 
-        // ---- this drive: energy used, regen, net; what it went to (driving vs. climate); peaks
-        const y0 = 316;
-        G.panel(cv, t, x, y0, w, 196, 'This drive');
-        const tp = d.demo ? { out: 2.84, regen: 0.61, charged: 0, climate: 0.48, peakOut: 61, peakIn: 24, since: Date.now() - 23 * 60000 } : trip;
+        // (below the cells: eDrive's Battery health, drawn by main.js into x, 316, w, 196)
+    }
+
+    /** This drive: energy used, regen, net; what it went to (driving vs. climate); peaks. Wide (w >= 700) or tall. */
+    function renderTrip(cv, t, d, x, y0, w, h) {
+        const r = x + w - 24;
+        G.panel(cv, t, x, y0, w, h, 'This drive');
+        if (w < 700) return renderTripTall(cv, t, d, x, y0, w, h);
+        const tp = tripNow(d);
         const col = (cx, label, v, c) => {
             cv.text(label, cx, y0 + 72, 18, t.dim, { font: 'bold', spacing: 1.2 });
             const ww = cv.text(G.fmt(v, v >= 10 ? 1 : 2), cx, y0 + 120, 42, c, { font: 'num' });
@@ -639,12 +681,37 @@ module.exports = function live(ctx, sh) {
         cv.text('peak ' + G.fmt(tp.peakOut, 0) + ' kW out  ·  ' + G.fmt(tp.peakIn, 0) + ' kW regen  ·  ' + (tp.charged > 0.05 ? 'charged ' + G.fmt(tp.charged, 2) + ' kWh  ·  ' : '')
             + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago') , x + 24, y0 + 168, 18, t.dim);
     }
+    const tripNow = (d) => (d.demo ? { out: 2.84, regen: 0.61, charged: 0, climate: 0.48, peakOut: 61, peakIn: 24, since: Date.now() - 23 * 60000 } : trip);
+    function renderTripTall(cv, t, d, x, y0, w, h) {
+        const tp = tripNow(d), r = x + w - 24;
+        const row = (y, label, v, c) => {
+            cv.text(label, x + 24, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
+            const kw = cv.text('kWh', r, y + 44, 22, t.dim, { align: 'right' });
+            cv.text(G.fmt(v, v >= 10 ? 1 : 2), r - kw - 8, y + 44, 48, c, { font: 'num', align: 'right' });
+        };
+        row(y0 + 84, 'USED', tp.out, t.text);
+        row(y0 + 166, 'REGEN', tp.regen, GO);
+        row(y0 + 248, 'NET', tp.out - tp.regen, t.text);
+        const clim = Math.min(tp.climate || 0, tp.out), drive = Math.max(0, tp.out - clim);
+        const cp2 = tp.out > 0.005 ? clim / tp.out : 0, dp = tp.out > 0.005 ? 1 - cp2 : 0;
+        const pct = (f) => (tp.out > 0.005 ? Math.round(f * 100) + ' %' : '--'), yb = y0 + 340, sw = w - 48;
+        cv.text('DRIVING ' + pct(dp), x + 24, yb, 18, t.text, { font: 'bold', spacing: 1 });
+        cv.text('CLIMATE ' + pct(cp2), r, yb, 18, t.warn, { font: 'bold', spacing: 1, align: 'right' });
+        cv.roundRect(x + 24, yb + 12, sw, 14, 5, withAlpha(t.track, 0.9));
+        if (tp.out > 0.005) {
+            if (dp > 0.005) cv.roundRect(x + 24, yb + 12, Math.max(4, sw * dp), 14, 5, withAlpha(t.text, 0.8));
+            if (cp2 > 0.005) cv.roundRect(x + 24 + sw * dp, yb + 12, Math.max(4, sw * cp2), 14, 5, t.warn);
+        }
+        const mins = Math.round((Date.now() - tp.since) / 60000);
+        cv.text('peak ' + G.fmt(tp.peakOut, 0) + ' kW out  ·  ' + G.fmt(tp.peakIn, 0) + ' kW regen', x + 24, y0 + 410, 18, t.dim);
+        cv.text((tp.charged > 0.05 ? 'charged ' + G.fmt(tp.charged, 2) + ' kWh  ·  ' : '') + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago'), x + 24, y0 + 440, 18, t.dim);
+    }
 
     function renderUnit(cv, t, d) {
         G.panel(cv, t, 24, 44, 1552, 468, 'Battery unit (UDS)');
         const link = diag.p ? (diag.available ? 'link up' : 'link down') : 'no link (' + (diag.error || 'not started') + ')';
         const rr = readRate();
-        cv.text('UDS 22  ·  ' + link + '  ·  power read ' + (rr ? G.fmt(rr.hz, 1) + 'x/s, ' + G.fmt(rr.ms, 0) + ' ms each' : 'n/a') + '  ·  power sign ' + cfg.powerSign + '  ·  baseline ' + G.fmt(baseline(), 2) + ' kW (' + (st.baseN || 0) + ' samples)', 48, 112, 22, t.text, { font: 'label' });
+        cv.text('UDS 22  ·  ' + link + '  ·  power read ' + (rr ? G.fmt(rr.hz, 1) + 'x/s, ' + G.fmt(rr.ms, 0) + ' ms each' : 'n/a') + (pMiss ? '  ·  power missed ' + pMiss : '') + (Object.keys(slowFail).length ? '  ·  missed ' + Object.keys(slowFail).map((k) => k + ' ' + slowFail[k]).join(' ') : '') + '  ·  power sign ' + cfg.powerSign + '  ·  baseline ' + G.fmt(baseline(), 2) + ' kW (' + (st.baseN || 0) + ' samples)', 48, 112, 22, t.text, { font: 'label' });
         const cols = [48, 200, 290, 380, 900, 1290];
         ['VALUE', 'ECU', 'DID', 'REPLY', 'DECODED', 'STATUS'].forEach((h, i) => cv.text(h, cols[i], 156, 20, t.dim, { font: 'bold', spacing: 1 }));
         cv.fillRect(48, 168, 1504, 1, t.tick);
@@ -803,6 +870,19 @@ module.exports = function live(ctx, sh) {
         PAGES: ['battery'],
         DIAG: ['unit', 'scan'],
         NAMES: { battery: 'Battery', unit: 'Battery unit', scan: 'Scan' },
+        /** This drive (energy used, regen, net, split, peaks) into a panel at x, y, w, h. */
+        drawTrip(cv, t, x, y, w, h) { renderTrip(cv, t, data(), x, y, w, h); },
+        /** The battery's power now as the pages show it: { kw, text, col, what } (kw null: no reading). */
+        powerNow(t) { return power(data(), t); },
+        /**
+         * Measured consumption: kWh per km over the last km driven electric (perKm, over km; null before
+         * 1 km) and over the last minute (nowPerKm, null while standing), from the battery's own power.
+         */
+        consumption() {
+            if (usingDemo()) return { perKm: 0.168, km: USE_KM, nowPerKm: 0.21, demo: true };
+            const u = st.use, nk = useNow.reduce((a, s) => a + s[1], 0), ne = useNow.reduce((a, s) => a + s[2], 0);
+            return { perKm: u && u.km >= 1 ? Math.max(0.02, u.kwh / u.km) : null, km: u ? u.km : 0, nowPerKm: nk >= 0.1 ? ne / nk : null };
+        },
         /** Draws page `name`; returns the data it showed. */
         draw(name, cv, t) {
             lastDrawT = Date.now();

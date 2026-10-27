@@ -221,7 +221,7 @@ def build_ui(spec, language='en'):
         # the project's own credit, last row
         repo_title, repo_link = sid(app, 'REPO_CREDITS_TITLE'), sid(app, 'REPO_CREDITS_LINK')
         strings[repo_title] = 'iDrive 7 custom apps'
-        strings[repo_link] = 'GitHub cauliflowermossgrape · github.com/cauliflowermossgrape/idrive7-apps'
+        strings[repo_link] = 'GitHub TheoneLT83 · github.com/TheoneLT83/idrive7-apps'
         items.append(comp('tworow', 'REPO_CREDITS', rows=[{
             'Text1stRow': {'value': repo_title, 'type': 'StringId'},
             'Text2ndRow': {'value': repo_link, 'type': 'StringId'},
