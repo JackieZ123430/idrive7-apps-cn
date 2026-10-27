@@ -584,6 +584,7 @@ mgu.run({
         const turn = (n) => { page = n; actionLabel(); return render(); };
         ui.onClick('BTN_PAGE', () => turn((page + 1) % pages().length));
         ui.onClick('BTN_PREV', () => { const n = pages().length; return turn((page + n - 1) % n); });
+        ctx.onTab((i) => turn(i));
         ui.onClick('BTN_READ', () => {
             const p = pages()[page];
             if (isLive(p) && lv.actionLabel(p)) { lv.action(p); return render(); }

@@ -78,6 +78,7 @@ display._send = (n, o, s) => send(n, o, s, true);
 const ctx = {
     ui, settings, spec, dataDir: out, log, display,
     canvas: (w, h) => display.canvas(w, h),
+    onTab(fn) { display.onTab = fn; },
     signals: { watch: async (iface) => ({ iface, error: 'preview' }), proxy: async () => { throw new Error('preview'); } },
     theme: themeFn,
     loop: (n, fps, fn) => { loops[n] = fn; return { stop() {}, kick() {} }; },

@@ -19,6 +19,8 @@ const rec = require('./record');
 const SOCKET = process.env.MGU_RENDERD_SOCKET || '/run/mgu-renderd/renderd.sock';
 const M = { HELLO: 1, PLACE: 2, SHOW: 3, ATLAS: 4, RAMP: 5, LAYER: 6, FRAME: 7, DROP_LAYER: 8, IMAGE: 9, GRAB: 10 };
 const E = { READY: 101, TICK: 102, ERROR: 103, STATS: 104, CCU: 105 };
+// touch (mgu-render, IterioDev's mgu-renderd): message 9 is CLAIM there; 105 and 106 come back as TOUCH and CLOSED
+const CLAIM = 9, TOUCH = 105, CLOSED = 106;
 
 function msg(type, payload) {
     const len = payload ? payload.length : 0;
@@ -49,6 +51,7 @@ class RenderClient extends EventEmitter {
         this.retry = null;
         this.closed = false;
         this.fd = null;              // file sink
+        this.claimed = null;         // the claims sent on this connection (JSON), null: none yet
     }
 
     /** Socket exists (the renderer is installed and running)? */
@@ -73,6 +76,7 @@ class RenderClient extends EventEmitter {
             if (this.placement) this._sendPlace();
             if (this.visible) this._write(this._u32msg(M.SHOW, [1]));
             if (this.grabbing) this._write(this._u32msg(M.GRAB, [1]));
+            this.claimed = null;
         });
         s.on('data', (d) => this._data(d));
         s.on('error', (e) => { if (!this.errLogged) { this.errLogged = true; this.log.warn('renderd: ' + e.message); } });
@@ -96,6 +100,22 @@ class RenderClient extends EventEmitter {
         if (this.grabTimer) { clearInterval(this.grabTimer); this.grabTimer = null; }
         if (on) this.grabTimer = setInterval(() => { if (this.connected) this._write(this._u32msg(M.GRAB, [1])); }, 500);
         if (this.connected) this._write(this._u32msg(M.GRAB, [on ? 1 : 0]));
+    }
+    /**
+     * Touch in these rects ([{ x, y, w, h }] logical px) comes to this app as 'touch' (phase 1 down,
+     * 2 move, 3 up, x, y) while it is shown; a touch elsewhere goes to the HMI and comes as 'closed'
+     * (the renderer has hidden us). Only on a renderer that routes touch (READY's fourth word), and
+     * only on a connection that never sends images or GRAB: CLAIM shares their message numbers.
+     */
+    claim(rects) {
+        if (!this.ready || !this.touch || this.grabbing || this.sent.image.size) return;
+        const key = JSON.stringify(rects);
+        if (key === this.claimed || (this.claimed === null && !rects.length)) return;
+        const b = Buffer.alloc(4 + rects.length * 16);
+        b.writeUInt32LE(rects.length, 0);
+        rects.forEach((r, i) => ['x', 'y', 'w', 'h'].forEach((k, j) => b.writeFloatLE(r[k], 4 + i * 16 + j * 4)));
+        this._write(msg(CLAIM, b));
+        this.claimed = key;
     }
     close() {
         this.grab(false);
@@ -121,11 +141,17 @@ class RenderClient extends EventEmitter {
             if (type === E.READY) {
                 this.ready = true; this.errLogged = false;
                 this.screen = { w: p.readUInt32LE(4), h: p.readUInt32LE(8) };
+                this.touch = p.length >= 16 && p.readUInt32LE(12) !== 0;
                 this.log.info('renderd: connected, screen ' + this.screen.w + 'x' + this.screen.h);
                 this.emit('ready', this.screen);
             } else if (type === E.TICK) {
                 this.waiting = false;
                 this.emit('tick', p.readUInt32LE(0), p.readUInt32LE(4));
+            } else if (this.claimed && type === TOUCH && p.length >= 12) {
+                this.emit('touch', p.readUInt32LE(0), p.readFloatLE(4), p.readFloatLE(8));
+            } else if (this.claimed && type === CLOSED) {
+                this.visible = false;
+                this.emit('closed');
             } else if (type === E.CCU && p.length >= 5) {
                 // the controller event the HMI didn't get (we hold the grab): FrontCCU names
                 this.emit('ccu', {

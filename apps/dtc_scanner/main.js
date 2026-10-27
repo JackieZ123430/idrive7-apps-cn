@@ -374,6 +374,7 @@ mgu.run({
         ui.onClick('BTN_SCAN', () => { doScan(); });
         ui.onClick('BTN_CLEAR', () => { doClear(); });
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pageCount(); changed(); });
+        ctx.onTab((i) => { const fp = pageCount() - 2; page = i === 0 ? 0 : fp + i - 1; changed(); });
 
         var loop = ctx.loop('MAIN', 2, () => render(false));
         let scannedOnOpen = false;

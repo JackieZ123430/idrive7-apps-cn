@@ -308,6 +308,7 @@ mgu.run({
         const flip = () => { page = 1 - page; return render(); };
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
+        ctx.onTab((i) => i !== page && flip());
         ui.onClick('BTN_RESET', () => {
             peakRpm = 0; peakRpmT = 0; sessionRpm = 0; peakSpeed = 0; limiterHits = 0; shifts = []; lastShift = null;
             log.info('peaks reset'); return render();

@@ -244,6 +244,7 @@ mgu.run({
         const flip = () => { page = 1 - page; sel = 0; labels(); return render(); };
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
+        ctx.onTab((i) => i !== page && flip());
         ui.onClick('BTN_ACTION', () => {
             const st = store();
             if (page === 1) { if (st.runs.length) sel = (sel + 1) % Math.min(8, st.runs.length); lastRun = st.runs[sel] || null; return render(); }

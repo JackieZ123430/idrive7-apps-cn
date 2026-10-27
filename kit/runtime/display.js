@@ -23,6 +23,10 @@
  *             (Focusable=3 bar buttons) light up the button the iDrive controller is on. The
  *             page content is scaled up into everything in between.
  *   standard  the HMI's own title and bar; the renderer covers only the app's image area.
+ *
+ * Tabs: on a renderer that routes touch (mgu-render), the app's header and page are claimed and
+ * a tap on a tab calls the app's ctx.onTab(i); the bar, the back column and the HMI's status
+ * icons still go to the HMI.
  */
 const { Recorder, play } = require('./record');
 const { Canvas } = require('./canvas');
@@ -95,6 +99,7 @@ class Display {
             const inFront = () => { if (this.ui._setFocus) this.ui._setFocus(this.screen.name, true); };
             c.on('action', () => {
                 inFront();
+                this._syncVisible();            // a tap on the bar went to the HMI: the renderer hid us
                 this.pressed = b[0]; this.pressedT = Date.now(); this._repaint();
                 setTimeout(() => this._repaint(), 320);              // end of the press flash
             });
@@ -131,6 +136,9 @@ class Display {
         gpu.on('close', () => { if (this.gpu === gpu) this._lost(); });
         gpu.on('stats', (s) => { this.gpuStats = s; });
         gpu.on('ccu', (v) => { if (this.gpu === gpu && this.onCcu) this.onCcu(v); });
+        gpu.on('touch', (phase, x, y) => { if (this.gpu === gpu) this._touch(phase, x, y); });
+        // the HMI was touched outside the tabs: shown again unless that left the screen
+        gpu.on('closed', () => setTimeout(() => { if (this.gpu === gpu) this._syncVisible(); }, 700));
         G.onLayerDrop((id) => { if (this.gpu) this.gpu.dropLayer(id); });
         gpu.connect();
         if (this.grabbing) gpu.grab(true);
@@ -140,6 +148,28 @@ class Display {
     grab(on) {
         this.grabbing = !!on;
         if (this.gpu) this.gpu.grab(this.grabbing);
+    }
+
+    /** Touch on a tab (logical px): a tap (down and up on the same tab) opens its page. */
+    _touch(phase, x, y) {
+        const at = (this.tabs || []).find((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+        if (phase === 1) this.tabDown = at ? at.i : -1;
+        else if (phase === 3) {
+            const i = this.tabDown;
+            this.tabDown = -1;
+            if (at && at.i === i && this.onTab) Promise.resolve().then(() => this.onTab(i)).catch((e) => this.log.error('tab', e));
+        }
+    }
+
+    /** The tabs of the frame just sent (rects in logical px, or in the surface's for the header). */
+    _claimTabs(rects, r) {
+        const pl = this.place;
+        const logical = (q) => (r ? q : { i: q.i, x: (q.x - pl.ox) / pl.scale, y: (q.y - pl.oy) / pl.scale, w: q.w / pl.scale, h: q.h / pl.scale });
+        this.tabs = (rects || []).map(logical);
+        if (!this.onTab || this.tabs.length < 2) { this.gpu.claim([]); return; }
+        const W = pl.w, hx = HMI.left - pl.x, by = pl.h - this.barH();
+        this.gpu.claim(r ? [{ x: 0, y: 0, w: r.w, h: r.h }]
+            : [{ x: hx, y: 0, w: this.headEnd - hx, h: this.headH() }, { x: hx, y: this.headH(), w: W - hx, h: by - this.headH() }].map(logical));
     }
 
     /** GPU path gone (or off): the HMI's own image shows again - push a frame now. */
@@ -211,6 +241,7 @@ class Display {
         let r = this.recorders.get(key);
         if (!r) { r = new Recorder(w, h, { textScale: scale }); this.recorders.set(key, r); }
         r.reset();
+        r.tabRects = null;
         // full-screen layout: G.frame hands its tabs to the header instead of drawing them
         r.chrome = this.active() && this.place.full && this.screen.chrome !== false ? { tabs: null } : null;
         // where the frame lands on screen (apps that draw some parts in screen pixels, r.xf)
@@ -242,6 +273,8 @@ class Display {
                 out = this._compose();
             } else this.app = null;
             this._send(name, out, softImage, false);
+            if (this.place.full && r.chrome) this._claimTabs(this.chromeRec.tabRects, null);
+            else this._claimTabs(r.tabRects, r);
             // the HMI's own image under the renderer's surface: a plain background, once
             const t = this.theme();
             if (this.bgShown !== t.bg) {
@@ -333,7 +366,7 @@ class Display {
         const hx = HMI.left - pl.x;
         const end = G.header(c, Object.assign({}, t, { bg: HMI.headBg }), hx, 0, HMI.status.x - pl.x - hx, FULL.headH,
             this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges, true, true);
-        const sx = Math.min(HMI.status.x - pl.x, Math.ceil(end));
+        const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(end));
         // the strip's bottom edge continues under the see-through part
         c.fillRect(sx, 0, W - sx, FULL.headH, HMI.headBg);
         c.fillRect(sx, FULL.headH - 2, W - sx, 2, G.withAlpha('#ffffff', 0.22));

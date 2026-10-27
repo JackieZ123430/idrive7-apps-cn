@@ -611,6 +611,7 @@ function gmeter(cv, t, cx, cy, r, g) {
  * On the full-screen layout (GPU renderer) the frame surface carries a `chrome` object: the
  * tabs go there and the display draws them in the header up in the HMI's title strip, so the
  * page content gets the whole screen below it. Otherwise a slim tab bar (BAR_H) along the top.
+ * Each drawn tab is left in cv.tabRects ({ i, x, y, w, h }), so a touch on it can open that page.
  */
 const BAR_H = 36, TOP = 44, BOTTOM = 512;
 /**
@@ -636,8 +637,10 @@ function frame(cv, t, tabs, sel, badges) {
     const badgesW = live.reduce((a, b) => a + Math.max(24 * 3.5, cv.textWidth(b.text, 18, opt) + 24) + 24 * 0.4, 0);
     const widths = tabWidths(cv, labels, 20, opt, 150, 48, W - 32 - badgesW, 20);
     let x = 16;
+    cv.tabRects = [];
     labels.forEach((label, i) => {
         const tw = widths[i], on = i === sel;
+        cv.tabRects.push({ i, x, y: 0, w: tw, h: BAR_H });
         if (on) {
             cv.gradientRect(x, 0, tw, BAR_H, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.22)]]);
             cv.fillRect(x, BAR_H - 4, tw, 4, S);
@@ -687,9 +690,11 @@ function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat, compact) {
         cv.text(title, tx, y + h / 2 + tsize * 0.36, tsize, t.text);
         tx += titleW + 40;
     }
+    cv.tabRects = [];
     names.forEach((n, i) => {
         const on = i === sel, bw = tw[i];
         if (tx + bw > right) return;
+        cv.tabRects.push({ i, x: tx, y, w: bw, h });
         if (on) {
             cv.gradientRect(tx, y, bw, h, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.25)]]);
             cv.fillRect(tx, y + h - 5, bw, 5, S);
@@ -723,9 +728,11 @@ function headerCompact(cv, t, x, y, w, h, title, tabs, sel, badges) {
         cv.text(title, tx, y + h / 2 + tsize * 0.36, tsize, t.text);
         tx += titleW + 32;
     }
+    cv.tabRects = [];
     names.forEach((n, i) => {
         const on = i === sel, bw = tw[i];
         if (tx + bw > x + room) return;
+        cv.tabRects.push({ i, x: tx, y, w: bw, h });
         if (on) {
             cv.gradientRect(tx, y, bw, h, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.25)]]);
             cv.fillRect(tx, y + h - 4, bw, 4, S);
