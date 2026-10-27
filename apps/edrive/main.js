@@ -559,7 +559,7 @@ mgu.run({
             });
         }
         /** km a charge of +pct % adds (charge log). */
-        const kmOf = (pct) => pct * estimate(null, live.ambient, live.climate, paceNow(), comfortKw()).kpp;
+        const kmOf = (pct) => pct * estimate(null, live.ambient, null, paceNow(), comfortKw()).kpp;
 
         /* ---------- units ---------- */
         const MI = () => settings.get('distUnit') === 'mi';
@@ -634,7 +634,8 @@ mgu.run({
         }
 
         function renderMain(cv, t, d) {
-            const e = estimate(d.soc, d.ambient, d.climate, d.pace, comfortKw(d)), has = G.isNum(d.soc);
+            const e = estimate(d.soc, d.ambient, null, d.pace, comfortKw(d)), has = G.isNum(d.soc);
+            const ec = estimate(d.soc, d.ambient, d.climate, d.pace, comfortKw(d));      // the climate line's figures
 
             // ---- range: what is left until the engine starts
             G.panel(cv, t, 24, 44, 720, 468, 'Real electric range');
@@ -668,13 +669,13 @@ mgu.run({
             // the battery's power now: regen to the left, use to the right (live.js)
             lv.drawPowerBar(cv, t, 48, 428, 672);
             // climate control + on-board electrics: costs range by the hour (off: the on-board draw only)
-            const ac = e.climate !== false && e.auxKw >= 1.5 ? t.warn : t.dim;
-            const what = e.climate === false ? 'CLIMATE OFF  ·  ON-BOARD  ' : e.climate ? 'CLIMATE ON' + (d.ac ? ' (A/C)' : '') + '  ' : 'CLIMATE & ON-BOARD  ';
+            const ac = ec.climate !== false && ec.auxKw >= 1.5 ? t.warn : t.dim;
+            const what = ec.climate === false ? 'CLIMATE OFF  ·  ON-BOARD  ' : ec.climate ? 'CLIMATE ON' + (d.ac ? ' (A/C)' : '') + '  ' : 'CLIMATE & ON-BOARD  ';
             // the range the climate costs (above the on-board draw it would have off); unknown climate: the whole draw
-            const costKm = e.climate === null || e.climate === undefined ? e.auxKm : e.climateKm;
-            const seats = G.isNum(e.comfortKm) && e.comfortKm >= 0.5 && has ? '  ·  SEATS -' + Math.round(D(e.comfortKm)) + ' ' + dU() : '';
+            const costKm = ec.climate === null || ec.climate === undefined ? ec.auxKm : ec.climateKm;
+            const seats = G.isNum(ec.comfortKm) && ec.comfortKm >= 0.5 && has ? '  ·  SEATS -' + Math.round(D(ec.comfortKm)) + ' ' + dU() : '';
             // (shown at the foot of This drive)
-            const climFoot = [[what.trim(), ac], [G.fmt(e.auxKw, 1) + ' kW' + (e.auxLearned ? '' : ' (typical)')
+            const climFoot = [[what.trim(), ac], [G.fmt(ec.auxKw, 1) + ' kW' + (ec.auxLearned ? '' : ' (typical)')
                 + (G.isNum(costKm) && costKm >= 0.5 && has ? '  ·  -' + Math.round(D(costKm)) + ' ' + dU() : '') + seats, ac]];
 
             // ---- charge + last charge
@@ -728,8 +729,7 @@ mgu.run({
                 cv.text('IN THE BATTERY NOW', x + 24, y + 342, 22, t.dim, { font: 'bold', spacing: 1.5 });
                 const ew = cv.text(G.isNum(now) ? G.fmt(now, 1) : '--', x + 24, y + 418, 72, G.isNum(now) ? t.text : t.dim, { font: 'num' });
                 cv.text('kWh', x + 34 + ew, y + 418, 28, t.dim);
-                cv.text('TEMP', x + w - 24, y + 342, 22, t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
-                cv.text(G.isNum(bt) ? Math.round(T(bt)) + (F() ? '°F' : '°C') : '--', x + w - 24, y + 418, 44, btc, { font: 'bold', align: 'right' });
+                // (the temperature: the Cells panel's, from the battery unit)
                 return;
             }
             const tall = false, hy = y + 118;
@@ -875,7 +875,8 @@ mgu.run({
             lv.drawPower(cv, t, 24, 44, 740, 468);
             // the range at the rate the battery itself measured: energy above the engine-start point / kWh per km lately
             const use = lv.consumption(), usable = has ? k * Math.max(0, d.soc - e.res) : null;
-            const rr = G.isNum(usable) && G.isNum(use.perKm) ? usable / use.perKm : null;
+            const measured = G.isNum(usable) && G.isNum(use.perKm);
+            const rr = measured ? usable / use.perKm : e.mid;          // not measured yet: the learned range
 
             // ---- where the power goes now
             const x0 = 788, w0 = 788;
@@ -918,11 +919,11 @@ mgu.run({
             const sent = [['drive', pd.displayRepartitionDriveElectricPower], ['climate', pd.displayRepartitionAirConditioningElectricPower],
                 ['seat bars', pd.displayRepartitionElectricSeatHeater], ['climate boost', pd.displayRepartitionElectricRangeAirConditioningBoost]]
                 .filter(([, v]) => G.isNum(v) && v !== 255);
-            if (sent.length) cv.text('CAR SHOWS  ' + sent.map(([n, v]) => n + ' ' + v).join('  ·  '), x0 + 24, 444, 19, t.dim, { font: 'bold', spacing: 0.5 });
+            void sent;
             // learned range vs. the range at the rate measured lately
             const kmTxt = (km) => (G.isNum(km) && has ? Math.round(D(km)) + ' ' + dU() : '--');
             cv.text('RANGE AT THIS RATE', x0 + 24, 486, 22, t.dim, { font: 'bold', spacing: 1.5 });
-            cv.text(kmTxt(rr), x0 + w0 - 24, 490, 40, G.isNum(rr) ? t.text : t.dim, { font: 'bold', align: 'right' });
+            cv.text(kmTxt(rr), x0 + w0 - 24, 490, 40, measured ? t.text : t.dim, { font: 'bold', align: 'right' });
         }
 
         function render() {

@@ -655,10 +655,6 @@ module.exports = function live(ctx, sh) {
             for (let i = 0; i < n; i += 12) cv.text(String(i + 1), x0 + i * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
             cv.text(String(n), x0 + (n - 1) * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
         } else cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', x + w / 2, 300, 24, t.dim, { align: 'center' });
-        // the cells' temperature, where it comes from
-        cv.text('CELL TEMPERATURE  ' + (ct ? fmtT(ct.avg, 1) + (G.isNum(ct.min) && G.isNum(ct.max) ? '   (' + fmtT(ct.min) + ' - ' + fmtT(ct.max) + ')' : '') : '--'),
-            x + 24, 492, 20, ct ? tempColor(t, ct.avg) : t.dim, { font: 'bold', spacing: 1 });
-        if (ct) cv.text(ct.src + (d.stale && d.stale.cellT && ct.src.indexOf('battery unit') >= 0 ? ', read ' + Math.round(d.stale.cellT / 60000) + ' min ago' : ''), r, 492, 16, t.dim, { align: 'right' });
     }
 
     /** This drive: energy used, regen, net; what it went to (driving vs. climate); peaks. Wide (w >= 700) or tall. */
@@ -889,11 +885,12 @@ module.exports = function live(ctx, sh) {
         DIAG: ['unit', 'scan'],
         NAMES: { battery: 'Battery', unit: 'Battery unit', scan: 'Scan' },
         /** This drive (energy used, regen, net, split, peaks) into a panel at x, y, w, h. */
-        drawTrip(cv, t, x, y, w, h, foot, inBattery) { renderTrip(cv, t, data(), x, y, w, h, foot, inBattery); },
+        drawTrip(cv, t, x, y, w, h, foot, inBattery) { lastDrawT = Date.now(); renderTrip(cv, t, data(), x, y, w, h, foot, inBattery); },
         /** The Battery page's power panel (kW, bar, the last two minutes) at x, y, w, h. */
-        drawPower(cv, t, x, y, w, h) { renderPowerPanel(cv, t, data(), x, y, w, h); },
+        drawPower(cv, t, x, y, w, h) { lastDrawT = Date.now(); renderPowerPanel(cv, t, data(), x, y, w, h); },
         /** A one-line "battery power now": label, kW and the bar (regen left, use right), no history. */
         drawPowerBar(cv, t, x, y, w) {
+            lastDrawT = Date.now();
             const d = data(), pw = power(d, t);
             const lim = limitsKw(d);
             cv.text('LIVE BATTERY USAGE', x, y - 34, 20, t.dim, { font: 'bold', spacing: 1.5 });
