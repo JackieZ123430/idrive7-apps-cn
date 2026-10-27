@@ -244,8 +244,7 @@ node kit/tools/extract_sdk.js x_call/javascript/app.js     # writes ./oap-sdk/
 
 On Windows the same commands work in PowerShell (scp and tar are built in), with the real file
 name instead of `x_call@*.tgz`.
-Or download it from a public website:
-https://bedrive.ru/da77
+
 
 
 You get:
