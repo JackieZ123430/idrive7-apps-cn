@@ -698,14 +698,20 @@ module.exports = function live(ctx, sh) {
             const kw = cv.text('kWh', r, y + 44, 22, t.dim, { align: 'right' });
             cv.text(G.fmt(v, v >= 10 ? 1 : 2), r - kw - 8, y + 44, 48, c, { font: 'num', align: 'right' });
         };
-        row(y0 + 84, 'USED', tp.out, t.text);
-        row(y0 + 166, 'REGEN', tp.regen, GO);
+        // used - regen = total, side by side (kWh)
+        const cols = [[x + 24, 'USED', tp.out, t.text, 'left'], [x + w / 2, 'REGEN', tp.regen, GO, 'center'],
+            [r, 'TOTAL', tp.out - tp.regen, t.text, 'right']];
+        cols.forEach(([cx, label, v, c, align]) => {
+            cv.text(label, cx, y0 + 84, 20, t.dim, { font: 'bold', spacing: 1.5, align });
+            cv.text(G.fmt(v, v >= 10 ? 1 : 2), cx, y0 + 136, 44, c, { font: 'num', align });
+        });
+        cv.text('kWh', r, y0 + 166, 18, t.dim, { align: 'right' });
         if (inBattery) {
-            cv.text('IN BATTERY', x + 24, y0 + 248, 20, t.dim, { font: 'bold', spacing: 1.5 });
-            const kw2 = cv.text('kWh', r, y0 + 292, 22, t.dim, { align: 'right' });
-            const tw = cv.text(' / ' + inBattery[1], r - kw2 - 8, y0 + 292, 30, t.dim, { font: 'bold', align: 'right' });
-            cv.text(inBattery[0], r - kw2 - 8 - tw, y0 + 292, 48, t.text, { font: 'num', align: 'right' });
-        } else row(y0 + 248, 'NET', tp.out - tp.regen, t.text);
+            cv.text('IN BATTERY', x + 24, y0 + 222, 20, t.dim, { font: 'bold', spacing: 1.5 });
+            const kw2 = cv.text('kWh', r, y0 + 278, 22, t.dim, { align: 'right' });
+            const tw = cv.text(' / ' + inBattery[1], r - kw2 - 8, y0 + 278, 30, t.dim, { font: 'bold', align: 'right' });
+            cv.text(inBattery[0], r - kw2 - 8 - tw, y0 + 278, 48, t.text, { font: 'num', align: 'right' });
+        }
         const clim = Math.min(tp.climate || 0, tp.out), drive = Math.max(0, tp.out - clim);
         const cp2 = tp.out > 0.005 ? clim / tp.out : 0, dp = tp.out > 0.005 ? 1 - cp2 : 0;
         const pct = (f) => (tp.out > 0.005 ? Math.round(f * 100) + ' %' : '--'), yb = y0 + 340, sw = w - 48;

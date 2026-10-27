@@ -713,12 +713,28 @@ mgu.run({
             const now = G.isNum(cap) && G.isNum(d.soc) ? cap * d.soc / 100 : null;  // energy in the pack right now
             G.panel(cv, t, x, y, w, h, 'Battery health');
             const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
-            const tall = h >= 300, hy = y + (tall ? 190 : 118);
-            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', x + 24, hy, tall ? 110 : 64, hc, { font: 'num' });
-            cv.text(G.isNum(soh) ? '%' : diagHint('not read yet'), x + 32 + hw, hy, G.isNum(soh) ? (tall ? 36 : 26) : 18, t.dim, { font: 'bold' });
-            if (tall && G.isNum(soh)) cv.text('of a new battery', x + 24, hy + 40, 22, t.dim);
             // HV battery temperature (the car's own value): cold packs give less range and charge slower
             const bt = d.batt && d.batt.avg, btc = !G.isNum(bt) ? t.dim : bt < 5 || bt > 45 ? t.warn : t.text;
+            if (h >= 300) {
+                // the full layout: health, how much a full charge holds (bar against new), in it now, temperature
+                const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', x + 24, y + 136, 100, hc, { font: 'num' });
+                cv.text('%', x + 32 + hw, y + 136, 34, t.dim, { font: 'bold' });
+                if (!G.isNum(soh)) cv.text(diagHint('not read yet'), x + 24, y + 170, 22, t.dim);
+                G.bar(cv, t, x + 24, y + 178, w - 48, 92, {
+                    label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh, step: kwh / 4, scaleDecimals: kwh % 4 ? 1 : 0, ramp: 'hot',
+                    zones: [{ from: 0, to: kwh * 0.7, color: 'crit' }, { from: kwh * 0.7, to: kwh * 0.8, color: 'warn' }],
+                });
+                cv.fillRect(x + 24, y + 304, w - 48, 1, t.panelEdge);
+                cv.text('IN THE BATTERY NOW', x + 24, y + 342, 22, t.dim, { font: 'bold', spacing: 1.5 });
+                const ew = cv.text(G.isNum(now) ? G.fmt(now, 1) : '--', x + 24, y + 418, 72, G.isNum(now) ? t.text : t.dim, { font: 'num' });
+                cv.text('kWh', x + 34 + ew, y + 418, 28, t.dim);
+                cv.text('TEMP', x + w - 24, y + 342, 22, t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
+                cv.text(G.isNum(bt) ? Math.round(T(bt)) + (F() ? '°F' : '°C') : '--', x + w - 24, y + 418, 44, btc, { font: 'bold', align: 'right' });
+                return;
+            }
+            const tall = false, hy = y + 118;
+            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', x + 24, hy, 64, hc, { font: 'num' });
+            cv.text(G.isNum(soh) ? '%' : diagHint('not read yet'), x + 32 + hw, hy, G.isNum(soh) ? 26 : 18, t.dim, { font: 'bold' });
             const r = x + w - 24, line = (yy, label, val, c) => {
                 const vw2 = cv.text(val, r, yy, 22, c || t.text, { font: 'bold', align: 'right' });
                 cv.text(label, r - vw2 - 14, yy, 18, t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
