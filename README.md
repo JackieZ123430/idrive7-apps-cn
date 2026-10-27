@@ -1,4 +1,4 @@
-**English** | [中文](README.zh-CN.md)
+**English** | [中文 (Chinese translation)](README.zh-CN.md)
 
 <h1 align="center">MGU Custom Apps</h1>
 
@@ -267,10 +267,17 @@ too; the tool lists anything missing.
 ```sh
 python3 kit/tools/build.py            # all apps -> dist/<id>@<ver>.mgu
 python3 kit/tools/build.py redline    # just one
+python3 kit/tools/build.py --language zh-CN   # Simplified Chinese -> dist/<id>@<ver>-zh.cn.2.mgu
 node kit/tools/preview.js dist/redline preview wait=10   # render it on the PC -> preview/*.png
 ```
 
 (On Windows type `python` instead of `python3`.)
+
+English is the default. **Chinese:** `--language zh-CN` builds every app in Simplified Chinese
+(the language is fixed at build time; the car's language setting doesn't change it). Installing
+the other language's package swaps it like an update. Chinese translation by 小白151
+([JackieZ123430](https://github.com/JackieZ123430), [idrive7-apps-cn](https://github.com/JackieZ123430/idrive7-apps-cn));
+Chinese guide: [README.zh-CN.md](README.zh-CN.md).
 
 The `.mgu` files contain BMW's SDK, so keep them for your own car and don't publish them.
 
@@ -283,7 +290,11 @@ apps, the installer and the GPU renderer) into `dist/mgu-custom-apps.tar.gz`:
 deploy/make-car-kit.sh                 # macOS / Linux / WSL
 deploy\make-car-kit.cmd                # Windows (cmd or PowerShell)
 python3 kit/tools/make_kit.py redline  # any OS; just some apps
+python3 kit/tools/make_kit.py --language zh-CN   # Chinese kit -> dist/mgu-custom-apps-zh-CN(.tar.gz)
 ```
+
+(For the Chinese kit, give `push-to-car.sh` `KIT=dist/mgu-custom-apps-zh-CN` and `push-to-car.ps1`
+`-Kit dist\mgu-custom-apps-zh-CN.tar.gz`.)
 
 Then push it over SSH. macOS / Linux / WSL:
 

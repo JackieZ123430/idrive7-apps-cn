@@ -60,7 +60,7 @@
    python kit/tools/make_kit.py --language en
    ```
 
-   输出：`dist/mgu-custom-apps-en.tar.gz`。
+   输出：`dist/mgu-custom-apps.tar.gz`。
 
 3. 构建中文包：
 
@@ -72,7 +72,7 @@
 
    只构建一个应用可在命令末尾加应用 ID，例如 `python kit/tools/make_kit.py --language zh-CN warmup`。
 
-英文构建同时保留兼容上游脚本的 `dist/mgu-custom-apps.tar.gz`。两个语言安装包分别保存在不同文件中，可以先后构建，不会互相覆盖。
+英文构建输出 `dist/mgu-custom-apps.tar.gz`（与原有脚本兼容），中文构建输出 `dist/mgu-custom-apps-zh-CN.tar.gz`。两个语言安装包分别保存在不同文件中，可以先后构建，不会互相覆盖。
 
 ## Windows 安装
 
@@ -90,7 +90,7 @@ powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 check -Kit dist/
 powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 install -Kit dist/mgu-custom-apps-zh-CN.tar.gz -Key "C:\你的目录\id_rsa" -Ip "车机IP"
 ```
 
-要安装英文版，将 `-Kit` 后的文件换成 `dist/mgu-custom-apps-en.tar.gz`。安装器会备份配置并重启应用平台，首次设置 Doom 控制器插件可能重启车机。恢复使用同一脚本的 `restore` 命令；更多细节见 [英文原文档](README.md)。
+要安装英文版，将 `-Kit` 后的文件换成 `dist/mgu-custom-apps.tar.gz`。安装器会备份配置并重启应用平台，首次设置 Doom 控制器插件可能重启车机。恢复使用同一脚本的 `restore` 命令；更多细节见 [英文原文档](README.md)。
 
 ## 新增其他语言
 

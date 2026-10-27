@@ -128,8 +128,10 @@ def main():
     parser.add_argument('--language', choices=languages(), default='en')
     parser.add_argument('apps', nargs='*')
     args = parser.parse_args()
-    OUT = os.path.join(DIST, 'mgu-custom-apps-' + args.language)
-    archive = os.path.join(DIST, 'mgu-custom-apps-' + args.language + '.tar.gz')
+    # English (the default) keeps the usual dist/mgu-custom-apps(.tar.gz); other languages get a suffix
+    name = 'mgu-custom-apps' + ('' if args.language == 'en' else '-' + args.language)
+    OUT = os.path.join(DIST, name)
+    archive = os.path.join(DIST, name + '.tar.gz')
     apps = args.apps or sorted(d for d in os.listdir(os.path.join(ROOT, 'apps'))
                                   if os.path.isfile(os.path.join(ROOT, 'apps', d, 'app.json')))
     rd = pick_renderer()
@@ -167,8 +169,6 @@ def main():
             os.chmod(os.path.join(OUT, n), 0o755)
     shutil.copyfile(os.path.join(DEPLOY, 'push-to-car.ps1'), os.path.join(DIST, 'push-to-car.ps1'))  # Windows: next to the .tar.gz
     print('kit: %s  (%s)' % (OUT, ' '.join(sorted(os.listdir(os.path.join(OUT, 'apps'))))))
-    if args.language == 'en':
-        shutil.copyfile(archive, os.path.join(DIST, 'mgu-custom-apps.tar.gz'))
     print('     %s' % archive)
 
 
