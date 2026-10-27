@@ -44,10 +44,14 @@ const G = require('./kit/gauges');
 const { Diag, hex } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
 const { RangeModel } = require('./range');
+const startLive = require('./live');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
-const PAGES_HYBRID = ['main', 'energy', 'log', 'diag', 'signals'], PAGES_12V = ['main', 'diag', 'signals'];
+// the live pages (power, battery, cells, climate; the battery unit and scan with the diagnostics) are live.js's
+const PAGES_HYBRID = ['main', 'power', 'energy', 'battery', 'cells', 'climate', 'log', 'diag', 'unit', 'scan', 'signals'];
+const PAGES_12V = ['main', 'diag', 'signals'];
+const DIAG_PAGES = ['diag', 'unit', 'scan', 'signals'];
 /** Comfort consumers, estimated from their levels (kW): seat heating per level 0..3, steering wheel. */
 const SEAT_KW = [0, 0.04, 0.07, 0.1];
 const WHEEL_KW = 0.06;
@@ -112,7 +116,8 @@ mgu.run({
         const sc = (k, raw) => {
             const c = S[k];
             if (!c || raw === undefined || raw === null || raw === c.invalid) return null;
-            return raw * c.factor + (c.offset || 0);
+            const v = raw * c.factor + (c.offset || 0);
+            return c.max != null && v > c.max ? null : v;
         };
 
         /* ---------- persisted state: SOH, the last charge reading and the last charge session ---------- */
@@ -131,7 +136,7 @@ mgu.run({
         };
         const live = { soc: null, socT: 0, soh: G.isNum(st.soh) ? st.soh : null, sohT: st.sohT || 0, v12: null, v12T: 0, ambient: null, speed: null, rpm: null, rpmT: 0,
             climate: null, ac: null, seats: {}, wheel: null, blower: null, blowerTop: 8, pd: null, batt: null, hvV: null,
-            pace: null, lastMove: 0, raw: {} };
+            pace: null, lastMove: 0, raw: {}, standSince: 0, acRaw: null, acKw: null, lscV: null, lscVT: 0 };
 
         /* ---------- electric driving: what the car really does per % ----------
          * seg = distance since the last charge reading, and whether the engine ran meanwhile.
@@ -239,7 +244,11 @@ mgu.run({
                 zones.climate = { 0: b > 0 }; climateChanged();
             }
         };
-        const onCompressor = (v) => { seen('compressor', v); live.acPower = one(v, 'actualValuePowerACCompressor'); };
+        const onCompressor = (v) => {
+            seen('compressor', v);
+            const r = one(v, 'actualValuePowerACCompressor');
+            live.acPower = r; live.acRaw = r; live.acKw = typeof r === 'number' ? sc('acPower', r) : null;
+        };
         /** Climate during the stretch since the last charge reading: true / false / null / 'mixed'. */
         const stretchClimate = () => (seg.climateMixed ? 'mixed' : seg.climate);
 
@@ -272,7 +281,14 @@ mgu.run({
             ExteriorTemperature: (v) => { const a = sc('ambient', v.temperatureExterior); if (a !== null) live.ambient = a; },
         }, log).then((s) => log.info('ambient ' + (s.error ? 'error: ' + s.error : 'subscribed')));
         ctx.signals.watch('de.bmw.infotainment.vehicle.Vehicle2', '1', {
-            statusCarSpeed2: (v) => { const k = v.speedVehicleCentreOfGravity; live.speed = k === 65535 || k == null ? null : k * 0.015625; onSpeed(live.speed); },
+            statusCarSpeed2: (v) => {
+                const k = v.speedVehicleCentreOfGravity;
+                live.speed = k === 65535 || k == null ? null : k * 0.015625;
+                // standing since (live.js: the measured climate draw)
+                if (G.isNum(live.speed) && live.speed > 1) live.standSince = 0;
+                else if (G.isNum(live.speed) && !live.standSince) live.standSince = Date.now();
+                onSpeed(live.speed);
+            },
             highVoltageStorageInfoToExternal: (v) => rawSeen('HV energy', v),
         }, log).then((s) => log.info('speed ' + (s.error ? 'error: ' + s.error : 'subscribed')));
         ctx.signals.watch('de.bmw.infotainment.vehicle.CDS', '1', {
@@ -310,7 +326,14 @@ mgu.run({
             },
         }, log, { pollMs: 30000 }).then((s) => log.info('battery temperature ' + (s.error ? 'error: ' + s.error : 'subscribed')));
         ctx.signals.watch('de.bmw.infotainment.lsc.LSCDataSink', '1', {
-            statusHighVoltageStorage: (v) => { rawSeen('HV voltage', v); const x = one(v, 'actualValueVoltageHighVoltageStorage'); if (G.isNum(x)) live.hvV = x; },
+            statusHighVoltageStorage: (v) => {
+                rawSeen('HV voltage', v);
+                const x = one(v, 'actualValueVoltageHighVoltageStorage');
+                if (!G.isNum(x)) return;
+                live.hvV = x;
+                const volts = x > 1500 ? x / 10 : x;            // 0.1 V on the X5 45e
+                if (volts > 150 && volts < 500) { live.lscV = volts; live.lscVT = Date.now(); }
+            },
         }, log).then((s) => log.info('HV voltage ' + (s.error ? 'error: ' + s.error : 'subscribed')));
 
         // connect in the background: the screen must not wait for the diagnostic link
@@ -323,7 +346,25 @@ mgu.run({
         /* ---------- UDS reads (candidates per value, see kit/dids.js) ---------- */
         const reader = new DidReader(diag, { ecu: cfg.ecu });
         const raws = reader.raws, pick = reader.pick;      // for the Diagnostics page
-        const readValue = (key) => reader.value(key, cfg[key]);
+        // one request at a time on the diagnostic link: a queue rather than a plain chain, so a live
+        // power read (urgent) goes ahead of the reads that wait
+        const queue = [];
+        let pumping = false;
+        async function pump() {
+            if (pumping) return;
+            pumping = true;
+            while (queue.length) {
+                const j = queue.shift();
+                try { j.res(await j.fn()); } catch (e) { j.rej(e); }
+            }
+            pumping = false;
+        }
+        const exclusive = (fn, urgent) => new Promise((res, rej) => {
+            const j = { fn, res, rej };
+            if (urgent) queue.unshift(j); else queue.push(j);
+            pump();
+        });
+        const readValue = (key) => exclusive(() => reader.value(key, cfg[key]));
 
         /* ---------- last charge ----------
          * A charge = the charge level rising by >= chargeMinPct while the car stands still
@@ -397,7 +438,7 @@ mgu.run({
         }
         const isHybrid = () => (settings.get('hybrid') === 'yes' ? true : settings.get('hybrid') === 'no' ? false : !st.noHybrid);
         // the Diagnostics page (UDS replies per value) only when switched on in Settings: it is for tuning DIDs
-        const pages = () => (isHybrid() ? PAGES_HYBRID : PAGES_12V).filter((p) => (p !== 'diag' && p !== 'signals') || settings.get('diagPage'));
+        const pages = () => (isHybrid() ? PAGES_HYBRID : PAGES_12V).filter((p) => DIAG_PAGES.indexOf(p) < 0 || settings.get('diagPage'));
         const diagHint = (s) => (settings.get('diagPage') ? s + ' - see Diagnostics page' : s);
 
         // 12 V history (one sample per 30 s)
@@ -532,13 +573,26 @@ mgu.run({
 
         /* ---------- drawing ---------- */
         let page = 0;
-        ui.onClick('BTN_PAGE', () => { page = (page + 1) % pages().length; return render(); });
-        ui.onClick('BTN_PREV', () => { const n = pages().length; page = (page + n - 1) % n; return render(); });
-        ui.onClick('BTN_READ', () => poll(true).then(render));
+        const lv = startLive(ctx, { diag, reader, exclusive, live, page: () => pages()[page] });
+        const isLive = (p) => lv.PAGES.indexOf(p) >= 0 || lv.DIAG.indexOf(p) >= 0;
+        // the first bar button: "Read now", on the live pages their own action (this drive's totals, the scan)
+        let actionText = 'Read now';
+        const actionLabel = () => {
+            const p = pages()[page], txt = (isLive(p) && lv.actionLabel(p)) || 'Read now';
+            if (txt !== actionText) { actionText = txt; ui.text('BTN_READ', txt); }
+        };
+        const turn = (n) => { page = n; actionLabel(); return render(); };
+        ui.onClick('BTN_PAGE', () => turn((page + 1) % pages().length));
+        ui.onClick('BTN_PREV', () => { const n = pages().length; return turn((page + n - 1) % n); });
+        ui.onClick('BTN_READ', () => {
+            const p = pages()[page];
+            if (isLive(p) && lv.actionLabel(p)) { lv.action(p); return render(); }
+            return poll(true).then(render);
+        });
 
         /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t, d) {
-            const names = { main: isHybrid() ? 'Range' : '12 V battery', energy: 'Energy', log: 'Charge log', diag: 'Diagnostics', signals: 'Signals' };
+            const names = Object.assign({ main: isHybrid() ? 'Range' : '12 V battery', energy: 'Energy', log: 'Charge log', diag: 'Diagnostics', signals: 'Signals' }, lv.NAMES);
             G.frame(cv, t, pages().map((p) => names[p]), page, [d.demo && { text: 'DEMO' }]);
         }
 
@@ -868,11 +922,13 @@ mgu.run({
         }
 
         function render() {
-            const t = ctx.theme(), d = data();
+            const t = ctx.theme();
+            let d = data();
             const cv = ctx.canvas(W, H).clear(t.bg);
             const pg = pages();
-            if (page >= pg.length) page = 0;
-            if (pg[page] === 'diag') renderDiag(cv, t, d);
+            if (page >= pg.length) { page = 0; actionLabel(); }
+            if (isLive(pg[page])) d = lv.draw(pg[page], cv, t);
+            else if (pg[page] === 'diag') renderDiag(cv, t, d);
             else if (pg[page] === 'signals') renderSignals(cv, t, d);
             else if (pg[page] === 'energy') renderEnergy(cv, t, d);
             else if (pg[page] === 'log') renderLog(cv, t, d);
@@ -886,6 +942,7 @@ mgu.run({
         ctx.loop('MAIN', 2, render);
         settings.onChange((k) => {
             if (k === 'poll') schedule();
+            if (k === 'diagPage' || k === 'hybrid') actionLabel();
         });
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));
     },
