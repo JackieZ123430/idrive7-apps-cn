@@ -891,12 +891,17 @@ mgu.run({
             const share = (kw) => (G.isNum(e.comfortKm) && comfort > 0 ? e.comfortKm * kw / comfort : null);
             // driving: learned % per km at the pace; before that the typical range (all use per km) less
             // what the climate, on-board electrics and seat heating draw
-            const driveKw = !G.isNum(e.pace) ? null : G.isNum(e.perKm) ? e.perKm * k * e.pace
+            // moving with the engine off: live - the battery's power now less what the rest draws; else the learned figure
+            const pwNow = d.demo ? null : lv.powerNow(t).kw;
+            const liveDrive = G.isNum(pwNow) && !d.engine && G.isNum(d.speed) && d.speed > 2
+                ? Math.max(0, pwNow - climKw - (comfort || 0) - base) : null;
+            const driveKw = G.isNum(liveDrive) ? liveDrive : !G.isNum(e.pace) ? null : G.isNum(e.perKm) ? e.perKm * k * e.pace
                 : G.isNum(e.kpp) && e.kpp > 0 ? Math.max(0, (1 / e.kpp) * k * e.pace - e.auxKw - (comfort || 0)) : null;
             const seatTxt = Object.keys(d.seats || {}).filter((s2) => d.seats[s2]).map((s2) => ({ DR: 'driver', PS: 'pass.', DRR: 'rear L', PSR: 'rear R' }[s2] + ' ' + d.seats[s2])).join(', ');
             const rows = [
                 ['Driving', driveKw, null,
-                    G.isNum(e.pace) ? 'at ' + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h') + (e.learned ? '' : ' (typical)') : 'learns as you drive'],
+                    G.isNum(liveDrive) ? 'live, at ' + Math.round(D(d.speed)) + ' ' + (MI() ? 'mph' : 'km/h')
+                        : G.isNum(e.pace) ? 'at ' + Math.round(D(e.pace)) + ' ' + (MI() ? 'mph' : 'km/h') + (e.learned ? '' : ' (typical)') : 'learns as you drive'],
                 ['Climate (heating / A/C)', climKw, has && d.climate !== false ? e.climateKm : null,
                     lc ? (lc.how === 'measured' ? 'from the battery' : lc.how === 'climate unit' ? 'climate unit' : 'measured before')
                         + (blow > 0 ? ', blower ~' + G.fmt(blow, 2) + ' kW' : '')

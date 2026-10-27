@@ -179,10 +179,24 @@ module.exports = function live(ctx, sh) {
         push(trace, TRACE_S, kw);
         learnBaseline(kw, now);
     }
+    // how fast power is really read while shown (logged every 30 s): reads, time per read, time queued
+    const perf = { n: 0, ms: 0, wait: 0, maxWait: 0, t: Date.now() };
+    function logPerf() {
+        const now = Date.now();
+        if (now - perf.t < 30000) return;
+        if (perf.n && shown()) {
+            log.info('power reads: ' + (perf.n / ((now - perf.t) / 1000)).toFixed(1) + '/s, ' + Math.round(perf.ms / perf.n) + ' ms each, queued '
+                + Math.round(perf.wait / perf.n) + ' ms avg / ' + perf.maxWait + ' ms max, poll ' + settings.get('powerPoll') + ' s');
+        }
+        Object.assign(perf, { n: 0, ms: 0, wait: 0, maxWait: 0, t: now });
+    }
     async function readPower() {
         // a car without the current identifier: only every 30 s. One that has answered keeps being asked
         if (!diag.available || (!iOk && iFail >= 3 && Date.now() - iTry < 30000)) return;
+        const queued = Date.now();
         await exclusive(async () => {
+            const w = Date.now() - queued;
+            perf.wait += w; perf.maxWait = Math.max(perf.maxWait, w);
             try {
                 // the pack voltage moves little: every 5 s is enough, so the current gets nearly every read
                 if (!G.isNum(live.v) || Date.now() - live.vT > 5000) {
@@ -192,6 +206,7 @@ module.exports = function live(ctx, sh) {
                 iTry = Date.now();
                 const r = await readGroup('hvI', cfg.fast.hvI);
                 rate.push([iTry, Date.now() - iTry]);
+                perf.n++; perf.ms += Date.now() - iTry; logPerf();
                 while (rate.length && iTry - rate[0][0] > 10000) rate.shift();
                 if (!r) {
                     iFail++; pMiss++;
