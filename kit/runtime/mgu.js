@@ -263,6 +263,159 @@ class Ui {
     }
 }
 
+
+/* ---------------- home-screen widget (app.json "startWidget") ----------------
+ * How BMW's widgets work on this firmware (taken from MainApp and the Drive Recorder app):
+ * the app ships rhmiDataStartWidget/ (kit/tools/build.py); MainApp finds it, offers the widget
+ * in the home screen's widget list and, when one is placed, starts the app (if needed) and hands
+ * it the widget's RHMI application (OnlineApp "startWidgetInitialized"). Each widget placed on the
+ * home screen is a "spawn" of the one startWidget component: the app writes the layout's cells
+ * per spawn (setValue(spawnId, cell, value, type)). widgetSize 1 = small, anything else = big.
+ * The HMI's events (placed, removed, resized, shown, tapped) come through MainApp:
+ * CREATE_START_WIDGET_RHMI_APP (with the events so far) and SEND_EVENTS later. The SDK the kit is
+ * built with only knows the first, so patchStartWidgetEvents() adds the rest.
+ */
+function patchStartWidgetEvents(app) {
+    const orig = app._createStartWidgetRhmiApplication;
+    if (typeof orig !== 'function') { log.warn('widget: this SDK has no start widget support'); return; }
+    const replay = (self, cfg, list) => {
+        (list || []).forEach((ev) => {
+            const c = self.startWidgetRhmiApplication && self.startWidgetRhmiApplication.getById(Number(ev.componentId));
+            if (!c) return;
+            if (cfg.components && cfg.components[ev.componentId]) Object.assign(c.spawnedInstances, cfg.components[ev.componentId]);
+            const inst = (id) => (c.spawnedInstances[id] = c.spawnedInstances[id] || {});
+            if (ev.type === 'created') { Object.assign(inst(ev.spawnId), { context: ev.context }, ev.widgetSize !== undefined ? { widgetSize: ev.widgetSize } : {}); c.emit('created', { spawnId: ev.spawnId, context: ev.context }); }
+            else if (ev.type === 'resize') { inst(ev.spawnId).widgetSize = ev.widgetSize; c.emit('resize', { spawnId: ev.spawnId, widgetSize: ev.widgetSize }); }
+            else if (ev.type === 'create') c.emit('create', { widgetSize: ev.widgetSize });
+            else if (ev.type === 'action') c.emit('action', { spawnId: ev.spawnId, context: ev.context });
+            else if (ev.type === 'visible') c.emit('visible', { spawnId: ev.spawnId, visible: ev.visible });
+            else if (ev.type === 'abort' || ev.type === 'destroyed') { delete c.spawnedInstances[ev.spawnId]; c.emit(ev.type, { spawnId: ev.spawnId }); }
+        });
+    };
+    app._createStartWidgetRhmiApplication = function (raw) {
+        let cfg = null;
+        try { cfg = JSON.parse(raw && raw.configData); } catch (e) { /* the SDK reports it */ }
+        if (cfg && cfg.command === 'SEND_EVENTS') {
+            // raw RHMI events, as the HMI sent them to MainApp: the component parses them itself
+            const sw = this.startWidgetRhmiApplication;
+            Object.keys(cfg.rhmiEvents || {}).forEach((id) => {
+                const c = sw && sw.getById(Number(id));
+                if (c) (cfg.rhmiEvents[id] || []).forEach((e) => { try { c.parseUserEvent(e); } catch (err) { log.warn('widget event: ' + err); } });
+            });
+            return Promise.resolve({});
+        }
+        return Promise.resolve(orig.call(this, raw)).then((r) => {
+            if (cfg && Array.isArray(cfg.events)) replay(this, cfg, cfg.events);
+            return r || {};
+        });
+    };
+}
+
+class Widget {
+    constructor(spec) {
+        this.spec = spec || {};
+        this.comp = null;
+        this.vis = Object.create(null);      // spawnId -> visible (unknown = true)
+        this._img = Object.create(null);
+        this._change = [];
+        this._tap = [];
+        this.timing = { png: 0, push: 0 };
+    }
+    get ready() { return !!this.comp; }
+    /** Placed widgets: [{ spawnId, big, visible }]. */
+    instances() {
+        if (!this.comp) return [];
+        return Object.keys(this.comp.spawnedInstances || {}).map((k) => {
+            const i = this.comp.spawnedInstances[k] || {};
+            return { spawnId: Number(k), big: i.widgetSize !== 1, size: i.widgetSize, visible: this.vis[k] !== false };
+        });
+    }
+    /** A widget is on the home screen and showing. */
+    active() { return this.instances().some((i) => i.visible); }
+    onChange(fn) { this._change.push(fn); }
+    onTap(fn) { this._tap.push(fn); }
+    _changed(why) { log.info('widget ' + why + ': ' + JSON.stringify(this.instances())); this._change.forEach((fn) => { try { fn(why); } catch (e) { log.error(e); } }); }
+    attach(rhmiApp) {
+        const name = SPEC.id.toUpperCase() + '_WIDGET';
+        const c = rhmiApp && rhmiApp.getByName(name);
+        if (!c) { log.warn('widget: no component ' + name); return; }
+        this.comp = c;
+        c.on('created', (e) => { this.vis[e.spawnId] = true; this._static(e.spawnId); this._changed('placed'); });
+        c.on('resize', (e) => { this._forget(e.spawnId); this._changed('resized'); });
+        c.on('visible', (e) => { this.vis[e.spawnId] = !!e.visible; if (e.visible) this._forget(e.spawnId); this._changed(e.visible ? 'shown' : 'hidden'); });
+        ['abort', 'destroyed'].forEach((n) => c.on(n, (e) => { delete this.vis[e.spawnId]; this._forget(e.spawnId); this._changed('removed'); }));
+        c.on('action', (e) => { log.info('widget tapped (' + e.spawnId + ')'); this._tap.forEach((fn) => { try { fn(e); } catch (err) { log.error(err); } }); });
+        this.instances().forEach((i) => this._static(i.spawnId));
+        this._changed('ready');
+    }
+    _forget(spawnId) { const st = this._img[spawnId]; if (st) st.lastPx = null; }
+    /** The layout's fixed cells (app.json startWidget.cells), written once per placed widget. */
+    _static(spawnId) {
+        const cells = this.spec.cells || {};
+        Object.keys(cells).forEach((k) => {
+            const [value, type] = cells[k];
+            this.set(spawnId, k, value, type);
+        });
+    }
+    set(spawnId, cell, value, type) {
+        if (!this.comp) return Promise.resolve();
+        if ((type || 'Text') === 'Text') value = widgetText(value);
+        return Promise.resolve(this.comp.setValue(Number(spawnId), cell, value, type || 'Text'))
+            .catch((e) => log.warn('widget ' + cell + ': ' + e));
+    }
+    /** Show a drawn image (canvas.js Canvas) in a placed widget (cell: app.json startWidget.image). */
+    image(spawnId, img) {
+        const st = this._img[spawnId] || (this._img[spawnId] = { n: 0, live: [], busy: null, next: null });
+        if (st.busy) { st.next = img; return st.busy; }
+        const cell = this.spec.image || 'BackgroundImage1';
+        const run = async (frame) => {
+            if (!this.comp) return;
+            const px = Buffer.from(frame.d.buffer, frame.d.byteOffset, frame.d.length);
+            if (st.lastPx && Date.now() - st.lastPush < 5000 && px.equals(st.lastPx)) return;
+            const rb = this.comp.getResourceBundle();
+            const file = path.join(RHMI_RES, 'dyn_' + RUN_TAG + '_w' + spawnId + '_' + (st.n++ % 4) + '.png');
+            const t0 = Date.now(), png = frame.png(), t1 = Date.now();
+            fs.writeFileSync(file + '.tmp', png);
+            fs.renameSync(file + '.tmp', file);
+            await rb.createResourceHandles([file]);
+            await this.comp.setValue(Number(spawnId), cell, rb.getResourceHandle(file), 'Asset');
+            this.timing.png += t1 - t0; this.timing.push += Date.now() - t1;
+            if (!st.lastPush) log.info('widget ' + spawnId + ': first image in ' + (Date.now() - t0) + ' ms');
+            st.lastPx = Buffer.from(px); st.lastPush = Date.now();
+            st.live = st.live.filter((f) => f !== file).concat([file]);
+            while (st.live.length > 2) rb.destroyResourceHandles([st.live.shift()]).catch(() => {});
+        };
+        st.busy = run(img).catch((e) => log.warn('widget image ' + spawnId + ': ' + e)).then(() => {
+            st.busy = null;
+            if (st.next) { const n = st.next; st.next = null; return this.image(spawnId, n); }
+        });
+        return st.busy;
+    }
+    /**
+     * Run draw(instance) -> Canvas for every widget on screen, about `fps` times a second
+     * (only while one is showing). The images are pushed as they finish; a slow push skips frames.
+     */
+    loop(fps, draw) {
+        let frames = 0;
+        const tick = async () => {
+            // every placed widget, shown or not: a visibility event the app missed must not leave one blank
+            const list = this.instances();
+            if (list.length) {
+                for (const i of list) {
+                    try { const cv = await draw(i); if (cv) this.image(i.spawnId, cv); } catch (e) { log.error('widget draw', e); }
+                }
+                if (++frames % 3 === 0 && typeof global.gc === 'function') { try { global.gc(); } catch (e) { /* ignore */ } }
+                if (frames % 200 === 0) {
+                    log.info('widget loop: png ' + Math.round(this.timing.png / 200) + ' ms, hmi ' + Math.round(this.timing.push / 200) + ' ms per frame');
+                    this.timing.png = 0; this.timing.push = 0;
+                }
+            }
+            setTimeout(tick, list.length ? 1000 / Math.max(1, typeof fps === 'function' ? fps() : fps) : 1000);
+        };
+        setTimeout(tick, 0);
+    }
+}
+
 /* ---------------- generic settings screen ---------------- */
 function wireSettings(ctx) {
     const { ui, settings } = ctx;
@@ -292,6 +445,12 @@ function wireSettings(ctx) {
     return refresh();
 }
 
+// widget text cells: ASCII only, as before the Chinese text support. A widget has its own string
+// bundle, without the app's SID_CN_DYNAMIC slots, so non-ASCII text can't go through StringIds there.
+function widgetText(s) {
+    return String(s).replace(/°/g, '').replace(/[^\x20-\x7e]/g, '');
+}
+
 /* ---------------- run ---------------- */
 async function run(impl) {
     try { return await runInner(impl); } catch (e) {
@@ -311,6 +470,12 @@ async function runInner(impl) {
         .then(() => log.info('registered active')).catch((e) => log.warn('registerActive: ' + e));
     app.on('appStatusProxyReady', active);
     app.on('shutdown', () => { log.info('shutdown requested by MainApp'); setTimeout(() => process.exit(0), 200); });
+    // home-screen widget: MainApp hands it over (now or whenever one is placed)
+    const widget = new Widget(SPEC.startWidget);
+    if (SPEC.startWidget) {
+        patchStartWidgetEvents(app);
+        app.on('startWidgetInitialized', (rhmiApp) => { log.info('widget initialized'); widget.attach(rhmiApp); });
+    }
     await app.start();
     active();
     const ui = new Ui(app);
@@ -318,7 +483,7 @@ async function runInner(impl) {
     const display = new Display(ui, log, SPEC, settings, () => themes.theme(settings.get('theme')));
     ui.display = display;
     const ctx = {
-        app, ui, settings, log, spec: SPEC, dataDir: DATA_DIR, display,
+        app, ui, settings, log, spec: SPEC, dataDir: DATA_DIR, display, widget,
         signals: require('./signals'),
         theme: () => themes.theme(settings.get('theme')),
         /**
@@ -431,6 +596,8 @@ async function runInner(impl) {
             .then(() => { opening = null; });
         return opening;
     };
+    // a tap on the home-screen widget opens the app
+    widget.onTap(() => { if (entryUuids[0]) openEntry(entryUuids[0]); });
     app.on('entryPointExecute', (uuid, reason, name) => {
         log.info('entry point ' + name + ' (' + reason + ')');
         openEntry(uuid);
