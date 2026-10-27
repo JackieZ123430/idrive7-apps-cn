@@ -72,7 +72,7 @@ def unicode_resources(ui, strings, language='en'):
     for key in strings:
         strings[key] = text(strings[key], words)
         if language == 'zh-CN' and key.endswith('_CN_CREDITS_TITLE'):
-            strings[key] = '抖音：小白科技杂物社 / BiliBili：小白151'
+            strings[key] = '汉化 Translation by：抖音 小白科技杂物社 / BiliBili 小白151'
     for n in range(256):
         strings['SID_CN_DYNAMIC_%04d' % n] = ''
     if len(strings) > 1024:

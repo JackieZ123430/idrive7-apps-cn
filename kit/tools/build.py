@@ -151,7 +151,7 @@ def fetch_assets(adir, assets):
         open(dst, 'wb').write(data)
 
 
-def build_ui(spec):
+def build_ui(spec, language='en'):
     """screens/settings -> (application.xml, uiDescription.json, strings, screen meta)"""
     app = spec['id']
     nid = Ids()
@@ -209,14 +209,22 @@ def build_ui(spec):
                 strings[sid(app, 'SET_' + s['key'])] = s['label']
                 items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
                                                         'Text2ndRow': {'value': '', 'type': 'Text'}}]))
-        # Chinese localization: Bilibili 小白151 / GitHub JackieZ123430.
-        # Keep attribution visible in every app without covering the live instruments.
-        credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
-        strings[credit_title] = 'Douyin 小白科技杂物社 / BiliBili 小白151'
-        strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
-        items.append(comp('tworow', 'CN_CREDITS', rows=[{
-            'Text1stRow': {'value': credit_title, 'type': 'StringId'},
-            'Text2ndRow': {'value': credit_link, 'type': 'StringId'},
+        # Chinese builds only: credit for the Chinese translation (localize.py sets the Chinese title)
+        if language == 'zh-CN':
+            credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
+            strings[credit_title] = 'Translation by Douyin 小白科技杂物社 / BiliBili 小白151'
+            strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
+            items.append(comp('tworow', 'CN_CREDITS', rows=[{
+                'Text1stRow': {'value': credit_title, 'type': 'StringId'},
+                'Text2ndRow': {'value': credit_link, 'type': 'StringId'},
+            }]))
+        # the project's own credit, last row
+        repo_title, repo_link = sid(app, 'REPO_CREDITS_TITLE'), sid(app, 'REPO_CREDITS_LINK')
+        strings[repo_title] = 'iDrive 7 custom apps'
+        strings[repo_link] = 'GitHub cauliflowermossgrape · github.com/cauliflowermossgrape/idrive7-apps'
+        items.append(comp('tworow', 'REPO_CREDITS', rows=[{
+            'Text1stRow': {'value': repo_title, 'type': 'StringId'},
+            'Text2ndRow': {'value': repo_link, 'type': 'StringId'},
         }]))
 
     for scr in screens:
@@ -327,7 +335,7 @@ def build(app_id, language='en'):
     os.makedirs(os.path.join(src, 'node_modules', 'oap-sdk'))
 
     manifest = manifest_for(json.loads(json.dumps(spec)))
-    xml, uidesc, strings, state_ids = build_ui(spec)
+    xml, uidesc, strings, state_ids = build_ui(spec, language)
     unicode_resources(uidesc, strings, language)
     for lang, tbl in spec.get('strings', {}).items():
         strings.update(tbl)

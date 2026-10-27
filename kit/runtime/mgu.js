@@ -295,9 +295,9 @@ function wireSettings(ctx) {
 /* ---------------- run ---------------- */
 async function run(impl) {
     try { return await runInner(impl); } catch (e) {
+        // log only: no process.exit here. On the car an unexpected exit makes CorruptAppsHandler
+        // wipe the app's data, and a second one uninstalls a custom app.
         fileLog('FATAL', 'start failed: ' + (e && e.stack || e));
-        // A live heartbeat after a rejected start leaves the HMI stuck on "Loading app".
-        setTimeout(() => process.exit(1), 100);
         throw e;
     }
 }

@@ -19,13 +19,19 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
         for a, b in zip(original['settings'], spec['settings']):
             assert a['key'] == b['key'] and a['default'] == b['default']
             assert [o[0] for o in a.get('options', [])] == [o[0] for o in b.get('options', [])]
-        _, ui, strings, _ = build.build_ui(copy.deepcopy(spec))
+        _, ui, strings, _ = build.build_ui(copy.deepcopy(spec), language)
         unicode_resources(ui, strings, language)
         assert len([k for k in strings if k.startswith('SID_CN_DYNAMIC_')]) == 256
         assert len(strings) <= 1024
         assert spec['title'] in strings.values()
+        # translation credit: Chinese builds only; the project credit: every build
+        cn = [k for k in strings if k.endswith('_CN_CREDITS_TITLE') or k.endswith('_CN_CREDITS_LINK')]
         if language == 'zh-CN':
-            assert '抖音：小白科技杂物社 / BiliBili：小白151' in strings.values()
+            assert '汉化 Translation by：抖音 小白科技杂物社 / BiliBili 小白151' in strings.values()
+            assert len(cn) == 2
+        else:
+            assert not cn and not any('JackieZ123430' in v or '小白' in v for v in strings.values())
+        assert any('github.com/cauliflowermossgrape/idrive7-apps' in v for v in strings.values())
         def visit(obj):
             if isinstance(obj, dict):
                 if obj.get('type') == 'StringId': assert obj['value'] in strings, (manifest, obj)
@@ -36,7 +42,7 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
         visit(ui)
         keys.append(set(strings))
         count += 1
-    assert keys[0] == keys[1]
+    assert keys[1] - keys[0] == {k for k in keys[1] if '_CN_CREDITS_' in k} and keys[0] <= keys[1]
 try:
     unicode_resources({}, {'SID_TEST_%d' % n: '' for n in range(769)})
 except ValueError:
