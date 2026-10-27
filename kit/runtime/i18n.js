@@ -4,6 +4,9 @@
 // Local display translation only. Never use this on signal names, IDs or stored settings.
 const dict = require('./locales/zh-CN.json');
 const cache = new Map();
+let language = 'en';
+function getLanguage() { return language; }
+function setLanguage(value) { language = value === 'zh-CN' ? 'zh-CN' : 'en'; cache.clear(); return language; }
 const folded = Object.create(null);
 Object.keys(dict).forEach((key) => { folded[key.toLowerCase()] = dict[key]; });
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -11,6 +14,7 @@ const phrases = Object.keys(dict).filter((s) => s.length >= 4).sort((a, b) => b.
 const pattern = new RegExp('(^|[^A-Za-z0-9_./])(' + phrases.map(escape).join('|') + ')(?=$|[^A-Za-z0-9_./])', 'gi');
 function t(value) {
     const s = String(value == null ? '' : value);
+    if (language !== 'zh-CN') return s;
     if (!/[A-Za-z]/.test(s)) return s; // numeric telemetry / already translated labels: hot path
     if (s.trim() === 'rpm') return s; // preserve the physical unit; uppercase RPM headings may translate
     if (cache.has(s)) return cache.get(s);
@@ -30,4 +34,4 @@ function t(value) {
     cache.set(s, out);
     return out;
 }
-module.exports = { t, dict };
+module.exports = { t, dict, getLanguage, setLanguage };

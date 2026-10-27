@@ -17,7 +17,7 @@ import json, os, re, shutil, sys, tarfile, uuid
 from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pack_data  # noqa: E402
-from localize import spec_zh, text, unicode_resources
+from localize import unicode_resources, resource_tables
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -114,7 +114,7 @@ def sid(app, key):
 
 def hmi_text(s):
     """Keep Unicode: unicode_resources converts these cells to StringId before packaging."""
-    return text(s)
+    return str(s)
 
 
 def setting_options(s):
@@ -212,7 +212,7 @@ def build_ui(spec):
         # Chinese localization: Bilibili 小白151 / GitHub JackieZ123430.
         # Keep attribution visible in every app without covering the live instruments.
         credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
-        strings[credit_title] = '汉化：小白科技杂物社 / Bilibili 小白151'
+        strings[credit_title] = 'Chinese translation: Xiaobai / Bilibili 小白151'
         strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
         items.append(comp('tworow', 'CN_CREDITS', rows=[{
             'Text1stRow': {'value': credit_title, 'type': 'StringId'},
@@ -316,7 +316,6 @@ def make_icon(spec, out):
 
 def build(app_id):
     spec = json.load(open(os.path.join(APPS, app_id, 'app.json'), encoding='utf-8'))
-    spec = spec_zh(spec)
     spec.setdefault('id', app_id)
     ver = spec['version']
     stage = os.path.join(DIST, app_id)
@@ -331,6 +330,7 @@ def build(app_id):
     unicode_resources(uidesc, strings)
     for lang, tbl in spec.get('strings', {}).items():
         strings.update(tbl)
+    translations = resource_tables(strings)
 
     # --- source/ (the npm package) ---
     pkg = {
@@ -378,6 +378,7 @@ def build(app_id):
     rt_spec = {k: spec.get(k) for k in ('id', 'title', 'version', 'screens', 'settings', 'config')}
     rt_spec['stateIds'] = state_ids
     json.dump(rt_spec, open(os.path.join(src, 'javascript', 'kit', 'app-spec.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
+    json.dump(translations, open(os.path.join(src, 'javascript', 'kit', 'locale-strings.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(os.path.join(SDK, 'index.js'), os.path.join(src, 'node_modules', 'oap-sdk', 'index.js'))
     shutil.copy(os.path.join(SDK, 'package.json'), os.path.join(src, 'node_modules', 'oap-sdk', 'package.json'))
 
@@ -387,7 +388,7 @@ def build(app_id):
         'schemaVersion': '1.3.0',
         'application': {
             'uuid': u(app_id, 'app'), 'type': 'OnlineApp', 'name': app_id, 'vendor': spec.get('vendor', 'custom'),
-            'version': ver, 'defaultLanguage': 'zh_CN',
+            'version': ver, 'defaultLanguage': 'en_GB',
             'stringBundleUuid': u(app_id, 'strings'), 'resourceBundleUuid': u(app_id, 'resources'),
             'entryPoints': [{
                 'name': app_id.upper() + '_ENTRY', 'uuid': u(app_id, 'entry'), 'textId': sid(app_id, 'TITLE'),

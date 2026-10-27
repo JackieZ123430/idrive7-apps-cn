@@ -1,8 +1,8 @@
 {
   "id": "car_vitals",
-  "title": "M 车辆仪表",
-  "description": "发动机、温度、底盘、燃油与点火实时仪表",
-  "version": "2.13.0-cn.1",
+  "title": "M Vitals",
+  "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
+  "version": "2.13.0-cn.2",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -57,67 +57,83 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "M 车辆仪表",
+      "title": "M Vitals",
       "buttons": [
         [
           "BTN_PAGE",
-          "下一页"
+          "Next page"
         ],
         [
           "BTN_PREV",
-          "上一页"
+          "Previous page"
         ],
         [
           "BTN_SETTINGS",
-          "设置"
+          "Settings"
         ]
       ]
     }
   ],
   "settings": [
     {
+      "key": "language",
+      "label": "Language / 语言",
+      "type": "choice",
+      "default": "en",
+      "options": [
+        [
+          "en",
+          "English"
+        ],
+        [
+          "zh-CN",
+          "中文"
+        ]
+      ]
+    },
+    {
       "key": "page",
-      "label": "启动页面",
+      "label": "Start page",
       "type": "choice",
       "default": "engine",
       "options": [
         [
           "engine",
-          "发动机"
+          "Engine"
         ],
         [
           "thermal",
-          "温度"
+          "Thermals"
         ],
         [
           "fuel",
-          "燃油与点火"
+          "Fuel & ignition"
         ],
         [
           "chassis",
-          "底盘"
+          "Chassis"
         ]
       ]
     },
     {
       "key": "tempUnit",
-      "label": "温度",
+      "label": "Temperature",
       "type": "choice",
       "default": "C",
       "options": [
         [
           "C",
-          "摄氏度"
+          "Celsius"
         ],
         [
           "F",
-          "华氏度"
+          "Fahrenheit"
         ]
       ]
     },
     {
       "key": "pressUnit",
-      "label": "压力单位",
+      "label": "Pressure unit",
       "type": "choice",
       "default": "bar",
       "options": [
@@ -133,7 +149,7 @@
     },
     {
       "key": "speedUnit",
-      "label": "车速",
+      "label": "Speed",
       "type": "choice",
       "default": "kmh",
       "options": [
@@ -149,7 +165,7 @@
     },
     {
       "key": "redline",
-      "label": "换挡转速",
+      "label": "Redline",
       "type": "number",
       "unit": "rpm",
       "default": 7000,
@@ -165,7 +181,7 @@
     },
     {
       "key": "maxPower",
-      "label": "最大功率（运动仪表的 100%）",
+      "label": "Max power (100% on sport display)",
       "type": "number",
       "unit": "kW",
       "default": 215,
@@ -206,7 +222,7 @@
     },
     {
       "key": "powerUnit",
-      "label": "功率单位",
+      "label": "Power unit",
       "type": "choice",
       "default": "kw",
       "options": [
@@ -226,7 +242,7 @@
     },
     {
       "key": "torqueUnit",
-      "label": "扭矩单位",
+      "label": "Torque unit",
       "type": "choice",
       "default": "nm",
       "options": [
@@ -242,23 +258,23 @@
     },
     {
       "key": "powerSource",
-      "label": "功率来源",
+      "label": "Power from",
       "type": "choice",
       "default": "sport",
       "options": [
         [
           "sport",
-          "运动仪表"
+          "Sport display"
         ],
         [
           "calc",
-          "扭矩 × 转速"
+          "Torque x rpm"
         ]
       ]
     },
     {
       "key": "oilWarn",
-      "label": "机油温度警告",
+      "label": "Oil temp warning",
       "type": "number",
       "unit": "°C",
       "default": 125,
@@ -273,13 +289,13 @@
     },
     {
       "key": "peaks",
-      "label": "显示峰值标记",
+      "label": "Show peak markers",
       "type": "bool",
       "default": true
     },
     {
       "key": "peakHold",
-      "label": "峰值保持",
+      "label": "Peak hold",
       "type": "number",
       "unit": "s",
       "default": 15,
@@ -293,290 +309,290 @@
     },
     {
       "key": "xdrive",
-      "label": "xDrive 面板",
+      "label": "xDrive card",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏（后轮驱动）"
+          "Hide (RWD)"
         ]
       ]
     },
     {
       "key": "showBoost",
-      "label": "增压压力",
+      "label": "Boost",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "boostSource",
-      "label": "增压压力来源",
+      "label": "Boost from",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动（首个可用来源）"
+          "Auto (first that works)"
         ],
         [
           "fes",
-          "运动仪表"
+          "Sport display"
         ],
         [
           "dme",
-          "发动机控制单元（OBD）"
+          "Engine unit (OBD)"
         ]
       ]
     },
     {
       "key": "showGearbox",
-      "label": "变速箱油温",
+      "label": "Gearbox oil temperature",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showEgs",
-      "label": "变速箱温度（EGS）",
+      "label": "Gearbox temperature (EGS)",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showIat",
-      "label": "进气温度",
+      "label": "Intake air temperature",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showHpfp",
-      "label": "高压燃油",
+      "label": "High pressure fuel",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showLpfp",
-      "label": "低压燃油",
+      "label": "Low pressure fuel",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showTiming",
-      "label": "点火提前角",
+      "label": "Ignition timing",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showMisfire",
-      "label": "失火计数",
+      "label": "Misfire counter",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showTyres",
-      "label": "轮胎面板",
+      "label": "Tyre card",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "showTyreTemp",
-      "label": "轮胎温度",
+      "label": "Tyre temperatures",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "显示"
+          "Show"
         ],
         [
           "off",
-          "隐藏"
+          "Hide"
         ]
       ]
     },
     {
       "key": "theme",
-      "label": "配色主题",
+      "label": "Colour theme",
       "type": "choice",
       "default": "m_tricolour",
       "options": [
         [
           "m_red",
-          "M 红色"
+          "M Red"
         ],
         [
           "m_tricolour",
-          "M 三色"
+          "M Tricolour"
         ],
         [
           "ice",
-          "冰晶白"
+          "Ice White"
         ],
         [
           "amber",
-          "夜间琥珀"
+          "Night Amber"
         ]
       ]
     },
-    {"key": "speedRate", "label": "速度刷新率", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [5, 10, 15, 30, 60]},
-    {"key": "layout", "label": "屏幕布局", "type": "choice", "default": "full",
-     "options": [["full", "全屏"], ["standard", "标准"]]},
-    {"key": "renderer", "label": "渲染器", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 帧（默认）"], ["software", "软件渲染"]]},
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [5, 10, 15, 30, 60]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
     {
       "key": "demo",
-      "label": "演示数据",
+      "label": "Demo data",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "始终"
+          "Always"
         ],
         [
           "off",
-          "从不"
+          "Never"
         ]
       ]
     }

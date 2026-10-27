@@ -1,8 +1,8 @@
 {
   "id": "doom",
-  "title": "毁灭战士",
-  "description": "在 iDrive 控制器上运行 Freedoom，含中文启动菜单与设置",
-  "version": "1.4.1-cn.1",
+  "title": "Doom",
+  "description": "Doom (Freedoom: Phase 1) on the iDrive. Main menu with all settings; the game drawn in full resolution across the whole screen, on the controller; BACK returns to the menu and saves",
+  "version": "1.4.1-cn.2",
   "vendor": "custom",
   "loggingId": "OA9F",
   "maxDiskUsage": 104857600,
@@ -29,18 +29,18 @@
     {
       "name": "MAIN",
       "kind": "menu",
-      "title": "毁灭战士",
+      "title": "Doom",
       "settings": true,
       "items": [
         [
           "button",
           "BTN_PLAY",
-          "开始游戏"
+          "Play"
         ],
         [
           "button",
           "BTN_NEW",
-          "新游戏"
+          "New game"
         ],
         [
           "text",
@@ -52,170 +52,186 @@
     {
       "name": "GAME",
       "kind": "canvas",
-      "title": "毁灭战士",
+      "title": "Doom",
       "chrome": false,
       "buttons": [
         [
           "BTN_BACK",
-          "后退"
+          "Back up"
         ],
         [
           "BTN_TL",
-          "向左转"
+          "Turn left"
         ],
         [
           "BTN_WL",
-          "向左平移"
+          "Walk left"
         ],
         [
           "BTN_STAND",
-          "停止移动"
+          "Stand"
         ],
         [
           "BTN_WALK",
-          "行走"
+          "Walk"
         ],
         [
           "BTN_WR",
-          "向右平移"
+          "Walk right"
         ],
         [
           "BTN_TR",
-          "向右转"
+          "Turn right"
         ],
         [
           "BTN_WEAPON",
-          "切换武器"
+          "Weapon"
         ]
       ]
     }
   ],
   "settings": [
     {
+      "key": "language",
+      "label": "Language / 语言",
+      "type": "choice",
+      "default": "en",
+      "options": [
+        [
+          "en",
+          "English"
+        ],
+        [
+          "zh-CN",
+          "中文"
+        ]
+      ]
+    },
+    {
       "key": "skill",
-      "label": "难度（新游戏）",
+      "label": "Difficulty (new game)",
       "type": "choice",
       "default": "3",
       "options": [
         [
           "1",
-          "入门"
+          "I'm too young to die"
         ],
         [
           "2",
-          "简单"
+          "Hey, not too rough"
         ],
         [
           "3",
-          "普通"
+          "Hurt me plenty"
         ],
         [
           "4",
-          "困难"
+          "Ultra-Violence"
         ],
         [
           "5",
-          "噩梦！"
+          "Nightmare!"
         ]
       ]
     },
     {
       "key": "episode",
-      "label": "章节（新游戏）",
+      "label": "Episode (new game)",
       "type": "choice",
       "default": "1",
       "options": [
         [
           "1",
-          "1：前哨危机"
+          "1: Outpost Outbreak"
         ],
         [
           "2",
-          "2：军事实验室"
+          "2: Military Labs"
         ],
         [
           "3",
-          "3：事件视界"
+          "3: Event Horizon"
         ],
         [
           "4",
-          "4：双重冲击"
+          "4: Double Impact"
         ]
       ]
     },
     {
       "key": "run",
-      "label": "移动速度",
+      "label": "Move speed",
       "type": "choice",
       "default": "slow",
       "options": [
         [
           "slow",
-          "慢走（方便控制）"
+          "Slow walk (easiest to steer)"
         ],
         [
           "walk",
-          "行走"
+          "Walk"
         ],
         [
           "run",
-          "奔跑"
+          "Run"
         ]
       ]
     },
     {
       "key": "aim",
-      "label": "瞄准速度（旋转控制器）",
+      "label": "Aim speed (controller turn)",
       "type": "choice",
       "default": "normal",
       "options": [
         [
           "slow",
-          "慢"
+          "Slow"
         ],
         [
           "normal",
-          "正常"
+          "Normal"
         ],
         [
           "fast",
-          "快"
+          "Fast"
         ]
       ]
     },
     {
       "key": "aimdir",
-      "label": "瞄准方向",
+      "label": "Aim direction",
       "type": "choice",
       "default": "normal",
       "options": [
         [
           "normal",
-          "正常"
+          "Normal"
         ],
         [
           "reversed",
-          "反向"
+          "Reversed"
         ]
       ]
     },
     {
       "key": "detail",
-      "label": "渲染分辨率",
+      "label": "Render resolution",
       "type": "choice",
       "default": "full",
       "options": [
         [
           "full",
-          "全分辨率：1920 × 504"
+          "Full: 1920 x 504, every screen pixel"
         ],
         [
           "medium",
-          "中：1440 × 378"
+          "Medium: 1440 x 378"
         ],
         [
           "low",
-          "低：960 × 252"
+          "Low: 960 x 252"
         ]
       ]
     }

@@ -1,6 +1,6 @@
-**中文** | [English](README.en.md)
+[English](README.md) | **中文**
 
-# MGU Custom Apps 简体中文版
+# MGU Custom Apps 英文 / 简体中文双语版
 
 **汉化：小白科技杂物社 / Bilibili 小白151 / GitHub [JackieZ123430](https://github.com/JackieZ123430)**
 汉化仓库：[JackieZ123430/idrive7-apps-cn](https://github.com/JackieZ123430/idrive7-apps-cn)
@@ -10,12 +10,14 @@
 
 ## 汉化内容
 
-- 11 个应用的名称、菜单、按钮、设置，以及内置的仪表标题、状态和常用提示。
+- 11 个应用默认英文；在各应用的 **Settings → Language / 语言 → 中文** 中切换为简体中文。
+- 语言选择会保存，重新打开应用后继续使用；原生菜单、自绘仪表和已有动态提示同步切换。
+- 从上一版中文包升级且未设置过语言时，默认英文，需要重新选择中文。
 - 自绘仪表使用开源 Noto Sans SC 字形，GPU 和软件渲染均支持中文；数字和单位沿用原样。
 - 原生 HMI 菜单通过 SDK 的 StringBundle / StringId 传输 Unicode，避免旧版 Text 通道乱码。
 - 每个应用的设置页底部保留“小白科技杂物社 / Bilibili 小白151 / GitHub JackieZ123430”署名。
-- 画面右上角使用 12 px、约 25% 不透明度的小字署名“汉化：小白科技杂物社 · GitHub：JackieZ123430”；全屏时放在系统状态栏下方，标准布局避开演示标记。
-- 应用版本带 `-cn.1` 后缀，便于与上游版本区分。
+- 仅中文模式在画面右上角使用 12 px、约 25% 不透明度的小字署名“汉化：小白科技杂物社 · GitHub：JackieZ123430”；全屏时放在系统状态栏下方，标准布局避开演示标记。
+- 应用版本带 `-cn.2` 后缀，便于与上游版本区分。
 
 | 原应用 | 中文名称 |
 |---|---|
@@ -39,6 +41,8 @@
 以下为演示数据的离线绘制效果，不是实车测试截图。右上角为低对比度汉化署名。
 
 ![M 车辆仪表中文预览](docs/screens/chinese-vitals-preview.png)
+
+![默认英文预览](docs/screens/bilingual-english-preview.png)
 
 ![暖机助手中文预览](docs/screens/chinese-warmup-preview.png)
 
@@ -110,4 +114,6 @@ python kit/tools/test_zh.py
 
 字形生成器会校验字体 SHA-256，并检查中文字库的 GPU 纹理预算。生成后的 `cjk.json` 和译文一起提交。
 
-完整功能、安装实现和恢复细节请阅读 [英文详细文档](README.en.md)。
+完整功能、安装实现和恢复细节请阅读 [英文详细文档](README.md)。
+
+[上游 PR 准备说明](docs/UPSTREAM-PR.md)：当前仅更新本 fork，尚未向原作者提交 PR。

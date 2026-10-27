@@ -50,6 +50,7 @@ try { fs.unlinkSync(settings.file); } catch (e) {}
 settings.values = {};
 for (const s of spec.settings || []) settings.values[s.key] = s.default;
 Object.assign(settings.values, { demo: 'on' }, sets);
+require(path.join(kitDir, 'i18n')).setLanguage(settings.get('language'));
 
 const ui = {
     image: (name, cv) => display.present(name, cv, softImage),
@@ -95,6 +96,11 @@ require(path.join(stage, 'source', 'javascript', 'app.js'));
 setTimeout(async () => {
     for (const c of clicks) {
         // wait=<seconds> pauses (demo data keeps running); render forces a frame
+        if (/^language=/.test(c)) {
+            settings.set('language', c.slice(9));
+            require(path.join(kitDir, 'i18n')).setLanguage(settings.get('language'));
+            continue;
+        }
         if (/^wait=/.test(c)) { await new Promise((r) => setTimeout(r, Number(c.slice(5)) * 1000)); continue; }
         if (c === 'render') { await loopFn(); continue; }
         if (/^frames=/.test(c)) {

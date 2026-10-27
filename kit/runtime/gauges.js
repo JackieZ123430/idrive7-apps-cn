@@ -36,6 +36,7 @@
  */
 const { mix, ramp, withAlpha } = require('./canvas');
 const { makeLayer, dropLayer } = require('./record');
+const { getLanguage } = require('./i18n');
 
 const isNum = (x) => typeof x === 'number' && isFinite(x);
 const fmt = (v, d) => (isNum(v) ? v.toFixed(d || 0) : '--');
@@ -88,7 +89,7 @@ const sm = (g, key, v) => (g.smooth === false ? v : smooth(key, v, typeof g.smoo
 const layers = new Map();
 let layerDrop = null;                 // set by the display: tell the renderer a layer is gone
 function layer(key, w, h, draw, textScale) {
-    key = key + '|' + (textScale || 1);
+    key = key + '|' + (textScale || 1) + '|' + getLanguage();
     let L = layers.get(key);
     if (L) { layers.delete(key); layers.set(key, L); return L; }
     L = makeLayer(w, h, draw, textScale || 1);

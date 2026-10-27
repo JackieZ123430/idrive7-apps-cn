@@ -1,8 +1,8 @@
 {
   "id": "brake_test",
-  "title": "制动测试",
-  "description": "制动距离、减速度与制动衰减测试",
-  "version": "1.3.1-cn.1",
+  "title": "Brake Test",
+  "description": "100-0 and 200-0 braking distance, peak decel and brake-fade tracking",
+  "version": "1.3.1-cn.2",
   "vendor": "custom",
   "loggingId": "OA99",
   "iconGlyph": "brake",
@@ -18,29 +18,45 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "制动测试",
+      "title": "Brake Test",
       "buttons": [
-        ["BTN_ACTION", "取消本次"],
-        ["BTN_PAGE", "下一页"],
-        ["BTN_PREV", "上一页"],
-        ["BTN_SETTINGS", "设置"]
+        ["BTN_ACTION", "Cancel run"],
+        ["BTN_PAGE", "Next page"],
+        ["BTN_PREV", "Previous page"],
+        ["BTN_SETTINGS", "Settings"]
       ]
     }
   ],
   "settings": [
-    {"key": "speedUnit", "label": "测试项目", "type": "choice", "default": "kmh",
+    {
+      "key": "language",
+      "label": "Language / 语言",
+      "type": "choice",
+      "default": "en",
+      "options": [
+        [
+          "en",
+          "English"
+        ],
+        [
+          "zh-CN",
+          "中文"
+        ]
+      ]
+    },
+    {"key": "speedUnit", "label": "Tests", "type": "choice", "default": "kmh",
      "options": [["kmh", "100-0 / 200-0 km/h"], ["mph", "60-0 / 100-0 mph"]]},
-    {"key": "trigger", "label": "急刹车判定阈值", "type": "number", "unit": "g", "default": 0.4,
+    {"key": "trigger", "label": "Counts as hard braking above", "type": "number", "unit": "g", "default": 0.4,
      "steps": [0.2, 0.3, 0.4, 0.5, 0.6]},
-    {"key": "distUnit", "label": "距离单位", "type": "choice", "default": "m",
-     "options": [["m", "米"], ["ft", "英尺"]]},
-    {"key": "theme", "label": "配色主题", "type": "choice", "default": "m_tricolour",
-     "options": [["m_red", "M 红色"], ["m_tricolour", "M 三色"], ["ice", "冰晶白"], ["amber", "夜间琥珀"]]},
-    {"key": "layout", "label": "屏幕布局", "type": "choice", "default": "full",
-     "options": [["full", "全屏"], ["standard", "标准"]]},
-    {"key": "renderer", "label": "渲染器", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 帧（默认）"], ["software", "软件渲染"]]},
-    {"key": "demo", "label": "演示数据", "type": "choice", "default": "auto",
-     "options": [["auto", "自动"], ["on", "始终"], ["off", "从不"]]}
+    {"key": "distUnit", "label": "Distance unit", "type": "choice", "default": "m",
+     "options": [["m", "metres"], ["ft", "feet"]]},
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
   ]
 }

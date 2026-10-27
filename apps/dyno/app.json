@@ -1,8 +1,8 @@
 {
   "id": "dyno",
-  "title": "虚拟马力机",
-  "description": "根据加速度估算功率与扭矩曲线",
-  "version": "1.2.4-cn.1",
+  "title": "Virtual Dyno",
+  "description": "Power and torque curves from a full-throttle pull, saved and compared",
+  "version": "1.2.4-cn.2",
   "vendor": "custom",
   "loggingId": "OA98",
   "iconGlyph": "dyno",
@@ -24,34 +24,50 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "虚拟马力机",
+      "title": "Virtual Dyno",
       "buttons": [
-        ["BTN_ACTION", "基准曲线"],
-        ["BTN_PAGE", "下一页"],
-        ["BTN_PREV", "上一页"],
-        ["BTN_SETTINGS", "设置"]
+        ["BTN_ACTION", "Baseline"],
+        ["BTN_PAGE", "Next page"],
+        ["BTN_PREV", "Previous page"],
+        ["BTN_SETTINGS", "Settings"]
       ]
     }
   ],
   "settings": [
-    {"key": "weight", "label": "含驾驶员和燃油的车重", "type": "number", "unit": "kg", "default": 1750,
+    {
+      "key": "language",
+      "label": "Language / 语言",
+      "type": "choice",
+      "default": "en",
+      "options": [
+        [
+          "en",
+          "English"
+        ],
+        [
+          "zh-CN",
+          "中文"
+        ]
+      ]
+    },
+    {"key": "weight", "label": "Weight with driver + fuel", "type": "number", "unit": "kg", "default": 1750,
      "steps": [1300, 1400, 1500, 1550, 1600, 1650, 1700, 1750, 1800, 1850, 1900, 1950, 2000, 2100, 2200, 2300, 2400, 2500]},
-    {"key": "body", "label": "车身类型（空气阻力）", "type": "choice", "default": "coupe",
-     "options": [["coupe", "双门轿跑 / 轿车"], ["wagon", "旅行车 / 掀背车"], ["suv", "SUV"]]},
-    {"key": "loss", "label": "传动损耗", "type": "number", "unit": "%", "default": 15, "steps": [0, 10, 12, 15, 18, 20, 25]},
-    {"key": "powerUnit", "label": "功率单位", "type": "choice", "default": "hp",
+    {"key": "body", "label": "Body shape (air drag)", "type": "choice", "default": "coupe",
+     "options": [["coupe", "Coupe / sedan"], ["wagon", "Touring / hatch"], ["suv", "SUV"]]},
+    {"key": "loss", "label": "Drivetrain loss", "type": "number", "unit": "%", "default": 15, "steps": [0, 10, 12, 15, 18, 20, 25]},
+    {"key": "powerUnit", "label": "Power unit", "type": "choice", "default": "hp",
      "options": [["hp", "hp"], ["ps", "PS"], ["kw", "kW"]]},
-    {"key": "torqueUnit", "label": "扭矩单位", "type": "choice", "default": "nm",
+    {"key": "torqueUnit", "label": "Torque unit", "type": "choice", "default": "nm",
      "options": [["nm", "Nm"], ["lbft", "lb-ft"]]},
-    {"key": "maxRpm", "label": "图表转速上限", "type": "number", "unit": "rpm", "default": 7500, "steps": [6000, 6500, 7000, 7500, 8000, 9000]},
-    {"key": "ecuTorque", "label": "叠加 ECU 扭矩", "type": "bool", "default": true},
-    {"key": "theme", "label": "配色主题", "type": "choice", "default": "m_tricolour",
-     "options": [["m_red", "M 红色"], ["m_tricolour", "M 三色"], ["ice", "冰晶白"], ["amber", "夜间琥珀"]]},
-    {"key": "layout", "label": "屏幕布局", "type": "choice", "default": "full",
-     "options": [["full", "全屏"], ["standard", "标准"]]},
-    {"key": "renderer", "label": "渲染器", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 帧（默认）"], ["software", "软件渲染"]]},
-    {"key": "demo", "label": "演示数据", "type": "choice", "default": "auto",
-     "options": [["auto", "自动"], ["on", "始终"], ["off", "从不"]]}
+    {"key": "maxRpm", "label": "Graph up to", "type": "number", "unit": "rpm", "default": 7500, "steps": [6000, 6500, 7000, 7500, 8000, 9000]},
+    {"key": "ecuTorque", "label": "Overlay ECU torque", "type": "bool", "default": true},
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
+     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
+     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
   ]
 }

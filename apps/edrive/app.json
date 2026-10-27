@@ -1,8 +1,8 @@
 {
   "id": "edrive",
-  "title": "电驱助手",
-  "description": "纯电续航估算、电池健康、能耗与充电记录",
-  "version": "2.0.1-cn.1",
+  "title": "eDrive",
+  "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
+  "version": "2.0.1-cn.2",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -58,31 +58,47 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "电驱助手",
+      "title": "eDrive",
       "buttons": [
         [
           "BTN_READ",
-          "立即读取"
+          "Read now"
         ],
         [
           "BTN_PAGE",
-          "下一页"
+          "Next page"
         ],
         [
           "BTN_PREV",
-          "上一页"
+          "Previous page"
         ],
         [
           "BTN_SETTINGS",
-          "设置"
+          "Settings"
         ]
       ]
     }
   ],
   "settings": [
     {
+      "key": "language",
+      "label": "Language / 语言",
+      "type": "choice",
+      "default": "en",
+      "options": [
+        [
+          "en",
+          "English"
+        ],
+        [
+          "zh-CN",
+          "中文"
+        ]
+      ]
+    },
+    {
       "key": "range20",
-      "label": "20°C 满电纯电续航",
+      "label": "Electric range when full, 20 °C",
       "type": "number",
       "unit": "km",
       "default": 50,
@@ -103,13 +119,13 @@
     },
     {
       "key": "reserve",
-      "label": "发动机介入电量",
+      "label": "Engine starts at",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动学习"
+          "Auto (learned)"
         ],
         [
           "0",
@@ -155,27 +171,27 @@
     },
     {
       "key": "hybrid",
-      "label": "混合动力系统",
+      "label": "Hybrid system",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "yes",
-          "是"
+          "Yes"
         ],
         [
           "no",
-          "否（仅 12 V 电池）"
+          "No (12 V only)"
         ]
       ]
     },
     {
       "key": "designKwh",
-      "label": "新电池总容量",
+      "label": "Battery size when new (gross)",
       "type": "number",
       "unit": "kWh",
       "default": 12,
@@ -195,7 +211,7 @@
     },
     {
       "key": "price",
-      "label": "电价",
+      "label": "Electricity price",
       "type": "number",
       "unit": "EUR/kWh",
       "default": 0.25,
@@ -239,7 +255,7 @@
     },
     {
       "key": "distUnit",
-      "label": "距离单位",
+      "label": "Distance unit",
       "type": "choice",
       "default": "km",
       "options": [
@@ -249,29 +265,29 @@
         ],
         [
           "mi",
-          "英里"
+          "miles"
         ]
       ]
     },
     {
       "key": "tempUnit",
-      "label": "温度单位",
+      "label": "Temperature unit",
       "type": "choice",
       "default": "c",
       "options": [
         [
           "c",
-          "摄氏度"
+          "Celsius"
         ],
         [
           "f",
-          "华氏度"
+          "Fahrenheit"
         ]
       ]
     },
     {
       "key": "poll",
-      "label": "充电数据读取间隔",
+      "label": "Read charge every",
       "type": "number",
       "unit": "s",
       "default": 15,
@@ -285,7 +301,7 @@
     },
     {
       "key": "sohDays",
-      "label": "电池健康读取间隔",
+      "label": "Read battery health every",
       "type": "number",
       "unit": "days",
       "default": 7,
@@ -297,55 +313,55 @@
     },
     {
       "key": "diagPage",
-      "label": "诊断页面（UDS 响应）",
+      "label": "Diagnostics page (UDS replies)",
       "type": "bool",
       "default": false
     },
     {
       "key": "theme",
-      "label": "配色主题",
+      "label": "Colour theme",
       "type": "choice",
       "default": "m_tricolour",
       "options": [
         [
           "m_red",
-          "M 红色"
+          "M Red"
         ],
         [
           "m_tricolour",
-          "M 三色"
+          "M Tricolour"
         ],
         [
           "ice",
-          "冰晶白"
+          "Ice White"
         ],
         [
           "amber",
-          "夜间琥珀"
+          "Night Amber"
         ]
       ]
     },
-    {"key": "layout", "label": "屏幕布局", "type": "choice", "default": "full",
-     "options": [["full", "全屏"], ["standard", "标准"]]},
-    {"key": "renderer", "label": "渲染器", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 帧（默认）"], ["software", "软件渲染"]]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
     {
       "key": "demo",
-      "label": "演示数据",
+      "label": "Demo data",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "始终"
+          "Always"
         ],
         [
           "off",
-          "从不"
+          "Never"
         ]
       ]
     }

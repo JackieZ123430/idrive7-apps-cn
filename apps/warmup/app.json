@@ -1,8 +1,8 @@
 {
   "id": "warmup",
-  "title": "暖机助手",
-  "description": "机油和冷却液暖机估算、转速建议及涡轮冷却",
-  "version": "1.4.4-cn.1",
+  "title": "Warm-Up",
+  "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit and turbo cool-down",
+  "version": "1.4.4-cn.2",
   "vendor": "custom",
   "loggingId": "OA9A",
   "iconGlyph": "temp",
@@ -22,19 +22,35 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "暖机助手",
+      "title": "Warm-Up",
       "buttons": [
         [
           "BTN_SETTINGS",
-          "设置"
+          "Settings"
         ]
       ]
     }
   ],
   "settings": [
     {
+      "key": "language",
+      "label": "Language / 语言",
+      "type": "choice",
+      "default": "en",
+      "options": [
+        [
+          "en",
+          "English"
+        ],
+        [
+          "zh-CN",
+          "中文"
+        ]
+      ]
+    },
+    {
       "key": "warmOil",
-      "label": "机油暖机目标温度",
+      "label": "Oil is warm at",
       "type": "number",
       "unit": "°C",
       "default": 80,
@@ -50,7 +66,7 @@
     },
     {
       "key": "warmCoolant",
-      "label": "冷却液暖机目标温度",
+      "label": "Coolant is warm at",
       "type": "number",
       "unit": "°C",
       "default": 80,
@@ -65,7 +81,7 @@
     },
     {
       "key": "coldLimit",
-      "label": "冷机转速上限",
+      "label": "Rev limit when cold",
       "type": "number",
       "unit": "rpm",
       "default": 3500,
@@ -79,7 +95,7 @@
     },
     {
       "key": "redline",
-      "label": "换挡转速",
+      "label": "Redline",
       "type": "number",
       "unit": "rpm",
       "default": 7000,
@@ -98,71 +114,71 @@
     },
     {
       "key": "cooldown",
-      "label": "激烈驾驶后涡轮冷却",
+      "label": "Turbo cool-down after hard driving",
       "type": "bool",
       "default": true
     },
     {
       "key": "tempUnit",
-      "label": "温度单位",
+      "label": "Temperature unit",
       "type": "choice",
       "default": "c",
       "options": [
         [
           "c",
-          "摄氏度"
+          "Celsius"
         ],
         [
           "f",
-          "华氏度"
+          "Fahrenheit"
         ]
       ]
     },
     {
       "key": "theme",
-      "label": "配色主题",
+      "label": "Colour theme",
       "type": "choice",
       "default": "m_tricolour",
       "options": [
         [
           "m_red",
-          "M 红色"
+          "M Red"
         ],
         [
           "m_tricolour",
-          "M 三色"
+          "M Tricolour"
         ],
         [
           "ice",
-          "冰晶白"
+          "Ice White"
         ],
         [
           "amber",
-          "夜间琥珀"
+          "Night Amber"
         ]
       ]
     },
-    {"key": "layout", "label": "屏幕布局", "type": "choice", "default": "full",
-     "options": [["full", "全屏"], ["standard", "标准"]]},
-    {"key": "renderer", "label": "渲染器", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 帧（默认）"], ["software", "软件渲染"]]},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
+     "options": [["full", "Full screen"], ["standard", "Standard"]]},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
     {
       "key": "demo",
-      "label": "演示数据",
+      "label": "Demo data",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "自动"
+          "Auto"
         ],
         [
           "on",
-          "始终"
+          "Always"
         ],
         [
           "off",
-          "从不"
+          "Never"
         ]
       ]
     }

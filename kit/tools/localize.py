@@ -1,6 +1,5 @@
-"""Chinese display metadata; identifiers, defaults, signals and diagnostics stay untouched."""
+"""English canonical strings plus a Chinese table; no mutation of protocol/configuration data."""
 # 汉化维护：Bilibili 小白151 / GitHub JackieZ123430
-import copy
 import json
 import os
 
@@ -14,32 +13,14 @@ def text(value):
     return WORDS.get(s, s).replace(' (default)', '（默认）')
 
 
-def spec_zh(spec):
-    s = copy.deepcopy(spec)
-    s['title'] = text(s['title'])
-    for screen in s.get('screens', []):
-        if 'title' in screen:
-            screen['title'] = text(screen['title'])
-        for button in screen.get('buttons', []):
-            button[1] = text(button[1])
-        for item in screen.get('items', []):
-            if len(item) > 2 and isinstance(item[2], str):
-                item[2] = text(item[2])
-    for setting in s.get('settings', []):
-        setting['label'] = text(setting['label'])
-        for option in setting.get('options', []):
-            option[1] = text(option[1])
-    return s
-
-
 def unicode_resources(ui, strings):
-    """Initial RHMI Text cells use StringIds too: avoid the legacy Text encoding path."""
+    """Every nonempty static Text cell gets a stable StringId for runtime language changes."""
     counter = [0]
 
     def visit(obj):
         if isinstance(obj, dict):
             value = obj.get('value')
-            if obj.get('type') == 'Text' and isinstance(value, str) and any(ord(ch) > 127 for ch in value):
+            if obj.get('type') == 'Text' and isinstance(value, str) and value:
                 sid = 'SID_CN_STATIC_%04d' % counter[0]
                 counter[0] += 1
                 strings[sid] = value
@@ -52,8 +33,16 @@ def unicode_resources(ui, strings):
                 visit(item)
 
     visit(ui)
-    for key in list(strings):
-        strings[key] = text(strings[key])
     # Reserved for HmiText's dynamic per-component/row/cell resources.
     for n in range(1024):
         strings['SID_CN_DYNAMIC_%04d' % n] = ''
+
+
+def resource_tables(strings):
+    # Dynamic slots must not be blanked when switching static resources.
+    english = {key: value for key, value in strings.items() if not key.startswith('SID_CN_DYNAMIC_')}
+    chinese = {key: text(value) for key, value in english.items()}
+    for key in chinese:
+        if key.endswith('_CN_CREDITS_TITLE'):
+            chinese[key] = '汉化：小白科技杂物社 / Bilibili 小白151'
+    return {'en': english, 'zh-CN': chinese}
