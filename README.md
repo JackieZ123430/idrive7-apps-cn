@@ -1,25 +1,5 @@
 **English** | [中文](README.zh-CN.md)
 
-> Simplified Chinese localization by **小白科技杂物社 / Bilibili 小白151 / GitHub [JackieZ123430](https://github.com/JackieZ123430)**.
->
-> This fork adds Chinese menus, dashboard text, a CJK font atlas and a subtle attribution in the top-right corner. The application interface defaults to English. Select **Settings → Language / 语言 → 中文** inside each app to enable Simplified Chinese; the choice is saved across app restarts. The corner attribution is visible only in Chinese mode.
->
-> [Chinese build and installation guide](README.zh-CN.md) · [Localization attribution](NOTICE.zh-CN.md) · [Upstream project](https://github.com/cauliflowermossgrape/idrive7-apps)
->
-> All 11 apps have been built and previewed offline. This localization has not yet been installation-tested on a head unit. Doom's in-game assets and the original fault-code database retain their original language.
-
-## App language
-
-English is the default in this bilingual fork. In each app open **Settings → Language / 语言**, then select **English** or **中文**. Menus, dashboard labels and existing dynamic text follow the choice. No BMW ID login, firmware flash or internet translation service is needed.
-
-See [the Chinese guide](README.zh-CN.md) and [the proposed upstream contribution](docs/UPSTREAM-PR.md). The upstream project has not yet accepted this feature. Package versions carry a `-cn.2` suffix to distinguish this fork.
-
-Offline preview of the same app in both languages (demo data; not a head-unit installation test):
-
-![Default English interface](docs/screens/bilingual-english-preview.png)
-
-![Optional Simplified Chinese interface](docs/screens/chinese-warmup-preview.png)
-
 <h1 align="center">MGU Custom Apps</h1>
 
 <p align="center">
