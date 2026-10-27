@@ -230,7 +230,7 @@ module.exports = function live(ctx, sh) {
         clearTimeout(powerTimer);
         const s = shown() ? settings.get('powerPoll') : Math.max(BG_POWER_S, settings.get('powerPoll'));
         // 0.1 s: as fast as the battery unit answers (one read waits for the last)
-        powerTimer = setTimeout(() => readPower().then(schedulePower, schedulePower), Math.max(60, s * 1000 - (s <= 0.1 ? 1000 : 0)));
+        powerTimer = setTimeout(() => readPower().then(schedulePower, schedulePower), Math.max(20, s * 1000 - (s <= 0.1 ? 1000 : 0)));
     }
     schedulePower();
 
