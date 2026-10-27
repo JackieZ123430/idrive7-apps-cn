@@ -48,8 +48,8 @@ const startLive = require('./live');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
-// the live pages (power, battery; the battery unit and scan with the diagnostics) are live.js's
-const PAGES_HYBRID = ['main', 'power', 'energy', 'battery', 'log', 'diag', 'unit', 'scan', 'signals'];
+// the live pages (battery; the battery unit and scan with the diagnostics) are live.js's
+const PAGES_HYBRID = ['main', 'energy', 'battery', 'log', 'diag', 'unit', 'scan', 'signals'];
 const PAGES_12V = ['main', 'diag', 'signals'];
 const DIAG_PAGES = ['diag', 'unit', 'scan', 'signals'];
 /** Comfort consumers, estimated from their levels (kW): seat heating per level 0..3, steering wheel. */
