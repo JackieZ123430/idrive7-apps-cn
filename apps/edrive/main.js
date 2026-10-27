@@ -649,24 +649,24 @@ mgu.run({
                 cv.text('engine starts at ' + G.fmt(e.res, 0) + ' %', 720, 196, 26, t.dim, { align: 'right' });
                 cv.text(e.learned ? 'learned from ' + Math.round(D(st.learn.km)) + ' ' + dU() : 'Learns while driving', 720, 236, 22, t.dim, { align: 'right' });
             }
-            if (!has) cv.text(diagHint('no charge reading yet'), 48, 250, 24, t.dim);
-            else if (d.stale) cv.text('charge read ' + ago(d.socAge), 48, 250, 24, t.warn);
-            // the battery's power now: regen to the left, use to the right (live.js)
-            lv.drawPowerBar(cv, t, 48, 326, 672);
+            // one status line under the number: low battery / engine on, else a missing or old charge reading
             const eu = d.engine ? model.enginePctPerKm(d.speed) : null;
             if (hold) {
                 // low battery: the car drives as a hybrid and keeps the charge at 5-11 %
-                cv.text('Low battery: electric only up to ' + Math.round(D(62)) + ' ' + (MI() ? 'mph' : 'km/h') + ' with light throttle',
-                    48, 430, 23, t.warn, { font: 'bold' });
-                cv.text('the engine takes over above  ·  lifting off and braking recharge', 48, 460, 21, t.dim);
+                cv.text('Low battery: electric up to ' + Math.round(D(62)) + ' ' + (MI() ? 'mph' : 'km/h') + ', light throttle', 48, 250, 22, t.warn, { font: 'bold' });
             } else if (d.engine) {
                 // engine running: what the battery does meanwhile (learned with the engine on), per 10 km / mi
                 const per10 = G.isNum(eu) ? (MI() ? eu / KM_MI : eu) * 10 : null, u10 = MI() ? '10 mi' : '10 km';
-                const lasts = G.isNum(eu) && eu > 0.02 && has ? '  ·  lasts ~' + Math.round(D(Math.max(0, d.soc - e.res) / eu)) + ' ' + dU() : '';
-                cv.text('ENGINE ON  ·  ' + (!G.isNum(per10) ? 'learning what the battery does meanwhile'
-                    : per10 < -0.05 ? 'the engine charges the battery: +' + G.fmt(-per10, 1) + ' % per ' + u10
-                        : 'the battery still helps: -' + G.fmt(per10, 1) + ' % per ' + u10 + lasts), 48, 440, 24, t.warn, { font: 'bold' });
-            }
+                cv.text('ENGINE ON  ·  ' + (!G.isNum(per10) ? 'learning' : per10 < -0.05 ? 'charging +' + G.fmt(-per10, 1) + ' % per ' + u10
+                    : 'battery helps -' + G.fmt(per10, 1) + ' % per ' + u10), 48, 250, 22, t.warn, { font: 'bold' });
+            } else if (!has) cv.text(diagHint('no charge reading yet'), 48, 250, 24, t.dim);
+            else if (d.stale) cv.text('charge read ' + ago(d.socAge), 48, 250, 24, t.warn);
+            // the range on a bar (full charge at the end)
+            G.bar(cv, t, 48, 262, 672, 92, {
+                label: 'Full: ' + Math.round(D(e.full)) + ' ' + dU(), value: has ? D(e.mid) : null, unit: dU(), max: D(e.full), niceMax: true, ramp: 'hot',
+            });
+            // the battery's power now: regen to the left, use to the right (live.js)
+            lv.drawPowerBar(cv, t, 48, 428, 672);
             // climate control + on-board electrics: costs range by the hour (off: the on-board draw only)
             const ac = e.climate !== false && e.auxKw >= 1.5 ? t.warn : t.dim;
             const what = e.climate === false ? 'CLIMATE OFF  ·  ON-BOARD  ' : e.climate ? 'CLIMATE ON' + (d.ac ? ' (A/C)' : '') + '  ' : 'CLIMATE & ON-BOARD  ';

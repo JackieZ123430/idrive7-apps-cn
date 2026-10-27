@@ -704,8 +704,8 @@ module.exports = function live(ctx, sh) {
         cols.forEach(([cx, label, v, c, align]) => {
             cv.text(label, cx, y0 + 84, 20, t.dim, { font: 'bold', spacing: 1.5, align });
             cv.text(G.fmt(v, v >= 10 ? 1 : 2), cx, y0 + 136, 44, c, { font: 'num', align });
+            cv.text('kWh', cx, y0 + 166, 18, t.dim, { align });
         });
-        cv.text('kWh', r, y0 + 166, 18, t.dim, { align: 'right' });
         if (inBattery) {
             cv.text('IN BATTERY', x + 24, y0 + 222, 20, t.dim, { font: 'bold', spacing: 1.5 });
             const kw2 = cv.text('kWh', r, y0 + 278, 22, t.dim, { align: 'right' });
