@@ -1052,6 +1052,7 @@ mgu.run({
             const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip;
             const amps = G.isNum(d.a) ? G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : '';
             const cells = {
+                Title: [on ? 'eDrive Live' : '', 'Text'],
                 // one short line per text cell of the layout (each shows ~20 characters)
                 TextRecordings: [on ? pw.text + ' kW   ' + (G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' %' : '-- %') : '', 'Text'],
                 TextCam: [on ? pw.what + (G.isNum(d.v) ? '  ' + G.fmt(d.v, 0) + ' V  ' + amps : '') : '', 'Text'],
@@ -1068,33 +1069,39 @@ mgu.run({
                 ctx.widget.set(inst.spawnId, k, cells[k][0], cells[k][1]);
             });
         }
-        /* Big widget picture. The HMI scales it to the widget and crops the overflow, centred: measured
-         * on the car, the big widget shows about 384 x 256 of it, with the layout's title on the top left
-         * (to about row 50). */
+        /* Big widget picture. The HMI fills the widget with it and crops a fixed share of every edge
+         * (about 5 % on the car, whatever the picture's size), so everything stays inside app.json
+         * startWidget.safe (share of width / height kept clear on each side). The layout's title is
+         * set empty (startWidget.cells), so the picture has the whole widget. */
         function renderWidget(inst) {
             if (inst) widgetCells(inst);
-            const [w, h] = (ctx.spec.startWidget && ctx.spec.startWidget.size) || [384, 256];
+            const sw0 = ctx.spec.startWidget || {};
+            const [w, h] = sw0.size || [384, 256], [sx, sy] = sw0.safe || [0.09, 0.1];
             const key = w + 'x' + h;
             const cv = (wcan[key] = wcan[key] || new Canvas(w, h)).clear([0, 0, 0, 0]);
             const t = ctx.theme(), d = data(), pw = power(d, t), lim = limitsKw(d);
             const scol = pw.what === 'REGEN' || pw.what === 'CHARGING' ? GO : pw.kw === null ? t.dim : t.text;
-            const x0 = 16, x1 = w - 16, ky = Math.round(h * 0.55);
-            cv.text(pw.what, x1, 30, 18, scol, { font: 'bold', spacing: 1.5, align: 'right' });
+            const x0 = Math.round(w * sx), x1 = w - x0, y0 = Math.round(h * sy), y1 = h - y0, iw = x1 - x0;
+            // top row: state left, V / A right
+            cv.text(pw.what, x0, y0 + 18, 18, scol, { font: 'bold', spacing: 1.5 });
             cv.text((G.isNum(d.v) ? G.fmt(d.v, 0) + ' V' : '-- V') + (G.isNum(d.a) ? '   ' + G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : ''),
-                x1, 54, 16, t.dim, { align: 'right' });
-            const vw = cv.text(pw.text, x0, ky, 68, pw.col, { font: 'num' });
+                x1, y0 + 18, 16, t.dim, { align: 'right' });
+            if (d.engine || d.demo) cv.text(d.engine ? 'ENGINE ON' : 'DEMO', (x0 + x1) / 2, y0 + 18, 13, t.warn, { font: 'bold', spacing: 1, align: 'center' });
+            // power and charge
+            const ky = y0 + 92;
+            const vw = cv.text(pw.text, x0, ky, 70, pw.col, { font: 'num' });
             cv.text('kW', x0 + 8 + vw, ky, 22, t.dim, { font: 'bold' });
-            const sw = cv.text('%', x1, ky, 20, t.dim, { font: 'bold', align: 'right' });
-            cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--', x1 - sw - 4, ky, 44, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'right' });
-            if (d.engine || d.demo) cv.text(d.engine ? 'ENGINE ON' : 'DEMO', w / 2 + 30, ky - 4, 13, t.warn, { font: 'bold', spacing: 1, align: 'center' });
-            widgetBar(cv, t, x0, ky + 14, w - 32, 12, pw.kw, lim);
-            const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip, yb = h - 44;
+            const pc = cv.text('%', x1, ky, 20, t.dim, { font: 'bold', align: 'right' });
+            cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--', x1 - pc - 4, ky, 46, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'right' });
+            widgetBar(cv, t, x0, ky + 16, iw, 12, pw.kw, lim);
+            // bottom row
+            const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip, yb = y1 - 26;
             const colm = (x, label, v, c, align) => {
                 cv.text(label, x, yb, 13, t.dim, { font: 'bold', spacing: 1, align });
-                cv.text(v, x, yb + 26, 22, c, { font: 'bold', align });
+                cv.text(v, x, yb + 24, 21, c, { font: 'bold', align });
             };
             colm(x0, 'CELLS', ct ? fmtT(ct.avg) : '--', ct ? tempColor(t, ct.avg) : t.dim);
-            colm(w / 2, 'THIS DRIVE', G.fmt(tp.out - tp.regen, 2) + ' kWh', t.text, 'center');
+            colm((x0 + x1) / 2, 'THIS DRIVE', G.fmt(tp.out - tp.regen, 2) + ' kWh', t.text, 'center');
             colm(x1, 'REGEN', G.fmt(tp.regen, 2) + ' kWh', GO, 'right');
             return cv;
         }
