@@ -34,8 +34,10 @@ def unicode_resources(ui, strings):
 
     visit(ui)
     # Reserved for HmiText's dynamic per-component/row/cell resources.
-    for n in range(1024):
+    for n in range(256):
         strings['SID_CN_DYNAMIC_%04d' % n] = ''
+    if len(strings) > 1024:
+        raise ValueError('HMI string bundle exceeds 1024 resources; reduce static strings or dynamic slots')
 
 
 def resource_tables(strings):

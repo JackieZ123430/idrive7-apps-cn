@@ -23,7 +23,8 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
     assert not any(k.startswith('SID_CN_DYNAMIC_') for k in tables['en'])
     assert original['title'] in tables['en'].values()
     assert next(s for s in original['settings'] if s['key'] == 'language')['default'] == 'en'
-    assert len([k for k in strings if k.startswith('SID_CN_DYNAMIC_')]) == 1024
+    assert len([k for k in strings if k.startswith('SID_CN_DYNAMIC_')]) == 256
+    assert len(strings) <= 1024
     assert '汉化：小白科技杂物社 / Bilibili 小白151' in tables['zh-CN'].values()
     assert any('GitHub JackieZ123430' in v for v in strings.values())
 
@@ -40,4 +41,10 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
                 visit(value)
     visit(ui)
     count += 1
+try:
+    unicode_resources({}, {'SID_TEST_%d' % n: '' for n in range(769)})
+except ValueError:
+    pass
+else:
+    raise AssertionError('build must reject bundles exceeding the measured 1024-string HMI limit')
 print('PASS: %d layouts, default English, bilingual resource parity, Unicode handles and metadata invariants' % count)

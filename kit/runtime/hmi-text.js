@@ -3,7 +3,7 @@
 // RHMI Text is not a reliable Unicode transport on this firmware. Use the SDK's
 // UTF-8 StringBundle and StringId handles for non-ASCII values instead.
 const { t } = require('./i18n');
-const SLOT_COUNT = 1024;
+const SLOT_COUNT = 256; // HMI accepts at most 1024 strings, including all static menu resources.
 const slotId = (n) => 'SID_CN_DYNAMIC_' + ('0000' + n).slice(-4);
 class HmiText {
     constructor() { this.slots = new Map(); this.requests = new Map(); }

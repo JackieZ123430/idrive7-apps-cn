@@ -21,10 +21,14 @@ Chinese contribution: **小白科技杂物社 / Bilibili 小白151 / GitHub Jack
 
 The fork retains attribution in the README, NOTICE, source comments and settings. Its subtle corner attribution appears only in Chinese mode. Whether this corner text belongs upstream should be agreed with the maintainer; it is implemented in a separate `credits.js` module for easy adjustment.
 
+## Resource limit
+
+On the P18_23w44.2-1-3 bench, native `createStringBundle` accepts 1024 entries and rejects a 1052-entry bundle with `INVALID_VALUE`. Reserve 256 dynamic entries and fail the build if the total exceeds 1024. Startup SDK errors are retained in the app log; rejected startup exits rather than keeping the loading screen alive.
+
 ## Validation
 
 - `node kit/tools/test_zh.js`: English defaults, persistence, two-way and rapid language changes, existing dynamic rows, English/Chinese credit visibility, glyph coverage, renderer measurements and texture budget.
 - `python kit/tools/test_zh.py`: all 11 layouts, English/Chinese resource-key parity, valid StringId references and a default English selector.
 - Build all 11 apps; preview English → Chinese → English without restarting the app.
 
-Head-unit installation and physical HMI layout still require bench testing. Doom's in-game assets and the original fault-code database retain their original language. Extracted BMW SDK code and install packages are excluded from the public repository.
+Installed on a P18_23w44.2-1-3 bench; the Service app is confirmed to open after the string-resource fix. The remaining app functions, Chinese switching and physical HMI layout still require testing. Doom's in-game assets and the original fault-code database retain their original language. Extracted BMW SDK code and install packages are excluded from the public repository.

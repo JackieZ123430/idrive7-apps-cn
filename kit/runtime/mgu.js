@@ -48,6 +48,16 @@ function fileLog(level, msg) {
         fs.appendFileSync(LOG_FILE, new Date().toISOString() + ' ' + level + ' ' + msg + '\n');
     } catch (e) { /* data dir not writable (host preview) */ }
 }
+// The SDK can swallow the first RHMI resource error and fail later with a misleading
+// null entry-point factory. Preserve the original warnings/errors in the app log.
+['warn', 'error'].forEach((level) => {
+    const original = sdkLog[level];
+    sdkLog[level] = (...args) => {
+        const message = args.map((x) => x && x.stack || String(x)).join(' ');
+        if (message.indexOf(SPEC.id + ': ') !== 0) fileLog('SDK_' + level.toUpperCase(), message);
+        return original.apply(sdkLog, args);
+    };
+});
 const log = {};
 ['error', 'warn', 'info', 'debug'].forEach((lvl) => {
     log[lvl] = (...a) => {
@@ -286,7 +296,12 @@ function wireSettings(ctx) {
 
 /* ---------------- run ---------------- */
 async function run(impl) {
-    try { return await runInner(impl); } catch (e) { fileLog('FATAL', 'start failed: ' + (e && e.stack || e)); throw e; }
+    try { return await runInner(impl); } catch (e) {
+        fileLog('FATAL', 'start failed: ' + (e && e.stack || e));
+        // A live heartbeat after a rejected start leaves the HMI stuck on "Loading app".
+        setTimeout(() => process.exit(1), 100);
+        throw e;
+    }
 }
 async function runInner(impl) {
     const app = new OnlineApp();
