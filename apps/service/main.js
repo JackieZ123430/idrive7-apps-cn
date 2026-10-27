@@ -14,6 +14,7 @@
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
+const { fitText } = require('./kit/text-layout');
 
 const W = 1600, H = 520, PER_PAGE = 5;
 const GO = '#2fd27a';
@@ -33,7 +34,7 @@ function find(v, key, str) {
 /** JSON without the item icons (each answer carries a PNG as a long list of byte numbers) */
 const brief = (v) => JSON.stringify(v, (k, x) => (k === 'symbolData' ? '[icon]' : x));
 const colour = (c) => (typeof c === 'number' ? c : COLORS[String(c)] !== undefined ? COLORS[String(c)] : 0);
-const txt = (s) => String(s === undefined || s === null ? '' : s).replace(/[^\x20-\x7e]/g, (ch) => ({ 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue', 'ß': 'ss' }[ch] || '')).trim();
+const txt = (s) => String(s === undefined || s === null ? '' : s).replace(/[^\x20-\x7e]/g, (ch) => ({ 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue', 'ß': 'ss' }[ch] || ch)).replace(/[\x00-\x1f\x7f]/g, '').trim();
 
 const DEMO = {
     list: [
@@ -119,10 +120,7 @@ mgu.run({
         }
 
         function fit(cv, s, size, max, opt) {
-            s = String(s);
-            if (cv.textWidth(s, size, opt) <= max) return s;
-            while (s.length > 4 && cv.textWidth(s + '...', size, opt) > max) s = s.slice(0, -1);
-            return s.trim() + '...';
+            return fitText(cv, s, size, max, opt);
         }
 
         function drawMain(cv, t, its) {

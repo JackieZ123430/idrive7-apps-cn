@@ -38,7 +38,8 @@ def main():
     # Prebuilt renderer packs 1024-wide atlases into two 4096-high columns.
     if atlas['atlasH'] > 2048:
         raise SystemExit('Chinese atlas exceeds its reserved GPU budget; subset it before publishing')
-    data = {'family': 'cjk', 'source': 'Noto Sans SC (OFL-1.1)', 'sizes': [atlas]}
+    cache_key = hashlib.sha256(json.dumps(atlas, separators=(',', ':')).encode()).hexdigest()[:16]
+    data = {'family': 'cjk', 'source': 'Noto Sans SC (OFL-1.1)', 'cacheKey': cache_key, 'sizes': [atlas]}
     out = ROOT / 'kit/runtime/fonts/cjk.json'
     out.write_text(json.dumps(data, ensure_ascii=False, separators=(',', ':')) + '\n', encoding='utf-8')
     print('cjk:', len(chars), 'glyphs,', atlas['atlasW'], 'x', atlas['atlasH'], 'pixels,', out.stat().st_size, 'bytes')

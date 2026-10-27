@@ -36,7 +36,8 @@
  */
 const { mix, ramp, withAlpha } = require('./canvas');
 const { makeLayer, dropLayer } = require('./record');
-const { getLanguage } = require('./i18n');
+const { getLanguage, t: localizeLabel } = require('./i18n');
+const upperText = (value) => localizeLabel(String(value)).toUpperCase();
 
 const isNum = (x) => typeof x === 'number' && isFinite(x);
 const fmt = (v, d) => (isNum(v) ? v.toFixed(d || 0) : '--');
@@ -167,7 +168,7 @@ function radialStatic(cv, t, cx, cy, r, g, min, max, thick) {
         }
     }
     if (g.unit) cv.text(g.unit, cx, cy + Math.round(r * 0.62) * 0.32 + 36, 28, t.dim, { align: 'center', font: 'label' });
-    if (g.label) cv.text(String(g.label).toUpperCase(), cx, cy + r * 0.82, 26, t.text, { align: 'center', font: 'bold', spacing: 1.5 });
+    if (g.label) cv.text(upperText(g.label), cx, cy + r * 0.82, 26, t.text, { align: 'center', font: 'bold', spacing: 1.5 });
 }
 function radialLive(cv, t, cx, cy, r, g, min, max, thick, v, sv, f) {
     const a0 = -135, a1 = 135;
@@ -219,7 +220,7 @@ function needle(cv, t, cx, cy, r, g) {
                     isNum(g.redFrom) && val >= g.redFrom ? t.crit : t.text, { align: 'center', font: 'bold' });
             }
         }
-        if (g.label) c.text(String(g.label).toUpperCase(), x, y + r * 0.42, 20, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+        if (g.label) c.text(upperText(g.label), x, y + r * 0.42, 20, t.dim, { align: 'center', font: 'bold', spacing: 2 });
     }, cv.textScale), Math.round(cx) - S, Math.round(cy) - S);
     const f = isNum(sv) ? clamp((sv - min) / (max - min), 0, 1.02) : 0;
     const a = (A0 + f * SPAN) * Math.PI / 180, sx = Math.sin(a), cy_ = -Math.cos(a);
@@ -241,7 +242,7 @@ function ring(cv, t, cx, cy, r, g) {
     const big = g.size || Math.round(r * 0.55);
     const tw = cv.text(g.text != null ? g.text : fmt(v, g.decimals), cx, cy + big * 0.34, big, isNum(v) || g.text != null ? t.text : t.dim, { align: 'center', font: 'num' });
     if (g.unit) cv.text(g.unit, cx + tw / 2 + 4, cy + big * 0.34, 22, t.dim);
-    if (g.label) cv.text(String(g.label).toUpperCase(), cx, cy + r + 30, 18, t.dim, { align: 'center', font: 'bold', spacing: 2 });
+    if (g.label) cv.text(upperText(g.label), cx, cy + r + 30, 18, t.dim, { align: 'center', font: 'bold', spacing: 2 });
 }
 
 /* ---------------- bars ---------------- */
@@ -280,7 +281,7 @@ function bar(cv, t, x, y, w, h, g) {
     if (g.niceMax) max = min + Math.ceil((max - min) / step - 1e-9) * step;
     const sv = sm(g, 'bar|' + x + '|' + y, v);
     const f = isNum(sv) ? clamp((sv - min) / (max - min), 0, 1) : 0;
-    cv.text(String(g.label || '').toUpperCase(), x, y + 26, 22, t.dim, { font: 'bold', spacing: 2 });
+    cv.text(upperText(g.label || ''), x, y + 26, 22, t.dim, { font: 'bold', spacing: 2 });
     const uw = g.unit ? cv.textWidth(' ' + g.unit, 26) : 0;
     cv.text(fmt(v, g.decimals), x + w - uw, y + 30, 44, isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
     if (g.unit) cv.text(' ' + g.unit, x + w, y + 30, 26, t.dim, { align: 'right' });
@@ -399,7 +400,7 @@ function stat(cv, t, x, y, w, h, g) {
 function readout(cv, t, x, y, g) {
     const al = g.align || 'left', size = g.size || 64, ls = g.labelSize || 18;
     let yy = y;
-    if (g.label) { cv.text(String(g.label).toUpperCase(), x, y + ls, ls, t.dim, { align: al, font: 'bold', spacing: 2 }); yy += ls + 10; }
+    if (g.label) { cv.text(upperText(g.label), x, y + ls, ls, t.dim, { align: al, font: 'bold', spacing: 2 }); yy += ls + 10; }
     const v = g.value, s = g.text != null ? String(g.text) : fmt(v, g.decimals);
     const has = g.text != null || isNum(v), c = has ? zoneColor(t, g, v, col(t, g.color, t.text)) : t.dim;
     const us = g.unit ? ' ' + g.unit : '', uz = Math.max(18, Math.round(size * 0.36));
@@ -503,7 +504,7 @@ function table(cv, t, x, y, w, cols, rows, g) {
     const xs = cols.map((c) => { const at = cx; cx += c.w; return at; });
     cols.forEach((c, i) => {
         const al = c.align || 'left', tx = al === 'right' ? xs[i] + c.w - 8 : al === 'center' ? xs[i] + c.w / 2 : xs[i];
-        cv.text(String(c.label || '').toUpperCase(), tx, y + hs, hs, t.dim, { align: al, font: 'bold', spacing: 1.5 });
+        cv.text(upperText(c.label || ''), tx, y + hs, hs, t.dim, { align: al, font: 'bold', spacing: 1.5 });
     });
     const top = y + hs + 14;
     if (!rows.length && g.empty) { cv.text(g.empty, x, top + rh * 0.8, 24, t.dim); return; }
@@ -621,7 +622,7 @@ function frame(cv, t, tabs, sel, badges) {
     const opt = { align: 'center', font: 'bold', spacing: 1.5 };
     let x = 16;
     (tabs || []).forEach((name, i) => {
-        const label = String(name).toUpperCase(), tw = Math.max(150, cv.textWidth(label, 20, opt) + 48), on = i === sel;
+        const label = upperText(name), tw = Math.max(150, cv.textWidth(label, 20, opt) + 48), on = i === sel;
         if (on) {
             cv.gradientRect(x, 0, tw, BAR_H, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.22)]]);
             cv.fillRect(x, BAR_H - 4, tw, 4, S);
@@ -662,7 +663,7 @@ function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat, compact) {
     if (!flat) cv.gradientRect(x, y, w, h, [[0, withAlpha('#ffffff', 0.02)], [1, withAlpha('#ffffff', 0.08)]]);
     cv.fillRect(x, y + h - 2, w, 2, withAlpha('#ffffff', 0.22));
     const right = badgeRow(cv, t, x + w - 16, y + (h - 30) / 2, 30, 18, badges || []);
-    const names = (tabs || []).map((n) => String(n).toUpperCase());
+    const names = (tabs || []).map((n) => upperText(n));
     const tw = names.map((n) => Math.max(170, cv.textWidth(n, 20, opt) + 64));
     const tabsW = tw.reduce((a, b) => a + b, 0);
     let tx = x + 20;
@@ -687,7 +688,7 @@ function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat, compact) {
 function headerCompact(cv, t, x, y, w, h, title, tabs, sel, badges) {
     const S = t.sel || t.accent, opt = { align: 'center', font: 'bold', spacing: 1.6 };
     const bopt = { align: 'center', font: 'bold', spacing: 1.5 };
-    const names = (tabs || []).map((n) => String(n).toUpperCase());
+    const names = (tabs || []).map((n) => upperText(n));
     const tw = names.map((n) => Math.max(132, cv.textWidth(n, 18, opt) + 44));
     const tabsW = tw.reduce((a, b) => a + b, 0);
     const bh = 30, bsize = 17;
@@ -740,7 +741,7 @@ function menuBar(cv, t, x, y, w, h, buttons, focus, variant, flash) {
             cv.gradientRect(b.x, y, b.w, h, [[0, withAlpha(sel, hit ? 0.5 : 0.08)], [1, withAlpha(sel, hit ? 0.7 : 0.4)]]);
             cv.fillRect(b.x, y + h - 4 * u, b.w, 4 * u, sel);
         }
-        const label = std ? String(b.label) : String(b.label).toUpperCase();
+        const label = std ? String(b.label) : upperText(b.label);
         cv.text(label, b.x + b.w / 2, y + h / 2 + size * 0.36, size, on || hit ? t.selText || '#ffffff' : std ? t.text : t.dim,
             { align: 'center', font: std ? 'label' : 'bold', spacing: std ? 0 : 2 * u });
         if (i < buttons.length - 1) cv.fillRect(b.x + b.w, y + h * 0.25, Math.max(1, u), h * 0.5, withAlpha('#ffffff', 0.13));

@@ -5,9 +5,11 @@ const kit=process.argv[2]?path.resolve(process.argv[2]):path.resolve(__dirname,'
 const {t,getLanguage}=require(path.join(kit,'i18n'));
 const {HmiText,slotId}=require(path.join(kit,'hmi-text'));
 const {Canvas}=require(path.join(kit,'canvas'));
-const {Recorder}=require(path.join(kit,'record'));
+const {Recorder,atlasId}=require(path.join(kit,'record'));
 const {CREDIT,drawCredit}=require(path.join(kit,'credits'));
 const fonts=require(path.join(kit,'fonts'));
+const {statusInfo,NRC}=require(path.join(kit,'diag'));
+const {fitText}=require(path.join(kit,'text-layout'));
 const chinese=getLanguage()==='zh-CN';
 async function main(){
  assert.strictEqual(t('Settings'),chinese?'设置':'Settings');
@@ -28,8 +30,24 @@ async function main(){
  else assert.deepStrictEqual(writes[0],[0,'Text','Scan now','Text']);
  await hmi.set(component,'CODE',0,'Text','D1C604');assert.deepStrictEqual(writes[1],[0,'Text','D1C604','Text']);
  const f=fonts.get('bold',32,'中文'),catalog=JSON.parse(fs.readFileSync(path.join(kit,'locales/zh-CN.json'),'utf8'));
+ assert.notStrictEqual(atlasId(f,'cjk'),atlasId(Object.assign({},f,{cacheKey:f.cacheKey+'-changed'}),'cjk'),'font updates must not reuse an old GPU texture');
  for(const ch of CREDIT+Object.values(catalog).join(''))assert(f.glyphs[ch.codePointAt(0)],'missing Chinese glyph '+ch);
  const cv=new Canvas(800,120),r=new Recorder(800,120),opts={font:'bold'};
+ if(chinese){
+  for(const bits of [0x01,0x80,0x04,0x08,0]){
+   const label=statusInfo(bits).label;assert.notStrictEqual(t(label),label,'untranslated DTC status '+label);
+  }
+  for(const label of Object.values(NRC))assert.notStrictEqual(t(label),label,'untranslated diagnostic rejection '+label);
+  const source='ZGM: Ethernet: Communication ended unexpectedly';
+  const fitted=fitText(cv,source,22,190);
+  assert(!fitted.includes('Ethernet')&&fitted.includes('以太网'),'translate the full diagnostic sentence before truncation');
+  assert(cv.textWidth(fitted,22)<=190,'localized truncated text must fit');
+  assert.strictEqual(t('FAULTS'),'故障');
+  const G=require(path.join(kit,'gauges')),theme=require(path.join(kit,'themes')).theme('m_tricolour');
+  const labels=[],mock={w:1600,fillRect:()=>{},gradientRect:()=>{},textWidth:()=>50,text:(s)=>labels.push(s)};
+  G.frame(mock,theme,['History','Faults'],0,[]);
+  assert(labels.includes('历史')&&labels.includes('故障'),'translate heading context before uppercasing');
+ }
  assert.strictEqual(cv.text('Oil',10,50,32,'#ffffff',opts),r.text('Oil',10,50,32,'#ffffff',opts));
  assert.strictEqual(cv.textWidth('Oil',32,opts),r.textWidth('Oil',32,opts));
  const credit=new Canvas(600,40);drawCredit(credit,580,25);let alpha=0;

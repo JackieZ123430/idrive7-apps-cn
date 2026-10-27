@@ -30,3 +30,7 @@ Chinese contribution: 抖音 小白科技杂物社 / BiliBili 小白151 / GitHub
 - Both language kits are built and previewed independently.
 
 The bench installation and Service startup are verified after the resource-limit correction; further functions and physical HMI layout still require testing. Extracted BMW SDK code and generated installation packages are excluded from the public repository.
+
+## Translation coverage
+
+Common DTC states, diagnostic rejection labels, demo faults and a curated set of diagnostic descriptions are translated. Full sentences are localized before truncation, and font atlas IDs include the atlas content revision so updates cannot reuse an outdated GPU glyph texture. The complete OEM fault database is not translated; unknown descriptions retain English. This should be presented as partial diagnostic-text coverage in a draft PR.

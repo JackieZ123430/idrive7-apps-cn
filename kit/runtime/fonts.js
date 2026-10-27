@@ -17,7 +17,7 @@ function family(name) {
         const j = JSON.parse(fs.readFileSync(path.join(DIR, name + '.json'), 'utf8'));
         fam = j.sizes.map((s) => ({
             size: s.size, ascent: s.ascent, descent: s.descent, atlasW: s.atlasW, atlasH: s.atlasH,
-            glyphs: s.glyphs, _alpha: s.alpha, alpha: null, family: name,
+            glyphs: s.glyphs, _alpha: s.alpha, alpha: null, family: name, cacheKey: j.cacheKey || '',
         }));
     } catch (e) { fam = null; }
     families[name] = fam;
