@@ -2,7 +2,7 @@
   "id": "edrive2",
   "title": "eDrive Live",
   "description": "Live HV battery power (kW), cell temperatures and voltages, power limits and climate / HVAC power use - set up for the X5 xDrive45e (G05 PHEV)",
-  "version": "1.3.0",
+  "version": "1.4.1",
   "vendor": "custom",
   "loggingId": "OA9D",
   "iconGlyph": "battery",
@@ -49,6 +49,21 @@
       "statusHighVoltageStorage": "s"
     }
   },
+  "startWidget": {
+    "comment": "Home-screen widget. Layout and cell names are those of BMW's Drive Recorder widget on this firmware: the drawn image goes into BackgroundImage1, the layout shows Title above it. If the image doesn't show or sits wrong, try another 'image' cell or adjust 'size' (pixels: one picture for both widget sizes, shown centred at its own size).",
+    "name": "eDrive Live",
+    "layout": "LT_Table_OnlineApps_DriveRecorderWidget",
+    "image": "BackgroundImage1",
+    "size": [420, 284],
+    "cells": {
+      "Title": ["eDrive Live", "Text"],
+      "ErrorInfo": [false, "Bool"],
+      "background": [true, "Bool"],
+      "ProgressbarVisible": [false, "Bool"],
+      "TextCam": ["", "Text"],
+      "TextRecordings": ["", "Text"]
+    }
+  },
   "screens": [
     {
       "name": "MAIN",
@@ -69,6 +84,8 @@
      "steps": [60, 80, 100, 120, 150]},
     {"key": "powerPoll", "label": "Read power every (0.1 = as fast as the car answers)", "type": "number", "unit": "s", "default": 0.1, "reset": 1,
      "steps": [0.1, 0.25, 0.5, 1, 2]},
+    {"key": "widgetFps", "label": "Home-screen widget: redraw per second", "type": "number", "unit": "fps", "default": 8,
+     "steps": [2, 4, 8, 12]},
     {"key": "slowPoll", "label": "Read cells, temperatures, limits every", "type": "number", "unit": "s", "default": 5,
      "steps": [2, 5, 10, 30]},
     {"key": "tempUnit", "label": "Temperature unit", "type": "choice", "default": "f",

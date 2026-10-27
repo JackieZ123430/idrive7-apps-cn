@@ -81,6 +81,20 @@ const ctx = {
     signals: { watch: async (iface) => ({ iface, error: 'preview' }), proxy: async () => { throw new Error('preview'); } },
     theme: themeFn,
     loop: (n, fps, fn) => { loops[n] = fn; return { stop() {}, kick() {} }; },
+    // home-screen widget (app.json "startWidget"): one small and one big widget placed; "render" draws them too
+    widget: spec.startWidget ? {
+        ready: true, active: () => true, instances: () => WIDGETS, onChange() {}, onTap() {}, set: async () => {},
+        loop: (fps, fn) => { widgetFn = fn; },
+    } : null,
+};
+const WIDGETS = [{ spawnId: 1, big: false, size: 1, visible: true }, { spawnId: 2, big: true, size: 2, visible: true }];
+let widgetFn = null;
+const renderWidgets = async () => {
+    if (!widgetFn) return;
+    for (const i of WIDGETS) {
+        const cv = await widgetFn(i);
+        if (cv) { const f = path.join(out, `widget_${i.big ? 'big' : 'small'}-${frame++}.png`); fs.writeFileSync(f, cv.png()); console.log('frame', f); }
+    }
 };
 
 const realLoad = Module._load;
@@ -96,7 +110,7 @@ setTimeout(async () => {
     for (const c of clicks) {
         // wait=<seconds> pauses (demo data keeps running); render forces a frame
         if (/^wait=/.test(c)) { await new Promise((r) => setTimeout(r, Number(c.slice(5)) * 1000)); continue; }
-        if (c === 'render') { await loopFn(); continue; }
+        if (c === 'render') { await loopFn(); await renderWidgets(); continue; }
         if (/^frames=/.test(c)) {
             const n = Number(c.slice(7)), t0 = Date.now();
             for (let i = 0; i < n; i++) {

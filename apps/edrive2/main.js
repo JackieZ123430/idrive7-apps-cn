@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
-const { withAlpha } = require('./kit/canvas');
+const { Canvas, withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { Diag, hex } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
@@ -261,7 +261,8 @@ mgu.run({
             pump();
         });
         let lastDrawT = 0;
-        const shown = () => Date.now() - lastDrawT < SHOWN_MS;
+        // the app's screen, or its home-screen widget: either one gets the fast power reads
+        const shown = () => Date.now() - lastDrawT < SHOWN_MS || !!(ctx.widget && ctx.widget.active());
         const engineOn = () => G.isNum(live.rpm) && live.rpm > 400 && Date.now() - live.rpmT < 5000;
 
         /* ---------- power: fast reads, drive totals, traces ---------- */
@@ -1019,6 +1020,92 @@ mgu.run({
             ({ power: renderPower, battery: renderBattery, cells: renderCells, climate: renderClimate, diag: renderDiag, scan: renderScan, signals: renderSignals })[pg[page]](cv, t, d);
             G.frame(cv, t, pg.map((p) => NAMES[p]), page, [d.demo && { text: 'DEMO' }]);
             return ui.image('MAIN_GFX', cv);
+        }
+
+
+        /* ---------- home-screen widget ----------
+         * Drawn into the layout's image cell (app.json startWidget). Big widget: power, state, bar,
+         * V / A, charge, cell temperature and this drive; small one: power, state, charge and the bar.
+         * The layout draws its own title ("eDrive Live") above the image, so the image leaves room for it. */
+        const wcan = {};
+        function widgetBar(cv, t, x, y, w, h, kw, lim) {
+            const outMax = Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'));
+            const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
+            const span = outMax + inMax, x0 = x + w * inMax / span;
+            const X = (v) => x0 + G.clamp(v, -inMax, outMax) / span * w;
+            cv.roundRect(x, y, w, h, h / 2, withAlpha(t.track, 0.9));
+            const sv = G.smooth('edrive2.wbar', kw, 22);
+            if (G.isNum(sv) && Math.abs(sv) > 0.05) {
+                if (sv > 0) cv.rampRect(x0, y, X(sv) - x0, h, h / 2, t.hotRamp || t.ramp, x0, x + w - x0);
+                else cv.roundRect(X(sv), y, x0 - X(sv), h, h / 2, GO);
+            }
+            cv.fillRect(Math.round(x0) - 1, y - 4, 3, h + 8, t.text);
+        }
+        /* One picture for both widget sizes. The HMI shows it at its own pixel size, centred and
+         * cut to the widget (big about 430 x 290, small about 430 x 150; the layout's title sits on
+         * the top left of both). So: rows ~70-125 hold the small widget's title (status and V / A on
+         * the right of it), rows 125-215 what both sizes show (power, charge, the bar) and the rows
+         * outside that only the big widget (cells, this drive). */
+        /* Small widget: the layout doesn't show the picture at that size (log: images pushed, nothing on
+         * screen), so its own text lines and progress bar carry the numbers there; cleared on the big one. */
+        const wtext = {};
+        function widgetCells(inst) {
+            const t = ctx.theme(), d = data(), pw = power(d, t), lim = limitsKw(d);
+            const max = pw.kw > 0 ? Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'))
+                : Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
+            const on = !inst.big;
+            const cells = {
+                TextRecordings: [on ? pw.text + ' kW  ' + pw.what + '  ' + (G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' %' : '') : '', 'Text'],
+                ProgressbarVisible: [on, 'Bool'],
+                Progress: [on && G.isNum(pw.kw) ? Math.round(G.clamp(Math.abs(pw.kw) / max, 0, 1) * 100) : 0, 'Float'],
+                TimeElapsed: [on ? pw.text + ' kW' : '', 'Text'],
+                TimeRemaining: [on && G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' %' : '', 'Text'],
+            };
+            const prev = wtext[inst.spawnId] || (wtext[inst.spawnId] = {});
+            Object.keys(cells).forEach((k) => {
+                const v = JSON.stringify(cells[k][0]);
+                if (prev[k] === v) return;
+                prev[k] = v;
+                ctx.widget.set(inst.spawnId, k, cells[k][0], cells[k][1]);
+            });
+        }
+        function renderWidget(inst) {
+            if (inst) widgetCells(inst);
+            const [w, h] = (ctx.spec.startWidget && ctx.spec.startWidget.size) || [420, 284];
+            const key = w + 'x' + h;
+            const cv = (wcan[key] = wcan[key] || new Canvas(w, h)).clear([0, 0, 0, 0]);
+            const t = ctx.theme(), d = data(), pw = power(d, t), lim = limitsKw(d);
+            const scol = pw.what === 'REGEN' || pw.what === 'CHARGING' ? GO : pw.kw === null ? t.dim : t.text;
+            const cy = h / 2, x0 = 14, x1 = w - 14;
+            // beside the title (both sizes)
+            cv.text(pw.what, x1, cy - 52, 20, scol, { font: 'bold', spacing: 1.5, align: 'right' });
+            cv.text((G.isNum(d.v) ? G.fmt(d.v, 0) + ' V' : '-- V') + (G.isNum(d.a) ? '   ' + G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : ''),
+                x1, cy - 26, 17, t.dim, { align: 'right' });
+            // power and charge (both sizes)
+            const vw = cv.text(pw.text, x0, cy + 44, 72, pw.col, { font: 'num' });
+            cv.text('kW', x0 + 8 + vw, cy + 44, 24, t.dim, { font: 'bold' });
+            const sw = cv.text('%', x1, cy + 44, 22, t.dim, { font: 'bold', align: 'right' });
+            cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--', x1 - sw - 4, cy + 44, 48, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'right' });
+            widgetBar(cv, t, x0, cy + 58, w - 28, 14, pw.kw, lim);
+            // big widget only: below the bar
+            const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip, yb = cy + 102;
+            const colm = (x, label, v, c, align) => {
+                cv.text(label, x, yb, 14, t.dim, { font: 'bold', spacing: 1, align });
+                cv.text(v, x, yb + 28, 24, c, { font: 'bold', align });
+            };
+            colm(x0, 'CELLS', ct ? fmtT(ct.avg) : '--', ct ? tempColor(t, ct.avg) : t.dim);
+            colm(w / 2, 'THIS DRIVE', G.fmt(tp.out - tp.regen, 2) + ' kWh', t.text, 'center');
+            colm(x1, 'REGEN', G.fmt(tp.regen, 2) + ' kWh', GO, 'right');
+            if (d.engine || d.demo) cv.text(d.engine ? 'ENGINE ON' : 'DEMO', w / 2 + 30, cy + 40, 14, t.warn, { font: 'bold', spacing: 1, align: 'center' });
+            return cv;
+        }
+        if (ctx.widget) {
+            ctx.widget.loop(() => settings.get('widgetFps') || 8, renderWidget);
+            // a widget just placed or shown: read the slow values now instead of waiting
+            ctx.widget.onChange((why) => {
+                if (why === 'resized' || why === 'placed') Object.keys(wtext).forEach((k) => delete wtext[k]);
+                schedulePower(); if (ctx.widget.active()) readSlow();
+            });
         }
 
         ctx.loop('MAIN', 2, render);
