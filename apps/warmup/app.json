@@ -1,8 +1,8 @@
 {
   "id": "warmup",
-  "title": "Warm-Up",
-  "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit and turbo cool-down",
-  "version": "1.4.4",
+  "title": "暖机助手",
+  "description": "机油和冷却液暖机估算、转速建议及涡轮冷却",
+  "version": "1.4.4-cn.1",
   "vendor": "custom",
   "loggingId": "OA9A",
   "iconGlyph": "temp",
@@ -22,11 +22,11 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "Warm-Up",
+      "title": "暖机助手",
       "buttons": [
         [
           "BTN_SETTINGS",
-          "Settings"
+          "设置"
         ]
       ]
     }
@@ -34,7 +34,7 @@
   "settings": [
     {
       "key": "warmOil",
-      "label": "Oil is warm at",
+      "label": "机油暖机目标温度",
       "type": "number",
       "unit": "°C",
       "default": 80,
@@ -50,7 +50,7 @@
     },
     {
       "key": "warmCoolant",
-      "label": "Coolant is warm at",
+      "label": "冷却液暖机目标温度",
       "type": "number",
       "unit": "°C",
       "default": 80,
@@ -65,7 +65,7 @@
     },
     {
       "key": "coldLimit",
-      "label": "Rev limit when cold",
+      "label": "冷机转速上限",
       "type": "number",
       "unit": "rpm",
       "default": 3500,
@@ -79,7 +79,7 @@
     },
     {
       "key": "redline",
-      "label": "Redline",
+      "label": "换挡转速",
       "type": "number",
       "unit": "rpm",
       "default": 7000,
@@ -98,71 +98,71 @@
     },
     {
       "key": "cooldown",
-      "label": "Turbo cool-down after hard driving",
+      "label": "激烈驾驶后涡轮冷却",
       "type": "bool",
       "default": true
     },
     {
       "key": "tempUnit",
-      "label": "Temperature unit",
+      "label": "温度单位",
       "type": "choice",
       "default": "c",
       "options": [
         [
           "c",
-          "Celsius"
+          "摄氏度"
         ],
         [
           "f",
-          "Fahrenheit"
+          "华氏度"
         ]
       ]
     },
     {
       "key": "theme",
-      "label": "Colour theme",
+      "label": "配色主题",
       "type": "choice",
       "default": "m_tricolour",
       "options": [
         [
           "m_red",
-          "M Red"
+          "M 红色"
         ],
         [
           "m_tricolour",
-          "M Tricolour"
+          "M 三色"
         ],
         [
           "ice",
-          "Ice White"
+          "冰晶白"
         ],
         [
           "amber",
-          "Night Amber"
+          "夜间琥珀"
         ]
       ]
     },
-    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
-     "options": [["full", "Full screen"], ["standard", "Standard"]]},
-    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
+    {"key": "layout", "label": "屏幕布局", "type": "choice", "default": "full",
+     "options": [["full", "全屏"], ["standard", "标准"]]},
+    {"key": "renderer", "label": "渲染器", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 帧（默认）"], ["software", "软件渲染"]]},
     {
       "key": "demo",
-      "label": "Demo data",
+      "label": "演示数据",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "Auto"
+          "自动"
         ],
         [
           "on",
-          "Always"
+          "始终"
         ],
         [
           "off",
-          "Never"
+          "从不"
         ]
       ]
     }

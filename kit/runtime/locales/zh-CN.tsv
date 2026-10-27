@@ -1,0 +1,645 @@
+# English<TAB>简体中文。只用于显示文本，不改协议字段或设置值。
+M Vitals	M 车辆仪表
+Redline	换挡转速
+Virtual Dyno	虚拟马力机
+Brake Test	制动测试
+Drag Timer	加速计时
+G-Force	G 值仪表
+Warm-Up	暖机助手
+Fault Scanner	故障扫描
+eDrive	电驱助手
+Service	保养信息
+Doom	毁灭战士
+Settings	设置
+Next page	下一页
+Previous page	上一页
+Next item	下一项
+Details	详情
+Read now	立即读取
+Scan now	立即扫描
+Scan again	重新扫描
+Clear all	清除全部
+Reset max	重置峰值
+Reset run	重置本次
+Cancel run	取消本次
+Yes, clear	确认清除
+Clear log	清除记录
+Delete all	删除全部
+Reset best	重置最佳
+Current	当前
+Incl. history	包含历史
+Start page	启动页面
+Engine	发动机
+Chassis	底盘
+Thermals	温度
+Fuel & ignition	燃油与点火
+Colour theme	配色主题
+M Red	M 红色
+M Tricolour	M 三色
+Ice White	冰晶白
+Night Amber	夜间琥珀
+Demo data	演示数据
+Auto	自动
+Always	始终
+Never	从不
+On	开启
+Off	关闭
+Yes	是
+No	否
+Show	显示
+Hide	隐藏
+Auto (first that works)	自动（首个可用来源）
+Auto (learned)	自动学习
+Hide (RWD)	隐藏（后轮驱动）
+No (12 V only)	否（仅 12 V 电池）
+Speed unit	速度单位
+Speed display rate	速度刷新率
+Speed	车速
+Power unit	功率单位
+Torque unit	扭矩单位
+Temperature unit	温度单位
+Pressure unit	压力单位
+Distance unit	距离单位
+Temperature	温度
+Celsius	摄氏度
+Fahrenheit	华氏度
+Units	单位
+metres	米
+feet	英尺
+miles	英里
+1/4 mile	1/4 英里
+1/8 mile	1/8 英里
+Renderer	渲染器
+GPU 60 fps (default)	GPU 60 帧（默认）
+Software	软件渲染
+Screen layout	屏幕布局
+Full screen	全屏
+Standard	标准
+Peak hold	峰值保持
+Peak hold (0 = until reset)	峰值保持（0 表示手动重置）
+Show peak markers	显示峰值标记
+Max power (100% on sport display)	最大功率（运动仪表的 100%）
+Power from	功率来源
+Sport display	运动仪表
+Torque x rpm	扭矩 × 转速
+Oil temp warning	机油温度警告
+Boost	增压压力
+Boost from	增压压力来源
+Engine unit (OBD)	发动机控制单元（OBD）
+Gearbox oil temperature	变速箱油温
+Gearbox temperature (EGS)	变速箱温度（EGS）
+Tyre card	轮胎面板
+Tyre temperatures	轮胎温度
+xDrive card	xDrive 面板
+Intake air temperature	进气温度
+High pressure fuel	高压燃油
+Low pressure fuel	低压燃油
+Ignition timing	点火提前角
+Misfire counter	失火计数
+Cold rev limit	冷机转速上限
+Cold-engine rev guard	冷机转速保护
+Oil warm at	机油暖机温度
+Shift point before redline	换挡提示距红线转速
+Blink and flash at shift point	换挡点闪烁提示
+Shift light style	换挡灯样式
+M (green-yellow-red)	M 样式（绿黄红）
+Race (green-red-blue)	竞速样式（绿红蓝）
+Theme colour	主题颜色
+Weight with driver + fuel	含驾驶员和燃油的车重
+Body shape (air drag)	车身类型（空气阻力）
+Coupe / sedan	双门轿跑 / 轿车
+Touring / hatch	旅行车 / 掀背车
+SUV	SUV
+Drivetrain loss	传动损耗
+Graph up to	图表转速上限
+Overlay ECU torque	叠加 ECU 扭矩
+Baseline	基准曲线
+Tests	测试项目
+Distance split	距离分段
+One-foot rollout	一英尺起步豁免
+Circle size	圆盘量程
+G-force display rate	G 值刷新率
+Trail length	轨迹长度
+Swap left / right	交换左右方向
+Counts as hard braking above	急刹车判定阈值
+Oil is warm at	机油暖机目标温度
+Coolant is warm at	冷却液暖机目标温度
+Rev limit when cold	冷机转速上限
+Turbo cool-down after hard driving	激烈驾驶后涡轮冷却
+Hybrid system	混合动力系统
+Battery size when new (gross)	新电池总容量
+Electric range when full, 20 °C	20°C 满电纯电续航
+Engine starts at	发动机介入电量
+Electricity price	电价
+Read charge every	充电数据读取间隔
+Read battery health every	电池健康读取间隔
+Diagnostics page	诊断页面
+Diagnostics page (UDS replies)	诊断页面（UDS 响应）
+Scan when opened	打开时扫描
+Faults to read	读取的故障范围
+Also read info memory	同时读取信息存储器
+Play	开始游戏
+Continue	继续游戏
+New game	新游戏
+Back up	后退
+Turn left	向左转
+Turn right	向右转
+Walk left	向左平移
+Walk right	向右平移
+Walk	行走
+Stand	停止移动
+Weapon	切换武器
+Move speed	移动速度
+Slow walk (easiest to steer)	慢走（方便控制）
+Run	奔跑
+Aim speed (controller turn)	瞄准速度（旋转控制器）
+Slow	慢
+Normal	正常
+Fast	快
+Aim direction	瞄准方向
+Reversed	反向
+Difficulty (new game)	难度（新游戏）
+I'm too young to die	入门
+Too young to die	入门
+Hey, not too rough	简单
+Not too rough	简单
+Hurt me plenty	普通
+Ultra-Violence	困难
+Nightmare!	噩梦！
+Episode (new game)	章节（新游戏）
+1: Outpost Outbreak	1：前哨危机
+2: Military Labs	2：军事实验室
+3: Event Horizon	3：事件视界
+4: Double Impact	4：双重冲击
+Render resolution	渲染分辨率
+Full: 1920 x 504, every screen pixel	全分辨率：1920 × 504
+Medium: 1440 x 378	中：1440 × 378
+Low: 960 x 252	低：960 × 252
+DEMO	演示
+EST.	估算
+OK	正常
+READY	就绪
+Ready	就绪
+Oil	机油
+OIL	机油
+Coolant	冷却液
+COOLANT	冷却液
+WATER	水温
+RPM	转速
+SPEED	车速
+POWER	功率
+TORQUE	扭矩
+PEAK	峰值
+PEAK POWER	峰值功率
+PEAK TORQUE	峰值扭矩
+PEAK DECEL	最大减速度
+DECEL g	减速度 g
+FROM	起始
+WHEN	时间
+DATE	日期
+STATUS	状态
+VALUE	数值
+READ	读取
+REPLY	响应
+DECODED	解析值
+TEMP	温度
+ADDED	增加
+COST	费用
+LEARNED	已学习
+FULL	满电
+RANGE	续航
+ENERGY	能量
+ALL TIME	累计
+THIS MONTH	本月
+FROM - TO	起止电量
+WITH ENGINE	发动机运行
+LAST CHARGE	上次充电
+IN THE BATTERY NOW	当前电池能量
+HV BATTERY	高压电池
+OUTSIDE	车外温度
+CHARGING	充电中
+CLIMATE ON	空调开启
+CLIMATE & ON-BOARD	空调与车载用电
+CLIMATE OFF · ON-BOARD	空调关闭 · 车载用电
+CLIMATE OFF  ·  ON-BOARD	空调关闭 · 车载用电
+ENGINE ON  ·  battery	发动机运行 · 电池
+CHARGING  (engine / DC-DC running)	正在充电（发动机 / DC-DC 运行）
+KWH PER DAY, 14 DAYS	近 14 天每日充电量（kWh）
+Engine oil	发动机机油
+Engine speed	发动机转速
+Gearbox oil	变速箱油温
+Gearbox (EGS)	变速箱（EGS）
+Ambient	环境温度
+Intake air (IAT)	进气温度（IAT）
+Intake air above outside	进气与环境温差
+Ignition timing (before TDC)	点火提前角（上止点前）
+Misfires	失火次数
+Tyres	轮胎
+Power	功率
+Torque	扭矩
+G-force	G 值
+Front	前轴
+FRONT	前轴
+Rear	后轴
+FL	左前
+FR	右前
+RL	左后
+RR	右后
+2WD	两驱
+4WD	四驱
+2WD mode	两驱模式
+4WD Sport	四驱运动
+Sand	沙地
+DERATED / OFF	受限 / 关闭
+Power (torque x rpm)	功率（扭矩 × 转速）
+last 5 min	近 5 分钟
+this drive	本次行程
+engine temperatures	发动机温度
+heat soak	热浸效应
+needs IAT + outside temperature	需要进气温度和环境温度
+not available on this car	此车辆不支持
+no data	暂无数据
+no data from the car	暂无车辆数据
+no target	无目标值
+no diagnostic link	无诊断连接
+no reading from the engine unit	暂无发动机数据
+No data from the engine unit yet	尚未收到发动机控制单元数据
+Values show up here once the car answers. Settings: set one to Show to keep it on screen.	收到车辆响应后显示数据，可在设置中选择“显示”以固定项目。
+diagnostic link down	诊断连接断开
+reading...	读取中…
+engine unit: reading...	正在读取发动机控制单元…
+not changing	数值未变化
+no boost from the sport display	运动仪表未提供增压压力
+all-wheel drive detected	已检测到四轮驱动
+car sends no torque split	车辆未提供扭矩分配
+transfer case	分动箱
+transfer case, estimated	分动箱估算
+transfer case: clutch open	分动箱离合器断开
+ (transfer case)	（分动箱）
+target	目标
+max	最大
+min	分钟
+engine off	发动机关闭
+Cyl	气缸
+cylinders (counted)	缸（计数）
+cylinders (engine unit list)	缸（控制单元列表）
+car sends	车辆上报
+sport display sends	运动仪表上报
+stuck at	数值停留在
+from	来源
+raw	原始值
+front	前轴
+Tach	转速表
+Shift accuracy	换挡准确率
+Shift log	换挡记录
+Recent upshifts	最近升挡
+LAST SHIFT	上次换挡
+SHIFT AT	换挡转速
+SHIFT	换挡
+EARLY	过早
+LATE	过晚
+SPOT ON	恰好
+LIMITER	转速限制
+COLD	冷机
+COLD REV	冷机转速
+COLD  ·  LIMIT	冷机 · 转速上限
+OIL COLD  ·  GO EASY	机油未热 · 温和驾驶
+AVG	平均
+No shifts yet - go and use the rev range.	暂无换挡记录。
+rpm vs shift point	转速与换挡点
+shifts)	次换挡）
+Dyno sheet	马力曲线
+Saved runs	已保存测试
+No pull yet	暂无加速测试
+No runs yet.	暂无测试记录。
+Next run	下次测试
+Recording	记录中
+NEW RUN RECORDED	已记录新测试
+BASELINE	基准
+ECU TORQUE	ECU 扭矩
+POWER NOW	当前功率
+SETUP	参数
+SPEED RANGE	车速范围
+Peak	峰值
+estimate at the crank	估算曲轴功率
+waiting for a pull	等待加速测试
+keep it pinned...	保持油门…
+pull too short	测试过程过短
+Full throttle in 3rd gear from ~2000 rpm to the limiter, on a flat road	在平坦封闭道路以三挡从约 2000 转全油门加速至转速上限
+Brake test	制动测试
+All stops	全部制动
+Brake fade	制动衰减
+History	历史
+Last stop	上次制动
+Deceleration	减速度
+Stopping	制动中
+STOPPING	制动中
+STOPPED	已停车
+BRAKE HARD	全力制动
+GET ABOVE	加速至高于
+BEST	最佳
+NEW BEST	新最佳
+CONSISTENT	稳定
+FADING  +	衰减 +
+WARM  +	热衰减 +
+No stops yet.	暂无制动记录。
+no stops yet	暂无制动记录
+need 3 stops	需要 3 次制动
+Brake hard from above	从高于目标车速开始全力制动
+Brake released - stop not counted	制动提前松开，本次不计入
+stop	制动
+vs best	对比最佳
+Drag timer	加速计时
+Speed trace	车速曲线
+Splits	分段成绩
+Best times	最佳成绩
+Recent runs	最近测试
+Come to a stop to arm	停车后准备测试
+Launch when ready	准备好后起步
+STOP TO ARM	停车以准备
+READY - LAUNCH	已就绪，请起步
+FINISHED	已完成
+TIMING	计时中
+ROLLOUT 1 FT	起步豁免 1 英尺
+No runs yet - stop, launch, and they show up here.	暂无记录，停车后起步即可开始测试。
+no best yet	暂无最佳成绩
+live speed	实时车速
+best	最佳
+error	错误
+All-time records	历史纪录
+Records	纪录
+Now	当前
+Session peaks	本次峰值
+Hardest launch	最强起步
+Hardest stop	最强制动
+Left-hander	左转
+Right-hander	右转
+Top speed	最高车速
+Combined	合成 G 值
+COMBINED	合成
+LATERAL	横向
+LONGITUDINAL	纵向
+LEFT	左
+RIGHT	右
+ACCEL	加速
+BRAKE	制动
+ACC	加速
+BRK	制动
+TOP	最高
+Warm-up	暖机助手
+ENGINE OFF	发动机关闭
+NOT WARMING	未升温
+electric driving	纯电行驶
+drive to warm up	行驶以升温
+NO OIL TEMP	无机油温度
+OIL HOT - EASE OFF	机油过热，请降低负荷
+COOLED - OK TO SWITCH OFF	已冷却，可以熄火
+TURBO COOL-DOWN	涡轮冷却中
+WARMING UP	暖机中
+SAFE REV LIMIT	建议转速上限
+COOL-DOWN LEFT	冷却剩余时间
+OIL READY IN	机油暖机剩余
+COOLANT READY IN	冷却液暖机剩余
+Oil ready in ~	机油预计暖机约
+Engine off - oil not warming	发动机关闭，机油未升温
+Oil not warming	机油未升温
+Oil warm	机油已热
+keep it gentle	保持温和驾驶
+paused - stay under	已暂停，请保持低于
+Real electric range	实际纯电续航
+Range	续航
+Energy	能耗
+Charge log	充电记录
+Diagnostics	诊断
+Signals	信号
+Car signals	车辆信号
+Battery diagnostics	电池诊断
+Battery health	电池健康
+12 V battery	12 V 电池
+Driving	行驶
+Driving by speed	分车速能耗
+Climate (heating / A/C)	空调（暖风 / 制冷）
+On-board electrics	车载用电
+Seat heating	座椅加热
+Steering wheel	方向盘
+Outside	车外温度
+HV energy	高压电池能量
+HV voltage	高压电池电压
+Charge	充电
+Charges	充电次数
+Totals	总计
+Where the power goes now	当前功率分配
+Raw values as the car sends them - for checking the scalings (config.scaling in app.json).	车辆原始数值，用于核对 app.json 中的 config.scaling 换算配置。
+A value n/a or wrong? Adjust config.battery in apps/edrive/app.json and rebuild.	数值不可用或不正确时，调整 app.json 中的 config.battery 后重新构建。
+No hybrid system	无混合动力系统
+Hybrid car? Settings > Hybrid system > Yes	混动车请在“设置 > 混合动力系统”中选择“是”
+No high-voltage battery answered, so	高压电池无响应，因此
+eDrive shows the 12 V battery only.	电驱助手仅显示 12 V 电池。
+No charges logged yet.	暂无充电记录。
+Every charge of	每次充电增加
+% or more shows up here,	% 或以上时记录于此，
+also overnight charges.	包括车机休眠期间的充电。
+Holds	可用容量
+Full:	满电：
+no charge reading yet	尚无充电数据
+no reading yet	尚无读数
+no reply	无响应
+not read yet	尚未读取
+not read	未读取
+not started	尚未开始
+not yet	尚未
+none yet	暂无
+now	现在
+today	今天
+days ago	天前
+h ago	小时前
+min ago	分钟前
+s ago	秒前
+learns as you drive electric	纯电行驶时学习
+learns as you drive	行驶时学习
+estimate - learns as you drive electric	估算值，纯电行驶时学习
+typical	典型值
+measured	实测
+(est.)	（估算）
+(typical)	（典型值）
+your pace now	当前驾驶节奏
+your pace	你的驾驶节奏
+typical pace	典型驾驶节奏
+engine starts at	发动机介入电量
+last hour  ·  healthy at rest: 12.4-12.8 V	近一小时 · 静置健康电压：12.4–12.8 V
+GOOD  (about 75 %)	良好（约 75%）
+HALF  (about 50 %) - drive or charge soon	中等（约 50%），建议行驶或充电
+LOW - charge the battery	电量低，请充电
+Main page: demo data until the link answers	主页在连接响应前显示演示数据
+CAR SHOWS  (no power distribution from the car yet)	车辆显示（暂无车辆功率分配数据）
+CAR SHOWS  drive	车辆显示 · 驱动
+with engine: + = charging the battery, - = still using it	发动机运行时：+ 表示充电，- 表示仍在耗电
+screens, units, pumps	屏幕、控制单元、水泵
+battery temp	电池温度
+battery temperature	电池温度
+climate control	空调系统
+seat heating	座椅加热
+steering wheel	方向盘
+rear L	左后
+rear R	右后
+pass.	副驾驶
+driver	驾驶员
+link down	连接断开
+link up	已连接
+no hybrid battery unit: 12 V only	无混动电池单元，仅显示 12 V
+available	可用
+n/a	不可用
+Control units	控制单元
+Faults	故障
+Check Control	车辆检查信息
+Check Control messages	车辆检查消息
+Control units that answered	已响应的控制单元
+Active now	当前存在
+INFO MEMORY	信息存储器
+INFO:	信息：
+No faults stored	无已存储故障
+No active Check Control messages	当前无车辆检查消息
+No control unit answered	无控制单元响应
+No control unit answered - ignition on?	无控制单元响应，请检查点火状态
+No answer	无响应
+no answer	无响应
+answering...	等待响应…
+No faults	无故障
+Nothing to clear	无可清除项目
+Scan first	请先扫描
+Scan first, then clear	请先扫描，再清除
+Press "Scan now" (ignition on)	打开点火后点击“立即扫描”
+Scanning...	扫描中…
+Asking every control unit...	正在查询各控制单元…
+Identifying control units...	正在识别控制单元…
+Reading info memory...	正在读取信息存储器…
+Info memory not read this time (unit busy) - scan again for it	本次未读取信息存储器（单元忙），可重新扫描
+Last scan	上次扫描
+Scan failed:	扫描失败：
+Clears	将清除
+Clearing	正在清除
+Cleared	已清除
+control unit(s) - press again within 5 s	个控制单元，请在 5 秒内再次点击确认
+control unit(s) - scanning again	个控制单元，正在重新扫描
+control units,	个控制单元，
+faults	个故障
+fault	个故障
+info	信息
+more	更多
+possible texts (depends on unit type)	条候选说明（取决于单元型号）
+present right now	当前存在
+stored	已存储
+scanning again	重新扫描
+Message	消息
+Head unit	车机
+DME engine	DME 发动机
+DME 2	DME 2
+EGS gearbox	EGS 变速箱
+BDC body	BDC 车身
+BDC gateway	BDC 网关
+ATM telematics	ATM 远程通信
+KOMBI cluster	KOMBI 仪表
+ACSM airbag	ACSM 安全气囊
+DSC brakes	DSC 制动
+DSC brake booster	DSC 制动助力
+EPS steering	EPS 转向
+EME e-motor	EME 电机
+SME HV battery	SME 高压电池
+OBC charger	OBC 充电机
+IHKA climate	IHKA 空调
+RAM audio	RAM 音响
+ZBE controller	ZBE 控制器
+GWS gear selector	GWS 挡位选择器
+VTG xDrive	VTG 四驱
+KAFAS camera	KAFAS 摄像头
+ICAM cameras	ICAM 摄像头
+PDC parking	PDC 泊车
+USS park sensors	USS 泊车传感器
+SAS assist sensors	SAS 辅助传感器
+FRR front radar	FRR 前雷达
+SRR corner radar	SRR 角雷达
+DCS driver camera	DCS 驾驶员摄像头
+FZD roof	FZD 车顶
+FLM headlight	FLM 前照灯
+HKFM tailgate	HKFM 尾门
+SM seat module	SM 座椅模块
+TFM fuel tank	TFM 燃油箱
+VDP dampers	VDP 减振器
+Telematics: Mobile network connection limited	远程通信：移动网络连接受限
+Assist sensors: Unexpected Ethernet communication/link	辅助传感器：以太网通信或链路异常
+Service requirements	保养需求
+Next service	下次保养
+Service due	保养到期
+Engine oil	发动机机油
+Front brakes	前制动器
+Rear brakes	后制动器
+Brake fluid	制动液
+Vehicle check	车辆检查
+Statutory vehicle inspection	法定车辆检验
+DUE NOW	已到期
+DUE SOON	即将到期
+Due now	已到期
+Due soon	即将到期
+Diagnostics - what the instrument cluster sends	诊断 · 仪表发送的原始数据
+No details for this item	此项目无详情
+Details not available (	详情不可用（
+Waiting for the service data from the instrument cluster (ignition on)...	等待仪表保养数据，请打开点火…
+Asking the car...	正在查询车辆…
+waiting for the car	等待车辆
+instrument cluster not reachable	无法连接仪表
+connecting...	正在连接…
+not available yet	暂不可用
+nothing received	尚未收到数据
+item(s)	项
+items	项
+(demo)	（演示）
+Loading...	加载中…
+Doom stopped	游戏已停止
+Doom stopped:	游戏已停止：
+In the game, BACK returns here and saves	游戏中按 BACK 返回此处并保存
+Saved game:	已保存游戏：
+Game:	游戏：
+health	生命值
+(default)	（默认）
+LAST	上次
+answered	已响应
+messages	条消息
+record	纪录
+ELECTRIC	纯电
+over	高于
+battery	电池
+climate	空调
+blower	风机
+seats	座椅
+wheel	方向盘
+cells	电芯
+heating	加热
+compressor	压缩机
+charging	充电中
+charge	充电
+charges	次充电
+climate boost	空调增益
+seat bars	座椅档位
+no link	未连接
+use learning	使用学习值
+using	当前采用
+with engine	发动机运行
+cold: less range, slower charging	低温：续航降低，充电变慢
+from your last	依据最近
+lasts ~	预计可用约
+a typical	典型值
+there	处
+at	在
+pace	驾驶节奏
+learned	已学习
+in	剩余
+by	到期
+or	或
+of	共
+Fault Scanner	故障扫描
+Scan	扫描
+Reading	读取中
+Fault	故障
+Info memory	信息存储器
+minimum	最小
+maximum	最大

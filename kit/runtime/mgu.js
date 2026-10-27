@@ -23,6 +23,7 @@ const path = require('path');
 const { OnlineApp, logging } = require('oap-sdk');
 const themes = require('./themes');
 const { Display } = require('./display');
+const { HmiText } = require('./hmi-text');
 
 const sdkLog = logging.getSDKLogger();
 const SPEC = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-spec.json'), 'utf8'));
@@ -111,14 +112,6 @@ class Settings {
     }
 }
 
-/**
- * Text for the HMI's own lists / buttons. The HMI shows non-ASCII text from an app as mojibake
- * ("°C" arrives as "Â°C"), so '°' is dropped there ("125 C"); drawn screens are not affected.
- */
-function hmiText(s) {
-    return String(s).replace(/°/g, '').replace(/[^\x20-\x7e]/g, '');
-}
-
 /* ---------------- UI wrapper ---------------- */
 class Ui {
     constructor(app) {
@@ -130,6 +123,7 @@ class Ui {
         this._focus = Object.create(null);    // stateName -> false while a popup covers it
         this._focusHandlers = [];
         this.timing = { png: 0, push: 0 };    // ms spent encoding / handing images to the HMI
+        this._cnText = new HmiText();
     }
     comp(name) {
         const c = this.rhmi && this.rhmi.getByName(name);
@@ -145,13 +139,13 @@ class Ui {
     text(name, text, row, cell) {
         const c = this.comp(name);
         if (c && !row && (!cell || cell === 'Text') && this.display) this.display.label(name, text);   // slim bar mirrors it
-        return c ? this._try('text ' + name, c.setValue(row || 0, cell || 'Text', hmiText(text), 'Text')) : Promise.resolve();
+        return c ? this._try('text ' + name, this._cnText.set(c, name, row || 0, cell || 'Text', text)) : Promise.resolve();
     }
     /** Set several cells of one row: ui.cells('LIST', 3, { Text1stCol: 'a', Text2ndCol: 'b' }) */
     cells(name, row, obj) {
         const c = this.comp(name);
         if (!c) return Promise.resolve();
-        return Promise.all(Object.keys(obj).map((k) => this._try('cell ' + name + '.' + k, c.setValue(row, k, hmiText(obj[k]), 'Text'))));
+        return Promise.all(Object.keys(obj).map((k) => this._try('cell ' + name + '.' + k, this._cnText.set(c, name, row, k, obj[k]))));
     }
     /** Selected row of a drop-down menu. */
     selected(name, row) {

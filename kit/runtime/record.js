@@ -13,6 +13,7 @@
  */
 const { Canvas, rgba } = require('./canvas');
 const fonts = require('./fonts');
+const { t } = require('./i18n');
 
 const OP = {
     CLEAR: 1, RECT: 2, GRAD: 3, RRECT: 4, RSTROKE: 5, CARD: 6, RAMPRECT: 7, ARC: 8, LINE: 9,
@@ -90,7 +91,7 @@ class Recorder {
         this.images = new Set();     // pixel images it draws (setImage)
         this.recording = true;
     }
-    reset() { this.n = 0; if (this.layersUsed) this.layersUsed.clear(); this.atlases.clear(); this.ramps.clear(); this.images.clear(); return this; }
+    reset() { this.n = 0; this._cnStamped = false; if (this.layersUsed) this.layersUsed.clear(); this.atlases.clear(); this.ramps.clear(); this.images.clear(); return this; }
     _grow(k) {
         if (this.n + k <= this.u.length) return;
         let len = this.u.length * 2;
@@ -217,10 +218,10 @@ class Recorder {
     /** Text; y is the baseline. Returns the width in logical px (as canvas.js). */
     text(str, x, y, size, c, opts) {
         opts = opts || {};
-        const family = opts.font || 'label';
-        const f = fonts.get(family, size * this.textScale);
+        const s = t(str), family = opts.font || 'label';
+        const f = fonts.get(family, size * this.textScale, s);
         if (!f) return 0;
-        const s = String(str), sc = size / f.size, sp = opts.spacing || 0;
+        const sc = size / f.size, sp = opts.spacing || 0;
         const w = fonts.measure(f, s) * sc + sp * Math.max(0, s.length - 1);
         let pen = opts.align === 'center' ? x - w / 2 : opts.align === 'right' ? x - w : x;
         let cnt = 0;
@@ -240,15 +241,14 @@ class Recorder {
             pen += g[6] * sc + sp;
         }
         if (cnt) {
-            const aid = atlasId(f, family); this.atlases.add(aid);
+            const aid = atlasId(f, f.family || family); this.atlases.add(aid);
             u[head] = OP.GLYPHS; u[head + 1] = aid; u[head + 2] = pack(c); u[head + 3] = cnt;
             this.n = i;
         }
         return w;
     }
     textWidth(str, size, opts) {
-        const f = fonts.get((opts && opts.font) || 'label', size * this.textScale);
-        const s = String(str);
+        const s = t(str), f = fonts.get((opts && opts.font) || 'label', size * this.textScale, s);
         return f ? fonts.measure(f, s) * (size / f.size) + ((opts && opts.spacing) || 0) * Math.max(0, s.length - 1) : 0;
     }
 

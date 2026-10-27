@@ -1,3 +1,7 @@
+> **简体中文汉化：小白科技杂物社 / Bilibili 小白151 / GitHub [JackieZ123430](https://github.com/JackieZ123430)**
+> [中文说明与安装步骤](README.zh-CN.md) · [汉化仓库](https://github.com/JackieZ123430/idrive7-apps-cn) · [署名与来源](NOTICE.zh-CN.md)
+> 本仓库免费提供源码。Doom 游戏内文字和原厂故障码数据库保留原文；中文版本尚待实机安装验证。
+
 <h1 align="center">MGU Custom Apps</h1>
 
 <p align="center">

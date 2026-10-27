@@ -9,6 +9,7 @@
  */
 const zlib = require('zlib');
 const fonts = require('./fonts');
+const { t } = require('./i18n');
 
 /* ---------- colours ---------- */
 const cache = Object.create(null);
@@ -418,11 +419,11 @@ class Canvas {
      */
     text(str, x, y, size, c, opts) {
         opts = opts || {};
-        const f = fonts.get(opts.font || 'label', size);
+        const s = t(str);
+        const f = fonts.get(opts.font || 'label', size, s);
         if (!f) return 0;
         c = rgba(c);
         const scale = size / f.size;
-        const s = String(str);
         const w = fonts.measure(f, s) * scale + (opts.spacing || 0) * Math.max(0, s.length - 1);
         let pen = opts.align === 'center' ? x - w / 2 : opts.align === 'right' ? x - w : x;
         for (const ch of s) {
@@ -436,8 +437,8 @@ class Canvas {
     }
 
     textWidth(str, size, opts) {
-        const f = fonts.get((opts && opts.font) || 'label', size);
-        return f ? fonts.measure(f, String(str)) * (size / f.size) + ((opts && opts.spacing) || 0) * Math.max(0, String(str).length - 1) : 0;
+        const s = t(str), f = fonts.get((opts && opts.font) || 'label', size, s);
+        return f ? fonts.measure(f, s) * (size / f.size) + ((opts && opts.spacing) || 0) * Math.max(0, s.length - 1) : 0;
     }
 
     /** Blit an alpha glyph from the atlas, scaled (bilinear) and tinted. */

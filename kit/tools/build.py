@@ -17,6 +17,7 @@ import json, os, re, shutil, sys, tarfile, uuid
 from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pack_data  # noqa: E402
+from localize import spec_zh, text, unicode_resources
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -112,9 +113,8 @@ def sid(app, key):
 
 
 def hmi_text(s):
-    """Text for the HMI's own components: it shows non-ASCII as mojibake ('deg C' -> 'A-circumflex deg C'),
-    so the degree sign is dropped and other non-ASCII characters removed (as mgu.js hmiText)."""
-    return re.sub(r'[^\x20-\x7e]', '', str(s).replace('°', ''))
+    """Keep Unicode: unicode_resources converts these cells to StringId before packaging."""
+    return text(s)
 
 
 def setting_options(s):
@@ -209,6 +209,15 @@ def build_ui(spec):
                 strings[sid(app, 'SET_' + s['key'])] = s['label']
                 items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
                                                         'Text2ndRow': {'value': '', 'type': 'Text'}}]))
+        # Chinese localization: Bilibili 小白151 / GitHub JackieZ123430.
+        # Keep attribution visible in every app without covering the live instruments.
+        credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
+        strings[credit_title] = '汉化：小白科技杂物社 / Bilibili 小白151'
+        strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
+        items.append(comp('tworow', 'CN_CREDITS', rows=[{
+            'Text1stRow': {'value': credit_title, 'type': 'StringId'},
+            'Text2ndRow': {'value': credit_link, 'type': 'StringId'},
+        }]))
 
     for scr in screens:
         cid = nid()
@@ -307,6 +316,7 @@ def make_icon(spec, out):
 
 def build(app_id):
     spec = json.load(open(os.path.join(APPS, app_id, 'app.json'), encoding='utf-8'))
+    spec = spec_zh(spec)
     spec.setdefault('id', app_id)
     ver = spec['version']
     stage = os.path.join(DIST, app_id)
@@ -318,6 +328,7 @@ def build(app_id):
 
     manifest = manifest_for(json.loads(json.dumps(spec)))
     xml, uidesc, strings, state_ids = build_ui(spec)
+    unicode_resources(uidesc, strings)
     for lang, tbl in spec.get('strings', {}).items():
         strings.update(tbl)
 
@@ -376,7 +387,7 @@ def build(app_id):
         'schemaVersion': '1.3.0',
         'application': {
             'uuid': u(app_id, 'app'), 'type': 'OnlineApp', 'name': app_id, 'vendor': spec.get('vendor', 'custom'),
-            'version': ver, 'defaultLanguage': 'en_GB',
+            'version': ver, 'defaultLanguage': 'zh_CN',
             'stringBundleUuid': u(app_id, 'strings'), 'resourceBundleUuid': u(app_id, 'resources'),
             'entryPoints': [{
                 'name': app_id.upper() + '_ENTRY', 'uuid': u(app_id, 'entry'), 'textId': sid(app_id, 'TITLE'),
@@ -398,7 +409,7 @@ def build(app_id):
     json.dump(pj, open(os.path.join(pr, 'application.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
     open(os.path.join(pr, 'uiDescriptions', 'ID7', 'application.xml'), 'w', encoding='utf-8', newline='\n').write(xml)
     json.dump(uidesc, open(os.path.join(pr, 'uiDescriptions', 'ID7', 'uiDescription.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
-    for lang in ('en_GB', 'en_US', 'de_DE'):
+    for lang in LANGS:
         json.dump(strings, open(os.path.join(pr, 'variantGroups', 'Common', 'texts', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     make_icon(spec, os.path.join(pr, 'variantGroups', 'Common', 'images', icon))
 

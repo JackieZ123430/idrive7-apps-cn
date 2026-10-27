@@ -1,8 +1,8 @@
 {
   "id": "edrive",
-  "title": "eDrive",
-  "description": "Real electric range, HV battery health (SOH) and energy, last charge, charge log and 12 V battery voltage",
-  "version": "2.0.1",
+  "title": "电驱助手",
+  "description": "纯电续航估算、电池健康、能耗与充电记录",
+  "version": "2.0.1-cn.1",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -58,23 +58,23 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "eDrive",
+      "title": "电驱助手",
       "buttons": [
         [
           "BTN_READ",
-          "Read now"
+          "立即读取"
         ],
         [
           "BTN_PAGE",
-          "Next page"
+          "下一页"
         ],
         [
           "BTN_PREV",
-          "Previous page"
+          "上一页"
         ],
         [
           "BTN_SETTINGS",
-          "Settings"
+          "设置"
         ]
       ]
     }
@@ -82,7 +82,7 @@
   "settings": [
     {
       "key": "range20",
-      "label": "Electric range when full, 20 °C",
+      "label": "20°C 满电纯电续航",
       "type": "number",
       "unit": "km",
       "default": 50,
@@ -103,13 +103,13 @@
     },
     {
       "key": "reserve",
-      "label": "Engine starts at",
+      "label": "发动机介入电量",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "Auto (learned)"
+          "自动学习"
         ],
         [
           "0",
@@ -155,27 +155,27 @@
     },
     {
       "key": "hybrid",
-      "label": "Hybrid system",
+      "label": "混合动力系统",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "Auto"
+          "自动"
         ],
         [
           "yes",
-          "Yes"
+          "是"
         ],
         [
           "no",
-          "No (12 V only)"
+          "否（仅 12 V 电池）"
         ]
       ]
     },
     {
       "key": "designKwh",
-      "label": "Battery size when new (gross)",
+      "label": "新电池总容量",
       "type": "number",
       "unit": "kWh",
       "default": 12,
@@ -195,7 +195,7 @@
     },
     {
       "key": "price",
-      "label": "Electricity price",
+      "label": "电价",
       "type": "number",
       "unit": "EUR/kWh",
       "default": 0.25,
@@ -239,7 +239,7 @@
     },
     {
       "key": "distUnit",
-      "label": "Distance unit",
+      "label": "距离单位",
       "type": "choice",
       "default": "km",
       "options": [
@@ -249,29 +249,29 @@
         ],
         [
           "mi",
-          "miles"
+          "英里"
         ]
       ]
     },
     {
       "key": "tempUnit",
-      "label": "Temperature unit",
+      "label": "温度单位",
       "type": "choice",
       "default": "c",
       "options": [
         [
           "c",
-          "Celsius"
+          "摄氏度"
         ],
         [
           "f",
-          "Fahrenheit"
+          "华氏度"
         ]
       ]
     },
     {
       "key": "poll",
-      "label": "Read charge every",
+      "label": "充电数据读取间隔",
       "type": "number",
       "unit": "s",
       "default": 15,
@@ -285,7 +285,7 @@
     },
     {
       "key": "sohDays",
-      "label": "Read battery health every",
+      "label": "电池健康读取间隔",
       "type": "number",
       "unit": "days",
       "default": 7,
@@ -297,55 +297,55 @@
     },
     {
       "key": "diagPage",
-      "label": "Diagnostics page (UDS replies)",
+      "label": "诊断页面（UDS 响应）",
       "type": "bool",
       "default": false
     },
     {
       "key": "theme",
-      "label": "Colour theme",
+      "label": "配色主题",
       "type": "choice",
       "default": "m_tricolour",
       "options": [
         [
           "m_red",
-          "M Red"
+          "M 红色"
         ],
         [
           "m_tricolour",
-          "M Tricolour"
+          "M 三色"
         ],
         [
           "ice",
-          "Ice White"
+          "冰晶白"
         ],
         [
           "amber",
-          "Night Amber"
+          "夜间琥珀"
         ]
       ]
     },
-    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
-     "options": [["full", "Full screen"], ["standard", "Standard"]]},
-    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
+    {"key": "layout", "label": "屏幕布局", "type": "choice", "default": "full",
+     "options": [["full", "全屏"], ["standard", "标准"]]},
+    {"key": "renderer", "label": "渲染器", "type": "choice", "default": "auto",
+     "options": [["auto", "GPU 60 帧（默认）"], ["software", "软件渲染"]]},
     {
       "key": "demo",
-      "label": "Demo data",
+      "label": "演示数据",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
-          "Auto"
+          "自动"
         ],
         [
           "on",
-          "Always"
+          "始终"
         ],
         [
           "off",
-          "Never"
+          "从不"
         ]
       ]
     }

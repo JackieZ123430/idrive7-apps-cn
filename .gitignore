@@ -24,3 +24,4 @@ dtc_scanner_*.json
 
 # Doom: Freedoom data is downloaded by the build (app.json "assets")
 apps/doom/*.wad
+kit/tools/.font-cache/
