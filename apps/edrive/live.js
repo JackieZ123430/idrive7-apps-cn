@@ -594,7 +594,7 @@ module.exports = function live(ctx, sh) {
     /** Battery power now: kW, what the pack does, V / A, a bar against the battery's limits and (room permitting) the last two minutes. */
     function renderPowerPanel(cv, t, d, x, y, w, h) {
         const pw = power(d, t), lim = limitsKw(d), r = x + w - 24, big = h >= 400;
-        G.panel(cv, t, x, y, w, h, 'Battery power now');
+        G.panel(cv, t, x, y, w, h, 'Live battery usage');
         const ky = y + (big ? 152 : 118);
         const vw = cv.text(pw.text, x + 24, ky, big ? 120 : 84, pw.col, { font: 'num' });
         cv.text('kW', x + 34 + vw, ky, big ? 38 : 30, t.dim, { font: 'bold' });
@@ -614,7 +614,6 @@ module.exports = function live(ctx, sh) {
 
     /** Battery: its power now (left; Battery health under it is eDrive's, main.js: 24, 360, 560, 152) and every cell. */
     function renderBattery(cv, t, d) {
-        renderPowerPanel(cv, t, d, 24, 44, 560, 300);
 
         // ---- every cell's voltage: the lowest and highest marked, scaled to the spread; the cells' temperature
         const x = 608, w = 968, r = x + w - 24;
@@ -663,10 +662,10 @@ module.exports = function live(ctx, sh) {
     }
 
     /** This drive: energy used, regen, net; what it went to (driving vs. climate); peaks. Wide (w >= 700) or tall. */
-    function renderTrip(cv, t, d, x, y0, w, h, foot) {
+    function renderTrip(cv, t, d, x, y0, w, h, foot, inBattery) {
         const r = x + w - 24;
         G.panel(cv, t, x, y0, w, h, 'This drive');
-        if (w < 700) return renderTripTall(cv, t, d, x, y0, w, h, foot);
+        if (w < 700) return renderTripTall(cv, t, d, x, y0, w, h, foot, inBattery);
         const tp = tripNow(d);
         const col = (cx, label, v, c) => {
             cv.text(label, cx, y0 + 72, 18, t.dim, { font: 'bold', spacing: 1.2 });
@@ -692,7 +691,7 @@ module.exports = function live(ctx, sh) {
             + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago') , x + 24, y0 + 168, 18, t.dim);
     }
     const tripNow = (d) => (d.demo ? { out: 2.84, regen: 0.61, charged: 0, climate: 0.48, peakOut: 61, peakIn: 24, since: Date.now() - 23 * 60000 } : trip);
-    function renderTripTall(cv, t, d, x, y0, w, h, foot) {
+    function renderTripTall(cv, t, d, x, y0, w, h, foot, inBattery) {
         const tp = tripNow(d), r = x + w - 24;
         const row = (y, label, v, c) => {
             cv.text(label, x + 24, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
@@ -701,7 +700,12 @@ module.exports = function live(ctx, sh) {
         };
         row(y0 + 84, 'USED', tp.out, t.text);
         row(y0 + 166, 'REGEN', tp.regen, GO);
-        row(y0 + 248, 'NET', tp.out - tp.regen, t.text);
+        if (inBattery) {
+            cv.text('IN BATTERY', x + 24, y0 + 248, 20, t.dim, { font: 'bold', spacing: 1.5 });
+            const kw2 = cv.text('kWh', r, y0 + 292, 22, t.dim, { align: 'right' });
+            const tw = cv.text(' / ' + inBattery[1], r - kw2 - 8, y0 + 292, 30, t.dim, { font: 'bold', align: 'right' });
+            cv.text(inBattery[0], r - kw2 - 8 - tw, y0 + 292, 48, t.text, { font: 'num', align: 'right' });
+        } else row(y0 + 248, 'NET', tp.out - tp.regen, t.text);
         const clim = Math.min(tp.climate || 0, tp.out), drive = Math.max(0, tp.out - clim);
         const cp2 = tp.out > 0.005 ? clim / tp.out : 0, dp = tp.out > 0.005 ? 1 - cp2 : 0;
         const pct = (f) => (tp.out > 0.005 ? Math.round(f * 100) + ' %' : '--'), yb = y0 + 340, sw = w - 48;
@@ -879,15 +883,20 @@ module.exports = function live(ctx, sh) {
         DIAG: ['unit', 'scan'],
         NAMES: { battery: 'Battery', unit: 'Battery unit', scan: 'Scan' },
         /** This drive (energy used, regen, net, split, peaks) into a panel at x, y, w, h. */
-        drawTrip(cv, t, x, y, w, h, foot) { renderTrip(cv, t, data(), x, y, w, h, foot); },
+        drawTrip(cv, t, x, y, w, h, foot, inBattery) { renderTrip(cv, t, data(), x, y, w, h, foot, inBattery); },
         /** The Battery page's power panel (kW, bar, the last two minutes) at x, y, w, h. */
         drawPower(cv, t, x, y, w, h) { renderPowerPanel(cv, t, data(), x, y, w, h); },
         /** A one-line "battery power now": label, kW and the bar (regen left, use right), no history. */
         drawPowerBar(cv, t, x, y, w) {
             const d = data(), pw = power(d, t);
-            cv.text('BATTERY POWER NOW', x, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
-            cv.text(pw.text + ' kW', x + w, y, 28, pw.col, { font: 'bold', align: 'right' });
-            powerBar(cv, t, x, y + 18, w, pw.kw, limitsKw(d));
+            const lim = limitsKw(d);
+            cv.text('LIVE BATTERY USAGE', x, y - 34, 20, t.dim, { font: 'bold', spacing: 1.5 });
+            // the kW above the bar, over the end of its fill (kept inside the bar's width)
+            const outMax = Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'));
+            const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
+            const kx = x + w * (inMax + G.clamp(G.isNum(pw.kw) ? pw.kw : 0, -inMax, outMax)) / (outMax + inMax);
+            cv.text(pw.text + ' kW', G.clamp(kx, x + 50, x + w - 50), y + 4, 28, pw.col, { font: 'bold', align: 'center' });
+            powerBar(cv, t, x, y + 18, w, pw.kw, lim);
         },
         /** The battery's power now as the pages show it: { kw, text, col, what } (kw null: no reading). */
         powerNow(t) { return power(data(), t); },

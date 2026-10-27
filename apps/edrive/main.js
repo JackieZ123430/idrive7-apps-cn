@@ -652,7 +652,7 @@ mgu.run({
             if (!has) cv.text(diagHint('no charge reading yet'), 48, 250, 24, t.dim);
             else if (d.stale) cv.text('charge read ' + ago(d.socAge), 48, 250, 24, t.warn);
             // the battery's power now: regen to the left, use to the right (live.js)
-            lv.drawPowerBar(cv, t, 48, 300, 672);
+            lv.drawPowerBar(cv, t, 48, 326, 672);
             const eu = d.engine ? model.enginePctPerKm(d.speed) : null;
             if (hold) {
                 // low battery: the car drives as a hybrid and keeps the charge at 5-11 %
@@ -701,7 +701,9 @@ mgu.run({
             }
 
             // ---- this drive (from the battery's own power readings, live.js)
-            lv.drawTrip(cv, t, 1172, 44, 404, 468, climFoot);
+            const holds = G.isNum(d.soh) ? settings.get('designKwh') * d.soh / 100 : settings.get('designKwh');
+            const inBat = has ? [G.fmt(holds * d.soc / 100, 1), G.fmt(holds, 1)] : ['--', G.fmt(holds, 1)];
+            lv.drawTrip(cv, t, 1172, 44, 404, 468, climFoot, inBat);
         }
 
         /** Battery health (capacity vs. new), energy in the pack now and its temperature - on the Battery page, under the cells. */
@@ -711,17 +713,20 @@ mgu.run({
             const now = G.isNum(cap) && G.isNum(d.soc) ? cap * d.soc / 100 : null;  // energy in the pack right now
             G.panel(cv, t, x, y, w, h, 'Battery health');
             const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
-            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', x + 24, y + 118, 64, hc, { font: 'num' });
-            cv.text(G.isNum(soh) ? '%' : diagHint('not read yet'), x + 32 + hw, y + 118, G.isNum(soh) ? 26 : 18, t.dim, { font: 'bold' });
+            const tall = h >= 300, hy = y + (tall ? 190 : 118);
+            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', x + 24, hy, tall ? 110 : 64, hc, { font: 'num' });
+            cv.text(G.isNum(soh) ? '%' : diagHint('not read yet'), x + 32 + hw, hy, G.isNum(soh) ? (tall ? 36 : 26) : 18, t.dim, { font: 'bold' });
+            if (tall && G.isNum(soh)) cv.text('of a new battery', x + 24, hy + 40, 22, t.dim);
             // HV battery temperature (the car's own value): cold packs give less range and charge slower
             const bt = d.batt && d.batt.avg, btc = !G.isNum(bt) ? t.dim : bt < 5 || bt > 45 ? t.warn : t.text;
             const r = x + w - 24, line = (yy, label, val, c) => {
                 const vw2 = cv.text(val, r, yy, 22, c || t.text, { font: 'bold', align: 'right' });
                 cv.text(label, r - vw2 - 14, yy, 18, t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
             };
-            line(y + 78, 'HOLDS', G.isNum(cap) ? G.fmt(cap, 1) + ' kWh' : '--');
-            line(y + 108, 'IN IT NOW', G.isNum(now) ? G.fmt(now, 1) + ' kWh' : '--');
-            line(y + 138, 'TEMP', G.isNum(bt) ? Math.round(T(bt)) + (F() ? '°F' : '°C') : '--', btc);
+            const ly = tall ? [y + 340, y + 382, y + 424] : [y + 78, y + 108, y + 138];
+            line(ly[0], 'HOLDS', G.isNum(cap) ? G.fmt(cap, 1) + ' kWh' : '--');
+            line(ly[1], 'IN IT NOW', G.isNum(now) ? G.fmt(now, 1) + ' kWh' : '--');
+            line(ly[2], 'TEMP', G.isNum(bt) ? Math.round(T(bt)) + (F() ? '°F' : '°C') : '--', btc);
         }
 
         const pad = (n) => (n < 10 ? '0' : '') + n;
@@ -900,7 +905,8 @@ mgu.run({
             if (sent.length) cv.text('CAR SHOWS  ' + sent.map(([n, v]) => n + ' ' + v).join('  ·  '), x0 + 24, 444, 19, t.dim, { font: 'bold', spacing: 0.5 });
             // learned range vs. the range at the rate measured lately
             const kmTxt = (km) => (G.isNum(km) && has ? Math.round(D(km)) + ' ' + dU() : '--');
-            cv.text('LEARNED  ' + kmTxt(e.mid) + '     AT THIS RATE  ' + kmTxt(rr), x0 + 24, 486, 24, t.text, { font: 'bold', spacing: 1 });
+            cv.text('RANGE AT THIS RATE', x0 + 24, 486, 22, t.dim, { font: 'bold', spacing: 1.5 });
+            cv.text(kmTxt(rr), x0 + w0 - 24, 490, 40, G.isNum(rr) ? t.text : t.dim, { font: 'bold', align: 'right' });
         }
 
         function render() {
@@ -912,7 +918,7 @@ mgu.run({
             if (isLive(pg[page])) {
                 const own = d;
                 d = lv.draw(pg[page], cv, t);
-                if (pg[page] === 'battery') renderHealth(cv, t, own, 24, 360, 560, 152);
+                if (pg[page] === 'battery') renderHealth(cv, t, own, 24, 44, 560, 468);
             }
             else if (pg[page] === 'diag') renderDiag(cv, t, d);
             else if (pg[page] === 'signals') renderSignals(cv, t, d);
