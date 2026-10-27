@@ -28,6 +28,7 @@ const { Recorder, play } = require('./record');
 const { Canvas } = require('./canvas');
 const { RenderClient } = require('./renderd');
 const G = require('./gauges');
+const { drawCredit } = require('./credits');
 
 /* HMI geometry on the 1920 x 720 centre display (measured on the unit's HMI) */
 const HMI = {
@@ -223,6 +224,13 @@ class Display {
      */
     present(name, r, softImage) {
         if (!(r instanceof Recorder)) return softImage(name, r);
+        // Standard/software layout: keep the rightmost 96 px free for the DEMO badge.
+        // Full-screen GPU layout draws it below the native status strip in _drawChrome.
+        if (!(r.chrome && this.active() && this.place.full) && !r._cnStamped) {
+            r.xf().noclip();
+            drawCredit(r, r.w - 96, 25);
+            r._cnStamped = true;
+        }
         if (this.active()) {
             let out = r;
             if (this.place.full && r.chrome) {
@@ -339,6 +347,7 @@ class Display {
         // the column under them is covered, so the HMI's own bar doesn't show at the bottom left
         c.clip(sx, 0, W - sx, HMI.status.h).clear(0).noclip();
         if (hx > 0) c.clip(0, 0, hx, HMI.barTop - pl.y).clear(0).noclip();
+        drawCredit(c, W - 18, FULL.headH + 17);
         r.xf(1, 0, 0).append(c).xf();
     }
 
@@ -382,7 +391,7 @@ class Display {
         let x = HMI.btn.x;
         this._btns = (this.screen.buttons || []).map((b) => {
             const label = this.labels[b[0]] != null ? this.labels[b[0]] : String(b[1] || b[0]);
-            const w = Math.round(m.textWidth(label.replace(/[^\x20-\x7e]/g, ''), HMI.btn.size, { font: 'label' }) * HMI.btn.k) + HMI.btn.pad;
+            const w = Math.round(m.textWidth(label, HMI.btn.size, { font: 'label' }) * HMI.btn.k) + HMI.btn.pad;
             const r = { id: b[0], label, x, w };
             x += w;
             return r;

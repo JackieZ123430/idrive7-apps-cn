@@ -11,7 +11,7 @@
 #   cd /path/to/usb/mgu-custom-apps && sh deploy-car.sh check
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-KIT=$(dirname "$HERE")/dist/mgu-custom-apps
+KIT=${KIT:-$(dirname "$HERE")/dist/mgu-custom-apps}   # Chinese kit: KIT=dist/mgu-custom-apps-zh-CN
 : "${HU:?set HU=root@<head unit address>}"
 DEST=${DEST:-/var/opt/mgu-custom-apps}
 CMD=${1:-check}

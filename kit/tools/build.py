@@ -17,6 +17,7 @@ import json, os, re, shutil, sys, tarfile, uuid
 from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pack_data  # noqa: E402
+from localize import unicode_resources, localize_spec, load_locale, languages
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -112,9 +113,8 @@ def sid(app, key):
 
 
 def hmi_text(s):
-    """Text for the HMI's own components: it shows non-ASCII as mojibake ('deg C' -> 'A-circumflex deg C'),
-    so the degree sign is dropped and other non-ASCII characters removed (as mgu.js hmiText)."""
-    return re.sub(r'[^\x20-\x7e]', '', str(s).replace('°', ''))
+    """Keep Unicode: unicode_resources converts these cells to StringId before packaging."""
+    return str(s)
 
 
 def setting_options(s):
@@ -151,7 +151,7 @@ def fetch_assets(adir, assets):
         open(dst, 'wb').write(data)
 
 
-def build_ui(spec):
+def build_ui(spec, language='en'):
     """screens/settings -> (application.xml, uiDescription.json, strings, screen meta)"""
     app = spec['id']
     nid = Ids()
@@ -209,6 +209,23 @@ def build_ui(spec):
                 strings[sid(app, 'SET_' + s['key'])] = s['label']
                 items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
                                                         'Text2ndRow': {'value': '', 'type': 'Text'}}]))
+        # Chinese builds only: credit for the Chinese translation (localize.py sets the Chinese title)
+        if language == 'zh-CN':
+            credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
+            strings[credit_title] = 'Translation by Douyin 小白科技杂物社 / BiliBili 小白151'
+            strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
+            items.append(comp('tworow', 'CN_CREDITS', rows=[{
+                'Text1stRow': {'value': credit_title, 'type': 'StringId'},
+                'Text2ndRow': {'value': credit_link, 'type': 'StringId'},
+            }]))
+        # the project's own credit, last row
+        repo_title, repo_link = sid(app, 'REPO_CREDITS_TITLE'), sid(app, 'REPO_CREDITS_LINK')
+        strings[repo_title] = 'iDrive 7 custom apps'
+        strings[repo_link] = 'GitHub cauliflowermossgrape · github.com/cauliflowermossgrape/idrive7-apps'
+        items.append(comp('tworow', 'REPO_CREDITS', rows=[{
+            'Text1stRow': {'value': repo_title, 'type': 'StringId'},
+            'Text2ndRow': {'value': repo_link, 'type': 'StringId'},
+        }]))
 
     for scr in screens:
         cid = nid()
@@ -305,8 +322,55 @@ def make_icon(spec, out):
     os.system(f'node "{os.path.join(HERE, "make_icon.js")}" "{spec.get("iconGlyph", spec["title"][:2])}" "{out}"')
 
 
-def build(app_id):
+WIDGET_COMPONENT_ID = 501
+
+
+def build_start_widget(spec, app_id, icon_src, out):
+    """app.json "startWidget" -> rhmiDataStartWidget/ (installed format), the home-screen widget.
+
+    Same shape as BMW's own widgets on this firmware (Drive Recorder, Weather, News): a logical
+    container with one startWidget component whose "Widget" cell names an HMI layout template.
+    MainApp finds the folder by itself and offers the widget in the home screen's widget list;
+    the app fills each placed widget (one "spawn" per widget) at runtime (kit/runtime/mgu.js)."""
+    sw = spec['startWidget']
+    name = sw.get('name', spec['title'])
+    comp = app_id.upper() + '_WIDGET'
+    sid_name = sid(app_id, 'WIDGET_NAME')
+    icon = app_id + '_widget_icon.png'
+    wuuid = u(app_id, 'start-widget')
+    shutil.rmtree(out, ignore_errors=True)
+    for d in ('uiDescription', 'strings', 'resources'):
+        os.makedirs(os.path.join(out, d))
+    app_json = {'schemaVersion': '1.3.0', 'application': {
+        'uuid': wuuid, 'type': 'StartWidget', 'name': app_id + '_widget', 'vendor': spec.get('vendor', 'custom'),
+        'version': '1.0', 'defaultLanguage': 'en_GB',
+        'stringBundleUuid': u(app_id, 'sw-strings'), 'resourceBundleUuid': u(app_id, 'sw-resources'), 'entryPoints': [],
+        'entryPointsStringBundleUuid': u(app_id, 'sw-ep-strings'), 'entryPointsResourceBundleUuid': u(app_id, 'sw-ep-resources'),
+        'externalDialogStringBundleUuid': u(app_id, 'sw-ed-strings'),
+        'bookmarkUuidPool': [u(app_id, 'sw-bookmarks'), 1, 2, 3, 4, 5, 6, 7]}}
+    json.dump(app_json, open(os.path.join(out, 'application.json'), 'w', encoding='utf-8', newline='\n'), separators=(',', ':'))
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<application>\n'
+           '    <container id="500" type="logical">\n        <layoutGroup id="502">\n'
+           f'            <component id="{WIDGET_COMPONENT_ID}" type="startWidget">\n'
+           f'                <property id="7" value="{wuuid}"/>\n'
+           '            </component>\n        </layoutGroup>\n    </container>\n</application>\n')
+    open(os.path.join(out, 'uiDescription', 'application.xml'), 'w', encoding='utf-8', newline='\n').write(xml)
+    ui = {'schemaVersion': '1.3.0', 'containers': {'500': {'type': 'logical', 'name': 'startWidgetLogical', 'components': {
+        str(WIDGET_COMPONENT_ID): {'type': 'startWidget', 'name': comp,
+                                   'properties': {'UUID': {'value': wuuid, 'type': 'Text'}},
+                                   'cells': {'Widget': {'value': sw.get('layout', 'LT_Table_OnlineApps_DriveRecorderWidget'), 'type': 'Text'},
+                                             'SelectionName': {'value': sid_name, 'type': 'StringId'},
+                                             'SelectionIcon': {'value': icon, 'type': 'ResourceId'}}}}}}}
+    json.dump(ui, open(os.path.join(out, 'uiDescription', 'uiDescription.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
+    for lang in LANGS:
+        json.dump({sid_name: name}, open(os.path.join(out, 'strings', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
+    shutil.copy(icon_src, os.path.join(out, 'resources', icon))
+    return {'component': comp, 'layout': ui['containers']['500']['components'][str(WIDGET_COMPONENT_ID)]['cells']['Widget']['value']}
+
+
+def build(app_id, language='en'):
     spec = json.load(open(os.path.join(APPS, app_id, 'app.json'), encoding='utf-8'))
+    spec = localize_spec(spec, language)
     spec.setdefault('id', app_id)
     ver = spec['version']
     stage = os.path.join(DIST, app_id)
@@ -317,7 +381,8 @@ def build(app_id):
     os.makedirs(os.path.join(src, 'node_modules', 'oap-sdk'))
 
     manifest = manifest_for(json.loads(json.dumps(spec)))
-    xml, uidesc, strings, state_ids = build_ui(spec)
+    xml, uidesc, strings, state_ids = build_ui(spec, language)
+    unicode_resources(uidesc, strings, language)
     for lang, tbl in spec.get('strings', {}).items():
         strings.update(tbl)
 
@@ -364,9 +429,19 @@ def build(app_id):
             shutil.copytree(p, os.path.join(src, 'javascript', 'kit', f))
         else:
             shutil.copy(p, os.path.join(src, 'javascript', 'kit', f))
-    rt_spec = {k: spec.get(k) for k in ('id', 'title', 'version', 'screens', 'settings', 'config')}
+    if language == 'zh-CN':
+        # Retain localization authorship in the installed Chinese entry code as plain comments.
+        entry = os.path.join(src, 'javascript', 'app.js')
+        credit = ('// 中文汉化署名：抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430\n'
+                  '// 汉化仓库：https://github.com/JackieZ123430/idrive7-apps-cn\n')
+        with open(entry, 'rb') as file:
+            body = file.read()
+        with open(entry, 'wb') as file:
+            file.write(credit.encode('utf-8') + body)
+    rt_spec = {k: spec.get(k) for k in ('id', 'title', 'version', 'screens', 'settings', 'config', 'startWidget')}
     rt_spec['stateIds'] = state_ids
     json.dump(rt_spec, open(os.path.join(src, 'javascript', 'kit', 'app-spec.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
+    json.dump({'language': language, 'strings': load_locale(language)}, open(os.path.join(src, 'javascript', 'kit', 'locale.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(os.path.join(SDK, 'index.js'), os.path.join(src, 'node_modules', 'oap-sdk', 'index.js'))
     shutil.copy(os.path.join(SDK, 'package.json'), os.path.join(src, 'node_modules', 'oap-sdk', 'package.json'))
 
@@ -398,7 +473,7 @@ def build(app_id):
     json.dump(pj, open(os.path.join(pr, 'application.json'), 'w', encoding='utf-8', newline='\n'), indent=2)
     open(os.path.join(pr, 'uiDescriptions', 'ID7', 'application.xml'), 'w', encoding='utf-8', newline='\n').write(xml)
     json.dump(uidesc, open(os.path.join(pr, 'uiDescriptions', 'ID7', 'uiDescription.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
-    for lang in ('en_GB', 'en_US', 'de_DE'):
+    for lang in LANGS:
         json.dump(strings, open(os.path.join(pr, 'variantGroups', 'Common', 'texts', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     make_icon(spec, os.path.join(pr, 'variantGroups', 'Common', 'images', icon))
 
@@ -418,6 +493,9 @@ def build(app_id):
     for lang in LANGS:
         json.dump(strings, open(os.path.join(ir, 'strings', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(os.path.join(pr, 'variantGroups', 'Common', 'images', icon), os.path.join(ir, 'resources', icon))
+    if spec.get('startWidget'):
+        info = build_start_widget(spec, app_id, os.path.join(ir, 'resources', icon), os.path.join(stage, 'rhmiDataStartWidget'))
+        print('  home-screen widget: %s (%s)' % (info['component'], info['layout']))
 
     # --- installer helpers + metadata ---
     shutil.copytree(os.path.join(KIT, 'tools', 'oapgen'), os.path.join(stage, 'oapgen'))
@@ -428,8 +506,9 @@ def build(app_id):
     os.makedirs(DIST, exist_ok=True)
     bundle = os.path.join(DIST, f'{app_id}@{ver}.mgu')
     with tarfile.open(bundle, 'w:gz') as tf:
-        for n in ('meta.json', 'source', 'rhmiData', 'oapgen'):
-            tf.add(os.path.join(stage, n), arcname=n)
+        for n in ('meta.json', 'source', 'rhmiData', 'rhmiDataStartWidget', 'oapgen'):
+            if os.path.exists(os.path.join(stage, n)):
+                tf.add(os.path.join(stage, n), arcname=n)
     npm = os.path.join(DIST, f'{app_id}@{ver}.tgz')
     with tarfile.open(npm, 'w:gz') as tf:
         tf.add(src, arcname='package')
@@ -438,9 +517,14 @@ def build(app_id):
 
 
 def main():
-    ids = sys.argv[1:] or sorted(d for d in os.listdir(APPS) if os.path.exists(os.path.join(APPS, d, 'app.json')))
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--language', choices=languages(), default='en')
+    parser.add_argument('apps', nargs='*')
+    args = parser.parse_args()
+    ids = args.apps or sorted(d for d in os.listdir(APPS) if os.path.exists(os.path.join(APPS, d, 'app.json')))
     for i in ids:
-        build(i)
+        build(i, args.language)
 
 
 if __name__ == '__main__':

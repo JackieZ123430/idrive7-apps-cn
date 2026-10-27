@@ -17,7 +17,7 @@ function family(name) {
         const j = JSON.parse(fs.readFileSync(path.join(DIR, name + '.json'), 'utf8'));
         fam = j.sizes.map((s) => ({
             size: s.size, ascent: s.ascent, descent: s.descent, atlasW: s.atlasW, atlasH: s.atlasH,
-            glyphs: s.glyphs, _alpha: s.alpha, alpha: null,
+            glyphs: s.glyphs, _alpha: s.alpha, alpha: null, family: name, cacheKey: j.cacheKey || '',
         }));
     } catch (e) { fam = null; }
     families[name] = fam;
@@ -25,7 +25,9 @@ function family(name) {
 }
 
 /** Smallest baked size >= requested (downscaling looks better), else largest. */
-function get(name, size) {
+function get(name, size, text) {
+    // A shared CJK atlas avoids duplicating hundreds of glyphs in every numeric size.
+    if (text && /[\u3000-\u9fff\uff00-\uffef]/.test(text)) name = 'cjk';
     const fam = family(name) || family('label');
     if (!fam) return null;
     let best = null;

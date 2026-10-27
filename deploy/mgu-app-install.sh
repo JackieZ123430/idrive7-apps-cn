@@ -142,6 +142,11 @@ set_acls() {
         || setfacl -R -m g:5001:rX,g:12201:rwX,g:$u:rwX "$top/rhmiData" || warn "setfacl failed on rhmiData"
     find "$top/rhmiData" -type d -exec setfacl -d -m g:hmi_resourceaccess:rX,g:12201:rwX,g:$u:rwX {} \; 2>/dev/null \
         || find "$top/rhmiData" -type d -exec setfacl -d -m g:5001:rX,g:12201:rwX,g:$u:rwX {} \;
+    # home-screen widget (rhmiDataStartWidget): read by MainApp and the HMI, like rhmiData
+    if [ -d "$top/rhmiDataStartWidget" ]; then
+        setfacl -R -m g:hmi_resourceaccess:rX,g:12201:rwX,g:$u:rwX "$top/rhmiDataStartWidget" 2>/dev/null \
+            || setfacl -R -m g:5001:rX,g:12201:rwX,g:$u:rwX "$top/rhmiDataStartWidget" || warn "setfacl failed on rhmiDataStartWidget"
+    fi
 }
 
 custom_list() {    # custom_list add|del <id>  - maintain custom_apps.json
@@ -277,9 +282,13 @@ install_one() {
     done
 
     mkdir -p "$top"
-    rm -rf "$top/source" "$top/rhmiData" "$top/someipInterfaces"
+    rm -rf "$top/source" "$top/rhmiData" "$top/rhmiDataStartWidget" "$top/someipInterfaces"
     cp -a "$TMP/source" "$top/source" || die "copy source failed"
     cp -a "$TMP/rhmiData" "$top/rhmiData" || die "copy rhmiData failed"
+    # optional home-screen widget (app.json "startWidget")
+    if [ -d "$TMP/rhmiDataStartWidget" ]; then
+        cp -a "$TMP/rhmiDataStartWidget" "$top/rhmiDataStartWidget" || die "copy rhmiDataStartWidget failed"
+    fi
     for d in data kvs share security; do mkdir -p "$top/$d"; done
     # native platform modules, linked like the installer does
     mkdir -p "$top/source/node_modules"
@@ -305,6 +314,11 @@ install_one() {
     find "$top/someipInterfaces" -type f -exec chmod 640 {} \;
     find "$top/rhmiData" -type d -exec chmod 770 {} \;
     find "$top/rhmiData" -type f -exec chmod 660 {} \;
+    if [ -d "$top/rhmiDataStartWidget" ]; then
+        chown -Rh 12201:$u "$top/rhmiDataStartWidget"
+        find "$top/rhmiDataStartWidget" -type d -exec chmod 770 {} \;
+        find "$top/rhmiDataStartWidget" -type f -exec chmod 660 {} \;
+    fi
     # the app (uid/gid $u) writes data/ (settings, log) and rhmiData/resources
     # (its drawn graphics) through the group bits, like BMW's apps
     set_acls "$top" "$u"

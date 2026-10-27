@@ -19,6 +19,7 @@ const path = require('path');
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
+const { fitText } = require('./kit/text-layout');
 const { Diag, parseDtcReply, statusInfo, hex, NRC } = require('./kit/diag');
 const DEMO = require('./demo');
 
@@ -69,9 +70,9 @@ const variant = (a) => {
     const v = ids[hex(a)] ? SGBD[hex(a) + ' ' + ids[hex(a)]] : null;
     return v && /^[A-Za-z0-9_]+$/.test(v) ? v : null;
 };
-// the fonts are ASCII only
+// Normalize legacy German names, but preserve Unicode from translated/OEM text.
 const ascii = (s) => String(s).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/Ä/g, 'Ae')
-    .replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[^\x20-\x7e]/g, '');
+    .replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ß/g, 'ss').replace(/[\x00-\x1f\x7f]/g, '');
 // a summary where the texts for a unit family differ in wording but agree on the fault
 // (not an exact BMW text)
 const FAMILY = {
@@ -255,10 +256,7 @@ mgu.run({
 
         /** txt cut with "..." to at most max px wide */
         function fit(cv, txt, size, max, opt) {
-            txt = String(txt);
-            if (cv.textWidth(txt, size, opt) <= max) return txt;
-            while (txt.length > 4 && cv.textWidth(txt + '...', size, opt) > max) txt = txt.slice(0, -1);
-            return txt.trim() + '...';
+            return fitText(cv, txt, size, max, opt);
         }
 
         function tile(cv, t, x, label, value, sub, col) {

@@ -122,16 +122,27 @@ def md5(p):
 
 
 def main():
-    apps = sys.argv[1:] or sorted(d for d in os.listdir(os.path.join(ROOT, 'apps'))
+    import argparse
+    from localize import languages, package_version
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--language', choices=languages(), default='en')
+    parser.add_argument('apps', nargs='*')
+    args = parser.parse_args()
+    # English (the default) keeps the usual dist/mgu-custom-apps(.tar.gz); other languages get a suffix
+    name = 'mgu-custom-apps' + ('' if args.language == 'en' else '-' + args.language)
+    OUT = os.path.join(DIST, name)
+    archive = os.path.join(DIST, name + '.tar.gz')
+    apps = args.apps or sorted(d for d in os.listdir(os.path.join(ROOT, 'apps'))
                                   if os.path.isfile(os.path.join(ROOT, 'apps', d, 'app.json')))
     rd = pick_renderer()
 
     shutil.rmtree(OUT, ignore_errors=True)
     os.makedirs(os.path.join(OUT, 'apps'))
     for app in apps:
-        r = subprocess.run([sys.executable, os.path.join(ROOT, 'kit', 'tools', 'build.py'), app], cwd=ROOT)
+        r = subprocess.run([sys.executable, os.path.join(ROOT, 'kit', 'tools', 'build.py'), '--language', args.language, app], cwd=ROOT)
         if r.returncode: sys.exit('build of %s failed' % app)
         ver = json.load(open(os.path.join(ROOT, 'apps', app, 'app.json'), encoding='utf-8'))['version']
+        ver = package_version(ver, args.language)
         shutil.copyfile(os.path.join(DIST, '%s@%s.mgu' % (app, ver)), os.path.join(OUT, 'apps', '%s@%s.mgu' % (app, ver)))
     for src, dst in CAR_FILES:
         data = open(os.path.join(DEPLOY, src), 'rb').read().replace(b'\r\n', b'\n')
@@ -151,14 +162,14 @@ def main():
         ti.uid = ti.gid = 0; ti.uname = ti.gname = 'root'
         ti.mode = 0o755 if ti.isdir() or ti.name.endswith(('.sh', '/mgu-renderd', '.so')) else 0o644
         return ti
-    with tarfile.open(os.path.join(DIST, 'mgu-custom-apps.tar.gz'), 'w:gz') as tf:
+    with tarfile.open(archive, 'w:gz') as tf:
         tf.add(OUT, arcname='mgu-custom-apps', filter=mode)
     if hasattr(os, 'chmod'):
         for n in ('deploy-car.sh', 'mgu-app-install.sh') + (('mgu-renderd',) if rd else ()):
             os.chmod(os.path.join(OUT, n), 0o755)
     shutil.copyfile(os.path.join(DEPLOY, 'push-to-car.ps1'), os.path.join(DIST, 'push-to-car.ps1'))  # Windows: next to the .tar.gz
     print('kit: %s  (%s)' % (OUT, ' '.join(sorted(os.listdir(os.path.join(OUT, 'apps'))))))
-    print('     %s' % os.path.join(DIST, 'mgu-custom-apps.tar.gz'))
+    print('     %s' % archive)
 
 
 if __name__ == '__main__':
