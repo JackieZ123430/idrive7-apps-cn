@@ -742,10 +742,12 @@ mgu.run({
             const pl = cv.place;
             if (!pl) { parts[0](); return; }
             cv.scroll = true;
-            diagScroll.max = Math.max(0, parts.length * DIAG_STEP - (H - 44));
+            diagScroll.max = Math.max(0, parts.length * DIAG_STEP - (H + (cv.extra || 0) - 44));
             diagScroll.y = G.clamp(diagScroll.y, 0, diagScroll.max);
             const sy = G.smooth('diagScroll', diagScroll.y, 22);
-            cv.clip(0, 38, W, H - 38);
+            const extra = cv.extra;
+            cv.extra = 0;                // (each part is a page of its own height)
+            cv.clip(0, 38, W, H + extra - 38);
             parts.forEach((draw, i) => {
                 const oy = i * DIAG_STEP - sy;
                 if (oy > H || oy + DIAG_STEP < 0) return;
@@ -756,7 +758,8 @@ mgu.run({
                 for (let k = n0; k < cv.targets.length; k++) cv.targets[k].y += oy;
             });
             cv.noclip();
-            const vis = H - 44, bh = Math.max(40, vis * vis / (vis + diagScroll.max));
+            cv.extra = extra;
+            const vis = H + extra - 44, bh = Math.max(40, vis * vis / (vis + diagScroll.max));
             cv.roundRect(W - 9, 44 + (vis - bh) * (diagScroll.max ? sy / diagScroll.max : 0), 6, bh, 3, withAlpha('#ffffff', 0.3));
         }
 

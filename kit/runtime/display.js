@@ -48,6 +48,8 @@ const TILT = { 1: 'N', 2: 'N', 4: 'E', 5: 'E', 7: 'S', 8: 'S', 10: 'W', 11: 'W' 
 const PAGE = { w: 1600, h: 520 };
 // bar buttons that only turn pages (Next page, Previous page)
 const PAGER = ['BTN_PAGE', 'BTN_PREV'];
+// px between the header (and the screen's bottom) and a page with no bar under it
+const PAGE_GAP = 6;
 
 /* HMI geometry on the 1920 x 720 centre display (measured on the unit's HMI) */
 const HMI = {
@@ -469,6 +471,13 @@ class Display {
                 ox: HMI.left + Math.round((w - src.w * s) / 2 - src.x * s),
                 oy: Math.round(this.headH() + (ah - src.h * s) / 2 - src.y * s),
             };
+            // no bar under the page (the kit's, emptied): the page starts under the header and its panels
+            // reach down to the screen's bottom (extra: logical px below the app's 520, G.panel)
+            const spare = ah - 2 * PAGE_GAP - src.h * s;
+            if (!this.barH() && spare > 0) {
+                pl.oy = Math.round(this.headH() + PAGE_GAP - src.y * s);
+                pl.extra = Math.floor(spare / s);
+            }
         }
         this.place = pl;
         this.gpu.place(pl);
@@ -509,6 +518,7 @@ class Display {
         r.place = this.active() ? this.place : null;
         // the kit runs the screen: buttons drawn on the page (G.button) take the place of the bar's
         r.own = this.own() && this.active();
+        r.extra = r.own && this.place.extra ? this.place.extra : 0;
         return r;
     }
 

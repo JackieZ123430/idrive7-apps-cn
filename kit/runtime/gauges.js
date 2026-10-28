@@ -117,6 +117,8 @@ const col = (t, c, dflt) => (c ? t[c] || c : dflt);
 /* ---------------- panel ---------------- */
 /** Widget chrome in the OEM (G20 / MGU7) style; cached as a layer. */
 function panel(cv, t, x, y, w, h, title) {
+    // a panel down to the page's bottom goes on down to the screen's where there is room (cv.extra: display.js)
+    if (cv.extra && y + h >= 500) h += cv.extra;
     x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
     const L = layer(['panel', w, h, title || '', t.name].join('|'), w, h, (c) => drawPanel(c, t, 0, 0, w, h, title), cv.textScale);
     cv.blit(L, x, y);
