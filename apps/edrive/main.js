@@ -573,7 +573,13 @@ mgu.run({
 
         /* ---------- drawing ---------- */
         let page = 0;
-        const lv = startLive(ctx, { diag, reader, exclusive, live, page: () => pages()[page] });
+        // the climate's typical draw for this drive's totals while nothing better is known (the Energy page's estimate)
+        const climateKw = () => {
+            if (live.climate === false || live.climate == null) return 0;
+            const k = kwhPerPct();
+            return Math.max(0, (model.auxRate(live.ambient, k, live.climate).rate - model.auxRate(live.ambient, k, false).rate) * k);
+        };
+        const lv = startLive(ctx, { diag, reader, exclusive, live, climateKw, page: () => pages()[page] });
         const isLive = (p) => lv.PAGES.indexOf(p) >= 0 || lv.DIAG.indexOf(p) >= 0;
         // the first bar button: "Read now", on the live pages their own action (this drive's totals, the scan)
         let actionText = 'Read now';
