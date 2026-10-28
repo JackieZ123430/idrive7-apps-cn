@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, live battery power, cells and climate power, HV battery health (SOH) and energy, last charge, charge log, 12 V battery voltage and a home-screen widget",
-  "version": "2.4.9",
+  "version": "2.4.10",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -335,7 +335,7 @@
     },
     {
       "key": "gaugeKw",
-      "label": "Power gauge up to (until the car reports its limits)",
+      "label": "Power gauge up to",
       "type": "number",
       "unit": "kW",
       "default": 100,
@@ -345,21 +345,6 @@
         100,
         120,
         150
-      ]
-    },
-    {
-      "key": "powerPoll",
-      "label": "Read power every (0.1 = as fast as the car answers)",
-      "type": "number",
-      "unit": "s",
-      "default": 0.1,
-      "reset": 1,
-      "steps": [
-        0.1,
-        0.25,
-        0.5,
-        1,
-        2
       ]
     },
     {
@@ -482,7 +467,7 @@
     }
   ],
   "config": {
-    "comment": "HV battery values and the 12 V voltage are read with UDS ReadDataByIdentifier (0x22). Each value tries its candidates in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). 'ecu' on a candidate overrides battery.ecu (decimal: 7 = SME battery unit, 18 = DME engine unit). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong. F442 is the standard OBD 'control module voltage' (terminal 30, i.e. the 12 V battery). The live pages (live.js) read config.battery.fast (pack voltage and current, every powerPoll s) and config.battery.slow (cells, temperatures, limits, every slowPoll s): each a list of candidates { ecu (optional, decimal), did, fields }, every field { at, bytes, factor, offset, signed, min, max } on the same reply; the first that answers is used. powerSign: kW = V x A / 1000 x powerSign (+ = the battery gives power); if regen shows while accelerating, set it to 1. probes: climate-unit values (IHKA 0x78; with a factor, the climate's kW on the Energy page); scanKnown: identifiers the Scan page compares when a unit has no saved scan.",
+    "comment": "HV battery values and the 12 V voltage are read with UDS ReadDataByIdentifier (0x22). Each value tries its candidates in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). 'ecu' on a candidate overrides battery.ecu (decimal: 7 = SME battery unit, 18 = DME engine unit). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong. F442 is the standard OBD 'control module voltage' (terminal 30, i.e. the 12 V battery). The live pages (live.js) read config.battery.fast (pack voltage and current, as fast as the car answers) and config.battery.slow (cells, temperatures, limits, every slowPoll s): each a list of candidates { ecu (optional, decimal), did, fields }, every field { at, bytes, factor, offset, signed, min, max } on the same reply; the first that answers is used. powerSign: kW = V x A / 1000 x powerSign (+ = the battery gives power); if regen shows while accelerating, set it to 1. probes: climate-unit values (IHKA 0x78; with a factor, the climate's kW on the Energy page); scanKnown: identifiers the Scan page compares when a unit has no saved scan.",
     "battery": {
       "ecu": 7,
       "soc": [

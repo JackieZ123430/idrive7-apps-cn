@@ -3,8 +3,8 @@
  * eDrive's live pages - what the high-voltage battery is doing right now (from eDrive Live,
  * set up on the X5 xDrive45e, G05 PHEV; adjustable for other BMW plug-in hybrids in app.json).
  *
- *   Battery  power in / out of the pack now (kW = pack voltage x current, read every
- *            "powerPoll" s) on a bar against the battery's own discharge / charge limits, the
+ *   Battery  power in / out of the pack now (kW = pack voltage x current, read as fast
+ *            as the car answers) on a bar up to the "gaugeKw" setting and the charge limit, the
  *            last two minutes, cell temperature and coolant; every cell's voltage (the lowest
  *            and highest, the spread between them); this drive's energy used, regen, net, what
  *            it went to (driving vs. climate) and peaks
@@ -17,7 +17,7 @@
  *
  * The battery values come from the battery unit (SME) with UDS ReadDataByIdentifier over eDrive's
  * diagnostic link (sh.diag, sh.reader; one request at a time through sh.exclusive); identifiers
- * and scalings are in app.json "config.battery" (fast: read every powerPoll s, slow: every
+ * and scalings are in app.json "config.battery" (fast: read as fast as the car answers, slow: every
  * slowPoll s while a live page or the widget is shown). Speed, engine, climate and comfort states
  * are eDrive's (sh.live, from SOME/IP).
  *
@@ -35,6 +35,7 @@ const W = 1600, H = 520;
 const GO = '#2fd27a';
 const IDLE_KW = 0.3;              // below this either way the pack is idle
 const SHOWN_MS = 3000;            // the screen counts as shown when drawn this recently
+const POWER_S = 0.1;              // power read while shown: as fast as the car answers
 const BG_POWER_S = 2;             // power read in the background (drive totals) at most this often
 const TRACE_S = 120;              // power trace on the Battery page
 const SEAT_KW = [0, 0.04, 0.07, 0.1];   // seat heating per level 0..3 (estimate)
@@ -155,7 +156,7 @@ module.exports = function live(ctx, sh) {
     const KW_KEEP = 15000;           // a missed power read: the last value stays (dimmed) this long
     function onPower(kw, now) {
         if (live.kwT && G.isNum(live.kw)) {
-            const h = Math.min(now - live.kwT, 3 * Math.max(BG_POWER_S, settings.get('powerPoll')) * 1000) / 3600000;
+            const h = Math.min(now - live.kwT, 3 * Math.max(BG_POWER_S, POWER_S) * 1000) / 3600000;
             const moving = G.isNum(L.speed) && L.speed > 1;
             if (kw > 0) {
                 trip.out += kw * h;
@@ -186,7 +187,7 @@ module.exports = function live(ctx, sh) {
         if (now - perf.t < 30000) return;
         if (perf.n && shown()) {
             log.info('power reads: ' + (perf.n / ((now - perf.t) / 1000)).toFixed(1) + '/s, ' + Math.round(perf.ms / perf.n) + ' ms each, queued '
-                + Math.round(perf.wait / perf.n) + ' ms avg / ' + perf.maxWait + ' ms max, poll ' + settings.get('powerPoll') + ' s');
+                + Math.round(perf.wait / perf.n) + ' ms avg / ' + perf.maxWait + ' ms max, poll ' + POWER_S + ' s');
         }
         Object.assign(perf, { n: 0, ms: 0, wait: 0, maxWait: 0, t: now });
     }
@@ -228,7 +229,7 @@ module.exports = function live(ctx, sh) {
     let powerTimer = null;
     function schedulePower() {
         clearTimeout(powerTimer);
-        const s = shown() ? settings.get('powerPoll') : Math.max(BG_POWER_S, settings.get('powerPoll'));
+        const s = shown() ? POWER_S : Math.max(BG_POWER_S, POWER_S);
         // 0.1 s: as fast as the battery unit answers (one read waits for the last)
         powerTimer = setTimeout(() => readPower().then(schedulePower, schedulePower), Math.max(20, s * 1000 - (s <= 0.1 ? 1000 : 0)));
     }
@@ -315,7 +316,7 @@ module.exports = function live(ctx, sh) {
     }
     diag.on('available', (a) => { if (a) readSlow(); });
     scheduleSlow();
-    settings.onChange((k) => { if (k === 'powerPoll') schedulePower(); if (k === 'slowPoll') scheduleSlow(); });
+    settings.onChange((k) => { if (k === 'slowPoll') scheduleSlow(); });
 
     /* ---------- identifier scan (Scan page) ----------
      * Asks one control unit ("scanUnit": the battery unit, or the IHKA climate unit that runs the HV
@@ -556,7 +557,7 @@ module.exports = function live(ctx, sh) {
 
     /** Centre-zero power bar: regen / charge to the left, drive to the right, scaled to the limits. */
     function powerBar(cv, t, x, y, w, kw, lim) {
-        const outMax = Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'));
+        const outMax = settings.get('gaugeKw');
         const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
         const span = outMax + inMax, x0 = x + w * inMax / span, h = 30;
         const X = (v) => x0 + G.clamp(v, -inMax, outMax) / span * w;
@@ -573,7 +574,7 @@ module.exports = function live(ctx, sh) {
         const lbl = (v) => G.fmt(v, 0) + ' kW';
         const inLim = lim && G.isNum(lim.in) && lim.in >= 15;
         cv.text((inLim ? 'REGEN MAX ' : '') + '-' + lbl(inMax), x, y + h + 30, 18, inLim ? GO : t.dim, { font: 'bold' });
-        cv.text((lim && G.isNum(lim.out) ? 'BATTERY MAX ' : '') + lbl(outMax), x + w, y + h + 30, 18, t.dim, { font: 'bold', align: 'right' });
+        cv.text(lbl(outMax), x + w, y + h + 30, 18, t.dim, { font: 'bold', align: 'right' });
     }
 
     /**
@@ -815,7 +816,7 @@ module.exports = function live(ctx, sh) {
      * The layout draws its own title ("eDrive") above the image, so the image leaves room for it. */
     const wcan = {};
     function widgetBar(cv, t, x, y, w, h, kw, lim) {
-        const outMax = Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'));
+        const outMax = settings.get('gaugeKw');
         const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
         const span = outMax + inMax, x0 = x + w * inMax / span;
         const X = (v) => x0 + G.clamp(v, -inMax, outMax) / span * w;
@@ -832,7 +833,7 @@ module.exports = function live(ctx, sh) {
     const wtext = {};
     function widgetCells(inst) {
         const t = ctx.theme(), d = data(), pw = power(d, t), lim = limitsKw(d);
-        const max = pw.kw > 0 ? Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'))
+        const max = pw.kw > 0 ? settings.get('gaugeKw')
             : Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
         const on = !inst.big;
         const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip;
@@ -915,7 +916,7 @@ module.exports = function live(ctx, sh) {
             const lim = limitsKw(d);
             cv.text('LIVE BATTERY USAGE', x, y - 34, 20, t.dim, { font: 'bold', spacing: 1.5 });
             // the kW above the bar, over the end of its fill (kept inside the bar's width)
-            const outMax = Math.max(20, lim && G.isNum(lim.out) ? lim.out : settings.get('gaugeKw'));
+            const outMax = settings.get('gaugeKw');
             const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
             const kx = x + w * (inMax + G.clamp(G.isNum(pw.kw) ? pw.kw : 0, -inMax, outMax)) / (outMax + inMax);
             cv.text(pw.text + ' kW', G.clamp(kx, x + 50, x + w - 50), y + 4, 28, pw.col, { font: 'bold', align: 'center' });
