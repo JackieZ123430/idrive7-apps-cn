@@ -59,6 +59,7 @@ const HMI = {
     btn: { x: 132, pad: 180, size: 40, k: 1.465 },
     left: 84,                                   // the HMI's back arrow column (x 0..84): kept see-through
     barTop: 596,                                // top of the HMI's own button bar (its 2 px edge line; body from 600)
+    colEnd: 530,                                // the back arrow column shows the HMI down to here (home, back arrow)
     headBg: '#000000',                          // the HMI's title / status strip
     status: { x: 1340, h: 76 },                 // status icons top right (notifications .. clock)
 };
@@ -590,9 +591,10 @@ class Display {
         const focus = btns.findIndex((b) => b.id === this.focused);
         if (btns.length && this.barH()) G.menuBar(c, t, 0, by, W, FULL.barH, btns, focus, 'slim', flash);
         // the HMI's status icons and its back arrow column (home button, back arrow) show through;
-        // the column under them is covered, so the HMI's own bar doesn't show at the bottom left
+        // the column under them is covered, so the HMI's own bar doesn't show at the bottom left, nor the
+        // mark the HMI draws above it when its bar is wider than the screen (eDrive's "Reset drive totals")
         c.clip(sx, 0, W - sx, HMI.status.h).clear(0).noclip();
-        if (hx > 0) c.clip(0, 0, hx, HMI.barTop - pl.y).clear(0).noclip();
+        if (hx > 0) c.clip(0, 0, hx, HMI.colEnd - pl.y).clear(0).noclip();
         drawCredit(c, W - 18, FULL.headH + 17);
         r.xf(1, 0, 0).append(c).xf();
     }
