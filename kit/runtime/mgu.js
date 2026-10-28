@@ -524,7 +524,12 @@ async function runInner(impl) {
         /** Show a sheet (sheet.js) over the page; false where it can't be (software path, other renderers). */
         sheet(sh) { return display.openSheet(sh); },
         /** hideButton(id): leave bar button id out where the kit runs the screen (its job is on the page there). */
-        hideButton(id) { display.ownHidden.add(id); display._btns = null; },
+        hideButton(id) { display.hideButton(id); },
+        /**
+         * onScroll(fn): fn(dy) scrolls a page drawn with cv.scroll = true by dy px (+ = further down), from a
+         * finger dragged on it or the controller turned while on it; returns false when already at that end.
+         */
+        onScroll(fn) { display.onScroll = fn; },
         /** The surface to draw one frame on (record.js Recorder, reused): pass it to ui.image. */
         canvas(w, h) { return display.canvas(w, h); },
         /**

@@ -255,6 +255,7 @@ mgu.run({
 
         function drawLog(cv, t) {
             G.panel(cv, t, 24, 44, 760, 468, 'Recent upshifts');
+            G.button(cv, t, 784 - 20 - 180, 56, 180, 40, 'Reset max', resetMax, { key: 'reset' });
             const up = shifts.slice(0, 9);
             if (!up.length) cv.text('No shifts yet - go and use the rev range.', 48, 189, 26, t.dim);
             up.forEach((s, i) => {
@@ -309,10 +310,13 @@ mgu.run({
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
         ctx.onTab((i) => i !== page && flip());
-        ui.onClick('BTN_RESET', () => {
+        // Reset max: on the Shift log page, or the bar's button
+        function resetMax() {
             peakRpm = 0; peakRpmT = 0; sessionRpm = 0; peakSpeed = 0; limiterHits = 0; shifts = []; lastShift = null;
             log.info('peaks reset'); return render();
-        });
+        }
+        ui.onClick('BTN_RESET', resetMax);
+        ctx.hideButton('BTN_RESET');
         // every screen refresh (60 fps) with the GPU renderer; 15 fps in software (PNG frames)
         ctx.loop('MAIN', 15, render);
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));

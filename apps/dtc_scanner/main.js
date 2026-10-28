@@ -213,7 +213,7 @@ mgu.run({
         }
 
         let clearArmed = null;
-        const clearLabel = () => ui.text('BTN_CLEAR', clearArmed ? 'Yes, clear' : 'Clear all');
+        const clearLabel = () => { changed(); return ui.text('BTN_CLEAR', clearArmed ? 'Yes, clear' : 'Clear all'); };
         async function doClear() {
             if (busy) return;
             const targets = scan ? scan.ecus.filter((e) => e.dtcs.some((d) => d.mem === 'fault')) : [];
@@ -249,8 +249,10 @@ mgu.run({
 
         /* ---------- drawing ---------- */
         let page = 0;
+        let only = null;                 // a control unit tapped on the Control units page: the Faults page lists its faults alone
         const faults = () => (scan ? [].concat(...scan.ecus.map((e) => e.dtcs.map((d) => Object.assign({ addr: e.addr }, d)))) : []);
-        const pageCount = () => Math.max(1, Math.ceil(faults().length / PER_PAGE)) + 2;
+        const listed = () => (only === null ? faults() : faults().filter((d) => d.addr === only));
+        const pageCount = () => Math.max(1, Math.ceil(listed().length / PER_PAGE)) + 2;
         const when = (ms) => { const d = new Date(ms); const p = (n) => String(n).padStart(2, '0'); return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
         const ccList = () => (scan && scan.demo ? DEMO.cc : Array.from(cc.entries()).map(([id, m]) => Object.assign({ id }, m, ccNames.get(id) || {})));
 
@@ -282,8 +284,11 @@ mgu.run({
             tile(cv, t, 1194, 'Check Control', String(c), 'messages', c ? t.warn : GO);
         }
 
-        function listPanel(cv, t, title) {
+        function listPanel(cv, t, title, buttons) {
             G.panel(cv, t, 24, 176, 1552, 336, title);
+            // the page's buttons right after its title (where the kit runs the screen; else the bar's)
+            let bx = 42 + cv.textWidth(String(title), 26, { font: 'bold' }) + 28;
+            (buttons || []).forEach((b) => { bx += G.button(cv, t, bx, 188, 0, 40, b.label, b.run, b) + 12; });
             let right = msg;
             if (!right && scan) right = 'Last scan ' + when(scan.at);
             if (phase === 'scanning' || phase === 'clearing') {
@@ -298,8 +303,13 @@ mgu.run({
         }
 
         function drawFaults(cv, t) {
-            const f = faults(), pages = Math.max(1, Math.ceil(f.length / PER_PAGE));
-            listPanel(cv, t, 'Faults' + (pages > 1 ? '  ' + (page + 1) + '/' + pages : ''));
+            const f = listed(), pages = Math.max(1, Math.ceil(f.length / PER_PAGE));
+            const busy = phase === 'scanning' || phase === 'clearing';
+            listPanel(cv, t, (only === null ? 'Faults' : 'Faults  ' + ecuName(only)) + (pages > 1 ? '  ' + (page + 1) + '/' + pages : ''), [
+                { label: phase === 'scanning' ? 'Scanning...' : scan ? 'Scan again' : 'Scan now', run: () => doScan(), key: 'scan', busy },
+                { label: clearArmed ? 'Yes, clear' : 'Clear all', run: () => doClear(), key: 'clear', busy: busy || !faults().length, color: clearArmed ? t.crit : null },
+                only !== null && { label: 'All units', run: () => { only = null; page = 0; changed(); }, key: 'all' },
+            ].filter(Boolean));
             if (!scan) {
                 cv.text(phase === 'scanning' ? 'Scanning...' : 'Press "Scan now" (ignition on)', 800, 369, 32, t.dim, { align: 'center' });
                 return;
@@ -354,6 +364,8 @@ mgu.run({
                 cv.text(fit(cv, ecuName(e.addr), 22, cw - 120, { font: 'bold' }), x + 18, y + (e.nrc ? 23 : 32), 22, t.text, { font: 'bold' });
                 if (e.nrc) cv.text(NRC[e.nrc] || 'NRC ' + hex(e.nrc), x + 18, y + 44, 20, t.dim);
                 cv.text(n ? n + (n === 1 ? ' fault' : ' faults') : 'OK', x + cw - 12, y + 32, 22, col, { align: 'right', font: 'bold' });
+                // tapped (or pressed with the controller): the Faults page with this unit's faults alone
+                if (cv.own) cv.target(x, y, cw, ch - 6, () => { only = e.addr; page = 0; changed(); }, 'ecu' + e.addr, 6);
             });
         }
 
@@ -373,6 +385,9 @@ mgu.run({
 
         ui.onClick('BTN_SCAN', () => { doScan(); });
         ui.onClick('BTN_CLEAR', () => { doClear(); });
+        // on the Faults page where the kit runs the screen
+        ctx.hideButton('BTN_SCAN');
+        ctx.hideButton('BTN_CLEAR');
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pageCount(); changed(); });
         // tabs: Faults (opened again: its next page of faults), Check Control, Control units
         ctx.onTab((i) => {

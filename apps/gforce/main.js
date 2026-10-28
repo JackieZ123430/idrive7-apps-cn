@@ -147,6 +147,7 @@ mgu.run({
 
             // session peaks
             G.panel(cv, t, 1092, 44, 484, 468, 'Session peaks');
+            G.button(cv, t, 1576 - 20 - 180, 56, 180, 40, 'Reset max', act, { key: 'reset' });
             peakBox(cv, t, 1116, 116, 'ACCEL', S.peak.acc, R.acc);
             peakBox(cv, t, 1346, 116, 'BRAKE', S.peak.brk, R.brk);
             peakBox(cv, t, 1116, 255, 'LEFT', S.peak.left, R.left);
@@ -161,6 +162,7 @@ mgu.run({
         function drawRecords(cv, t) {
             const R = car.data().demo ? demoRec : rec;
             G.panel(cv, t, 24, 44, 1552, 468, 'All-time records');
+            G.button(cv, t, 1576 - 20 - 200, 56, 200, 40, clearArmed ? 'Yes, clear' : 'Delete all', act, { key: 'clear', color: clearArmed ? t.crit : null });
             const rows = [['acc', 'Hardest launch', 'g'], ['brk', 'Hardest stop', 'g'], ['left', 'Left-hander', 'g'], ['right', 'Right-hander', 'g'], ['comb', 'Combined', 'g'], ['vmax', 'Top speed', mph() ? 'mph' : 'km/h']];
             rows.forEach(([k, label, u], i) => {
                 const col = i % 2, row = Math.floor(i / 2), x = 48 + col * 760, y = 135 + row * 123;
@@ -190,7 +192,8 @@ mgu.run({
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
         ctx.onTab((i) => i !== page && flip());
-        ui.onClick('BTN_ACTION', () => {
+        // Reset max (G-force) / Delete all, pressed twice (Records): on the page, or the bar's button
+        function act() {
             if (page === 0) { newSession(); return render(); }
             if (!clearArmed) { clearArmed = setTimeout(() => { clearArmed = null; actionLabel(); }, 5000); return actionLabel(); }
             clearTimeout(clearArmed); clearArmed = null;
@@ -198,7 +201,9 @@ mgu.run({
             Object.keys(R).forEach((k) => delete R[k]);
             if (R === rec) saveSoon();
             actionLabel(); return render();
-        });
+        }
+        ui.onClick('BTN_ACTION', act);
+        ctx.hideButton('BTN_ACTION');
         // every screen refresh (60 fps) with the GPU renderer; 10 fps in software (PNG frames)
         ctx.loop('MAIN', 10, render);
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));

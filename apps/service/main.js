@@ -219,7 +219,6 @@ mgu.run({
         }
 
         /* ---------- an item's card (drawn by the renderer over the page, kit sheet) ---------- */
-        let rowsShown = [];                      // the list rows on screen: { i, y, h } (for taps)
         function openCard(i) {
             const it = items()[i];
             if (!it) return false;
@@ -273,7 +272,8 @@ mgu.run({
             tile(cv, t, 1198, 378, 'Due now', String(red), 'items', red ? t.crit : GO);
             G.panel(cv, t, 24, 176, 1552, 336, 'Service requirements' + (its.length > PER_PAGE ? '  ' + (Math.floor(sel / PER_PAGE) + 1) + '/' + Math.ceil(its.length / PER_PAGE) : ''));
             // the bottom line: an item's details, or what the last button did (reset)
-            const line = hint ? hint.name + ':  ' + hint.text : msg;
+            // (where the kit runs the screen the item's card shows its hint and the reset's progress)
+            const line = cv.own ? '' : hint ? hint.name + ':  ' + hint.text : msg;
             if (line) {
                 cv.roundRect(40, 470, 1520, 38, 8, withAlpha(t.accent, 0.12));
                 cv.text(fit(cv, line, 22, 1490), 56, 496, 22, t.text);
@@ -284,11 +284,11 @@ mgu.run({
             }
             const per = line ? PER_PAGE - 1 : PER_PAGE;          // the bottom line takes the last row
             const first = Math.floor(sel / per) * per;
-            rowsShown = [];
             its.slice(first, first + per).forEach((it, i) => {
                 const y = 232 + i * 55, col = COL(t, it.colour);
-                rowsShown.push({ i: first + i, y: y - 4, h: 50 });
-                if (first + i === sel) cv.roundRect(40, y - 4, 1520, 50, 8, withAlpha(t.accent, 0.18));
+                // a row tapped, or pressed with the controller: its card
+                if (cv.own) cv.target(40, y - 4, 1520, 50, () => openCard(first + i), 'item' + it.id, 8);
+                if (!cv.own && first + i === sel) cv.roundRect(40, y - 4, 1520, 50, 8, withAlpha(t.accent, 0.18));   // (the kit rings the row the controller is on)
                 cv.roundRect(48, y + 4, 8, 34, 4, col);
                 cv.text(fit(cv, it.name, 30, 720, { font: 'bold' }), 76, y + 32, 30, t.text, { font: 'bold' });
                 cv.text(it.way || '--', 1040, y + 32, 30, it.way ? t.text : t.dim, { align: 'right', font: 'bold' });
@@ -341,14 +341,8 @@ mgu.run({
             reset = reset && reset.busy ? reset : null; msg = ''; details();
         });
         ui.onClick('BTN_RESET', () => { resetPress(); });
-        // where the renderer draws the cards, the reset is on each item's card
-        ctx.hideButton('BTN_RESET');
-        // a tap on a row opens that item's card
-        ctx.onTap((x, y) => {
-            if (page !== 0) return;
-            const r = rowsShown.find((q) => y >= q.y && y < q.y + q.h && x >= 40 && x < 1560);
-            if (r) openCard(r.i);
-        });
+        // where the kit runs the screen the rows open their cards (with Reset): none of these in its bar
+        ['BTN_SELECT', 'BTN_DETAILS', 'BTN_RESET'].forEach((b) => ctx.hideButton(b));
         ctx.onTab((i) => { if (i !== page) { page = i; sel = 0; msg = ''; changed(); } });
 
         ctx.loop('MAIN', 2, () => render(false));

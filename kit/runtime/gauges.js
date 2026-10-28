@@ -770,6 +770,24 @@ function menuBar(cv, t, x, y, w, h, buttons, focus, variant, flash) {
     });
 }
 
+/**
+ * A button on the page: a pill with its label, pressed by a tap or the controller (cv.target). Drawn
+ * only where the kit runs the screen (display.js: the app's bar button then leaves the bar, hideButton).
+ * opts: { key (default: the label), color (a warning colour, for resets), primary (filled), busy (drawn
+ * dimmed, nothing to press) }. Returns the button's width.
+ */
+function button(cv, t, x, y, w, h, label, run, opts) {
+    const o = opts || {}, S = t.sel || t.accent, c = o.color || S;
+    if (!cv.own) return 0;              // elsewhere the HMI's bar has the button
+    if (!w) w = Math.max(h * 3, cv.textWidth(String(label).toUpperCase(), h * 0.4, { font: 'bold', spacing: 1.5 }) + h * 1.2);
+    cv.roundRect(x, y, w, h, h / 2, o.primary ? withAlpha(c, o.busy ? 0.35 : 0.85) : withAlpha('#ffffff', 0.07));
+    if (!o.primary) cv.strokeRoundRect(x, y, w, h, h / 2, 1.5, withAlpha(o.color || '#ffffff', o.busy ? 0.25 : o.color ? 0.75 : 0.3));
+    cv.text(String(label).toUpperCase(), x + w / 2, y + h / 2 + h * 0.15, h * 0.4, o.primary ? '#ffffff' : o.busy ? t.dim : o.color || t.text,
+        { align: 'center', font: 'bold', spacing: 1.5 });
+    if (!o.busy && run) cv.target(x, y, w, h, run, o.key || label);
+    return w;
+}
+
 /** Accent stripes (M-style) under a header. */
 function stripes(cv, t, x, y, w) {
     const s = t.stripes || [t.accent];
@@ -779,6 +797,6 @@ function stripes(cv, t, x, y, w) {
 
 module.exports = {
     BAR_H, TOP, BOTTOM, frame, header, layer, onLayerDrop, panel, segBar, radial, needle, ring, bar, stat, readout,
-    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, smooth, hold, niceStep,
+    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, button, smooth, hold, niceStep,
     fmt, isNum, clamp, mix, zoneColor, withAlpha, ramp,
 };
