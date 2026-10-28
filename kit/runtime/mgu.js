@@ -575,6 +575,9 @@ async function runInner(impl) {
         (SPEC.screens || []).forEach((s) => {
             const st = ui.comp(s.name);
             if (st) ui._setVisible(s.name, open.indexOf(st.getId ? st.getId() : -1) >= 0);
+            // back in front (reopened after Home or another app): the HMI does not always say the
+            // screen has its focus again, and without it the drawn screen stayed hidden
+            if (st && shown && ui.isVisible(s.name)) ui._setFocus(s.name, true);
         });
     });
 

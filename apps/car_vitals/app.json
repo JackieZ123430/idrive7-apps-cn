@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.13.2",
+  "version": "2.13.3",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -155,6 +155,8 @@
       "unit": "rpm",
       "default": 7000,
       "steps": [
+        4500,
+        5000,
         5500,
         6000,
         6500,
