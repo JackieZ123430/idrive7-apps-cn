@@ -64,7 +64,7 @@ MAIN=$OAP/oap_12201
 UIDS=$MAIN/security/uids.txt
 REG=$MAIN/data/apps
 CUSTOM=$MAIN/data/custom_apps.json
-CATALOG=/etc/oap/someip/someip-interfaces.json
+CATALOG=${CATALOG:-/etc/oap/someip/someip-interfaces.json}   # the unit's SOME/IP interface catalog
 MAINJS=/usr/lib/oap-mainapp/src/main.js
 PATCH_DIR=$OAP/_mgu_custom
 DROPIN=/etc/systemd/system/oapcontroller.service.d/50-mgu-custom-apps.conf
@@ -96,10 +96,10 @@ die()  { echo "[mgu-app] ERROR: $*" >&2; rm -rf "$TMP"; exit 1; }
 [ -x "$NODE" ] || die "node not found at $NODE"
 
 uid_of() {      # app id -> uid from uids.txt
-    sed -n "s/^\([0-9]*\)=$1\$/\1/p" "$UIDS" | head -1
+    sed -n "s/^\([0-9]*\)=$1\$/\1/p" "$UIDS" | head -n 1
 }
 app_of() {      # uid -> app id
-    sed -n "s/^$1=\(.*\)\$/\1/p" "$UIDS" | head -1
+    sed -n "s/^$1=\(.*\)\$/\1/p" "$UIDS" | head -n 1
 }
 # is_ours <id> <uid>: an app this tool installed (listed in custom_apps.json or built with
 # the kit). Not decided by uid: MainApp can give its own apps any uid in the range too.
@@ -233,6 +233,29 @@ gen() {
     return 1
 }
 
+# optional_missing <unpacked dir>: app.json signals marked "_optional" (meta.json "optional")
+# that this unit's catalog does not have are taken out of the app's manifest, so BMW's generator
+# accepts it; the app then runs without them. Says what is missing and leaves
+# source/javascript/kit/missing-interfaces.json, which the app logs when it starts.
+# Any other missing interface still makes the generator refuse the app.
+optional_missing() {
+    "$NODE" -e '
+        const fs = require("fs"), [dir, catalog] = process.argv.slice(1);
+        const meta = JSON.parse(fs.readFileSync(dir + "/meta.json", "utf8"));
+        const opt = meta.optional || {};
+        if (!Object.keys(opt).length) process.exit(0);
+        const have = JSON.parse(fs.readFileSync(catalog, "utf8")).interfaces || {};
+        const mf = dir + "/source/manifest.json", m = JSON.parse(fs.readFileSync(mf, "utf8"));
+        const missing = {};
+        for (const i of Object.keys(opt)) if (!have[i]) { missing[i] = opt[i]; delete m.proxies[i]; }
+        if (!Object.keys(missing).length) process.exit(0);
+        fs.writeFileSync(mf, JSON.stringify(m, null, 1));
+        fs.writeFileSync(dir + "/source/javascript/kit/missing-interfaces.json", JSON.stringify(missing, null, 1));
+        for (const i of Object.keys(missing))
+            console.error("[mgu-app] WARNING: " + meta.id + ": this unit has no " + i + " - installed without it: " + missing[i]);
+    ' "$1" "$CATALOG"
+}
+
 # verify_one <app.mgu>: would install_one's interface generation pass on this unit? Only $TMP is
 # written. Returns 1 (with the generator's reason) if not.
 verify_one() {
@@ -244,6 +267,7 @@ verify_one() {
         || die "$pkg is not an MGU app bundle"
     id=$("$NODE" -e "process.stdout.write(require('$TMP/meta.json').id)")
     ver=$("$NODE" -e "process.stdout.write(require('$TMP/meta.json').version)")
+    optional_missing "$TMP" || die "cannot read $pkg or $CATALOG"
     u=$(uid_of "$id"); [ -n "$u" ] || u=$FIRST_UID
     if gen "$TMP/source/manifest.json" "$u" "$TMP/out"; then
         say "$id $ver: accepted"; rm -rf "$TMP"; return 0
@@ -261,6 +285,7 @@ install_one() {
     id=$("$NODE" -e "process.stdout.write(require('$TMP/meta.json').id)")
     ver=$("$NODE" -e "process.stdout.write(require('$TMP/meta.json').version)")
     case "$id" in ''|*[!a-zA-Z0-9_-]*) die "bad app id '$id'";; esac
+    optional_missing "$TMP" || die "cannot read $pkg or $CATALOG"
 
     u=$(uid_of "$id")
     if [ -n "$u" ]; then
@@ -358,7 +383,7 @@ list_apps() {
     printf '%-6s %-24s %-10s %-11s %s\n' UID APP VERSION SOURCE STATE
     sed 's/\r//' "$UIDS" | while IFS='=' read -r u id || [ -n "$u" ]; do
         [ -n "$u" ] || continue
-        v=$(sed -n 's/.*"version"[^"]*"\([^"]*\)".*/\1/p' "$OAP/oap_$u/source/package.json" 2>/dev/null | head -1)
+        v=$(sed -n 's/.*"version"[^"]*"\([^"]*\)".*/\1/p' "$OAP/oap_$u/source/package.json" 2>/dev/null | head -n 1)
         src=$(sed -n 's/.*"installationSource":"\([A-Z]*\)".*/\1/p' "$REG/$id.json" 2>/dev/null)
         st=stopped
         for p in $(pidof node 2>/dev/null); do
@@ -374,7 +399,7 @@ status_one() {
     [ -n "$u" ] || die "$id is not installed"
     list_apps | sed -n "1p;/ $id /p"
     echo "--- crash history (MainApp):"
-    grep -o "\"name\":\"$id\"[^}]*" "$MAIN/data/diagOapStartStopStatus.json" 2>/dev/null | tail -5 || true
+    grep -o "\"name\":\"$id\"[^}]*" "$MAIN/data/diagOapStartStopStatus.json" 2>/dev/null | tail -n 5 || true
     echo "--- app log ($OAP/oap_$u/data/$id.log):"
     tail -n 25 "$OAP/oap_$u/data/$id.log" 2>/dev/null || echo "(none yet - the app writes it once started)"
 }

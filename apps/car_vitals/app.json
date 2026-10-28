@@ -24,6 +24,7 @@
       "statusActualValueTorque2": "rs"
     },
     "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "gearbox oil temperature; the xDrive split then comes from the transfer case or the drive mode",
       "basicDataSet": "s"
     },
     "de.bmw.infrastructure.EnvironmentalInformation": {

@@ -463,6 +463,11 @@ async function run(impl) {
 async function runInner(impl) {
     const app = new OnlineApp();
     log.info('starting ' + SPEC.id + ' ' + SPEC.version);
+    // interfaces this unit lacks, which the installer left out (app.json "_optional")
+    try {
+        const missing = JSON.parse(fs.readFileSync(path.join(__dirname, 'missing-interfaces.json'), 'utf8'));
+        Object.keys(missing).forEach((i) => log.warn('this unit has no ' + i + ' - running without it: ' + missing[i]));
+    } catch (e) { /* none missing */ }
     // lifecycle as BMW's M Laptimer does it: report ACTIVE as soon as the app
     // status channel is up (otherwise MainApp stops the app right after start),
     // report HMI visibility, and exit when MainApp asks us to shut down

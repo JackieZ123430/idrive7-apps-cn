@@ -13,7 +13,7 @@
 #                                  verifies the backup (aborts if it can't)
 #                               2. enables the custom-app provisioning hook,
 #                                  persistent across reboots
-#                               3. installs/updates every apps/*.mgu
+#                               3. installs/updates every apps/*.mgu this unit accepts (one it refuses is left out)
 #                               4. restarts the app platform once and verifies
 #                                  (REBOOT_NEXT=1: not - the caller reboots the head unit
 #                                  right after, which restarts it anyway: one restart, not two)
@@ -107,10 +107,22 @@ preflight() {
 
 # every app in the kit must pass the unit's interface generation BEFORE anything is changed
 # (an app asking for a signal the unit doesn't offer that way would stop the install half-way)
+# verify_apps: which apps this unit accepts. An app it refuses (it needs an interface this
+# firmware doesn't have) is left out - SKIP lists them - and the others are installed.
+# Only if it refuses every app does nothing happen.
+SKIP=
 verify_apps() {
     ls "$SELF_DIR"/apps/*.mgu >/dev/null 2>&1 || return 0
-    sh "$INSTALLER" verify "$SELF_DIR"/apps/*.mgu || die "an app is refused by this unit (see above) - nothing changed"
+    ok=0; SKIP=
+    for f in "$SELF_DIR"/apps/*.mgu; do
+        [ -f "$f" ] || continue
+        if sh "$INSTALLER" verify "$f"; then ok=1
+        else SKIP="$SKIP $(basename "$f")"; warn "$(basename "$f") is refused by this unit (see above) - it is left out"
+        fi
+    done
+    [ $ok = 1 ] || die "this unit refuses every app (see above) - nothing changed"
 }
+skipped() { case " $SKIP " in *" $(basename "$1") "*) return 0;; esac; return 1; }
 
 meta() {   # path [root] -> "present uid:gid:mode md5" or "absent"
     p=${2:-}/$1
@@ -132,7 +144,7 @@ platform_sig() {
         [ -n "$name" ] || continue
         [ -f "$R/$name.json" ] || { echo "inconsistent: $name in uids.txt has no registry entry"; return; }
     done < "$U"
-    d=$(cut -d= -f2 "$U" | sort | uniq -d | head -1)
+    d=$(cut -d= -f2 "$U" | sort | uniq -d | head -n 1)
     [ -z "$d" ] || { echo "inconsistent: $d listed twice in uids.txt"; return; }
     { cat "$U"; ls "$R"; cat "$R"/*.json 2>/dev/null; } | md5sum | cut -d' ' -f1
 }
@@ -204,10 +216,11 @@ rootfs_ro() { [ "${RW_DONE:-0}" = 1 ] && { sync; mount -o remount,ro / 2>/dev/nu
 cmd_check() {
     preflight
     verify_apps
-    say "unit looks OK. MainApp patch test-built fine, every app accepted."
+    if [ -n "$SKIP" ]; then say "unit looks OK. MainApp patch test-built fine; left out (refused by this unit):$SKIP"
+    else say "unit looks OK. MainApp patch test-built fine, every app accepted."; fi
     say "would back up and possibly change:"
     echo "$TOUCHED" | while read -r p; do echo "    /$p  ($(meta "$p" | cut -d' ' -f1))"; done
-    say "would install:"; for f in "$SELF_DIR"/apps/*.mgu; do [ -f "$f" ] && echo "    $(basename "$f")"; done
+    say "would install:"; for f in "$SELF_DIR"/apps/*.mgu; do [ -f "$f" ] && ! skipped "$f" && echo "    $(basename "$f")"; done
     if b=$(find_backup stock); then say "stock backup present: $b"; else say "no backup yet - install will create the stock backup first"; fi
 }
 
@@ -219,6 +232,7 @@ cmd_install() {
     sh "$INSTALLER" patch --persist || die "enabling the hook failed - run: sh $0 restore"
     for f in "$SELF_DIR"/apps/*.mgu; do
         [ -f "$f" ] || continue
+        skipped "$f" && { say "not installing $(basename "$f") (refused by this unit)"; continue; }
         sh "$INSTALLER" install "$f" || die "installing $(basename "$f") failed - run: sh $0 restore"
     done
     # GPU renderer: optional - without it the apps draw in software (slower, still fine)
@@ -290,7 +304,7 @@ cmd_restore() {
             [ -n "$name" ] || continue
             [ -f "$XR/$name.json" ] || { rm -rf "$X"; die "backup $(basename "$B") was taken while the platform was busy ($name has no registry entry) - pick another one (sh deploy-car.sh backups); nothing changed"; }
         done < "$XU"
-        d=$(cut -d= -f2 "$XU" | sort | uniq -d | head -1)
+        d=$(cut -d= -f2 "$XU" | sort | uniq -d | head -n 1)
         [ -z "$d" ] || { rm -rf "$X"; die "backup $(basename "$B") lists $d twice - pick another one (sh deploy-car.sh backups); nothing changed"; }
     fi
     # apps that appeared after the backup: ours are removed; anything else (a BMW
@@ -303,7 +317,7 @@ cmd_restore() {
         case "$u" in *[!0-9]*|'') continue;; esac
         [ "$u" -ge $APP_UID_MIN ] || continue
         grep -qx "$n" "$B/oap-dirs.txt" && continue
-        name=$(sed -n "s/^$u=//p" "$UIDS" 2>/dev/null | head -1)
+        name=$(sed -n "s/^$u=//p" "$UIDS" 2>/dev/null | head -n 1)
         if [ -f "$d/source/javascript/kit/app-spec.json" ] || { [ -n "$name" ] && grep -q "\"$name\"" "$CUSTOM" 2>/dev/null; }; then
             RMDIRS="$RMDIRS $d"
         elif [ -n "$name" ]; then
