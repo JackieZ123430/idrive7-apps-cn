@@ -5,6 +5,7 @@
 const locale = require('./locale.json');
 const dict = locale.strings || {};
 const language = locale.language || 'en';
+const localizedValues = new Set(Object.keys(dict).map((key) => dict[key]));
 const cache = new Map();
 function getLanguage() { return language; }
 const folded = Object.create(null);
@@ -19,6 +20,7 @@ function t(value) {
     if (s.trim() === 'rpm') return s; // preserve the physical unit; uppercase RPM headings may translate
     if (cache.has(s)) return cache.get(s);
     const key = s.trim();
+    if (localizedValues.has(key)) return s; // e.g. eDrive助手 must not become eDrive助手助手
     let out;
     if (Object.prototype.hasOwnProperty.call(dict, key)) {
         out = s.slice(0, s.indexOf(key)) + dict[key] + s.slice(s.indexOf(key) + key.length);
@@ -26,7 +28,7 @@ function t(value) {
         out = s.slice(0, s.indexOf(key)) + folded[key.toLowerCase()] + s.slice(s.indexOf(key) + key.length);
     } else {
         // Short words need context: "min 70" is a minimum, "12 min" is minutes.
-        out = language === 'zh-CN' ? s.replace(/\bmin(?=\s+-?\d)/g, '最小').replace(/\bmax(?=\s+-?\d)/g, '最大')
+        out = /^zh-(CN|TW)$/.test(language) ? s.replace(/\bmin(?=\s+-?\d)/g, '最小').replace(/\bmax(?=\s+-?\d)/g, '最大')
             .replace(/\bAVG(?=\s+[+-]?\d)/g, '平均').replace(/\bACC\b/g, '加速') : s;
         out = out.replace(pattern, (_, before, word) => before + (dict[word] || folded[word.toLowerCase()]));
     }

@@ -1,0 +1,837 @@
+# English<TAB>繁體中文（臺灣用語）；只翻譯顯示文字。
+M Vitals	M 車輛儀表
+Redline	換擋轉速
+Virtual Dyno	虛擬馬力機
+Brake Test	制動測試
+Drag Timer	彈射模式
+G-Force	G 值儀表
+Warm-Up	暖機助手
+Fault Scanner	故障檢測
+eDrive	eDrive助手
+Service	保養資訊
+Doom	毀滅戰士
+Settings	設定
+Next page	下一頁
+Previous page	上一頁
+Next item	下一項
+Details	詳情
+Read now	立即讀取
+Scan now	立即掃描
+Scan again	重新掃描
+Clear all	清除全部
+Reset max	重置峰值
+Reset run	重置本次
+Cancel run	取消本次
+Yes, clear	確認清除
+Clear log	清除記錄
+Delete all	刪除全部
+Reset best	重置最佳
+Current	當前
+Incl. history	包含歷史
+Start page	啟動頁面
+Engine	發動機
+Chassis	底盤
+Thermals	溫度
+Fuel & ignition	燃油與點火
+Colour theme	配色主題
+M Red	M 紅色
+M Tricolour	M 三色
+Ice White	冰晶白
+Night Amber	夜間琥珀
+Demo data	演示資料
+Auto	自動
+Always	始終
+Never	從不
+On	開啟
+Off	關閉
+Yes	是
+No	否
+Show	顯示
+Hide	隱藏
+Auto (first that works)	自動（首個可用來源）
+Auto (learned)	自動學習
+Hide (RWD)	隱藏（後輪驅動）
+No (12 V only)	否（僅 12 V 電池）
+Speed unit	速度單位
+Speed display rate	速度重新整理率
+Speed	車速
+Power unit	功率單位
+Torque unit	扭矩單位
+Temperature unit	溫度單位
+Pressure unit	壓力單位
+Distance unit	距離單位
+Temperature	溫度
+Celsius	攝氏度
+Fahrenheit	華氏度
+Units	單位
+metres	米
+feet	英尺
+miles	英里
+1/4 mile	1/4 英里
+1/8 mile	1/8 英里
+Renderer	渲染器
+GPU 60 fps (default)	GPU 60 幀（預設）
+Software	軟體渲染
+Screen layout	螢幕布局
+Full screen	全屏
+Standard	標準
+Peak hold	峰值保持
+Peak hold (0 = until reset)	峰值保持（0 表示手動重置）
+Show peak markers	顯示峰值標記
+Max power (100% on sport display)	最大功率（運動儀表的 100%）
+Power from	功率來源
+Sport display	運動儀表
+Torque x rpm	扭矩 × 轉速
+Oil temp warning	機油溫度警告
+Boost	增壓壓力
+Boost from	增壓壓力來源
+Engine unit (OBD)	發動機控制單元（OBD）
+Gearbox oil temperature	變速箱油溫
+Gearbox temperature (EGS)	變速箱溫度（EGS）
+Tyre card	輪胎面板
+Tyre temperatures	輪胎溫度
+xDrive card	xDrive 面板
+Intake air temperature	進氣溫度
+High pressure fuel	高壓燃油
+Low pressure fuel	低壓燃油
+Ignition timing	點火提前角
+Misfire counter	失火計數
+Cold rev limit	冷機轉速上限
+Cold-engine rev guard	冷機轉速保護
+Oil warm at	機油暖機溫度
+Shift point before redline	換擋提示距紅線轉速
+Blink and flash at shift point	換擋點閃爍提示
+Shift light style	換擋燈樣式
+M (green-yellow-red)	M 樣式（綠黃紅）
+Race (green-red-blue)	競速樣式（綠紅藍）
+Theme colour	主題顏色
+Weight with driver + fuel	含駕駛員和燃油的車重
+Body shape (air drag)	車身型別（空氣阻力）
+Coupe / sedan	雙門轎跑 / 轎車
+Touring / hatch	旅行車 / 掀背車
+SUV	SUV
+Drivetrain loss	傳動損耗
+Graph up to	圖表轉速上限
+Overlay ECU torque	疊加 ECU 扭矩
+Baseline	基準曲線
+Tests	測試專案
+Distance split	距離分段
+One-foot rollout	一英尺起步豁免
+Circle size	圓盤量程
+G-force display rate	G 值重新整理率
+Trail length	軌跡長度
+Swap left / right	交換左右方向
+Counts as hard braking above	急剎車判定閾值
+Oil is warm at	機油暖機目標溫度
+Coolant is warm at	冷卻液暖機目標溫度
+Rev limit when cold	冷機轉速上限
+Turbo cool-down after hard driving	激烈駕駛後渦輪冷卻
+Hybrid system	混合動力系統
+Battery size when new (gross)	新電池總容量
+Electric range when full, 20 °C	20°C 滿電純電續航
+Engine starts at	發動機介入電量
+Electricity price	電價
+Read charge every	充電資料讀取間隔
+Read battery health every	電池健康讀取間隔
+Diagnostics page	診斷頁面
+Diagnostics page (UDS replies)	診斷頁面（UDS 響應）
+Scan when opened	開啟時掃描
+Faults to read	讀取的故障範圍
+Also read info memory	同時讀取資訊儲存器
+Play	開始遊戲
+Continue	繼續遊戲
+New game	新遊戲
+Back up	後退
+Turn left	向左轉
+Turn right	向右轉
+Walk left	向左平移
+Walk right	向右平移
+Walk	行走
+Stand	停止移動
+Weapon	切換武器
+Move speed	移動速度
+Slow walk (easiest to steer)	慢走（方便控制）
+Run	奔跑
+Aim speed (controller turn)	瞄準速度（旋轉控制器）
+Slow	慢
+Normal	正常
+Fast	快
+Aim direction	瞄準方向
+Reversed	反向
+Difficulty (new game)	難度（新遊戲）
+I'm too young to die	入門
+Too young to die	入門
+Hey, not too rough	簡單
+Not too rough	簡單
+Hurt me plenty	普通
+Ultra-Violence	困難
+Nightmare!	噩夢！
+Episode (new game)	章節（新遊戲）
+1: Outpost Outbreak	1：前哨危機
+2: Military Labs	2：軍事實驗室
+3: Event Horizon	3：事件視界
+4: Double Impact	4：雙重衝擊
+Render resolution	渲染解析度
+Full: 1920 x 504, every screen pixel	全解析度：1920 × 504
+Medium: 1440 x 378	中：1440 × 378
+Low: 960 x 252	低：960 × 252
+DEMO	演示
+EST.	估算
+OK	正常
+READY	就緒
+Ready	就緒
+Oil	機油
+OIL	機油
+Coolant	冷卻液
+COOLANT	冷卻液
+WATER	水溫
+RPM	轉速
+SPEED	車速
+POWER	功率
+TORQUE	扭矩
+PEAK	峰值
+PEAK POWER	峰值功率
+PEAK TORQUE	峰值扭矩
+PEAK DECEL	最大減速度
+DECEL g	減速度 g
+FROM	起始
+WHEN	時間
+DATE	日期
+STATUS	狀態
+VALUE	數值
+READ	讀取
+REPLY	響應
+DECODED	解析值
+TEMP	溫度
+ADDED	增加
+COST	費用
+LEARNED	已學習
+FULL	滿電
+RANGE	續航
+ENERGY	能量
+ALL TIME	累計
+THIS MONTH	本月
+FROM - TO	起止電量
+WITH ENGINE	發動機執行
+LAST CHARGE	上次充電
+IN THE BATTERY NOW	當前電池能量
+HV BATTERY	高壓電池
+OUTSIDE	車外溫度
+CHARGING	充電中
+CLIMATE ON	空調開啟
+CLIMATE & ON-BOARD	空調與車載用電
+CLIMATE OFF · ON-BOARD	空調關閉 · 車載用電
+CLIMATE OFF  ·  ON-BOARD	空調關閉 · 車載用電
+ENGINE ON  ·  battery	發動機執行 · 電池
+CHARGING  (engine / DC-DC running)	正在充電（發動機 / DC-DC 執行）
+KWH PER DAY, 14 DAYS	近 14 天每日充電量（kWh）
+Engine oil	發動機機油
+Engine speed	發動機轉速
+Gearbox oil	變速箱油溫
+Gearbox (EGS)	變速箱（EGS）
+Ambient	環境溫度
+Intake air (IAT)	進氣溫度（IAT）
+Intake air above outside	進氣與環境溫差
+Ignition timing (before TDC)	點火提前角（上止點前）
+Misfires	失火次數
+Tyres	輪胎
+Power	功率
+Torque	扭矩
+G-force	G 值
+Front	前軸
+FRONT	前軸
+Rear	後軸
+FL	左前
+FR	右前
+RL	左後
+RR	右後
+2WD	兩驅
+4WD	四驅
+2WD mode	兩驅模式
+4WD Sport	四驅運動
+Sand	沙地
+DERATED / OFF	受限 / 關閉
+Power (torque x rpm)	功率（扭矩 × 轉速）
+last 5 min	近 5 分鐘
+this drive	本次行程
+engine temperatures	發動機溫度
+heat soak	熱浸效應
+needs IAT + outside temperature	需要進氣溫度和環境溫度
+not available on this car	此車輛不支援
+no data	暫無資料
+no data from the car	暫無車輛資料
+no target	無目標值
+no diagnostic link	無診斷連線
+no reading from the engine unit	暫無發動機資料
+No data from the engine unit yet	尚未收到發動機控制單後設資料
+Values show up here once the car answers. Settings: set one to Show to keep it on screen.	收到車輛響應後顯示資料，可在設定中選擇“顯示”以固定專案。
+diagnostic link down	診斷連線斷開
+reading...	讀取中…
+engine unit: reading...	正在讀取發動機控制單元…
+not changing	數值未變化
+no boost from the sport display	運動儀表未提供增壓壓力
+all-wheel drive detected	已檢測到四輪驅動
+car sends no torque split	車輛未提供扭矩分配
+transfer case	分動箱
+transfer case, estimated	分動箱估算
+transfer case: clutch open	分動箱離合器斷開
+(transfer case)	（分動箱）
+target	目標
+max	最大
+min	分鐘
+engine off	發動機關閉
+Cyl	氣缸
+cylinders (counted)	缸（計數）
+cylinders (engine unit list)	缸（控制單元列表）
+car sends	車輛上報
+sport display sends	運動儀表上報
+stuck at	數值停留在
+from	來源
+raw	原始值
+front	前軸
+Tach	轉速錶
+Shift accuracy	換擋準確率
+Shift log	換擋記錄
+Recent upshifts	最近升擋
+LAST SHIFT	上次換擋
+SHIFT AT	換擋轉速
+SHIFT	換擋
+EARLY	過早
+LATE	過晚
+SPOT ON	恰好
+LIMITER	轉速限制
+COLD	冷機
+COLD REV	冷機轉速
+COLD  ·  LIMIT	冷機 · 轉速上限
+OIL COLD  ·  GO EASY	機油未熱 · 溫和駕駛
+AVG	平均
+No shifts yet - go and use the rev range.	暫無換擋記錄。
+rpm vs shift point	轉速與換擋點
+shifts)	次換擋）
+Dyno sheet	馬力曲線
+Saved runs	已儲存測試
+No pull yet	暫無加速測試
+No runs yet.	暫無測試記錄。
+Next run	下次測試
+Recording	記錄中
+NEW RUN RECORDED	已記錄新測試
+BASELINE	基準
+ECU TORQUE	ECU 扭矩
+POWER NOW	當前功率
+SETUP	引數
+SPEED RANGE	車速範圍
+Peak	峰值
+estimate at the crank	估算曲軸功率
+waiting for a pull	等待加速測試
+keep it pinned...	保持油門…
+pull too short	測試過程過短
+Full throttle in 3rd gear from ~2000 rpm to the limiter, on a flat road	在平坦封閉道路以三擋從約 2000 轉全油門加速至轉速上限
+Brake test	制動測試
+All stops	全部制動
+Brake fade	制動衰減
+History	歷史
+Last stop	上次制動
+Deceleration	減速度
+Stopping	制動中
+STOPPING	制動中
+STOPPED	已停車
+BRAKE HARD	全力制動
+GET ABOVE	加速至高於
+BEST	最佳
+NEW BEST	新最佳
+CONSISTENT	穩定
+FADING  +	衰減 +
+WARM  +	熱衰減 +
+No stops yet.	暫無制動記錄。
+no stops yet	暫無制動記錄
+need 3 stops	需要 3 次制動
+Brake hard from above	從高於目標車速開始全力制動
+Brake released - stop not counted	制動提前鬆開，本次不計入
+stop	制動
+vs best	對比最佳
+Drag timer	彈射模式
+Speed trace	車速曲線
+Splits	分段成績
+Best times	最佳成績
+Recent runs	最近測試
+Come to a stop to arm	停車後準備測試
+Launch when ready	準備好後起步
+STOP TO ARM	停車以準備
+READY - LAUNCH	已就緒，請起步
+FINISHED	已完成
+TIMING	計時中
+ROLLOUT 1 FT	起步豁免 1 英尺
+No runs yet - stop, launch, and they show up here.	暫無記錄，停車後起步即可開始測試。
+no best yet	暫無最佳成績
+live speed	實時車速
+best	最佳
+error	錯誤
+All-time records	歷史紀錄
+Records	紀錄
+Now	當前
+Session peaks	本次峰值
+Hardest launch	最強起步
+Hardest stop	最強制動
+Left-hander	左轉
+Right-hander	右轉
+Top speed	最高車速
+Combined	合成 G 值
+COMBINED	合成
+LATERAL	橫向
+LONGITUDINAL	縱向
+LEFT	左
+RIGHT	右
+ACCEL	加速
+BRAKE	制動
+ACC	加速
+BRK	制動
+TOP	最高
+Warm-up	暖機助手
+ENGINE OFF	發動機關閉
+NOT WARMING	未升溫
+electric driving	純電行駛
+drive to warm up	行駛以升溫
+NO OIL TEMP	無機油溫度
+OIL HOT - EASE OFF	機油過熱，請降低負荷
+COOLED - OK TO SWITCH OFF	已冷卻，可以熄火
+TURBO COOL-DOWN	渦輪冷卻中
+WARMING UP	暖機中
+SAFE REV LIMIT	建議轉速上限
+COOL-DOWN LEFT	冷卻剩餘時間
+OIL READY IN	機油暖機剩餘
+COOLANT READY IN	冷卻液暖機剩餘
+Oil ready in ~	機油預計暖機約
+Engine off - oil not warming	發動機關閉，機油未升溫
+Oil not warming	機油未升溫
+Oil warm	機油已熱
+keep it gentle	保持溫和駕駛
+paused - stay under	已暫停，請保持低於
+Real electric range	實際純電續航
+Range	續航
+Energy	能耗
+Charge log	充電記錄
+Diagnostics	診斷
+Signals	訊號
+Car signals	車輛訊號
+Battery diagnostics	電池診斷
+Battery health	電池健康
+12 V battery	12 V 電池
+Driving	行駛
+Driving by speed	分車速能耗
+Climate (heating / A/C)	空調（暖風 / 製冷）
+On-board electrics	車載用電
+Seat heating	座椅加熱
+Steering wheel	方向盤
+Outside	車外溫度
+HV energy	高壓電池能量
+HV voltage	高壓電池電壓
+Charge	充電
+Charges	充電次數
+Totals	總計
+Where the power goes now	當前功率分配
+Raw values as the car sends them - for checking the scalings (config.scaling in app.json).	車輛原始數值，用於核對 app.json 中的 config.scaling 換算配置。
+A value n/a or wrong? Adjust config.battery in apps/edrive/app.json and rebuild.	數值不可用或不正確時，調整 app.json 中的 config.battery 後重新構建。
+No hybrid system	無混合動力系統
+Hybrid car? Settings > Hybrid system > Yes	混動車請在“設定 > 混合動力系統”中選擇“是”
+No high-voltage battery answered, so	高壓電池無響應，因此
+eDrive shows the 12 V battery only.	eDrive助手僅顯示 12 V 電池。
+No charges logged yet.	暫無充電記錄。
+Every charge of	每次充電增加
+% or more shows up here,	% 或以上時記錄於此，
+also overnight charges.	包括車機休眠期間的充電。
+Holds	可用容量
+Full:	滿電：
+no charge reading yet	尚無充電資料
+no reading yet	尚無讀數
+no reply	無響應
+not read yet	尚未讀取
+not read	未讀取
+not started	尚未開始
+not yet	尚未
+none yet	暫無
+now	現在
+today	今天
+days ago	天前
+h ago	小時前
+min ago	分鐘前
+s ago	秒前
+learns as you drive electric	純電行駛時學習
+learns as you drive	行駛時學習
+estimate - learns as you drive electric	估算值，純電行駛時學習
+typical	典型值
+measured	實測
+(est.)	（估算）
+(typical)	（典型值）
+your pace now	當前駕駛節奏
+your pace	你的駕駛節奏
+typical pace	典型駕駛節奏
+engine starts at	發動機介入電量
+last hour  ·  healthy at rest: 12.4-12.8 V	近一小時 · 靜置健康電壓：12.4–12.8 V
+GOOD  (about 75 %)	良好（約 75%）
+HALF  (about 50 %) - drive or charge soon	中等（約 50%），建議行駛或充電
+LOW - charge the battery	電量低，請充電
+Main page: demo data until the link answers	主頁在連線響應前顯示演示資料
+CAR SHOWS  (no power distribution from the car yet)	車輛顯示（暫無車輛功率分配資料）
+CAR SHOWS  drive	車輛顯示 · 驅動
+with engine: + = charging the battery, - = still using it	發動機執行時：+ 表示充電，- 表示仍在耗電
+screens, units, pumps	螢幕、控制單元、水泵
+battery temp	電池溫度
+battery temperature	電池溫度
+climate control	空調系統
+seat heating	座椅加熱
+steering wheel	方向盤
+rear L	左後
+rear R	右後
+pass.	副駕駛
+driver	駕駛員
+link down	連線斷開
+link up	已連線
+no hybrid battery unit: 12 V only	無混動電池單元，僅顯示 12 V
+available	可用
+n/a	不可用
+Control units	控制單元
+Faults	故障
+Check Control	車輛檢查資訊
+Check Control messages	車輛檢查訊息
+Control units that answered	已響應的控制單元
+Active now	當前存在
+INFO MEMORY	資訊儲存器
+INFO:	資訊：
+No faults stored	無已儲存故障
+No active Check Control messages	當前無車輛檢查訊息
+No control unit answered	無控制單元響應
+No control unit answered - ignition on?	無控制單元響應，請檢查點火狀態
+No answer	無響應
+no answer	無響應
+answering...	等待響應…
+No faults	無故障
+Nothing to clear	無可清除專案
+Scan first	請先掃描
+Scan first, then clear	請先掃描，再清除
+Press "Scan now" (ignition on)	開啟點火後點選“立即掃描”
+Scanning...	掃描中…
+Asking every control unit...	正在查詢各控制單元…
+Identifying control units...	正在識別控制單元…
+Reading info memory...	正在讀取資訊儲存器…
+Info memory not read this time (unit busy) - scan again for it	本次未讀取資訊儲存器（單元忙），可重新掃描
+Last scan	上次掃描
+Scan failed:	掃描失敗：
+Clears	將清除
+Clearing	正在清除
+Cleared	已清除
+control unit(s) - press again within 5 s	個控制單元，請在 5 秒內再次點選確認
+control unit(s) - scanning again	個控制單元，正在重新掃描
+control units,	個控制單元，
+faults	個故障
+fault	個故障
+info	資訊
+more	更多
+possible texts (depends on unit type)	條候選說明（取決於單元型號）
+present right now	當前存在
+stored	已儲存
+scanning again	重新掃描
+Message	訊息
+Head unit	車機
+DME engine	DME 發動機
+DME 2	DME 2
+EGS gearbox	EGS 變速箱
+BDC body	BDC 車身
+BDC gateway	BDC 閘道器
+ATM telematics	ATM 遠端通訊
+KOMBI cluster	KOMBI 儀表
+ACSM airbag	ACSM 安全氣囊
+DSC brakes	DSC 制動
+DSC brake booster	DSC 制動助力
+EPS steering	EPS 轉向
+EME e-motor	EME 電機
+SME HV battery	SME 高壓電池
+OBC charger	OBC 充電機
+IHKA climate	IHKA 空調
+RAM audio	RAM 音響
+ZBE controller	ZBE 控制器
+GWS gear selector	GWS 擋位選擇器
+VTG xDrive	VTG 四驅
+KAFAS camera	KAFAS 攝像頭
+ICAM cameras	ICAM 攝像頭
+PDC parking	PDC 泊車
+USS park sensors	USS 泊車感測器
+SAS assist sensors	SAS 輔助感測器
+FRR front radar	FRR 前雷達
+SRR corner radar	SRR 角雷達
+DCS driver camera	DCS 駕駛員攝像頭
+FZD roof	FZD 車頂
+FLM headlight	FLM 前照燈
+HKFM tailgate	HKFM 尾門
+SM seat module	SM 座椅模組
+TFM fuel tank	TFM 燃油箱
+VDP dampers	VDP 減振器
+Telematics: Mobile network connection limited	遠端通訊：行動網路連線受限
+Assist sensors: Unexpected Ethernet communication/link	輔助感測器：乙太網通訊或鏈路異常
+Service requirements	保養需求
+Next service	下次保養
+Service due	保養到期
+Front brakes	前制動器
+Rear brakes	後制動器
+Brake fluid	制動液
+Vehicle check	車輛檢查
+Statutory vehicle inspection	法定車輛檢驗
+DUE NOW	已到期
+DUE SOON	即將到期
+Due now	已到期
+Due soon	即將到期
+Diagnostics - what the instrument cluster sends	診斷 · 儀表傳送的原始資料
+No details for this item	此專案無詳情
+Details not available (	詳情不可用（
+Waiting for the service data from the instrument cluster (ignition on)...	等待儀表保養資料，請開啟點火…
+Asking the car...	正在查詢車輛…
+waiting for the car	等待車輛
+instrument cluster not reachable	無法連線儀表
+connecting...	正在連線…
+not available yet	暫不可用
+nothing received	尚未收到資料
+item(s)	項
+items	項
+(demo)	（演示）
+Loading...	載入中…
+Doom stopped	遊戲已停止
+Doom stopped:	遊戲已停止：
+In the game, BACK returns here and saves	遊戲中按 BACK 返回此處並儲存
+Saved game:	已儲存遊戲：
+Game:	遊戲：
+health	生命值
+(default)	（預設）
+LAST	上次
+answered	已響應
+messages	條訊息
+record	紀錄
+ELECTRIC	純電
+over	高於
+battery	電池
+climate	空調
+blower	風機
+seats	座椅
+wheel	方向盤
+cells	電芯
+heating	加熱
+compressor	壓縮機
+charging	充電中
+charge	充電
+charges	次充電
+climate boost	空調增益
+seat bars	座椅檔位
+no link	未連線
+use learning	使用學習值
+using	當前採用
+with engine	發動機執行
+cold: less range, slower charging	低溫：續航降低，充電變慢
+from your last	依據最近
+lasts ~	預計可用約
+a typical	典型值
+there	處
+at	在
+pace	駕駛節奏
+learned	已學習
+in	剩餘
+by	到期
+or	或
+of	共
+Scan	掃描
+Reading	讀取中
+Fault	故障
+Info memory	資訊儲存器
+minimum	最小
+maximum	最大
+ACTIVE	當前故障
+WARNING LAMP	警示燈請求
+PENDING	待確認
+HISTORY	歷史故障
+general reject	請求被拒絕
+service not supported	不支援該服務
+sub-function not supported	不支援該子功能
+bad length	資料長度錯誤
+busy	控制單元忙
+conditions not correct	當前條件不滿足
+out of range	請求超出範圍
+security access denied	安全訪問被拒絕
+programming failure	程式設計失敗
+pending	等待響應
+not supported in session	當前會話不支援
+Debug mode active (SSH open)	除錯模式已啟用（SSH 已開放）
+HU-H: Reset	HU-H：主機復位
+Check engine oil level	檢查發動機機油液位
+Drive system	驅動系統
+FA-CAN message missing: fuel tank level / range (0x373)	FA-CAN 報文缺失：油箱液位 / 續航里程（0x373）
+Message (driver assistance, comfort, safety) missing, receiver ACC/FRSF, transmitter DSC/SAS	報文缺失（駕駛輔助、舒適性、安全）：接收方 ACC/FRSF，傳送方 DSC/SAS
+Message (chassis, acceleration data) missing, receiver ACC/FRSF, transmitter DSC/VIP	報文缺失（底盤、加速度資料）：接收方 ACC/FRSF，傳送方 DSC/VIP
+ZGM: Test operation is active	ZGM：測試執行模式已啟用
+ZGM: Ethernet: Communication ended unexpectedly	ZGM：乙太網通訊意外中斷
+Message (system time, 0x328) faulty, receiver ZGM, transmitter KOMBI	報文異常（系統時間，0x328）：接收方 ZGM，傳送方 KOMBI
+Power window regulator, driver's side: LIN slave not present	駕駛員側車窗升降器：LIN 從節點不存在
+Power window regulator on passenger's side: LIN slave	前排乘客側車窗升降器：LIN 從節點
+Rear driver's side power window regulator: LIN slave missing	駕駛員側後車窗升降器：LIN 從節點缺失
+Power window, passenger's side, rear: LIN slave missing	乘客側後車窗：LIN 從節點缺失
+Steering column switch cluster (SZL): LIN slave missing	轉向柱開關元件（SZL）：LIN 從節點缺失
+Multifunction steering wheel: LIN slave absent	多功能方向盤：LIN 從節點不存在
+Steering wheel module: LIN slave missing	方向盤模組：LIN 從節點缺失
+ELSV (LIN): LIN slave absent	ELSV（LIN）：LIN 從節點不存在
+Brake light switch (BLS): wire break or short circuit to battery voltage	制動燈開關（BLS）：線路斷路或對蓄電池正極短路
+IBS wakeup: line disconnected or short circuit to battery voltage	IBS 喚醒線路：斷路或對蓄電池正極短路
+Centre lock rocker switch in the front passenger door: Line fault or malfunctioning	前排乘客門中控鎖翹板開關：線路故障或功能異常
+Central locking drive for tailgate or split door, right: line break or short circuit to battery voltage	尾門或右側對開門中控鎖驅動：斷路或對蓄電池正極短路
+Rocker switch of central locking system in driver's door: Wiring fault or defective	駕駛員門中控鎖翹板開關：線路故障或損壞
+Engine compartment lid contact switch: Line fault or defective	發動機艙蓋接觸開關：線路故障或損壞
+Front passenger door contact Wiring broken or defective	前排乘客門接觸開關：線路斷路或損壞
+Front passenger door door contact, rear / bottom: Wiring broken or defective	乘客側後門或下門接觸開關：線路斷路或損壞
+Driver's door contact: Line break or faulty	駕駛員門接觸開關：線路斷路或故障
+Door contact, driver's door rear / bottom: Line break or faulty	駕駛員側後門或下門接觸開關：線路斷路或故障
+Headlight beam throw adjustment (LWR): System failure	前照燈照射高度調節（LWR）：系統故障
+Rain-light-solar-condensation sensor: Implausible signal from rain sensor or driving light sensor	雨量、光照、日照及凝露感測器：雨量或行車燈光照訊號不可信
+Washer jet heating: Wiring break or short circuit to B+	清洗噴嘴加熱：線路斷路或對 B+ 短路
+Auxiliary coolant pump: Short circuit to positive terminal or open line	輔助冷卻液泵：對正極短路或線路斷路
+compressor clutch: Open line or short circuit to B+	壓縮機離合器：線路斷路或對 B+ 短路
+control valve : Short circuit to positive terminal or circuit open	控制閥：對正極短路或線路斷路
+Automatic air recirculation control (AUC) sensor: short circuit, interruption or defective pulse-width modulated signal	自動內迴圈控制（AUC）感測器：短路、斷路或脈寬調製訊號異常
+Fanfare: B+ short circuit or line break or relay stuck	喇叭：對 B+ 短路、線路斷路或繼電器卡滯
+Shifting paddles: B+ short circuit or cable break	換擋撥片：對 B+ 短路或線路斷路
+Light sources on the LIN bus system for interior light: Incorrect number of light sources	車內照明 LIN 匯流排：光源數量不正確
+LIN master FAT-LIN: Communication absent	LIN 主節點 FAT-LIN：無通訊
+LIN master K-LIN_1: Communication not present	LIN 主節點 K-LIN_1：無通訊
+LIN master K-LIN_16: Communication not present	LIN 主節點 K-LIN_16：無通訊
+LIN master K-LIN_21: Communication not present	LIN 主節點 K-LIN_21：無通訊
+LIN master K-LIN_15: Communication not present	LIN 主節點 K-LIN_15：無通訊
+LIN master BFT-LIN: Communication absent	LIN 主節點 BFT-LIN：無通訊
+LIN master FI-LIN: Communication not present	LIN 主節點 FI-LIN：無通訊
+LIN master SV-LIN: Communication not present	LIN 主節點 SV-LIN：無通訊
+LIN master SV-LIN: Faulty communication	LIN 主節點 SV-LIN：通訊異常
+Door switch centre operating facility (SZT), (LIN): No LIN slave present	車門開關控制元件（SZT，LIN）：無 LIN 從節點
+Exterior mirror, left (LIN): No LIN slave present	左側外後視鏡（LIN）：無 LIN 從節點
+Exterior mirror, right (LIN): No LIN slave present	右側外後視鏡（LIN）：無 LIN 從節點
+Evaluation electronics, non-contact tailgate opening (LIN): LIN components absent or communication not possible	非接觸式尾門開啟評估電子裝置（LIN）：元件缺失或無法通訊
+Windscreen wiper (LIN): No LIN-slave present	風窗刮水器（LIN）：無 LIN 從節點
+Drivers side rear seat-heating electronics (LIN): LIN components missing or communication not possible	駕駛員側後排座椅加熱電子裝置（LIN）：元件缺失或無法通訊
+Passengers side rear seat-heating electronics (LIN): LIN components missing or communication not possible	乘客側後排座椅加熱電子裝置（LIN）：元件缺失或無法通訊
+Switch block, seat functions driver's door (LIN): LIN components missing or communication not possible	駕駛員門座椅功能開關元件（LIN）：元件缺失或無法通訊
+Switch block, seat functions front passenger door (LIN): LIN components missing or communication not possible	前排乘客門座椅功能開關元件（LIN）：元件缺失或無法通訊
+Centre console control panel: LIN slave missing	中控臺操作面板：LIN 從節點缺失
+LIN power distribution box: LIN slave absent	LIN 配電盒：LIN 從節點不存在
+Message not received (torque crankshaft 1, 0xA5), receiver BDC, transmitter DME/DDE	未收到報文（曲軸扭矩 1，0xA5）：接收方 BDC，傳送方 DME/DDE
+Message missing (status of DSC stabilisation, 0x173), recipient BDC, sender DSC	報文缺失（DSC 穩定控制狀態，0x173）：接收方 BDC，傳送方 DSC
+Missing message (centre of gravity longitudinal acceleration, 0x199), BDC is receiver, DSC is transmitter	報文缺失（質心縱向加速度，0x199）：接收方 BDC，傳送方 DSC
+Message not received (vehicle yaw rate, 0x19F), recipient BDC, sender DSC	未收到報文（車輛橫擺角速度，0x19F）：接收方 BDC，傳送方 DSC
+Missing message (vehicle speed, 0x1A1), BDC is receiver, DSC is transmitter	報文缺失（車速，0x1A1）：接收方 BDC，傳送方 DSC
+Message missing (status, assistance system display, 0x1C0), BDC receiver, KOMBI transmitter	報文缺失（輔助系統顯示狀態，0x1C0）：接收方 BDC，傳送方 KOMBI
+Message missing (vehicle electrical system voltage value, 0x281), BDC receiver, DME/DDE transmitter	報文缺失（車載電網電壓值，0x281）：接收方 BDC，傳送方 DME/DDE
+Message not received (Seat occupancy seat belt buckle contact status, 0x297), receiver is BDC, transmitter is ACSM	未收到報文（座椅佔用及安全帶鎖釦觸點狀態，0x297）：接收方 BDC，傳送方 ACSM
+Message absent (actual driver steering angle, 0x301), receiver BDC, transmitter DSC	報文缺失（駕駛員實際轉向角，0x301）：接收方 BDC，傳送方 DSC
+Missing message (steering angle, front axle, effective, 0x302), BDC receiver, DSC transmitter	報文缺失（前軸有效轉向角，0x302）：接收方 BDC，傳送方 DSC
+Message absent (relative time, 0x328), BDC receiver, KOMBI transmitter	報文缺失（相對時間，0x328）：接收方 BDC，傳送方 KOMBI
+Message absent (data, drive train 2, 0x3F9), receiver is BDC, transmitter is DME/DDE	報文缺失（動力總成資料 2，0x3F9）：接收方 BDC，傳送方 DME/DDE
+Missing message (vehicle ride height, 0x83) receiver BDC, transmitter VDP	報文缺失（車身高度，0x83）：接收方 BDC，傳送方 VDP
+Message not received (control, water valves, 0x2BF), receiver BDC, transmitter IHKA	未收到報文（水閥控制，0x2BF）：接收方 BDC，傳送方 IHKA
+Missing message (exterior lighting front electronics 1 left status, 0x1E0), BDC is receiver, FLEL is transmitter	報文缺失（左前車外照明電子裝置 1 狀態，0x1E0）：接收方 BDC，傳送方 FLEL
+Absent message (exterior light front electronics 1 right status, 0x1E6), BDC is receiver, FLER is transmitter	報文缺失（右前車外照明電子裝置 1 狀態，0x1E6）：接收方 BDC，傳送方 FLER
+Missing message (exterior lighting front electronics 2 left status, 0x1FB), BDC is receiver, FLEL is transmitter	報文缺失（左前車外照明電子裝置 2 狀態，0x1FB）：接收方 BDC，傳送方 FLEL
+Message absent (target display, vibration, lane change warning, 0x1FC), receiver SAS, sender SWW	報文缺失（變道警告顯示及振動目標，0x1FC）：接收方 SAS，傳送方 SWW
+Absent message (exterior light front electronics 2 right status, 0x1FD), BDC is receiver, FLER is transmitter	報文缺失（右前車外照明電子裝置 2 狀態，0x1FD）：接收方 BDC，傳送方 FLER
+Message absent (nominal haptics warning, lane departure, 0x23F), BDC receiver, KAFAS transmitter	報文缺失（車道偏離觸覺警告目標，0x23F）：接收方 BDC，傳送方 KAFAS
+Message absent (target answer-back warning of lateral control assistance, 0x240), receiver BDC, sender SAS	報文缺失（橫向控制輔助警告反饋目標，0x240）：接收方 BDC，傳送方 SAS
+Missing message (front climate control panel status, 0x246), receiver BDC, transmitter IHKA	報文缺失（前部空調操作面板狀態，0x246）：接收方 BDC，傳送方 IHKA
+Message absent (data, drive train 2, 230.0.2), receiver is BDC, transmitter is DME/DDE	報文缺失（動力總成資料 2，230.0.2）：接收方 BDC，傳送方 DME/DDE
+FM/AM aerial: Line open between aerial amplifier and control unit	FM/AM 天線：天線放大器與控制單元之間線路斷路
+FM2 aerial: Disconnection of line between aerial amplifier and control unit	FM2 天線：天線放大器與控制單元之間線路斷路
+RAM: Microphone 1: Wire break	RAM：麥克風 1 線路斷路
+RAM: Microphone 2. Wire break in line	RAM：麥克風 2 線路斷路
+RAM, K-CAN4: Fault in line	RAM，K-CAN4：線路故障
+HU-H: Fault in secure ethernet communication occurred	HU-H：安全乙太網通訊故障
+Bluetooth aerial: Disconnected line	藍芽天線：線路斷路
+WLAN aerial: Disconnected line	WLAN 天線：線路斷路
+HU-H: Theft-proofing initialisation was not started	HU-H：防盜初始化尚未啟動
+FAULTS	故障
+CHARGES	充電次數
+Hot film air mass meter: Intake air temp too high	熱膜式空氣流量計：進氣溫度過高
+Intake air temperature sensor: Short to B+	進氣溫度感測器：對 B+ 短路
+BDC: LED GEN2: Headlight temperature too high	BDC：第二代 LED 前照燈溫度過高
+Head unit: Bluetooth/Wi-Fi aerial 1: Disconnected line	主機：藍芽 / Wi-Fi 天線 1 線路斷路
+KAFAS: camera calibration missing	KAFAS：攝像頭缺少標定
+EDrive	eDrive助手
+Battery power now	當前電池功率
+Battery unit	電池控制單元
+Battery unit (UDS)	電池控制單元（UDS）
+Battery (SME 0x07)	電池（SME 0x07）
+Battery unit (SME)	電池控制單元（SME）
+Climate, heater, A/C (IHKA 0x78)	空調、暖風與製冷（IHKA 0x78）
+Diagnostics pages (UDS replies, scan, raw signals)	診斷頁面（UDS 響應、掃描、原始訊號）
+Home-screen widget: redraw per second	主畫面小工具：每秒重新繪製次數
+Power gauge up to (until the car reports its limits)	功率表量程上限（車輛未報告限制時）
+Read cells, temperatures, limits every	電芯、溫度與功率限制讀取間隔
+Read power every (0.1 = as fast as the car answers)	功率讀取間隔（0.1 表示按車輛響應速度讀取）
+Reset drive totals	重置本次行程統計
+Scan page: control unit	掃描頁面：控制單元
+CELLS	電芯
+Cells	電芯
+Drive	行程
+THIS DRIVE	本次行程
+This drive	本次行程
+CHARGE	充電
+DRIVING	行駛
+DRAWING	用電
+REGEN	能量回收
+IDLE	待機
+ENGINE ON	發動機執行
+ENGINE RUNNING	發動機執行
+READING	讀取中
+NO DIAGNOSTIC LINK	診斷未連線
+NO REPLY	無響應
+NO REPLY - SEE DIAGNOSTICS	無響應，請檢視診斷
+BATTERY MAX	電池功率上限
+REGEN MAX	回收功率上限
+NET	淨值
+USED	已消耗
+CAR SHOWS	車輛顯示
+CHANGED SINCE RESET	重置後的變化
+CLIMATE	空調
+CLIMATE OFF	空調關閉
+ON-BOARD	車載用電
+HYBRID	混合動力
+HIGHEST	最高
+LOWEST	最低
+SPREAD	差值
+TEMPERATURE	溫度
+SCANNING	掃描中
+DONE	完成
+ALL THAT ANSWER (identifier: bytes)	所有響應項（識別符號：位元組數）
+LIVE COMPARISON: starts when the scan is done	實時對比：掃描結束後開始
+LOOK LIKE CELL VOLTAGES (V)	疑似電芯電壓（V）
+LOOK LIKE PACK VOLTAGE (V)	疑似電池包電壓（V）
+ENGINE ON: charges = the engine fills the battery, uses = the battery still helps	發動機執行：充電錶示發動機為電池充電，用電錶示電池仍在提供動力
+Climate OFF, press Reset drive totals, then set HI (heater) or LO with A/C: the values that follow it show up here.	關閉空調後點選“重置本次行程統計”，再設定 HI 暖風或 LO 製冷；隨之變化的數值會顯示在這裡。
+the engine charges the battery	發動機為電池充電
+the battery still helps	電池仍在提供動力
+from the battery	來自電池
+battery unit (SME)	電池控制單元（SME）
+climate unit (IHKA)	空調控制單元（IHKA）
+cell core (battery unit)	電芯核心溫度（電池控制單元）
+the car's battery temperature	車輛報告的電池溫度
+no reading - see Diagnostics	沒有讀數，請檢視診斷
+no diagnostic link yet	診斷尚未連線
+well balanced	均衡良好
+out of balance	不均衡
+high (normal under load)	較高（負載下屬正常）
+just now	剛剛
+current pace	當前能耗
+range at 20 °C	20 °C 時的續航
+range when full, 20 °C	20 °C 滿電續航
+last measured	上次測量
+measured before	先前測量
+per km	每公里
+learning what the battery does meanwhile	正在學習期間的電池狀態
+(unit not answering)	（控制單元未響應）
+on (est.)	開啟（估算）
+electric	純電
+charged	已充入
+uses	用電
+peak	峰值
+ambient	環境溫度
+power distribution	功率分配
+s (cell core), else the car	秒（電芯核心溫度），否則使用車輛讀數
+Battery	電池

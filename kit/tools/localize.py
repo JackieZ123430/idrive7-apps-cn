@@ -6,6 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 LOCALES = ROOT / 'kit/runtime/locales'
+CHINESE = ('zh-CN', 'zh-TW')
+WIDGET_SLOT_COUNT = 64
 
 
 def languages():
@@ -33,6 +35,13 @@ def localize_spec(spec, language):
     s = copy.deepcopy(spec)
     s['version'] = package_version(s['version'], language)
     s['title'] = text(s['title'], words)
+    if 'startWidget' in s:
+        widget = s['startWidget']
+        if 'name' in widget:
+            widget['name'] = text(widget['name'], words)
+        for cell in widget.get('cells', {}).values():
+            if len(cell) > 1 and cell[1] == 'Text':
+                cell[0] = text(cell[0], words)
     for screen in s.get('screens', []):
         if 'title' in screen:
             screen['title'] = text(screen['title'], words)
@@ -71,9 +80,20 @@ def unicode_resources(ui, strings, language='en'):
     visit(ui)
     for key in strings:
         strings[key] = text(strings[key], words)
-        if language == 'zh-CN' and key.endswith('_CN_CREDITS_TITLE'):
-            strings[key] = '汉化 Translation by：抖音 小白科技杂物社 / BiliBili 小白151'
+        if language in CHINESE and key.endswith('_CN_CREDITS_TITLE'):
+            strings[key] = ('漢化' if language == 'zh-TW' else '汉化') + ' Translation by：抖音 小白科技杂物社 / BiliBili 小白151'
     for n in range(256):
         strings['SID_CN_DYNAMIC_%04d' % n] = ''
     if len(strings) > 1024:
         raise ValueError('HMI string bundle exceeds the verified 1024-resource budget')
+
+
+def widget_resources(name, value, language='en'):
+    # Do not run unicode_resources over widget metadata: Widget/UUID are protocol
+    # Text cells, not display labels, and must retain their literal values/types.
+    strings = {name: text(value, load_locale(language))}
+    for n in range(WIDGET_SLOT_COUNT):
+        strings['SID_WIDGET_DYNAMIC_%04d' % n] = ''
+    if len(strings) > 1024:
+        raise ValueError('Widget string bundle exceeds 1024 resources')
+    return strings

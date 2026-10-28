@@ -1,4 +1,4 @@
-[English](README.md) | **中文**
+[English](README.md) | **简体中文** | [繁體中文](README.zh-TW.md)
 
 # MGU Custom Apps 中文安装包
 
@@ -6,15 +6,15 @@
 
 [本仓库](https://github.com/JackieZ123430/idrive7-apps-cn) · [上游项目](https://github.com/cauliflowermossgrape/idrive7-apps) · [署名与来源](NOTICE.zh-CN.md)
 
-英文和中文分别构建、分别安装。**安装中文包就是中文，安装英文包就是英文，应用设置中没有语言切换选项。** 两种包更新同一组应用，不是重复安装两套应用。
+英文、简体中文和繁体中文分别构建、分别安装。**安装中文包就是中文，安装英文包就是英文，应用设置中没有语言切换选项。** 三种包更新同一组应用，不是重复安装两套应用。
 
 ## 功能与汉化范围
 
-包含 M 车辆仪表、换挡转速、虚拟马力机、制动测试、弹射模式、G 值仪表、暖机助手、EDrive助手、故障检测、保养信息和 Doom 共 11 个应用。
+包含 M 车辆仪表、换挡转速、虚拟马力机、制动测试、弹射模式、G 值仪表、暖机助手、eDrive助手、故障检测、保养信息和 Doom 共 11 个应用。
 
 “弹射模式”对应原 Drag Timer，用于记录起步、加速分段和成绩。
 
-中文包包含菜单、按钮、设置、仪表标题及内置提示的简体中文译文，并附带绘制这些文字所需的开源中文字形。中文画面右上角使用 12 px、约 25% 不透明度的小字署名：
+中文包包含菜单、按钮、设置、仪表标题及内置提示的简体或繁体中文译文，并附带绘制这些文字所需的开源中文字形。中文画面右上角使用 12 px、约 25% 不透明度的小字署名：
 
 **抖音：小白科技杂物社 · BiliBili：小白151 · GitHub：JackieZ123430**
 
@@ -42,7 +42,7 @@
 
 ![故障状态与说明中文示例](docs/screens/chinese-fault-preview.png)
 
-## 构建两个安装包
+## 构建英文、简体中文和繁体中文安装包
 
 需要 Python 3、Node.js 14 以上，以及从自己车机提取的 BMW oap-sdk。已提交预生成字库和 GPU 渲染器，正常构建无需字体工具或 Docker。
 
@@ -74,6 +74,14 @@
 
 英文构建输出 `dist/mgu-custom-apps.tar.gz`（与原有脚本兼容），中文构建输出 `dist/mgu-custom-apps-zh-CN.tar.gz`。两个语言安装包分别保存在不同文件中，可以先后构建，不会互相覆盖。
 
+### 繁体中文包
+
+```powershell
+python kit/tools/make_kit.py --language zh-TW
+```
+
+输出 `dist/mgu-custom-apps-zh-TW.tar.gz`，使用独立的繁体中文词库和 Noto Sans TC 字库。安装繁体包时，将 `-Kit` 后的文件替换为该路径。英文默认行为保持不变。
+
 ## Windows 安装
 
 适用于已具有 root SSH 的 iDrive 7 MGU。本项目部署应用，不刷写 MGU 固件。上游测试固件为 `P18_23w44.2`；本台架的 `P18_23w44.2-1-3` 已验证安装及保养应用启动，其他功能和版本需按实际设备测试。
@@ -91,6 +99,15 @@ powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 install -Kit dis
 ```
 
 要安装英文版，将 `-Kit` 后的文件换成 `dist/mgu-custom-apps.tar.gz`。安装器会备份配置并重启应用平台，首次设置 Doom 控制器插件可能重启车机。恢复使用同一脚本的 `restore` 命令；更多细节见 [英文原文档](README.md)。
+
+## 主页小组件的中文
+
+`eDrive` 的中文名称统一为 **eDrive助手**。小组件选择列表、原生文字格及自绘图片使用所安装包的语言。
+小组件拥有独立字符串包，预留 64 个 `SID_WIDGET_DYNAMIC_*` 槽位；主应用继续使用自己的 256 个槽位。多个小组件实例的文字互相隔离，删除后可复用槽位。
+
+小组件的布尔值、数值、布局模板名、图片和诊断标识符不参与翻译。小组件图片使用同一个语言包的中文字库；原生文字使用车机 HMI 字体。
+
+离线测试验证了资源生成、实例隔离、槽位预算、更新顺序和生命周期，**不能代替车机上的大小布局、裁切和字体验证**。实机测试方法见 [小组件中文测试](docs/widget-chinese-test.md)。
 
 ## 新增其他语言
 
@@ -110,13 +127,23 @@ powershell -ExecutionPolicy Bypass -File deploy/push-to-car.ps1 install -Kit dis
 3. 检查该语言所需字形。含现有字库未覆盖的字符时需补充字库；右向左文字等还需相应排版支持，不能只放入译文就假定显示正确。
 4. 验证原生菜单、仪表排版、动态提示和资源总量。信号名、设置内部取值、故障码及协议字段保持原样。
 
-中文译文维护在 `kit/runtime/locales/zh-CN.tsv`，执行 `python kit/tools/sync_zh.py` 生成 JSON。新增汉字后，用 Pillow 和 `python kit/tools/bake_cjk.py` 重建中文字库，并保留字体许可证。
+简体和繁体译文分别维护在 `kit/runtime/locales/zh-CN.tsv` 和 `zh-TW.tsv`：
+
+```powershell
+python kit/tools/sync_zh.py --language zh-CN
+python kit/tools/sync_zh.py --language zh-TW
+python kit/tools/bake_cjk.py --language zh-CN
+python kit/tools/bake_cjk.py --language zh-TW
+```
+
+字体重建需要 Pillow；正常构建直接使用已提交的字库，无需 OpenCC 或字体生成工具。繁体使用台湾用语，不等同于粤语翻译。每个安装包仅携带一份选定的 CJK 字库，保留对应 OFL 许可。
 
 ## 检查与预览
 
 ```powershell
 python kit/tools/test_zh.py
 node kit/tools/test_zh.js
+node kit/tools/test_widget_text.js
 node kit/tools/test_zh.js dist/warmup/source/javascript/kit
 node kit/tools/preview.js dist/warmup preview
 ```

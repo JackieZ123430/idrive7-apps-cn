@@ -24,6 +24,7 @@ const { OnlineApp, logging } = require('oap-sdk');
 const themes = require('./themes');
 const { Display } = require('./display');
 const { HmiText } = require('./hmi-text');
+const { WidgetText } = require('./widget-text');
 
 const sdkLog = logging.getSDKLogger();
 const SPEC = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-spec.json'), 'utf8'));
@@ -319,6 +320,7 @@ class Widget {
         this._img = Object.create(null);
         this._change = [];
         this._tap = [];
+        this.text = new WidgetText();
         this.timing = { png: 0, push: 0 };
     }
     get ready() { return !!this.comp; }
@@ -339,12 +341,15 @@ class Widget {
         const name = SPEC.id.toUpperCase() + '_WIDGET';
         const c = rhmiApp && rhmiApp.getByName(name);
         if (!c) { log.warn('widget: no component ' + name); return; }
+        this.text.dispose();
+        this.text = new WidgetText();
         this.comp = c;
-        c.on('created', (e) => { this.vis[e.spawnId] = true; this._static(e.spawnId); this._changed('placed'); });
-        c.on('resize', (e) => { this._forget(e.spawnId); this._changed('resized'); });
-        c.on('visible', (e) => { this.vis[e.spawnId] = !!e.visible; if (e.visible) this._forget(e.spawnId); this._changed(e.visible ? 'shown' : 'hidden'); });
-        ['abort', 'destroyed'].forEach((n) => c.on(n, (e) => { delete this.vis[e.spawnId]; this._forget(e.spawnId); this._changed('removed'); }));
-        c.on('action', (e) => { log.info('widget tapped (' + e.spawnId + ')'); this._tap.forEach((fn) => { try { fn(e); } catch (err) { log.error(err); } }); });
+        const on = (event, callback) => c.on(event, (e) => { if (this.comp === c) callback(e); });
+        on('created', (e) => { this.vis[e.spawnId] = true; this._static(e.spawnId); this._changed('placed'); });
+        on('resize', (e) => { this._forget(e.spawnId); this.text.invalidate(e.spawnId); this._static(e.spawnId); this._changed('resized'); });
+        on('visible', (e) => { this.vis[e.spawnId] = !!e.visible; if (e.visible) { this._forget(e.spawnId); this.text.invalidate(e.spawnId); this._static(e.spawnId); } this._changed(e.visible ? 'shown' : 'hidden'); });
+        ['abort', 'destroyed'].forEach((n) => on(n, (e) => { delete this.vis[e.spawnId]; this._forget(e.spawnId); this.text.release(e.spawnId); this._changed('removed'); }));
+        on('action', (e) => { log.info('widget tapped (' + e.spawnId + ')'); this._tap.forEach((fn) => { try { fn(e); } catch (err) { log.error(err); } }); });
         this.instances().forEach((i) => this._static(i.spawnId));
         this._changed('ready');
     }
@@ -359,9 +364,10 @@ class Widget {
     }
     set(spawnId, cell, value, type) {
         if (!this.comp) return Promise.resolve();
-        if ((type || 'Text') === 'Text') value = widgetText(value);
+        if ((type || 'Text') === 'Text') return this.text.set(this.comp, spawnId, cell, value)
+            .then(() => true).catch((e) => { log.warn('widget ' + cell + ': ' + e); return false; });
         return Promise.resolve(this.comp.setValue(Number(spawnId), cell, value, type || 'Text'))
-            .catch((e) => log.warn('widget ' + cell + ': ' + e));
+            .then(() => true).catch((e) => { log.warn('widget ' + cell + ': ' + e); return false; });
     }
     /** Show a drawn image (canvas.js Canvas) in a placed widget (cell: app.json startWidget.image). */
     image(spawnId, img) {
@@ -443,12 +449,6 @@ function wireSettings(ctx) {
     });
     if (ui.comp('BTN_SETTINGS')) ui.onClick('BTN_SETTINGS', () => refresh().then(() => ui.open('SETTINGS')));
     return refresh();
-}
-
-// widget text cells: ASCII only, as before the Chinese text support. A widget has its own string
-// bundle, without the app's SID_CN_DYNAMIC slots, so non-ASCII text can't go through StringIds there.
-function widgetText(s) {
-    return String(s).replace(/°/g, '').replace(/[^\x20-\x7e]/g, '');
 }
 
 /* ---------------- run ---------------- */

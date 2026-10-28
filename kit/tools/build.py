@@ -17,7 +17,7 @@ import json, os, re, shutil, sys, tarfile, uuid
 from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pack_data  # noqa: E402
-from localize import unicode_resources, localize_spec, load_locale, languages
+from localize import unicode_resources, localize_spec, load_locale, languages, widget_resources, CHINESE
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -210,7 +210,7 @@ def build_ui(spec, language='en'):
                 items.append(comp('tworow', name, rows=[{'Text1stRow': {'value': s['label'], 'type': 'Text'},
                                                         'Text2ndRow': {'value': '', 'type': 'Text'}}]))
         # Chinese builds only: credit for the Chinese translation (localize.py sets the Chinese title)
-        if language == 'zh-CN':
+        if language in CHINESE:
             credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
             strings[credit_title] = 'Translation by Douyin 小白科技杂物社 / BiliBili 小白151'
             strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
@@ -325,7 +325,7 @@ def make_icon(spec, out):
 WIDGET_COMPONENT_ID = 501
 
 
-def build_start_widget(spec, app_id, icon_src, out):
+def build_start_widget(spec, app_id, icon_src, out, language='en'):
     """app.json "startWidget" -> rhmiDataStartWidget/ (installed format), the home-screen widget.
 
     Same shape as BMW's own widgets on this firmware (Drive Recorder, Weather, News): a logical
@@ -363,7 +363,7 @@ def build_start_widget(spec, app_id, icon_src, out):
                                              'SelectionIcon': {'value': icon, 'type': 'ResourceId'}}}}}}}
     json.dump(ui, open(os.path.join(out, 'uiDescription', 'uiDescription.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
     for lang in LANGS:
-        json.dump({sid_name: name}, open(os.path.join(out, 'strings', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
+        json.dump(widget_resources(sid_name, name, language), open(os.path.join(out, 'strings', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(icon_src, os.path.join(out, 'resources', icon))
     return {'component': comp, 'layout': ui['containers']['500']['components'][str(WIDGET_COMPONENT_ID)]['cells']['Widget']['value']}
 
@@ -429,7 +429,13 @@ def build(app_id, language='en'):
             shutil.copytree(p, os.path.join(src, 'javascript', 'kit', f))
         else:
             shutil.copy(p, os.path.join(src, 'javascript', 'kit', f))
-    if language == 'zh-CN':
+    if language == 'zh-TW':
+        # Fixed-language packages ship one CJK atlas, keeping the GPU budget unchanged.
+        shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'zh-TW.json'),
+                    os.path.join(src, 'javascript', 'kit', 'fonts', 'cjk.json'))
+        shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'OFL-NotoSansTC.txt'),
+                    os.path.join(src, 'javascript', 'kit', 'fonts', 'OFL-NotoSansTC.txt'))
+    if language in CHINESE:
         # Retain localization authorship in the installed Chinese entry code as plain comments.
         entry = os.path.join(src, 'javascript', 'app.js')
         credit = ('// 中文汉化署名：抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430\n'
@@ -494,7 +500,7 @@ def build(app_id, language='en'):
         json.dump(strings, open(os.path.join(ir, 'strings', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(os.path.join(pr, 'variantGroups', 'Common', 'images', icon), os.path.join(ir, 'resources', icon))
     if spec.get('startWidget'):
-        info = build_start_widget(spec, app_id, os.path.join(ir, 'resources', icon), os.path.join(stage, 'rhmiDataStartWidget'))
+        info = build_start_widget(spec, app_id, os.path.join(ir, 'resources', icon), os.path.join(stage, 'rhmiDataStartWidget'), language)
         print('  home-screen widget: %s (%s)' % (info['component'], info['layout']))
 
     # --- installer helpers + metadata ---

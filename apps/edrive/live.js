@@ -750,8 +750,9 @@ module.exports = function live(ctx, sh) {
         Object.keys(cells).forEach((k) => {
             const v = JSON.stringify(cells[k][0]);
             if (prev[k] === v) return;
-            prev[k] = v;
-            ctx.widget.set(inst.spawnId, k, cells[k][0], cells[k][1]);
+            ctx.widget.set(inst.spawnId, k, cells[k][0], cells[k][1]).then((ok) => {
+                if (ok !== false) prev[k] = v;
+            });
         });
     }
     /* Big widget picture. The HMI fills the widget with it and crops a fixed share of every edge
@@ -794,7 +795,7 @@ module.exports = function live(ctx, sh) {
         ctx.widget.loop(() => settings.get('widgetFps') || 8, renderWidget);
         // a widget just placed or shown: read the slow values now instead of waiting
         ctx.widget.onChange((why) => {
-            if (why === 'resized' || why === 'placed') Object.keys(wtext).forEach((k) => delete wtext[k]);
+            if (['resized', 'placed', 'shown', 'ready', 'removed'].indexOf(why) >= 0) Object.keys(wtext).forEach((k) => delete wtext[k]);
             schedulePower(); if (ctx.widget.active()) readSlow();
         });
     }

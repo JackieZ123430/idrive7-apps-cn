@@ -2,9 +2,10 @@
 """Check fixed English/Chinese packages without loading the BMW SDK."""
 import copy
 import json
+import tempfile
 from pathlib import Path
 import build
-from localize import unicode_resources, localize_spec, languages, load_locale
+from localize import unicode_resources, localize_spec, languages, load_locale, CHINESE, WIDGET_SLOT_COUNT
 
 root = Path(__file__).resolve().parent.parent.parent
 count = 0
@@ -12,7 +13,7 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
     original = json.loads(manifest.read_text(encoding='utf-8'))
     assert not any(s['key'] == 'language' for s in original['settings'])
     keys = []
-    for language in ('en', 'zh-CN'):
+    for language in ('en', 'zh-CN', 'zh-TW'):
         spec = localize_spec(original, language)
         for key in ('id', 'signals', 'config', 'assets'):
             assert original.get(key) == spec.get(key), (manifest, key)
@@ -26,8 +27,8 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
         assert spec['title'] in strings.values()
         # translation credit: Chinese builds only; the project credit: every build
         cn = [k for k in strings if k.endswith('_CN_CREDITS_TITLE') or k.endswith('_CN_CREDITS_LINK')]
-        if language == 'zh-CN':
-            assert '汉化 Translation by：抖音 小白科技杂物社 / BiliBili 小白151' in strings.values()
+        if language in CHINESE:
+            assert ('漢化' if language == 'zh-TW' else '汉化') + ' Translation by：抖音 小白科技杂物社 / BiliBili 小白151' in strings.values()
             assert len(cn) == 2
         else:
             assert not cn and not any('JackieZ123430' in v or '小白' in v for v in strings.values())
@@ -40,9 +41,25 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
             elif isinstance(obj, list):
                 for value in obj: visit(value)
         visit(ui)
+        if spec.get('startWidget'):
+            with tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary) / 'widget'
+                build.build_start_widget(spec, spec['id'], manifest.parent / 'icon.png', str(out), language)
+                widget_ui = json.loads((out / 'uiDescription/uiDescription.json').read_text(encoding='utf-8'))
+                cells = widget_ui['containers']['500']['components']['501']['cells']
+                assert cells['Widget']['type'] == 'Text' and cells['Widget']['value'] == original['startWidget']['layout']
+                for path in (out / 'strings').glob('*.json'):
+                    resources = json.loads(path.read_text(encoding='utf-8'))
+                    assert resources[cells['SelectionName']['value']] == spec['startWidget']['name']
+                    assert sum(k.startswith('SID_WIDGET_DYNAMIC_') for k in resources) == WIDGET_SLOT_COUNT
+                    assert not any(k.startswith('SID_CN_DYNAMIC_') for k in resources)
+                    assert len(resources) <= 1024
         keys.append(set(strings))
         count += 1
-    assert keys[1] - keys[0] == {k for k in keys[1] if '_CN_CREDITS_' in k} and keys[0] <= keys[1]
+    for localized in keys[1:]:
+        assert localized - keys[0] == {k for k in localized if '_CN_CREDITS_' in k} and keys[0] <= localized
+assert localize_spec(json.loads((root/'apps/edrive/app.json').read_text()), 'zh-CN')['title'] == 'eDrive助手'
+assert localize_spec(json.loads((root/'apps/edrive/app.json').read_text()), 'zh-TW')['title'] == 'eDrive助手'
 try:
     unicode_resources({}, {'SID_TEST_%d' % n: '' for n in range(769)})
 except ValueError:
