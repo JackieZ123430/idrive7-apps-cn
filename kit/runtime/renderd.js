@@ -10,6 +10,12 @@
  * Fonts, colour ramps and cached layers a frame uses are uploaded once per connection
  * (again after a reconnect or a resize). With `file` instead of a socket path the messages
  * are written to that file (for `mgu-renderd --replay`).
+ *
+ * opts.native: ask for mgu-render's own dialect (mgu-render/1, the Store's renderer). There touch
+ * claims and the controller grab work on one connection, and X_STATE says when the renderer has
+ * the app on screen. A renderer that does not speak it answers READY alone and the connection
+ * stays in the upstream dialect. Pixel images (op 18) are upstream only: an app that draws them
+ * (Doom) connects without opts.native.
  */
 const net = require('net');
 const fs = require('fs');
@@ -21,6 +27,9 @@ const M = { HELLO: 1, PLACE: 2, SHOW: 3, ATLAS: 4, RAMP: 5, LAYER: 6, FRAME: 7, 
 const E = { READY: 101, TICK: 102, ERROR: 103, STATS: 104, CCU: 105 };
 // touch (mgu-render, IterioDev's mgu-renderd): message 9 is CLAIM there; 105 and 106 come back as TOUCH and CLOSED
 const CLAIM = 9, TOUCH = 105, CLOSED = 106;
+// mgu-render/1 (mgu-store native/mgu-render/PROTOCOL.md)
+const X = { MODE: 0x4d520001, GRAB: 0x4d520002, READY: 0x4d520101, STATE: 0x4d520102, CCU: 0x4d520103 };
+const X_MODE_LAYER = 1;
 
 function msg(type, payload) {
     const len = payload ? payload.length : 0;
@@ -52,6 +61,9 @@ class RenderClient extends EventEmitter {
         this.closed = false;
         this.fd = null;              // file sink
         this.claimed = null;         // the claims sent on this connection (JSON), null: none yet
+        this.native = false;         // this connection speaks mgu-render/1 (X_READY came)
+        this.info = null;            // X_READY: { touch, controller, frontGate }
+        this.onScreen = null;        // X_STATE: the renderer shows us (null: not told)
     }
 
     /** Socket exists (the renderer is installed and running)? */
@@ -61,7 +73,8 @@ class RenderClient extends EventEmitter {
         if (this.opts.file) {
             this.fd = fs.openSync(this.opts.file, 'w');
             this.connected = this.ready = true;
-            this._write(msg(M.HELLO, Buffer.from(this.appId)));
+            this._write(msg(M.HELLO, this._hello()));
+            if (this.opts.native) { this.native = true; this._write(this._u32msg(X.MODE, [X_MODE_LAYER])); }
             setImmediate(() => this.emit('ready', this.screen));
             return this;
         }
@@ -72,17 +85,19 @@ class RenderClient extends EventEmitter {
             this.connected = true;
             this._reset();
             s.setNoDelay && s.setNoDelay(true);
-            this._write(msg(M.HELLO, Buffer.from(this.appId)));
+            this.native = false; this.info = null; this.onScreen = null;
+            this.claimed = null;
+            this._write(msg(M.HELLO, this._hello()));
+            // upstream renderers take these before READY; they are sent again once READY came
             if (this.placement) this._sendPlace();
             if (this.visible) this._write(this._u32msg(M.SHOW, [1]));
-            if (this.grabbing) this._write(this._u32msg(M.GRAB, [1]));
-            this.claimed = null;
+            if (this.grabbing && !this.opts.native) this._write(this._u32msg(M.GRAB, [1]));
         });
         s.on('data', (d) => this._data(d));
         s.on('error', (e) => { if (!this.errLogged) { this.errLogged = true; this.log.warn('renderd: ' + e.message); } });
         s.on('close', () => {
             const was = this.ready;
-            this.connected = this.ready = false; this.sock = null; this.waiting = false;
+            this.connected = this.ready = this.native = false; this.sock = null; this.waiting = false; this.onScreen = null;
             if (was) { this.log.warn('renderd: connection closed'); this.emit('close'); }
             if (!this.closed) this.retry = setTimeout(() => { this.retry = null; this.connect(); }, 3000);
         });
@@ -98,17 +113,28 @@ class RenderClient extends EventEmitter {
         if (on === !!this.grabbing) return;
         this.grabbing = on;
         if (this.grabTimer) { clearInterval(this.grabTimer); this.grabTimer = null; }
-        if (on) this.grabTimer = setInterval(() => { if (this.connected) this._write(this._u32msg(M.GRAB, [1])); }, 500);
-        if (this.connected) this._write(this._u32msg(M.GRAB, [on ? 1 : 0]));
+        if (on) this.grabTimer = setInterval(() => { if (this.connected) this._sendGrab(1); }, 500);
+        if (this.connected) this._sendGrab(on ? 1 : 0);
+    }
+    _sendGrab(on) {
+        if (this.native) this._write(this._u32msg(X.GRAB, [on]));
+        // mgu-render/1 asked for: wait for READY, which tells the dialect (upstream GRAB is IMAGE there)
+        else if (!this.opts.native || this.ready) this._write(this._u32msg(M.GRAB, [on]));
+    }
+    /** HELLO: the app id; with opts.native also the dialect asked for */
+    _hello() {
+        const id = Buffer.from(this.appId);
+        return this.opts.native ? Buffer.concat([id, Buffer.from([0]), Buffer.from('proto=mgu-render/1')]) : id;
     }
     /**
      * Touch in these rects ([{ x, y, w, h }] logical px) comes to this app as 'touch' (phase 1 down,
      * 2 move, 3 up, x, y) while it is shown; a touch elsewhere goes to the HMI and comes as 'closed'
      * (the renderer has hidden us). Only on a renderer that routes touch (READY's fourth word), and
-     * only on a connection that never sends images or GRAB: CLAIM shares their message numbers.
+     * only on a connection that never sends images or GRAB: CLAIM shares their message numbers
+     * (not so in mgu-render/1: there claims and the grab go together).
      */
     claim(rects) {
-        if (!this.ready || !this.touch || this.grabbing || this.sent.image.size) return;
+        if (!this.ready || !this.touch || (!this.native && (this.grabbing || this.sent.image.size))) return;
         const key = JSON.stringify(rects);
         if (key === this.claimed || (this.claimed === null && !rects.length)) return;
         const b = Buffer.alloc(4 + rects.length * 16);
@@ -138,21 +164,43 @@ class RenderClient extends EventEmitter {
             if (this.inbuf.length < 8 + len) break;
             const p = this.inbuf.slice(8, 8 + len);
             this.inbuf = this.inbuf.slice(8 + len);
-            if (type === E.READY) {
+            if (type === X.READY && p.length >= 12) {
+                const caps = p.readUInt32LE(8);
+                this.native = true;
+                this.info = { touch: !!(caps & 1), controller: !!(caps & 2), frontGate: !!(caps & 4) };
+            } else if (type === E.READY) {
                 this.ready = true; this.errLogged = false;
                 this.screen = { w: p.readUInt32LE(4), h: p.readUInt32LE(8) };
                 this.touch = p.length >= 16 && p.readUInt32LE(12) !== 0;
-                this.log.info('renderd: connected, screen ' + this.screen.w + 'x' + this.screen.h);
+                this.log.info('renderd: connected, screen ' + this.screen.w + 'x' + this.screen.h +
+                    (this.native ? ', mgu-render/1 ' + JSON.stringify(this.info) : this.opts.native ? ', upstream dialect (no mgu-render/1)' : ''));
+                if (this.native) this._write(this._u32msg(X.MODE, [X_MODE_LAYER]));
+                else if (this.grabbing && this.opts.native) this._write(this._u32msg(M.GRAB, [1]));
                 this.emit('ready', this.screen);
+                // after the app's placement (sent in 'ready'): SHOW again. A SHOW sent before the renderer
+                // knew where the app goes (or before X_MODE) left the first app opened after start blank.
+                if (this.placement) this._sendPlace();
+                if (this.visible) this._write(this._u32msg(M.SHOW, [1]));
+                if (this.native && this.grabbing) this._sendGrab(1);
+            } else if (this.native && type === X.STATE && p.length >= 12) {
+                const on = !!p.readUInt32LE(4), front = !!p.readUInt32LE(8);
+                if (on !== this.onScreen) this.log.info('renderd: ' + (on ? 'on screen' : 'not on screen') + (front ? '' : ' (not in front)'));
+                this.onScreen = on;
+                this.emit('state', { onScreen: on, front });
+            } else if (this.native && type === X.CCU && p.length >= 5) {
+                this.emit('ccu', {
+                    frontSequenceNumberOperatingElement: p[0], frontRotaryEncoderOperation: p.readUInt16BE(1),
+                    frontRotaryEncoderPushButton: p[3], frontRotaryEncoderDeflection: p[4],
+                });
             } else if (type === E.TICK) {
                 this.waiting = false;
                 this.emit('tick', p.readUInt32LE(0), p.readUInt32LE(4));
-            } else if (this.claimed && type === TOUCH && p.length >= 12) {
+            } else if ((this.claimed || this.native) && type === TOUCH && p.length >= 12) {
                 this.emit('touch', p.readUInt32LE(0), p.readFloatLE(4), p.readFloatLE(8));
-            } else if (this.claimed && type === CLOSED) {
+            } else if ((this.claimed || this.native) && type === CLOSED) {
                 this.visible = false;
                 this.emit('closed');
-            } else if (type === E.CCU && p.length >= 5) {
+            } else if (!this.native && type === E.CCU && p.length >= 5) {
                 // the controller event the HMI didn't get (we hold the grab): FrontCCU names
                 this.emit('ccu', {
                     frontSequenceNumberOperatingElement: p[0], frontRotaryEncoderOperation: p.readUInt16BE(1),
@@ -219,6 +267,7 @@ class RenderClient extends EventEmitter {
     }
     /** upload a pixel image when this connection hasn't got its current version */
     _ensureImage(id) {
+        if (this.native) { if (!this.imgWarned) { this.imgWarned = true; this.log.warn('renderd: pixel images need the upstream dialect'); } return; }
         const im = rec.imageById.get(id);
         if (!im || !im.data) return;
         if (this.sent.image.get(id) === im.ver) return;

@@ -24,6 +24,7 @@ const { OnlineApp, logging } = require('oap-sdk');
 const themes = require('./themes');
 const { Display } = require('./display');
 const { HmiText } = require('./hmi-text');
+const { listSheet } = require('./sheet');
 
 const sdkLog = logging.getSDKLogger();
 const SPEC = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-spec.json'), 'utf8'));
@@ -441,7 +442,20 @@ function wireSettings(ctx) {
             });
         } else ui.onClick(comp, () => { settings.cycle(s.key); return refresh(); });
     });
-    if (ui.comp('BTN_SETTINGS')) ui.onClick('BTN_SETTINGS', () => refresh().then(() => ui.open('SETTINGS')));
+    // Settings: drawn over the page by the renderer (sheet.js) where the kit runs the screen,
+    // else the HMI's settings screen. The HMI's screen shows the values chosen in either.
+    settings.onChange(() => { if (!ctx.display.sheet) refresh(); });
+    if (ui.comp('BTN_SETTINGS')) {
+        ui.onClick('BTN_SETTINGS', () => {
+            const d = ctx.display;
+            if (d.sheet && d.sheet.settings) { d.closeSheet(); return null; }
+            const sh = listSheet(settings);
+            sh.settings = true;
+            sh.onClose = () => refresh();
+            if (d.openSheet(sh)) return null;
+            return refresh().then(() => ui.open('SETTINGS'));
+        });
+    }
     return refresh();
 }
 
@@ -500,8 +514,17 @@ async function runInner(impl) {
         // onInput(fn): while grabbed, fn gets each controller event the HMI didn't (same fields
         // as FrontCCU.statusRotaryEncoderState, enums as numbers)
         controller: { grab(on) { display.grab(on); }, onInput(fn) { display.onCcu = fn; } },
-        /** onTab(fn): fn(i) when the page tab i is tapped on the touchscreen (renderer with touch routing). */
+        /**
+         * onTab(fn): fn(i, step) when page tab i is tapped on the touchscreen (renderer with touch
+         * routing), or the controller is pushed right / left (step 1 / -1) to the next / previous tab.
+         */
         onTab(fn) { display.onTab = fn; },
+        /** onTap(fn): fn(x, y) for a tap on the page (app drawing px), where the kit runs the screen. */
+        onTap(fn) { display.onTap = fn; },
+        /** Show a sheet (sheet.js) over the page; false where it can't be (software path, other renderers). */
+        sheet(sh) { return display.openSheet(sh); },
+        /** hideButton(id): leave bar button id out where the kit runs the screen (its job is on the page there). */
+        hideButton(id) { display.ownHidden.add(id); display._btns = null; },
         /** The surface to draw one frame on (record.js Recorder, reused): pass it to ui.image. */
         canvas(w, h) { return display.canvas(w, h); },
         /**

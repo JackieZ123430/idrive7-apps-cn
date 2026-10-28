@@ -16,14 +16,38 @@
  *                              the cluster works out the new date / distance itself)
  *   check                    : 22 10 01 -> 12 bytes per item: id, .., [5] availability %, [4]&0x1F count
  * Only brake fluid (0x03) and the vehicle check (0x64) - the items kept in the cluster that were tried -
- * and only when the cluster itself reports no reason against it. Select the item with "Next item",
- * press "Reset service", then "Reset service" again within 15 s to confirm.
+ * and only when the cluster itself reports no reason against it. Where the renderer draws the cards
+ * (mgu-render/1), a tap on an item (or "Details") opens its card: due date, time and distance left,
+ * the car's hint, and Reset, then "Confirm reset" within 15 s. Elsewhere: select the item with
+ * "Next item", press "Reset service", then "Reset service" again within 15 s to confirm.
  */
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { Diag, hex, NRC } = require('./kit/diag');
 const { fitText } = require('./kit/text-layout');
+const { cardSheet } = require('./kit/sheet');
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const STATUS = ['', 'Due now', 'Due soon', 'OK', 'Due soon'];
+/**
+ * The car's due date ("09/2027", "09.2027", "15.09.2027", "2027-09") as { text: "September 2027",
+ * left: "in 11 months" / "2 months overdue", months }; null for anything else.
+ */
+function parseDue(s, now) {
+    s = String(s || '').trim();
+    let m, d = null, mo, y;
+    if ((m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(s))) { d = +m[1]; mo = +m[2]; y = +m[3]; } else if ((m = /^(\d{1,2})[./-](\d{4})$/.exec(s))) { mo = +m[1]; y = +m[2]; } else if ((m = /^(\d{4})[./-](\d{1,2})$/.exec(s))) { y = +m[1]; mo = +m[2]; } else return null;
+    if (mo < 1 || mo > 12) return null;
+    now = now || new Date();
+    const months = (y - now.getFullYear()) * 12 + (mo - 1 - now.getMonth());
+    const n = Math.abs(months), unit = n === 1 ? ' month' : ' months';
+    return {
+        text: (d ? d + ' ' : '') + MONTHS[mo - 1] + ' ' + y,
+        left: months > 0 ? 'in ' + n + unit : months === 0 ? 'this month' : n + unit + ' overdue',
+        months,
+    };
+}
 
 const W = 1600, H = 520, PER_PAGE = 5;
 const GO = '#2fd27a';
@@ -164,7 +188,7 @@ mgu.run({
                 }
                 const name = (cur && cur.id === id && cur.name) || RESETTABLE[id];
                 reset = { item: { id, name }, at: Date.now(), busy: false };
-                showMsg('Reset ' + name + '?  Press "Reset service" again to confirm (15 s)');
+                showMsg('Reset ' + name + '?  Press ' + (ctx.display.sheet ? '"Confirm reset"' : '"Reset service" again') + ' to confirm (15 s)');
             } catch (e) {
                 reset = null;
                 log.warn('reset list: ' + e);
@@ -192,6 +216,38 @@ mgu.run({
             } finally {
                 reset = null;
             }
+        }
+
+        /* ---------- an item's card (drawn by the renderer over the page, kit sheet) ---------- */
+        let rowsShown = [];                      // the list rows on screen: { i, y, h } (for taps)
+        function openCard(i) {
+            const it = items()[i];
+            if (!it) return false;
+            sel = i;
+            hint = null; msg = '';
+            reset = reset && reset.busy ? reset : null;
+            const due = parseDue(it.date);
+            const card = cardSheet({
+                title: it.name,
+                heading: it.name,
+                subtitle: () => STATUS[it.colour] || '',
+                color: () => [null, '#ef2b2d', '#ffb020', GO, '#ffb020'][it.colour] || null,
+                rows: () => [
+                    ['Due by', due ? due.text : it.date || '--', due && due.months < 0 ? '#ef2b2d' : null],
+                    due ? ['Time left', due.left] : null,
+                    ['Distance left', it.way || '--'],
+                ],
+                note: () => msg || (hint && hint.text) || '',
+                actions: () => [{
+                    label: reset && reset.item && reset.item.id === it.id && !reset.busy ? 'Confirm reset' : 'Reset',
+                    color: reset && reset.item && reset.item.id === it.id ? '#ef2b2d' : null,
+                    run: () => { resetPress(); return null; },
+                }],
+            });
+            card.onClose = () => { hint = null; msg = ''; reset = reset && reset.busy ? reset : null; changed(); };
+            if (!ctx.sheet(card)) return false;
+            details();
+            return true;
         }
 
         /* ---------- drawing ---------- */
@@ -228,8 +284,10 @@ mgu.run({
             }
             const per = line ? PER_PAGE - 1 : PER_PAGE;          // the bottom line takes the last row
             const first = Math.floor(sel / per) * per;
+            rowsShown = [];
             its.slice(first, first + per).forEach((it, i) => {
                 const y = 232 + i * 55, col = COL(t, it.colour);
+                rowsShown.push({ i: first + i, y: y - 4, h: 50 });
                 if (first + i === sel) cv.roundRect(40, y - 4, 1520, 50, 8, withAlpha(t.accent, 0.18));
                 cv.roundRect(48, y + 4, 8, 34, 4, col);
                 cv.text(fit(cv, it.name, 30, 720, { font: 'bold' }), 76, y + 32, 30, t.text, { font: 'bold' });
@@ -278,8 +336,19 @@ mgu.run({
             else if (pages().length > 1) page = 1; else sel = 0;
             changed();
         });
-        ui.onClick('BTN_DETAILS', () => { reset = reset && reset.busy ? reset : null; msg = ''; details(); });
+        ui.onClick('BTN_DETAILS', () => {
+            if (page === 0 && openCard(sel)) return;
+            reset = reset && reset.busy ? reset : null; msg = ''; details();
+        });
         ui.onClick('BTN_RESET', () => { resetPress(); });
+        // where the renderer draws the cards, the reset is on each item's card
+        ctx.hideButton('BTN_RESET');
+        // a tap on a row opens that item's card
+        ctx.onTap((x, y) => {
+            if (page !== 0) return;
+            const r = rowsShown.find((q) => y >= q.y && y < q.y + q.h && x >= 40 && x < 1560);
+            if (r) openCard(r.i);
+        });
         ctx.onTab((i) => { if (i !== page) { page = i; sel = 0; msg = ''; changed(); } });
 
         ctx.loop('MAIN', 2, () => render(false));
