@@ -229,6 +229,7 @@ mgu.run({
         const flip = () => { page = 1 - page; actionLabel(); return render(); };
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
+        ctx.onTab((i) => i !== page && flip());
         ui.onClick('BTN_ACTION', () => {
             if (page === 0) { run = null; last = null; state = 'arm'; return render(); }
             if (!clearArmed) { clearArmed = setTimeout(() => { clearArmed = null; actionLabel(); }, 5000); return actionLabel(); }

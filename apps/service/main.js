@@ -280,6 +280,7 @@ mgu.run({
         });
         ui.onClick('BTN_DETAILS', () => { reset = reset && reset.busy ? reset : null; msg = ''; details(); });
         ui.onClick('BTN_RESET', () => { resetPress(); });
+        ctx.onTab((i) => { if (i !== page) { page = i; sel = 0; msg = ''; changed(); } });
 
         ctx.loop('MAIN', 2, () => render(false));
         // back from Settings or a popup: draw again (this app only draws when something changed)

@@ -500,6 +500,8 @@ async function runInner(impl) {
         // onInput(fn): while grabbed, fn gets each controller event the HMI didn't (same fields
         // as FrontCCU.statusRotaryEncoderState, enums as numbers)
         controller: { grab(on) { display.grab(on); }, onInput(fn) { display.onCcu = fn; } },
+        /** onTab(fn): fn(i) when the page tab i is tapped on the touchscreen (renderer with touch routing). */
+        onTab(fn) { display.onTab = fn; },
         /** The surface to draw one frame on (record.js Recorder, reused): pass it to ui.image. */
         canvas(w, h) { return display.canvas(w, h); },
         /**
