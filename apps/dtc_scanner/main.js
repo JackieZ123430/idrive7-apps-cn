@@ -374,13 +374,10 @@ mgu.run({
         ui.onClick('BTN_SCAN', () => { doScan(); });
         ui.onClick('BTN_CLEAR', () => { doClear(); });
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pageCount(); changed(); });
-        // tabs: Faults (its pages: tapped again, or pushed through with the controller), Check Control, Control units
-        ctx.onTab((i, step) => {
+        // tabs: Faults (opened again: its next page of faults), Check Control, Control units
+        ctx.onTab((i) => {
             const fp = pageCount() - 2;
-            if (step > 0 && page < fp - 1) page++;
-            else if (step < 0 && page > 0 && page < fp) page--;
-            else if (step < 0 && page === fp) page = fp - 1;
-            else if (i === 0 && !step && page < fp) page = (page + 1) % fp;
+            if (i === 0 && page < fp) page = (page + 1) % fp;
             else page = i === 0 ? 0 : fp + i - 1;
             changed();
         });

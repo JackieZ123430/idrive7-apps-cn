@@ -30,10 +30,12 @@
  *
  * mgu-render/1 (the Store's renderer), full-screen layout: the kit runs the screen itself. The
  * header, page and slim bar are claimed (a tap on a bar button presses it here, so the HMI never
- * takes the screen away), and the iDrive controller is held while the screen shows: turn moves
- * along the bar, press presses the button, push left / right goes to the previous / next tab.
+ * takes the screen away), and the iDrive controller is held while the screen shows: turning moves
+ * along the page tabs and then the bar buttons, press opens the tab or presses the button.
  * Sheets (sheet.js: the settings, cards) are drawn over the page and take the controller and
- * touch while open; push left goes back. Doom ("chrome": false) keeps the upstream dialect.
+ * touch while open (a finger drags their lists); push left goes back. Doom ("chrome": false)
+ * keeps the upstream dialect. Should the renderer's foreground gate not have the app in front
+ * while its screen shows, the app draws in the HMI's own image meanwhile (blocked).
  */
 const { Recorder, play } = require('./record');
 const { Canvas } = require('./canvas');
@@ -123,7 +125,7 @@ class Display {
             });
             c.on('focus', (ev) => {
                 if (!ev || typeof ev.value !== 'boolean') return;          // (row-only events)
-                if (ev.value) { inFront(); this.focused = b[0]; this._scroll(); } else if (this.focused === b[0]) this.focused = null;
+                if (ev.value) { inFront(); this.focused = b[0]; this.focusTab = null; this._scroll(); } else if (this.focused === b[0]) this.focused = null;
                 this._repaint();
             });
         });
@@ -153,8 +155,27 @@ class Display {
         const gpu = this.gpu = new RenderClient(this.spec.id, this.log, Object.assign({ native }, file ? { file } : {}));
         gpu.on('ready', () => { if (this.gpu !== gpu) return; this._place(); this._syncVisible(); this._grab(); });
         gpu.on('tick', () => { if (this.gpu === gpu) { this.tickT = Date.now(); this.tickHandlers.forEach((fn) => fn()); } });
-        gpu.on('close', () => { if (this.gpu === gpu) this._lost(); });
+        gpu.on('close', () => { if (this.gpu === gpu) { this.blocked = false; this._lost(); } });
         gpu.on('stats', (s) => { this.gpuStats = s; });
+        // mgu-render/1: the renderer shows the app only while its foreground gate has it in front. A screen
+        // that stays shown here while the gate says otherwise (seen: a leftover install claiming the same
+        // RHMI uuid, which the gate then ignores) is drawn in the HMI's own image until the gate agrees.
+        gpu.on('state', (st) => {
+            if (this.gpu !== gpu) return;
+            if (st.front) {
+                if (this.blocked) { this.blocked = false; this.log.info('display: renderer has the app in front again'); this.lastWords = null; this._syncVisible(); this._grab(); }
+                return;
+            }
+            clearTimeout(this.frontTimer);
+            this.frontTimer = setTimeout(() => {
+                if (this.gpu !== gpu || gpu.onScreen || this.blocked || !this._shown()) return;
+                this.blocked = true;
+                this.log.warn('display: the renderer does not have this app in front while its screen shows - drawing in the HMI (journalctl -u mgu-render says why)');
+                this.closeSheet();
+                this._grab();
+                this._lost();
+            }, 1500);
+        });
         gpu.on('ccu', (v) => { if (this.gpu !== gpu) return; if (this.onCcu && !this.own()) this.onCcu(v); else this._ccu(v); });
         gpu.on('touch', (phase, x, y) => { if (this.gpu === gpu) this._touch(phase, x, y); });
         // the HMI was touched outside the tabs: shown again unless that left the screen
@@ -177,7 +198,7 @@ class Display {
     }
 
     /** The kit runs the screen: mgu-render/1 with touch, full-screen layout. */
-    own() { return !!(this.gpu && this.gpu.ready && this.gpu.native && this.gpu.touch && this.place && this.place.full); }
+    own() { return !!(this.gpu && this.gpu.ready && !this.blocked && this.gpu.native && this.gpu.touch && this.place && this.place.full); }
     /** A sheet can be shown now (else the app falls back to the HMI's own screens). */
     canSheet() { return this.own() && this.active(); }
 
@@ -218,7 +239,7 @@ class Display {
         this.app = {
             name: L.name, softImage: L.softImage, w: r.w, h: r.h, textScale: sc, words: new Uint32Array(r.words()),
             atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), images: new Set(r.images || []),
-            tabs: { tabs: [], sel: -1, badges: [] },
+            tabs: { tabs: this.sheet.title ? [this.sheet.title] : [], sel: 0, badges: [] },
         };
         this._send(L.name, this._compose(), L.softImage, false);
         this._claimTabs(this.chromeRec.tabRects, null);
@@ -249,22 +270,23 @@ class Display {
             if (tilt === 'W') this._sheetResult(this.sheet.back());
             return;
         }
-        if (d) {
-            const btns = this.buttons();
-            if (!btns.length) return;
-            let i = btns.findIndex((b) => b.id === this.focused);
-            i = i < 0 ? (d > 0 ? 0 : btns.length - 1) : Math.max(0, Math.min(btns.length - 1, i + d));
-            this.focused = btns[i].id;
-            this._scroll();
+        // one row of places for the knob: the page tabs (when there are two or more), then the bar buttons
+        const tabs = this.onTab && this.tabInfo && this.tabInfo.tabs.length > 1 ? this.tabInfo.tabs.length : 0;
+        const btns = this.buttons();
+        const n = tabs + btns.length;
+        if (d && n) {
+            let i = this.focusTab != null && this.focusTab < tabs ? this.focusTab : btns.findIndex((b) => b.id === this.focused);
+            if (i >= 0 && this.focusTab == null) i += tabs;
+            // the first turn lands on the page shown (or the first button)
+            i = i < 0 ? (tabs ? Math.max(0, this.tabInfo.sel) : 0) : Math.max(0, Math.min(n - 1, i + d));
+            if (i < tabs) { this.focusTab = i; this.focused = null; } else { this.focusTab = null; this.focused = btns[i - tabs].id; this._scroll(); }
             this._repaint();
         }
-        if (press && this.focused) this._click(this.focused);
-        if ((tilt === 'E' || tilt === 'W') && this.tabInfo && this.onTab) {
-            const n = this.tabInfo.tabs.length, sel = this.tabInfo.sel;
-            if (n > 1) {
-                const i = tilt === 'E' ? (sel + 1) % n : (sel + n - 1) % n;
-                try { Promise.resolve(this.onTab(i, tilt === 'E' ? 1 : -1)).catch((e) => this.log.error('tab', e)); } catch (e) { this.log.error('tab', e); }
-            }
+        if (press) {
+            if (this.focusTab != null && this.focusTab < tabs) {
+                const i = this.focusTab;
+                try { Promise.resolve(this.onTab(i)).catch((e) => this.log.error('tab', e)); } catch (e) { this.log.error('tab', e); }
+            } else if (this.focused) this._click(this.focused);
         }
     }
 
@@ -278,9 +300,17 @@ class Display {
             const pl = this.place, sx = x * pl.scale + pl.ox, sy = y * pl.scale + pl.oy;
             const bar = sy >= pl.h - this.barH() ? this.buttons().find((b) => sx >= b.x - this.barOff - pl.x && sx < b.x - this.barOff - pl.x + b.w) : null;
             const key = bar ? 'bar:' + bar.id : this.sheet ? 'sheet:' + (this.sheetTargets || []).findIndex(inside) : null;
-            if (phase === 1) { this.ownDown = key; this.downAt = { x, y }; } else if (phase === 3) {
+            // a finger moved on a sheet: its list follows (no tap then)
+            if (phase === 1) { this.ownDown = key; this.downAt = { x, y }; this.lastY = y; this.dragging = false; } else if (phase === 2) {
+                if (this.sheet && this.sheet.scroll && !bar && this.downAt) {
+                    if (!this.dragging && Math.abs(y - this.downAt.y) > 14) this.dragging = true;
+                    if (this.dragging) { this.sheet.scroll(this.lastY - y); this._paintSheet(); }
+                }
+                this.lastY = y;
+            } else if (phase === 3) {
                 const was = this.ownDown;
                 this.ownDown = null;
+                if (this.dragging) { this.dragging = false; if (this.sheet && this.sheet.release) this.sheet.release(); return; }
                 if (bar && was === key) { this._click(bar.id); return; }
                 if (this.sheet) {
                     const i = (this.sheetTargets || []).findIndex(inside);
@@ -380,7 +410,7 @@ class Display {
 
     /** GPU path usable for this screen right now? */
     active(stateName) {
-        return !!(this.gpu && this.gpu.ready && this.place && (!stateName || stateName === this.screen.name) && this._shown());
+        return !!(this.gpu && this.gpu.ready && this.place && !this.blocked && (!stateName || stateName === this.screen.name) && this._shown());
     }
 
     /** The surface to draw a frame on (reused). */
@@ -542,7 +572,14 @@ class Display {
         const hx = HMI.left - pl.x;
         const end = G.header(c, Object.assign({}, t, { bg: HMI.headBg }), hx, 0, HMI.status.x - pl.x - hx, FULL.headH,
             this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges, true, true);
-        const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(end));
+        // the HMI's own title is in the strip under the header: a narrower header (a sheet: no tabs) stays
+        // as wide as the app's widest, so none of that title shows beside it
+        if (!this.sheet) this.headMax = Math.max(this.headMax || 0, end);
+        const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(Math.max(end, this.headMax || 0)));
+        if (sx > end) { c.fillRect(end, 0, sx - end, FULL.headH - 2, HMI.headBg); c.fillRect(end, FULL.headH - 2, sx - end, 2, G.withAlpha('#ffffff', 0.22)); }
+        // the tab the controller is on (the kit holds it: Display._ccu)
+        const ft = this.focusTab != null && !this.sheet && (c.tabRects || []).find((q) => q.i === this.focusTab);
+        if (ft) c.strokeRoundRect(ft.x + 4, ft.y + 10, ft.w - 8, ft.h - 20, 10, 2, t.sel || t.accent);
         // the strip's bottom edge continues under the see-through part
         c.fillRect(sx, 0, W - sx, FULL.headH, HMI.headBg);
         c.fillRect(sx, FULL.headH - 2, W - sx, 2, G.withAlpha('#ffffff', 0.22));

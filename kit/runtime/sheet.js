@@ -51,11 +51,17 @@ function list(r, t, key, rows, focus, y0, controller) {
     const S = t.sel || t.accent, H = BOTTOM - y0;
     const total = rows.length * (ROW_H + GAP) - GAP;
     const fy = focus * (ROW_H + GAP);
-    const st = list.scroll[key] || (list.scroll[key] = { y: 0 });
-    if (fy < st.y) st.y = fy;
-    if (fy + ROW_H > st.y + H) st.y = fy + ROW_H - H;
+    // st.y: where the list should be; st.show: where it is drawn (glides there, follows a finger at once).
+    // The focused row is brought into view when the focus moves, so a finger can scroll it away.
+    const st = list.scroll[key] || (list.scroll[key] = { y: 0, show: 0, focus: -1, drag: false });
+    if (st.focus !== focus) {
+        st.focus = focus;
+        if (fy < st.y) st.y = fy;
+        if (fy + ROW_H > st.y + H) st.y = fy + ROW_H - H;
+    }
     st.y = Math.max(0, Math.min(st.y, Math.max(0, total - H)));
-    const sy = G.smooth('sheet_' + key, st.y, 18);
+    st.show = st.drag || Math.abs(st.y - st.show) < 0.5 ? st.y : st.show + (st.y - st.show) * 0.35;
+    const sy = st.show;
     const rects = [];
     r.clip(0, y0, W, H);
     rows.forEach((row, i) => {
@@ -111,17 +117,24 @@ function listSheet(settings, title) {
         draw(r, t) {
             r.clear(t.bg);
             const rows = this.rows();
-            const head = this.open ? this.open.label : this.title;
-            r.text(head, 44, TOP + 40, 32, t.text, { font: 'bold' });
+            // the header's tab names the sheet; a value list names its setting here
+            if (this.open) r.text(this.open.label, 44, TOP + 40, 32, t.text, { font: 'bold' });
             const targets = [];
             // Back (a value list) / Done (the settings): top right
             const bw = 150, bx = W - 40 - bw, by = TOP + 8;
             pill(r, t, bx, by, bw, 46, this.open ? 'Back' : 'Done', false);
             targets.push({ x: bx - 10, y: by - 6, w: bw + 20, h: 58, act: () => this.back() });
-            const rects = list(r, t, this.open ? 'v_' + this.open.key : 'settings', rows, this.open ? this.sub : this.focus, TOP + 74, this.controller);
+            const rects = list(r, t, this.key(), rows, this.open ? this.sub : this.focus, TOP + 74, this.controller);
             rects.forEach((q) => targets.push(Object.assign(q, { act: () => { if (this.open) this.sub = q.i; else this.focus = q.i; return this.choose(); } })));
             return targets;
         },
+        key() { return this.open ? 'v_' + this.open.key : 'settings'; },
+        /** touch: the list moved by dy (px, + = further down the list) while the finger is on it */
+        scroll(dy) {
+            const st = list.scroll[this.key()];
+            if (st) { st.y += dy; st.drag = true; }
+        },
+        release() { const st = list.scroll[this.key()]; if (st) st.drag = false; },
         move(d) {
             this.controller = true;
             const n = this.rows().length;
