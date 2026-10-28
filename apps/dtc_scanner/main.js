@@ -212,6 +212,33 @@ mgu.run({
             msg = '';
         }
 
+        /**
+         * Clear one unit's fault memory (14 FF FF FF), its replies only (other apps may talk to it too). No
+         * answer: asked once more. Refused for its session or conditions (engine and e-motor units: 7F 14 22,
+         * 7E, 7F, 31, 33): asked again in the extended session (10 03), then back to the default one (10 01).
+         * Resolves with { ok, why } (why: the refusal, for the page and the log).
+         */
+        const RETRY_NRC = [0x22, 0x31, 0x33, 0x7E, 0x7F];
+        async function clearUnit(addr) {
+            const ask = () => diag.physical(addr, 0x14, [0xFF, 0xFF, 0xFF], 8000, (u) => u[0] === 0x54 || (u[0] === 0x7F && u[1] === 0x14));
+            const session = (n) => diag.physical(addr, 0x10, [n], 3000, (u) => (u[0] === 0x50 && u[1] === n) || (u[0] === 0x7F && u[1] === 0x10));
+            let r = await ask();
+            if (!r) r = await ask();
+            if (r && r[0] === 0x7F && RETRY_NRC.indexOf(r[2]) >= 0) {
+                const first = r;
+                const ext = await session(0x03);
+                if (ext && ext[0] === 0x50) {
+                    r = (await ask()) || first;
+                    await session(0x01);
+                }
+                log.info('clear ' + hex(addr) + ': refused (' + (NRC[first[2]] || hex(first[2])) + ') - extended session: ' + (ext ? (ext[0] === 0x50 ? 'yes' : 'refused') : 'no answer') + ', then ' + (r[0] === 0x54 ? 'cleared' : 'still refused'));
+            }
+            if (r && r[0] === 0x54) return { ok: true };
+            const why = !r ? 'no answer' : r[0] === 0x7F ? (r[2] === 0x22 ? 'refused now (engine on? ignition only)' : NRC[r[2]] || 'NRC ' + hex(r[2])) : 'reply ' + r.map((x) => hex(x)).join('');
+            log.warn('clear ' + hex(addr) + ': ' + why);
+            return { ok: false, why };
+        }
+
         let clearArmed = null;
         const clearLabel = () => { changed(); return ui.text('BTN_CLEAR', clearArmed ? 'Yes, clear' : 'Clear all'); };
         async function doClear() {
@@ -226,16 +253,16 @@ mgu.run({
             clearTimeout(clearArmed); clearArmed = null; clearLabel();
             busy = true; phase = 'clearing'; changed();
             let ok = 0;
+            const failed = [], cleared = [];
             for (const e of targets) {
                 msg = 'Clearing ' + ecuName(e.addr) + '...'; changed();
-                if (scan.demo) { await new Promise((r) => setTimeout(r, 400)); ok++; continue; }
+                if (scan.demo) { await new Promise((r) => setTimeout(r, 400)); ok++; cleared.push(e.addr); continue; }
                 try {
-                    const r = await diag.physical(e.addr, 0x14, [0xFF, 0xFF, 0xFF], 6000);
-                    if (r && r[0] === 0x54) ok++;
-                    else log.warn('clear ' + hex(e.addr) + ': ' + (r ? (r[0] === 0x7F ? NRC[r[2]] || hex(r[2]) : r.map((x) => hex(x)).join('')) : 'no answer'));
-                } catch (err) { log.warn('clear ' + hex(e.addr) + ': ' + err); }
+                    const res = await clearUnit(e.addr);
+                    if (res.ok) { ok++; cleared.push(e.addr); } else failed.push(ecuName(e.addr) + ': ' + res.why);
+                } catch (err) { log.warn('clear ' + hex(e.addr) + ': ' + err); failed.push(ecuName(e.addr) + ': ' + (err.message || err)); }
             }
-            log.info('cleared ' + ok + '/' + targets.length);
+            log.info('cleared ' + ok + '/' + targets.length + (failed.length ? ' - not: ' + failed.join('; ') : ''));
             if (scan.demo) DEMO.ecus.forEach((e) => { e.dtcs = e.dtcs.filter((d) => d.mem !== 'fault' || (d.status & 1)); });
             busy = false;
             msg = 'Cleared ' + ok + ' of ' + targets.length + ' control unit(s) - scanning again';
@@ -243,7 +270,14 @@ mgu.run({
             await new Promise((r) => setTimeout(r, 1500));
             const keep = msg;
             await doScan();
-            if (!msg) msg = keep.replace(' - scanning again', '');
+            // what the clear left: units that refused, and faults back at once (still present: the cause is still there)
+            const back = scan && !scan.demo ? scan.ecus.filter((e) => cleared.indexOf(e.addr) >= 0 && e.dtcs.some((d) => d.mem === 'fault')).map((e) => ecuName(e.addr)) : [];
+            if (back.length) log.info('faults back at once after the clear: ' + back.join(', '));
+            if (!msg) {
+                msg = failed.length ? 'Not cleared - ' + failed.join(';  ')
+                    : back.length ? 'Cleared; back at once (still present): ' + back.join(', ')
+                        : keep.replace(' - scanning again', '');
+            }
             changed();
         }
 
@@ -298,7 +332,8 @@ mgu.run({
                 if (!msg) right = phase === 'scanning' ? 'Asking every control unit...' : '';
                 cv.text(right, x - 20, 212, 22, t.text, { align: 'right' });
             } else if (right) {
-                cv.text(right, 1552, 212, 22, phase === 'error' ? t.crit : t.dim, { align: 'right' });
+                // (cut to the room the title and its buttons leave; the log has it whole)
+                cv.text(fit(cv, right, 22, Math.max(240, 1552 - bx - 24)), 1552, 212, 22, phase === 'error' || /^Not cleared/.test(right) ? t.crit : t.dim, { align: 'right' });
             }
         }
 
