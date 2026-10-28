@@ -48,6 +48,8 @@ const TILT = { 1: 'N', 2: 'N', 4: 'E', 5: 'E', 7: 'S', 8: 'S', 10: 'W', 11: 'W' 
 const PAGE = { w: 1600, h: 520 };
 // bar buttons that only turn pages (Next page, Previous page)
 const PAGER = ['BTN_PAGE', 'BTN_PREV'];
+// the header with the app's name alone (its tabs along the bottom) covers at least this much of the HMI's strip
+const HEAD_MIN = 640;
 
 /* HMI geometry on the 1920 x 720 centre display (measured on the unit's HMI) */
 const HMI = {
@@ -67,6 +69,7 @@ const HMI = {
 const FULL = {
     headH: 80,                                  // header in the HMI's title strip
     barH: 48,                                   // slim button bar
+    tabH: 76,                                   // the page tabs along the bottom, where the kit runs the screen
     // part of the app's 1600 x 520 drawing shown: the tab bar (y < 38) moves to the header and
     // the side margins are trimmed a little, so the content can be scaled up further
     src: { x: 12, y: 38, w: 1576, h: 482 },
@@ -348,7 +351,7 @@ class Display {
         const inside = (r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
         if (this.own()) {
             const pl = this.place, sx = x * pl.scale + pl.ox, sy = y * pl.scale + pl.oy;
-            const bar = sy >= pl.h - this.barH() ? this.buttons().find((b) => sx >= b.x - this.barOff - pl.x && sx < b.x - this.barOff - pl.x + b.w) : null;
+            const bar = sy >= pl.h - this.barH() ? (this.barRects || []).find((b) => sx >= b.x && sx < b.x + b.w) : null;
             // the header's tabs (Settings among them) work over a sheet too
             const tab = !bar && (this.tabs || []).find(inside);
             const tgt = !bar && !tab && !this.sheet ? (this.pageTargets || []).find(inside) : null;
@@ -653,20 +656,23 @@ class Display {
         const pl = this.place, t = this.theme(), W = pl.w, H = pl.h;
         const c = this.chromeRec || (this.chromeRec = new Recorder(W, H));
         c.reset();
-        const tb = this.own() ? this._tabList() : r.chrome.tabs || { tabs: [], sel: -1, badges: [] };
+        const own = this.own();
+        const tb = own ? this._tabList() : r.chrome.tabs || { tabs: [], sel: -1, badges: [] };
         // compact header in the HMI strip's own black, only as wide as its name, tabs and badges:
-        // right of it the HMI's strip shows through (radio station, phone signal, status icons)
+        // right of it the HMI's strip shows through (radio station, phone signal, status icons).
+        // Where the kit runs the screen the tabs are along the bottom (_tabBar): the header has the name.
         const hx = HMI.left - pl.x;
         const end = G.header(c, Object.assign({}, t, { bg: HMI.headBg }), hx, 0, HMI.status.x - pl.x - hx, FULL.headH,
-            this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges, true, true);
-        // the HMI's own title is in the strip under the header: a narrower header (a sheet: no tabs) stays
-        // as wide as the app's widest, so none of that title shows beside it
+            this.screen.title || this.spec.title, own ? [] : tb.tabs, own ? -1 : tb.sel, tb.badges, true, true);
+        // the HMI's own title is in the strip under the header: a narrower header (a sheet: no tabs; the
+        // name alone) stays as wide as the app's widest, and at least HEAD_MIN, so none of that title shows beside it
         if (!this.sheet) this.headMax = Math.max(this.headMax || 0, end);
-        const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(Math.max(end, this.headMax || 0)));
+        const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(Math.max(end, this.headMax || 0, own ? hx + HEAD_MIN : 0)));
+        if (own) this._tabBar(c, t, tb, hx, H - FULL.tabH, W - hx, FULL.tabH);
         if (sx > end) { c.fillRect(end, 0, sx - end, FULL.headH - 2, HMI.headBg); c.fillRect(end, FULL.headH - 2, sx - end, 2, G.withAlpha('#ffffff', 0.22)); }
         // the tab the controller is on (the kit holds it: Display._ccu)
         const ft = this.focusTab != null && !this.sheet && (c.tabRects || []).find((q) => q.i === this.focusTab);
-        if (ft) c.strokeRoundRect(ft.x + 4, ft.y + 10, ft.w - 8, ft.h - 20, 10, 2, t.sel || t.accent);
+        if (ft) c.strokeRoundRect(ft.x + 6, ft.y + 8, ft.w - 12, ft.h - 16, 10, 3, t.sel || t.accent);
         // the page button (or row) the controller is on, and one just pressed
         const k = pl.scale, onPage = (key) => !this.sheet && key && (this.pageTargets || []).find((q) => 'tgt:' + q.key === key);
         const pt = onPage(this.focusKey), pp = Date.now() - this.pressedT < 300 && onPage(this.pressed);
@@ -681,7 +687,7 @@ class Display {
         const btns = this.buttons().map((b) => ({ id: b.id, label: b.label, x: b.x - this.barOff - pl.x, w: b.w }));
         const flash = this.pressed && Date.now() - this.pressedT < 300 ? btns.findIndex((b) => b.id === this.pressed) : -1;
         const focus = btns.findIndex((b) => b.id === this.focused);
-        if (btns.length && this.barH()) G.menuBar(c, t, 0, by, W, FULL.barH, btns, focus, 'slim', flash);
+        if (!own && btns.length && this.barH()) G.menuBar(c, t, 0, by, W, FULL.barH, btns, focus, 'slim', flash);
         // the HMI's status icons and its back arrow column (home button, back arrow) show through;
         // the column under them is covered, so the HMI's own bar doesn't show at the bottom left, nor the
         // mark the HMI draws above it when its bar is wider than the screen (eDrive's "Reset drive totals")
@@ -689,6 +695,36 @@ class Display {
         if (hx > 0) c.clip(0, 0, hx, HMI.colEnd - pl.y).clear(0).noclip();
         drawCredit(c, W - 18, FULL.headH + 17);
         r.xf(1, 0, 0).append(c).xf();
+    }
+
+    /**
+     * The page tabs along the bottom (x, y, w, h in the surface's pixels), Settings last, as wide as the
+     * room gives them, and any bar button the app still has after them. c.tabRects: the tabs (touch,
+     * the controller's ring); this.barRects: the buttons.
+     */
+    _tabBar(c, t, tb, x, y, w, h) {
+        const S = t.sel || t.accent, btns = this.buttons();
+        const n = Math.max(1, tb.tabs.length + btns.length), iw = w / n;
+        c.fillRect(x, y, w, h, t.bg);
+        c.gradientRect(x, y, w, h, [[0, G.withAlpha('#ffffff', 0.09)], [1, G.withAlpha('#ffffff', 0.03)]]);
+        c.fillRect(x, y, w, 2, G.withAlpha('#ffffff', 0.2));
+        const opt = { align: 'center', font: 'bold', spacing: 2 }, size = 24;
+        const fit = (s, room) => { s = String(s).toUpperCase(); while (s.length > 2 && c.textWidth(s, size, opt) > room) s = s.slice(0, -2) + '.'; return s; };
+        c.tabRects = [];
+        this.barRects = [];
+        const flash = this.pressed && Date.now() - this.pressedT < 300 ? this.pressed : null;
+        tb.tabs.concat(btns.map((b) => b.label)).forEach((label, i) => {
+            const tx = x + i * iw, on = i === tb.sel, btn = i >= tb.tabs.length ? btns[i - tb.tabs.length] : null;
+            if (on || (btn && flash === btn.id)) {
+                c.gradientRect(tx, y, iw, h, [[0, G.withAlpha(S, 0.06)], [1, G.withAlpha(S, 0.32)]]);
+                c.fillRect(tx, y + h - 5, iw, 5, S);
+            }
+            if (btn && this.focused === btn.id) c.strokeRoundRect(tx + 6, y + 8, iw - 12, h - 16, 10, 3, S);
+            c.text(fit(label, iw - 32), tx + iw / 2, y + h / 2 + size * 0.36, size, on ? t.selText || '#ffffff' : btn ? t.text : t.dim, opt);
+            if (i < n - 1) c.fillRect(tx + iw, y + h * 0.28, 1, h * 0.44, G.withAlpha('#ffffff', 0.14));
+            if (btn) this.barRects.push({ id: btn.id, x: tx, y, w: iw, h });
+            else c.tabRects.push({ i, x: tx, y, w: iw, h });
+        });
     }
 
     /** A bar button's text changed (ui.text): its width, and so the bar's layout, follow. */
@@ -723,7 +759,8 @@ class Display {
     barH() {
         if (this.screen && (this.screen.bar === false || this.screen.chrome === false)) return 0;
         // the kit's bar with nothing left on it (its buttons on the page, Settings a tab): no bar
-        return this.ownable() && !this.buttons().length ? 0 : FULL.barH;
+        // the page tabs (Settings at least) along the bottom, any bar button left after them
+        return this.ownable() ? FULL.tabH : FULL.barH;
     }
     /** Leave bar button id out where the kit runs the screen (the app draws it on the page there). */
     hideButton(id) {
