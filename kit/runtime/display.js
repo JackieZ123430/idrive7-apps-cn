@@ -132,7 +132,7 @@ class Display {
     _startGpu(file) {
         const gpu = this.gpu = new RenderClient(this.spec.id, this.log, file ? { file } : undefined);
         gpu.on('ready', () => { if (this.gpu !== gpu) return; this._place(); this._syncVisible(); });
-        gpu.on('tick', () => { if (this.gpu === gpu) this.tickHandlers.forEach((fn) => fn()); });
+        gpu.on('tick', () => { if (this.gpu === gpu) { this.tickT = Date.now(); this.tickHandlers.forEach((fn) => fn()); } });
         gpu.on('close', () => { if (this.gpu === gpu) this._lost(); });
         gpu.on('stats', (s) => { this.gpuStats = s; });
         gpu.on('ccu', (v) => { if (this.gpu === gpu && this.onCcu) this.onCcu(v); });
@@ -225,6 +225,7 @@ class Display {
     _syncVisible() {
         if (!this.gpu) return;
         const on = this._shown();
+        if (on && !this.gpu.visible) { this.shownT = Date.now(); this.softDone = false; }
         this.gpu.show(on);
         if (on) this.lastWords = null;
     }
@@ -336,9 +337,25 @@ class Display {
             this.keepTimer = setInterval(() => {
                 // apps that draw only on changes still send a frame every second (renderer watchdog)
                 if (this.last && this.active() && Date.now() - this.lastSent >= 1000) { this.lastSent = Date.now(); this.gpu.frame(this.last.frame); }
+                this._softIfNoTick();
             }, 500);
             if (this.keepTimer.unref) this.keepTimer.unref();
         }
+    }
+
+    /**
+     * Shown for 2 s and the renderer has not taken a frame (no tick): it may not be on screen yet (the
+     * first app opened after the head unit started showed only the HMI's empty page). The last frame
+     * goes into the HMI's own image too, once; the renderer's surface covers it when it comes.
+     */
+    _softIfNoTick() {
+        const L = this.last;
+        if (!L || this.softDone || !this.active() || !this.shownT || Date.now() - this.shownT < 2000 || (this.tickT || 0) > this.shownT) return;
+        this.softDone = true;
+        this.log.info('display: no frame taken by the renderer 2 s after showing - the last frame drawn in the HMI too');
+        const cv = new Canvas(L.w, L.h);
+        play(L.frame.words(), cv);
+        Promise.resolve(L.softImage(L.name, cv)).catch(() => {});
     }
 
     _stats() {

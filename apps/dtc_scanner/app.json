@@ -2,7 +2,7 @@
   "id": "dtc_scanner",
   "title": "Fault Scanner",
   "description": "Read and clear fault memory of every control unit, plus active Check Control messages",
-  "version": "2.6.5",
+  "version": "2.6.6",
   "vendor": "custom",
   "loggingId": "OA95",
   "iconGlyph": "engine",
