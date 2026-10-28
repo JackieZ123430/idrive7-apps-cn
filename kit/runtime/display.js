@@ -93,6 +93,7 @@ class Display {
         this.sheet = null;                           // sheet.js page drawn over the app's (openSheet)
         this.ccuLast = null;                         // last controller state (knob counter, press, push)
         this.ownHidden = new Set();                  // more bar buttons left out where the kit runs the screen (hideButton)
+        G.onConfirm(() => { this.lastWords = null; this.tickHandlers.forEach((fn) => fn()); });   // a reset asks / runs out
         const canvasScreens = (spec.screens || []).filter((s) => s.kind === 'canvas');
         this.screen = canvasScreens[0] || null;
         if (!this.screen) return;
@@ -243,6 +244,7 @@ class Display {
     openSheet(sheet) {
         if (!this.canSheet()) return false;
         if (!this.sheet) this.saved = this.app;          // the app's last frame, back when the sheet closes
+        this.sheetHead = false;
         this.sheet = sheet; this.sheetDown = -1;
         if (!this.sheetTimer) this.sheetTimer = setInterval(() => this._paintSheet(), 33);   // scrolling glides
         this._paintSheet();
@@ -251,7 +253,7 @@ class Display {
     closeSheet() {
         if (!this.sheet) return;
         const sh = this.sheet;
-        this.sheet = null; this.sheetTargets = null;
+        this.sheet = null; this.sheetTargets = null; this.sheetHead = false;
         if (this.sheetTimer) { clearInterval(this.sheetTimer); this.sheetTimer = null; }
         if (this.saved) { this.app = this.saved; this.saved = null; }
         this.lastWords = null;
@@ -302,13 +304,30 @@ class Display {
         const down = (x) => x === 1 || x === 2;
         const press = down(pb) && !(L && down(L.pb));
         const tilt = TILT[df] && !(L && TILT[L.df] === TILT[df]) ? TILT[df] : null;
+        const tl = this._tabList(), here = Math.max(0, tl.sel >= 0 ? tl.sel : tl.settings);
         if (this.sheet) {
+            // pushed up: the header's tabs (the knob along them, press opens one); pushed down: back to the sheet
+            if (tilt === 'N' && tl.tabs.length) { this.sheetHead = true; this._focus({ k: 'tab:' + here, tab: here }); this._paintSheet(); return; }
+            if (this.sheetHead) {
+                if (tilt === 'S') { this.sheetHead = false; this._focus(null); this._paintSheet(); return; }
+                if (d) { const i = Math.max(0, Math.min(tl.tabs.length - 1, (this.focusTab != null ? this.focusTab : here) + d)); this._focus({ k: 'tab:' + i, tab: i }); this._paintSheet(); }
+                if (press && this.focusTab != null) { this.sheetHead = false; this._openTab(this.focusTab); }
+                if (tilt === 'W') this._sheetResult(this.sheet.back());
+                return;
+            }
             if (d) { this.sheet.move(d); this._paintSheet(); }
             if (press) this._sheetResult(this.sheet.press());
             if (tilt === 'W') this._sheetResult(this.sheet.back());
             return;
         }
         if (tilt === 'W') { this._back(); return; }
+        // pushed up: the page's tab in the header; pushed down from the tabs: the first place under them
+        if (tilt === 'N' && tl.tabs.length) { this._focus({ k: 'tab:' + here, tab: here }); this._repaint(); return; }
+        if (tilt === 'S' && this.focusTab != null) {
+            const below = this._ring().find((p) => p.tab == null);
+            if (below) { this._focus(below); this._repaint(); }
+            return;
+        }
         // one row of places for the knob: the header's tabs, the page's buttons and rows, the bar
         const ring = this._ring();
         let i = ring.findIndex((p) => p.k === this.focusKey);
@@ -675,7 +694,7 @@ class Display {
         const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(Math.max(end, this.headMax || 0)));
         if (sx > end) { c.fillRect(end, 0, sx - end, FULL.headH - 2, HMI.headBg); c.fillRect(end, FULL.headH - 2, sx - end, 2, G.withAlpha('#ffffff', 0.22)); }
         // the tab the controller is on (the kit holds it: Display._ccu)
-        const ft = this.focusTab != null && !this.sheet && (c.tabRects || []).find((q) => q.i === this.focusTab);
+        const ft = this.focusTab != null && (!this.sheet || this.sheetHead) && (c.tabRects || []).find((q) => q.i === this.focusTab);
         if (ft) c.strokeRoundRect(ft.x + 4, ft.y + 10, ft.w - 8, ft.h - 20, 10, 2, t.sel || t.accent);
         // the page button (or row) the controller is on, and one just pressed
         const k = pl.scale, onPage = (key) => !this.sheet && key && (this.pageTargets || []).find((q) => 'tgt:' + q.key === key);

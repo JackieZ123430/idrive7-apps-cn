@@ -18,8 +18,8 @@
  * Only brake fluid (0x03) and the vehicle check (0x64) - the items kept in the cluster that were tried -
  * and only when the cluster itself reports no reason against it. Where the renderer draws the cards
  * (mgu-render/1), a tap on an item (or "Details") opens its card: due date, time and distance left,
- * the car's hint, and Reset, then "Confirm reset" within 15 s. Elsewhere: select the item with
- * "Next item", press "Reset service", then "Reset service" again within 15 s to confirm.
+ * the car's hint, and Reset, then "Confirm reset" within 5 s. Elsewhere: select the item with
+ * "Next item", press "Reset service", then "Reset service" again within 5 s to confirm.
  */
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
@@ -55,7 +55,7 @@ const KOMBI = 'de.bmw.infotainment.KombiInterface_2';
 const COLORS = { DEFAULT: 0, RED: 1, YELLOW: 2, GREEN: 3, ORANGE: 4 };
 const KOMBI_ECU = 0x60;
 const RESETTABLE = { 0x03: 'Brake fluid', 0x64: 'Vehicle check' };
-const CONFIRM_MS = 15000;
+const CONFIRM_MS = 5000;
 
 /**
  * the object holding `key` somewhere inside v (unions arrive wrapped in their member's name). With
@@ -162,7 +162,7 @@ mgu.run({
             return out;
         }
         /** "Reset service": the first press asks the cluster and arms the reset of the selected item; a
-         *  second press within 15 s confirms it. Anything else (Next item, Details) disarms it. */
+         *  second press within 5 s confirms it. Anything else (Next item, Details) disarms it. */
         async function resetPress() {
             if (settings.get('resetOn') !== true) return showMsg('Reset is off - turn on "Service reset" in Settings');
             if (useDemo()) return showMsg('No reset in demo mode');
@@ -188,7 +188,7 @@ mgu.run({
                 }
                 const name = (cur && cur.id === id && cur.name) || RESETTABLE[id];
                 reset = { item: { id, name }, at: Date.now(), busy: false };
-                showMsg('Reset ' + name + '?  Press ' + (ctx.display.sheet ? '"Confirm reset"' : '"Reset service" again') + ' to confirm (15 s)');
+                showMsg('Reset ' + name + '?  Press ' + (ctx.display.sheet ? '"Confirm reset"' : '"Reset service" again') + ' to confirm (5 s)');
             } catch (e) {
                 reset = null;
                 log.warn('reset list: ' + e);

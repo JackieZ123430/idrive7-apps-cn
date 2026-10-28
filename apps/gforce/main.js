@@ -147,7 +147,7 @@ mgu.run({
 
             // session peaks
             G.panel(cv, t, 1092, 44, 484, 468, 'Session peaks');
-            G.button(cv, t, 1576 - 20 - 180, 56, 180, 40, 'Reset max', act, { key: 'reset' });
+            G.button(cv, t, 1576 - 20 - 180, 56, 180, 40, 'Reset max', act, { key: 'reset', confirm: true });
             peakBox(cv, t, 1116, 116, 'ACCEL', S.peak.acc, R.acc);
             peakBox(cv, t, 1346, 116, 'BRAKE', S.peak.brk, R.brk);
             peakBox(cv, t, 1116, 255, 'LEFT', S.peak.left, R.left);

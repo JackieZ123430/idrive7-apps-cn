@@ -255,7 +255,7 @@ mgu.run({
 
         function drawLog(cv, t) {
             G.panel(cv, t, 24, 44, 760, 468, 'Recent upshifts');
-            G.button(cv, t, 784 - 20 - 180, 56, 180, 40, 'Reset max', resetMax, { key: 'reset' });
+            G.button(cv, t, 784 - 20 - 180, 56, 180, 40, 'Reset max', resetMax, { key: 'reset', confirm: true });
             const up = shifts.slice(0, 9);
             if (!up.length) cv.text('No shifts yet - go and use the rev range.', 48, 189, 26, t.dim);
             up.forEach((s, i) => {

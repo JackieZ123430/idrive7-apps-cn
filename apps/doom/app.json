@@ -2,7 +2,7 @@
   "id": "doom",
   "title": "Doom",
   "description": "Doom (Freedoom: Phase 1) on the iDrive. Main menu with all settings; the game drawn in full resolution across the whole screen, on the controller; BACK returns to the menu and saves",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "vendor": "custom",
   "loggingId": "OA9F",
   "maxDiskUsage": 104857600,

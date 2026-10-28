@@ -725,7 +725,7 @@ mgu.run({
             const holds = G.isNum(d.soh) ? settings.get('designKwh') * d.soh / 100 : settings.get('designKwh');
             const inBat = has ? [G.fmt(holds * d.soc / 100, 1), G.fmt(holds, 1)] : ['--', G.fmt(holds, 1)];
             lv.drawTrip(cv, t, 1172, 44, 404, 468, climFoot, inBat);
-            G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { lv.action('battery'); return render(); }, { key: 'trip' });
+            G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { lv.action('battery'); return render(); }, { key: 'trip', confirm: true });
         }
 
         /**
@@ -737,7 +737,7 @@ mgu.run({
             const parts = (isHybrid() ? DIAG_PARTS_HYBRID : DIAG_PARTS_12V).map((p) => ({
                 diag: () => renderDiag(cv, t, d), signals: () => renderSignals(cv, t, d),
                 unit: () => lv.draw('unit', cv, t),
-                scan: () => { lv.draw('scan', cv, t); G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { lv.action('scan'); return render(); }, { key: 'scan' }); },
+                scan: () => { lv.draw('scan', cv, t); G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { lv.action('scan'); return render(); }, { key: 'scan', confirm: true }); },
             })[p]);
             const pl = cv.place;
             if (!pl) { parts[0](); return; }

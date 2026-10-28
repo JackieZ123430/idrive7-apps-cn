@@ -776,11 +776,27 @@ function menuBar(cv, t, x, y, w, h, buttons, focus, variant, flash) {
  * A button on the page: a pill with its label, pressed by a tap or the controller (cv.target). Drawn
  * only where the kit runs the screen (display.js: the app's bar button then leaves the bar, hideButton).
  * opts: { key (default: the label), color (a warning colour, for resets), primary (filled), busy (drawn
- * dimmed, nothing to press) }. Returns the button's width.
+ * dimmed, nothing to press), confirm (a reset: the first press asks, Confirm pressed within 5 s runs it) }.
+ * Returns the button's width.
  */
+const armed = new Map();                // confirm buttons pressed once: key -> when
+let onArmed = null;
+/** fn() when a confirm button is armed or runs out (display.js: the app draws its next frame). */
+function onConfirm(fn) { onArmed = fn; }
 function button(cv, t, x, y, w, h, label, run, opts) {
-    const o = opts || {}, S = t.sel || t.accent, c = o.color || S;
+    let o = opts || {};
     if (!cv.own) return 0;              // elsewhere the HMI's bar has the button
+    if (o.confirm && run) {
+        const key = o.key || label, act = run, live = () => armed.has(key) && Date.now() - armed.get(key) < 5000;
+        if (live()) { label = 'Confirm'; o = Object.assign({}, o, { color: t.crit, primary: true }); }
+        run = () => {
+            if (live()) { armed.delete(key); if (onArmed) onArmed(); return act(); }
+            armed.set(key, Date.now());
+            if (onArmed) { onArmed(); setTimeout(onArmed, 5050); }
+            return null;
+        };
+    }
+    const S = t.sel || t.accent, c = o.color || S;
     if (!w) w = Math.max(h * 3, cv.textWidth(String(label).toUpperCase(), h * 0.4, { font: 'bold', spacing: 1.5 }) + h * 1.2);
     cv.roundRect(x, y, w, h, h / 2, o.primary ? withAlpha(c, o.busy ? 0.35 : 0.85) : withAlpha('#ffffff', 0.07));
     if (!o.primary) cv.strokeRoundRect(x, y, w, h, h / 2, 1.5, withAlpha(o.color || '#ffffff', o.busy ? 0.25 : o.color ? 0.75 : 0.3));
@@ -799,6 +815,6 @@ function stripes(cv, t, x, y, w) {
 
 module.exports = {
     BAR_H, TOP, BOTTOM, frame, header, layer, onLayerDrop, panel, segBar, radial, needle, ring, bar, stat, readout,
-    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, button, smooth, hold, niceStep,
+    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, button, onConfirm, smooth, hold, niceStep,
     fmt, isNum, clamp, mix, zoneColor, withAlpha, ramp,
 };

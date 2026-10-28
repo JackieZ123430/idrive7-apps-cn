@@ -161,7 +161,7 @@ mgu.run({
             cv.text(stTxt, 284, 446, 26, col, { align: 'center', font: 'bold', spacing: 3 });
             cv.text('PEAK ' + (peakG > 0 ? peakG.toFixed(2) : '-.--') + ' g', 44, 493, 22, t.dim, { font: 'bold', spacing: 1 });
             if (G.isNum(live.rpm)) cv.text(Math.round(live.rpm) + ' rpm', 524, 493, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
-            G.button(cv, t, 214, 466, 140, 38, 'Reset run', act, { key: 'reset' });
+            G.button(cv, t, 214, 466, 140, 38, 'Reset run', act, { key: 'reset', confirm: true });
 
             // --- speed trace ---
             G.panel(cv, t, 568, 44, 520, 468, 'Speed trace');

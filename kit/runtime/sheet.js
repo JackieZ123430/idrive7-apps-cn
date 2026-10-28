@@ -122,7 +122,8 @@ function listSheet(settings, title) {
             const targets = [];
             // Back (a value list) / Done (the settings): top right
             const bw = 150, bx = W - 40 - bw, by = TOP + 8;
-            pill(r, t, bx, by, bw, 46, this.open ? 'Back' : 'Done', false);
+            // (the controller reaches it turning up from the first row: place -1)
+            pill(r, t, bx, by, bw, 46, this.open ? 'Back' : 'Done', this.controller && (this.open ? this.sub : this.focus) === -1);
             targets.push({ x: bx - 10, y: by - 6, w: bw + 20, h: 58, act: () => this.back() });
             const rects = list(r, t, this.key(), rows, this.open ? this.sub : this.focus, TOP + 74, this.controller);
             rects.forEach((q) => targets.push(Object.assign(q, { act: () => { if (this.open) this.sub = q.i; else this.focus = q.i; return this.choose(); } })));
@@ -138,10 +139,14 @@ function listSheet(settings, title) {
         move(d) {
             this.controller = true;
             const n = this.rows().length;
-            if (this.open) this.sub = Math.max(0, Math.min(n - 1, this.sub + d));
-            else this.focus = Math.max(0, Math.min(n - 1, this.focus + d));
+            if (this.open) this.sub = Math.max(-1, Math.min(n - 1, this.sub + d));
+            else this.focus = Math.max(-1, Math.min(n - 1, this.focus + d));
         },
-        press() { this.controller = true; return this.choose(); },
+        press() {
+            this.controller = true;
+            if ((this.open ? this.sub : this.focus) === -1) { const r = this.back(); if (this.open === null) this.focus = Math.max(0, this.focus); return r; }
+            return this.choose();
+        },
         choose() {
             if (this.open) {
                 const v = values(this.open)[this.sub];

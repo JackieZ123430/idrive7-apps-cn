@@ -186,7 +186,7 @@ mgu.run({
 
             G.panel(cv, t, 1168, 44, 408, 468, live.state === 'pull' ? 'Recording' : 'Peak');
             // Reset: the power and torque shown go blank until the next pull (saved runs stay)
-            if (live.state !== 'pull') G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { cleared = true; lastRun = null; return render(); }, { key: 'reset', busy: !cur });
+            if (live.state !== 'pull') G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { cleared = true; lastRun = null; return render(); }, { key: 'reset', busy: !cur, confirm: true });
             const now = Date.now();
             if (live.state === 'pull') {
                 cv.circle(1540, 84, 9, Math.floor(now / 300) % 2 ? t.crit : withAlpha(t.crit, 0.3));
