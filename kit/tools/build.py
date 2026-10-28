@@ -500,6 +500,11 @@ def build(app_id, language='en'):
     # --- installer helpers + metadata ---
     shutil.copytree(os.path.join(KIT, 'tools', 'oapgen'), os.path.join(stage, 'oapgen'))
     meta = {'id': app_id, 'version': ver, 'title': spec['title'], 'native': NATIVE, 'kit': 1}
+    # app.json signals with "_optional": "<what the app loses>": a unit without that interface
+    # still installs the app, without it (deploy/mgu-app-install.sh says what is missing)
+    optional = {i: f['_optional'] for i, f in spec.get('signals', {}).items() if isinstance(f, dict) and f.get('_optional')}
+    if optional:
+        meta['optional'] = optional
     json.dump(meta, open(os.path.join(stage, 'meta.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
 
     # --- archives ---

@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.13.0",
+  "version": "2.13.1",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -24,6 +24,7 @@
       "statusActualValueTorque2": "rs"
     },
     "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "gearbox oil temperature; the xDrive split then comes from the transfer case or the drive mode",
       "basicDataSet": "s"
     },
     "de.bmw.infrastructure.EnvironmentalInformation": {
