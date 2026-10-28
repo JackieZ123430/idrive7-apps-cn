@@ -307,12 +307,13 @@ class Display {
         const tl = this._tabList(), here = Math.max(0, tl.sel >= 0 ? tl.sel : tl.settings);
         if (this.sheet) {
             // pushed up: the header's tabs (the knob along them, press opens one); pushed down: back to the sheet
-            if (tilt === 'N' && tl.tabs.length) { this.sheetHead = true; this._focus({ k: 'tab:' + here, tab: here }); this._paintSheet(); return; }
+            if (tilt === 'N' && !this.sheetHead && tl.tabs.length && (!this.sheet.top || this.sheet.top())) { this.sheetHead = true; this._focus({ k: 'tab:' + here, tab: here }); this._paintSheet(); return; }
+            if (!this.sheetHead && (tilt === 'N' || tilt === 'S')) { this.sheet.move(tilt === 'N' ? -1 : 1); this._paintSheet(); return; }
             if (this.sheetHead) {
                 if (tilt === 'S') { this.sheetHead = false; this._focus(null); this._paintSheet(); return; }
+                if (tilt === 'E' || tilt === 'W') d = tilt === 'E' ? 1 : -1;
                 if (d) { const i = Math.max(0, Math.min(tl.tabs.length - 1, (this.focusTab != null ? this.focusTab : here) + d)); this._focus({ k: 'tab:' + i, tab: i }); this._paintSheet(); }
                 if (press && this.focusTab != null) { this.sheetHead = false; this._openTab(this.focusTab); }
-                if (tilt === 'W') this._sheetResult(this.sheet.back());
                 return;
             }
             if (d) { this.sheet.move(d); this._paintSheet(); }
@@ -320,12 +321,10 @@ class Display {
             if (tilt === 'W') this._sheetResult(this.sheet.back());
             return;
         }
-        if (tilt === 'W') { this._back(); return; }
-        // pushed up: the page's tab in the header; pushed down from the tabs: the first place under them
-        if (tilt === 'N' && tl.tabs.length) { this._focus({ k: 'tab:' + here, tab: here }); this._repaint(); return; }
-        if (tilt === 'S' && this.focusTab != null) {
-            const below = this._ring().find((p) => p.tab == null);
-            if (below) { this._focus(below); this._repaint(); }
+        // pushed up / down / left / right: the nearest place that way; left with nothing there goes back (leaves the app)
+        if (tilt) {
+            const to = this._toward(tilt, here);
+            if (to) { this._focus(to); this._repaint(); } else if (tilt === 'W') this._back();
             return;
         }
         // one row of places for the knob: the header's tabs, the page's buttons and rows, the bar
@@ -352,6 +351,37 @@ class Display {
         try { moved = !!this.onScroll(dy); } catch (e) { this.log.error('scroll', e); }
         if (moved) this.tickHandlers.forEach((fn) => fn());
         return moved;
+    }
+    /** Where place p of the ring is on screen (the surface's px): { x, y, w, h }. */
+    _rectOf(p) {
+        const pl = this.place, k = pl.scale;
+        if (p.tab != null) return ((this.chromeRec && this.chromeRec.tabRects) || []).find((q) => q.i === p.tab) || null;
+        if (p.tgt) return { x: p.tgt.x * k + pl.ox, y: p.tgt.y * k + pl.oy, w: p.tgt.w * k, h: p.tgt.h * k };
+        if (p.bar) { const b = this.buttons().find((q) => q.id === p.bar); return b ? { x: b.x - this.barOff - pl.x, y: pl.h - this.barH(), w: b.w, h: this.barH() } : null; }
+        if (p.scroll) { const hx = HMI.left - pl.x; return { x: hx, y: this.headH(), w: pl.w - hx, h: pl.h - this.barH() - this.headH() }; }
+        return null;
+    }
+    /**
+     * The place nearest the controller's one in direction dir (N, S, E, W), by the places' centres: the
+     * distance that way, the sideways one counting double. Nothing focused yet: the page's tab (left: none).
+     */
+    _toward(dir, here) {
+        const ring = this._ring().filter((p) => !p.scroll || this.focusKey === 'scroll');
+        const cur = ring.find((p) => p.k === this.focusKey), cr = cur && this._rectOf(cur);
+        if (!cr) return dir === 'W' ? null : ring.find((p) => p.tab === here) || ring[0] || null;
+        const cx = cr.x + cr.w / 2, cy = cr.y + cr.h / 2;
+        let best = null, score = Infinity;
+        ring.forEach((p) => {
+            if (p === cur || p.scroll) return;
+            const r = this._rectOf(p);
+            if (!r) return;
+            const dx = r.x + r.w / 2 - cx, dy = r.y + r.h / 2 - cy;
+            const ahead = dir === 'E' ? dx : dir === 'W' ? -dx : dir === 'S' ? dy : -dy, side = dir === 'E' || dir === 'W' ? Math.abs(dy) : Math.abs(dx);
+            if (ahead <= 4) return;
+            const sc = ahead + 2 * side;
+            if (sc < score) { score = sc; best = p; }
+        });
+        return best;
     }
     /** The controller is on place p of the ring (null: nowhere). */
     _focus(p) {

@@ -2,7 +2,7 @@
   "id": "service",
   "title": "Service",
   "description": "Service requirements from the instrument cluster: oil, brakes, brake fluid, vehicle check, inspection - distance, date, details; brake fluid and vehicle check reset",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "vendor": "custom",
   "loggingId": "OA96",
   "iconGlyph": "wrench",

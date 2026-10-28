@@ -8,6 +8,7 @@
  *               targets [{ x, y, w, h, act }] (act(): what a tap does; 'close' closes the sheet)
  *   move(d)     controller knob: d clicks (+ = clockwise)
  *   press()     controller press; back(): tilt left. Both return 'close' to close the sheet.
+ *   top()       (optional) the controller is at the sheet's top: pushed up, it goes to the header's tabs
  *   title       the header's text
  *
  *   listSheet(settings)     the app's settings: a row per setting, a list of values to pick from
@@ -130,6 +131,8 @@ function listSheet(settings, title) {
             return targets;
         },
         key() { return this.open ? 'v_' + this.open.key : 'settings'; },
+        /** the controller is on Done / Back: pushed up from here it goes to the header's tabs */
+        top() { return (this.open ? this.sub : this.focus) === -1; },
         /** touch: the list moved by dy (px, + = further down the list) while the finger is on it */
         scroll(dy) {
             const st = list.scroll[this.key()];
