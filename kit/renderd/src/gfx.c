@@ -6,23 +6,32 @@
  * rounded box, ring sector with round caps, capsule, convex quad, glyph alpha), so edges
  * are anti-aliased without multisampling and the result matches the kit's software canvas
  * (kit/runtime/canvas.js) closely. Output is premultiplied alpha.
+ *
+ * From mgu-renderd src/gfx.c (idrive7-apps kit/renderd, MIT, Copyright (c) 2026 cauliflowermossgrape),
+ * with both forks' images: upstream's pixel images and IterioDev's pictures and video (mgu-renderd 1.2.0),
+ * and mgu-render's pixmaps (images written in regions, INDEX8 with a palette).
  */
 #include <GLES2/gl2.h>
+#include <fcntl.h>
 #include <math.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "gfx.h"
+#include "log.h"
 #include "proto.h"
 
-enum { K_BOX = 0, K_RRECT = 1, K_ARC = 3, K_LINE = 4, K_GLYPH = 5, K_TEX = 6, K_VCOL = 7, K_RAMPRECT = 8, K_QUAD = 9 };
+enum { K_BOX = 0, K_RRECT = 1, K_ARC = 3, K_LINE = 4, K_GLYPH = 5, K_TEX = 6, K_VCOL = 7, K_RAMPRECT = 8, K_QUAD = 9, K_IMG = 10, K_YUV = 11 };
 
 /* vertex: pos(2) kind(1) pad(1) | a(4) | b(4) | c(4) | d(4) | col(4) = 24 floats */
 #define VF 24
 typedef struct { float v[VF]; } vert;
 
 static GLuint prog, vbo, ibo;
-static GLint u_view, u_atlas, u_ramp, u_tex;
+static GLint u_view, u_atlas, u_ramp, u_tex, u_tex2, u_tex3;
 static GLuint atlas_tex, ramp_tex;
 #define ATLAS_W 2048
 #define ATLAS_H 4096
@@ -34,24 +43,26 @@ static char err[256];
 
 static vert *vb; static size_t nv, cap;                  /* current batch */
 static GLuint cur_tex;                                   /* layer texture bound for K_TEX quads */
+static GLuint cur_tex2, cur_tex3;                        /* a video's U and V planes (K_YUV; cur_tex = Y) */
 static int fb_w, fb_h;
+static int fb_top_down;                                  /* the framebuffer's rows in memory top-down (GFX_TOP_DOWN) */
 static float g_alpha = 1;
 
 const char *gfx_error(void) { return err; }
 
 static const char *VS =
     "attribute vec4 a_pos; attribute vec4 a_a; attribute vec4 a_b; attribute vec4 a_c; attribute vec4 a_d; attribute vec4 a_col;\n"
-    "uniform vec2 u_view;\n"
+    "uniform vec3 u_view;\n"
     "varying vec2 v_p; varying float v_kind; varying vec4 v_a; varying vec4 v_b; varying vec4 v_c; varying vec4 v_d; varying vec4 v_col;\n"
     "void main() {\n"
     "  v_p = a_pos.xy; v_kind = a_pos.z; v_a = a_a; v_b = a_b; v_c = a_c; v_d = a_d; v_col = a_col;\n"
-    "  gl_Position = vec4(a_pos.x / u_view.x * 2.0 - 1.0, 1.0 - a_pos.y / u_view.y * 2.0, 0.0, 1.0);\n"
+    "  gl_Position = vec4(a_pos.x / u_view.x * 2.0 - 1.0, u_view.z * (1.0 - a_pos.y / u_view.y * 2.0), 0.0, 1.0);\n"
     "}\n";
 
 static const char *FS =
     "precision highp float;\n"
     "varying vec2 v_p; varying float v_kind; varying vec4 v_a; varying vec4 v_b; varying vec4 v_c; varying vec4 v_d; varying vec4 v_col;\n"
-    "uniform sampler2D u_atlas; uniform sampler2D u_ramp; uniform sampler2D u_tex;\n"
+    "uniform sampler2D u_atlas; uniform sampler2D u_ramp; uniform sampler2D u_tex; uniform sampler2D u_tex2; uniform sampler2D u_tex3;\n"
     "const float PI = 3.14159265358979;\n"
     /* exact overlap of the pixel square around p with the box a.xy..a.zw */
     "float boxcov(vec2 p, vec4 r) { vec2 o = clamp(min(p + 0.5, r.zw) - max(p - 0.5, r.xy), 0.0, 1.0); return o.x * o.y; }\n"
@@ -102,9 +113,23 @@ static const char *FS =
     "    vec4 rc = rampcol(v_b.w, (p.x - v_b.y) / max(v_b.z, 1.0)); col = vec4(rc.rgb, rc.a * v_col.a);\n"
     "    if (v_c.z > 0.0) cov *= boxcov(p, v_d);\n"
     "  }\n"
-    "  else {\n"                                                /* convex quad: 4 edges (nx, ny, d), inside where n.p + d >= 0 */
+    "  else if (k < 9.5) {\n"                                   /* convex quad: 4 edges (nx, ny, d), inside where n.p + d >= 0 */
     "    vec4 e = vec4(dot(v_a.xy, p) + v_a.z, dot(vec2(v_a.w, v_b.x), p) + v_b.y, dot(v_b.zw, p) + v_c.x, dot(v_c.yz, p) + v_c.w);\n"
     "    vec4 c4 = clamp(e + 0.5, 0.0, 1.0); cov = c4.x * c4.y * c4.z * c4.w;\n"
+    "  }\n"
+    "  else if (k < 10.5) {\n"                                  /* picture: a = centre, half size; b.x radius; uv in c.xy (premultiplied) */
+    "    float ic = clamp(0.5 - rrdist(p, v_a, v_b.x), 0.0, 1.0) * v_col.a;\n"
+    "    if (ic <= 0.0) discard;\n"
+    "    gl_FragColor = texture2D(u_tex, v_c.xy) * ic; return;\n"
+    "  }\n"
+    "  else {\n"                                                /* video, I420 planes Y U V: as a picture; b.y 1 = BT.709, b.z 1 = full range */
+    "    float ic = clamp(0.5 - rrdist(p, v_a, v_b.x), 0.0, 1.0) * v_col.a;\n"
+    "    if (ic <= 0.0) discard;\n"
+    "    float cy = texture2D(u_tex, v_c.xy).r, cu = texture2D(u_tex2, v_c.xy).r - 0.501961, cv = texture2D(u_tex3, v_c.xy).r - 0.501961;\n"
+    "    if (v_b.z < 0.5) { cy = (cy - 0.062745) * 1.164384; cu *= 1.138393; cv *= 1.138393; }\n"
+    "    vec3 rgb = v_b.y > 0.5 ? vec3(cy + 1.5748 * cv, cy - 0.187324 * cu - 0.468124 * cv, cy + 1.8556 * cu)\n"
+    "                           : vec3(cy + 1.402 * cv, cy - 0.344136 * cu - 0.714136 * cv, cy + 1.772 * cu);\n"
+    "    gl_FragColor = vec4(clamp(rgb, 0.0, 1.0) * ic, ic); return;\n"
     "  }\n"
     "  float a = col.a * cov;\n"
     "  if (a <= 0.0) discard;\n"
@@ -134,6 +159,8 @@ int gfx_init(void) {
     u_atlas = glGetUniformLocation(prog, "u_atlas");
     u_ramp = glGetUniformLocation(prog, "u_ramp");
     u_tex = glGetUniformLocation(prog, "u_tex");
+    u_tex2 = glGetUniformLocation(prog, "u_tex2");
+    u_tex3 = glGetUniformLocation(prog, "u_tex3");
     glGenBuffers(1, &vbo); glGenBuffers(1, &ibo);
 
     glGenTextures(1, &atlas_tex);
@@ -227,36 +254,315 @@ void gfx_layer_drop(gfx_client *c, uint32_t id) {
     }
 }
 
-static gfx_layer *find_image(gfx_client *c, uint32_t id) {
-    for (gfx_layer *l = c->images; l; l = l->next) if (l->id == id) return l;
+static size_t images_all;                                /* picture bytes of all apps */
+static size_t videos_all;                                /* video bytes of all apps (GFX_VIDEO_ALL) */
+
+static gfx_image *find_image(gfx_client *c, uint32_t id) {
+    for (gfx_image *m = c->images; m; m = m->next) if (m->id == id) return m;
     return NULL;
 }
 
-/* upload (or replace) pixel image id: opaque RGBA, top row first */
-int gfx_image(gfx_client *c, uint32_t id, int w, int h, const uint8_t *rgba) {
-    if (w < 1 || h < 1 || w > 4096 || h > 4096) { snprintf(err, sizeof err, "image %u: bad size %dx%d", id, w, h); return -1; }
-    gfx_layer *l = find_image(c, id);
-    if (!l) {
-        l = calloc(1, sizeof *l);
-        l->id = id;
-        glGenTextures(1, &l->tex);
-        glBindTexture(GL_TEXTURE_2D, l->tex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        l->next = c->images; c->images = l;
+void gfx_image_drop(gfx_client *c, uint32_t id) {
+    for (gfx_image **pp = &c->images; *pp; pp = &(*pp)->next) {
+        if ((*pp)->id == id) {
+            gfx_image *m = *pp; *pp = m->next;
+            glDeleteTextures(1, &m->tex);
+            c->nimage--; images_all -= m->bytes;
+            if (m->kind == IMG_PICTURE) c->image_bytes -= m->bytes;
+            free(m->index); free(m);
+            return;
+        }
     }
-    glBindTexture(GL_TEXTURE_2D, l->tex);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    if (l->w != w || l->h != h) { glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba); l->w = w; l->h = h; }
-    else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+}
+
+/* room for one more image of `bytes`; pictures also count against the per-app bytes */
+static int image_room(gfx_client *c, uint32_t id, size_t bytes, int picture) {
+    if (c->nimage >= GFX_IMG_MAX || (picture && c->image_bytes + bytes > GFX_IMG_BYTES)) {
+        snprintf(err, sizeof err, "image %u: an app holds at most %d pictures / %u MB", id, GFX_IMG_MAX, GFX_IMG_BYTES >> 20);
+        return -1;
+    }
+    if (images_all + bytes > GFX_IMG_ALL) { snprintf(err, sizeof err, "image %u: all apps' pictures use %u MB already", id, GFX_IMG_ALL >> 20); return -1; }
     return 0;
+}
+
+/* a new texture w x h from px (NULL: zero); the caller sets its filters */
+static gfx_image *image_new(gfx_client *c, uint32_t id, int w, int h, int kind, const uint8_t *px) {
+    gfx_image *m = calloc(1, sizeof *m);
+    if (!m) { snprintf(err, sizeof err, "image %u: out of memory", id); return NULL; }
+    m->id = id; m->w = w; m->h = h; m->bytes = (size_t)w * h * 4; m->kind = kind;
+    for (int k = 0; k < 8 && glGetError() != GL_NO_ERROR; k++) {}    /* an older error must not fail this upload */
+    glGenTextures(1, &m->tex);
+    glBindTexture(GL_TEXTURE_2D, m->tex);
+    uint8_t *zero = NULL;
+    if (!px) px = zero = calloc(1, m->bytes);
+    if (!px) { glDeleteTextures(1, &m->tex); free(m); snprintf(err, sizeof err, "image %u: out of memory", id); return NULL; }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+    free(zero);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    return m;
+}
+
+static int image_add(gfx_client *c, gfx_image *m) {
+    if (glGetError() != GL_NO_ERROR) {
+        glDeleteTextures(1, &m->tex); free(m->index); free(m);
+        snprintf(err, sizeof err, "image: the GPU refused it (out of memory?)");
+        return -1;
+    }
+    m->next = c->images; c->images = m;
+    c->nimage++; images_all += m->bytes;
+    if (m->kind == IMG_PICTURE) c->image_bytes += m->bytes;
+    return 0;
+}
+
+int gfx_image_def(gfx_client *c, uint32_t id, int w, int h, const uint8_t *px) {
+    gfx_image_drop(c, id);                               /* a replace: the old one's room counts as free (refused = gone) */
+    if (w < 1 || h < 1 || w > GFX_IMG_SIDE || h > GFX_IMG_SIDE) { snprintf(err, sizeof err, "image %u: bad size %dx%d", id, w, h); return -1; }
+    size_t bytes = (size_t)w * h * 4;
+    if (image_room(c, id, bytes, 1) < 0) return -1;
+    gfx_image *m = image_new(c, id, w, h, IMG_PICTURE, px);
+    if (!m) return -1;
+    /* power-of-two sides get mipmaps (a 256 px icon shown at 76 px stays clean); GLES2 allows none on others */
+    int pot = !(w & (w - 1)) && !(h & (h - 1));
+    if (pot) glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, pot ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    return image_add(c, m);
+}
+
+int gfx_image_upstream(gfx_client *c, uint32_t id, int w, int h, const uint8_t *rgba) {
+    if (w < 1 || h < 1 || w > GFX_UPSTREAM_SIDE || h > GFX_UPSTREAM_SIDE) { snprintf(err, sizeof err, "image %u: bad size %dx%d", id, w, h); return -1; }
+    gfx_image *m = find_image(c, id);
+    if (m && m->kind == IMG_UPSTREAM && m->w == w && m->h == h) {   /* a game's next frame: overwrite */
+        glBindTexture(GL_TEXTURE_2D, m->tex);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+        return 0;
+    }
+    if (m) gfx_image_drop(c, id);
+    if (image_room(c, id, (size_t)w * h * 4, 0) < 0) return -1;
+    m = image_new(c, id, w, h, IMG_UPSTREAM, rgba);
+    if (!m) return -1;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    return image_add(c, m);
+}
+
+int gfx_pixmap_def(gfx_client *c, uint32_t id, int w, int h, int format, int linear) {
+    gfx_image_drop(c, id);
+    if (w < 1 || h < 1 || w > GFX_PIXMAP_SIDE || h > GFX_PIXMAP_SIDE) { snprintf(err, sizeof err, "pixmap %u: bad size %dx%d", id, w, h); return -1; }
+    if (format != PIX_RGBA_PREMUL && format != PIX_RGBA_OPAQUE && format != PIX_INDEX8) { snprintf(err, sizeof err, "pixmap %u: bad format %d", id, format); return -1; }
+    if (image_room(c, id, (size_t)w * h * 4, 0) < 0) return -1;
+    gfx_image *m = image_new(c, id, w, h, IMG_PIXMAP, NULL);
+    if (!m) return -1;
+    m->format = format;
+    if (format == PIX_INDEX8 && !(m->index = calloc(1, (size_t)w * h))) {
+        glDeleteTextures(1, &m->tex); free(m); snprintf(err, sizeof err, "pixmap %u: out of memory", id); return -1;
+    }
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, linear ? GL_LINEAR : GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, linear ? GL_LINEAR : GL_NEAREST);
+    return image_add(c, m);
+}
+
+/* rect x,y,w,h of an INDEX8 pixmap from its indices and palette, uploaded */
+static void index8_upload(gfx_image *m, int x, int y, int w, int h) {
+    uint8_t *row = malloc((size_t)w * 4);
+    if (!row) return;
+    glBindTexture(GL_TEXTURE_2D, m->tex);
+    for (int j = 0; j < h; j++) {
+        const uint8_t *ix = m->index + (size_t)(y + j) * m->w + x;
+        for (int i = 0; i < w; i++) {
+            const uint8_t *pc = m->pal + ix[i] * 3;
+            row[i * 4] = pc[0]; row[i * 4 + 1] = pc[1]; row[i * 4 + 2] = pc[2]; row[i * 4 + 3] = 255;
+        }
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x, y + j, w, 1, GL_RGBA, GL_UNSIGNED_BYTE, row);
+    }
+    free(row);
+}
+
+/* region x,y,w,h of pixmap m from px (its format's bytes, rows packed); the region is inside m */
+static int pixmap_rect(gfx_image *m, int x, int y, int w, int h, const uint8_t *px) {
+    if (m->format == PIX_INDEX8) {
+        for (int j = 0; j < h; j++) memcpy(m->index + (size_t)(y + j) * m->w + x, px + (size_t)j * w, (size_t)w);
+        index8_upload(m, x, y, w, h);
+        return 0;
+    }
+    glBindTexture(GL_TEXTURE_2D, m->tex);
+    if (m->format == PIX_RGBA_OPAQUE) {
+        size_t sz = (size_t)w * h * 4;
+        uint8_t *o = malloc(sz);
+        if (!o) return -2;
+        memcpy(o, px, sz);
+        for (size_t i = 3; i < sz; i += 4) o[i] = 255;
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, o);
+        free(o);
+    } else {
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);
+    }
+    return 0;
+}
+
+int gfx_pixmap_pixels(gfx_client *c, uint32_t id, const uint8_t *p, size_t len) {
+    if (len < 4) return -1;
+    uint32_t n; memcpy(&n, p, 4);
+    if (n < 1 || n > GFX_PIXELS_RECTS || len < 4 + (size_t)n * 16) return -1;
+    gfx_image *m = find_image(c, id);
+    int bpp = m && m->format == PIX_INDEX8 ? 1 : 4;
+    const uint8_t *rects = p + 4, *px = p + 4 + (size_t)n * 16;
+    size_t need = 0;
+    uint32_t r[GFX_PIXELS_RECTS][4];
+    memcpy(r, rects, (size_t)n * 16);
+    for (uint32_t k = 0; k < n; k++) {
+        if (r[k][2] > GFX_PIXMAP_SIDE || r[k][3] > GFX_PIXMAP_SIDE) return -1;
+        need += (size_t)r[k][2] * r[k][3] * bpp;
+    }
+    if (len - 4 - (size_t)n * 16 < need) return -1;
+    if (!m || m->kind != IMG_PIXMAP) { snprintf(err, sizeof err, "pixels: no pixmap %u", id); return -2; }
+    for (uint32_t k = 0; k < n; k++) {
+        uint32_t x = r[k][0], y = r[k][1], w = r[k][2], h = r[k][3];
+        if (x > (uint32_t)m->w || y > (uint32_t)m->h || w > (uint32_t)m->w - x || h > (uint32_t)m->h - y) {
+            snprintf(err, sizeof err, "pixels: rect %u,%u %ux%u outside pixmap %u", x, y, w, h, id);
+            return -2;
+        }
+        if (w && h && pixmap_rect(m, (int)x, (int)y, (int)w, (int)h, px) < 0) return -2;
+        px += (size_t)w * h * bpp;
+    }
+    return 0;
+}
+
+int gfx_pixmap_write(gfx_client *c, uint32_t id, int x, int y, int w, int h, const uint8_t *px) {
+    gfx_image *m = find_image(c, id);
+    if (!m || m->kind != IMG_PIXMAP || x < 0 || y < 0 || w < 1 || h < 1 || w > m->w - x || h > m->h - y) {
+        snprintf(err, sizeof err, "pixels: rect %d,%d %dx%d not in pixmap %u", x, y, w, h, id);
+        return -1;
+    }
+    return pixmap_rect(m, x, y, w, h, px) < 0 ? -1 : 0;
+}
+
+int gfx_pixmap_palette(gfx_client *c, uint32_t id, const uint8_t *rgb) {
+    gfx_image *m = find_image(c, id);
+    if (!m || m->kind != IMG_PIXMAP || m->format != PIX_INDEX8) { snprintf(err, sizeof err, "palette: no INDEX8 pixmap %u", id); return -1; }
+    memcpy(m->pal, rgb, 768);
+    index8_upload(m, 0, 0, m->w, m->h);
+    return 0;
+}
+
+/* ---------------- videos (proto.h MI_VIDEO): frames read from the player's file ---------------- */
+
+static gfx_video *find_video(gfx_client *c, uint32_t id) {
+    for (gfx_video *v = c->videos; v; v = v->next) if (v->id == id) return v;
+    return NULL;
+}
+
+void gfx_video_drop(gfx_client *c, uint32_t id) {
+    for (gfx_video **pp = &c->videos; *pp; pp = &(*pp)->next) {
+        if ((*pp)->id == id) {
+            gfx_video *v = *pp; *pp = v->next;
+            for (int k = 0; k < 3; k++) if (v->tex[k]) glDeleteTextures(1, &v->tex[k]);
+            c->nvideo--; c->video_bytes -= v->bytes; videos_all -= v->bytes;
+            close(v->fd); free(v->buf); free(v);
+            return;
+        }
+    }
+}
+
+/* A player that runs as a system service writes as root, or as nobody: IterioDev's mgu-ytplay starts as root, gives
+   its frame file to nobody and drops to nobody. Its frames are for whichever app shows them. */
+static uid_t nobody_uid(void) {
+    struct passwd *pw = getpwnam("nobody");
+    return pw ? pw->pw_uid : (uid_t)-1;
+}
+
+/* only /dev/shm/mgu-video-<letters, digits, - _ .>, owned by the app (uid), root or nobody: the renderer runs as root,
+   an app must not name other files, nor another app's frames */
+int gfx_video_def(gfx_client *c, uint32_t id, const char *path, uint32_t uid) {
+    static const char pfx[] = "/dev/shm/mgu-video-";
+    gfx_video_drop(c, id);
+    const char *n = path + sizeof pfx - 1;
+    int ok = !strncmp(path, pfx, sizeof pfx - 1) && *n && *n != '.' && strlen(n) <= 64;
+    for (const char *s = n; ok && *s; s++)
+        ok = (*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') || (*s >= '0' && *s <= '9') || *s == '-' || *s == '_' || *s == '.';
+    if (!ok) { snprintf(err, sizeof err, "video %u: not a /dev/shm/mgu-video-* file", id); return -1; }
+    if (c->nvideo >= GFX_VIDEO_MAX) { snprintf(err, sizeof err, "video %u: an app has at most %d videos", id, GFX_VIDEO_MAX); return -1; }
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    struct stat st;
+    if (fd < 0 || fstat(fd, &st) < 0 || !S_ISREG(st.st_mode)) {
+        if (fd >= 0) close(fd);
+        snprintf(err, sizeof err, "video %u: cannot open %.80s", id, path);
+        return -1;
+    }
+    if (uid != 0 && st.st_uid != uid && st.st_uid != 0 && st.st_uid != nobody_uid()) {
+        close(fd);
+        snprintf(err, sizeof err, "video %u: %.80s is not the app's (owner uid %u)", id, path, (unsigned)st.st_uid);
+        return -1;
+    }
+    gfx_video *v = calloc(1, sizeof *v);
+    if (!v) { close(fd); snprintf(err, sizeof err, "video %u: out of memory", id); return -1; }
+    v->id = id; v->fd = fd;
+    v->next = c->videos; c->videos = v; c->nvideo++;
+    return 0;
+}
+
+static int video_head(const gfx_video *v, struct mgu_video_head *h) {
+    return pread(v->fd, h, sizeof *h, 0) == (ssize_t)sizeof *h && h->magic == MGU_VIDEO_MAGIC && h->version == 1
+        && h->w >= 16 && h->h >= 16 && h->w <= GFX_VIDEO_SIDE && h->h <= GFX_VIDEO_SIDE && !(h->w & 1) && !(h->h & 1)
+        && h->nslot >= 1 && h->nslot <= 4 && h->slot < h->nslot;
+}
+
+int gfx_video_pending(gfx_client *c) {
+    struct mgu_video_head h;
+    for (gfx_video *v = c->videos; v; v = v->next) if (video_head(v, &h) && h.seq != v->seq && h.seq != v->bad_seq) return 1;
+    return 0;
+}
+
+/* the newest frame to the GPU (pread, not mmap: a file the player shrinks can't crash the renderer).
+   ponytail: a copy per frame (~1.4 MB at 720p); mmap or dmabuf if that ever shows */
+static void video_update(gfx_client *c, gfx_video *v) {
+    struct mgu_video_head h;
+    if (!video_head(v, &h) || h.seq == v->seq) return;
+    size_t ysz = (size_t)h.w * h.h, csz = (size_t)(h.w / 2) * (h.h / 2), fsz = ysz + 2 * csz;
+    if (fsz != v->cap) {             /* a new size: the frame's copy and its textures (fsz each) must fit the limits;
+                                        refused, the frame shown before stays */
+        size_t bytes = 2 * fsz;
+        int app = c->video_bytes - v->bytes + bytes > GFX_VIDEO_BYTES;
+        if (app || videos_all - v->bytes + bytes > GFX_VIDEO_ALL) {
+            if (h.w != v->refused_w || h.h != v->refused_h)
+                log_warn("%s: video %u: %ux%u frames not shown: %s %u MB of video", c->name ? c->name : "app", v->id, h.w,
+                         h.h, app ? "an app holds at most" : "all apps hold at most", (app ? GFX_VIDEO_BYTES : GFX_VIDEO_ALL) >> 20);
+            v->refused_w = h.w; v->refused_h = h.h; v->bad_seq = h.seq;
+            return;
+        }
+        uint8_t *b = realloc(v->buf, fsz);
+        if (!b) { v->bad_seq = h.seq; return; }
+        v->buf = b; v->cap = fsz;
+        c->video_bytes += bytes - v->bytes; videos_all += bytes - v->bytes; v->bytes = bytes;
+    }
+    v->refused_w = v->refused_h = 0;
+    /* short: the file is shorter than its header says (written in that order, or cut); not pending until seq moves on */
+    if (pread(v->fd, v->buf, fsz, (off_t)sizeof h + (off_t)h.slot * (off_t)fsz) != (ssize_t)fsz) { v->bad_seq = h.seq; return; }
+    int resize = (int)h.w != v->w || (int)h.h != v->h;
+    v->seq = v->bad_seq = h.seq; v->w = (int)h.w; v->h = (int)h.h; v->matrix = h.matrix == 1; v->full = h.full == 1;
+    const uint8_t *pl[3] = { v->buf, v->buf + ysz, v->buf + ysz + csz };
+    for (int k = 0; k < 3; k++) {
+        int pw = k ? v->w / 2 : v->w, ph = k ? v->h / 2 : v->h;
+        if (!v->tex[k]) {
+            glGenTextures(1, &v->tex[k]);
+            glBindTexture(GL_TEXTURE_2D, v->tex[k]);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            resize = 1;
+        }
+        glBindTexture(GL_TEXTURE_2D, v->tex[k]);
+        if (resize) glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, pw, ph, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, pl[k]);
+        else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pw, ph, GL_LUMINANCE, GL_UNSIGNED_BYTE, pl[k]);
+    }
 }
 
 void gfx_client_free(gfx_client *c) {
     while (c->layers) gfx_layer_drop(c, c->layers->id);
-    while (c->images) { gfx_layer *l = c->images; c->images = l->next; glDeleteTextures(1, &l->tex); free(l); }
+    while (c->images) gfx_image_drop(c, c->images->id);
+    while (c->videos) gfx_video_drop(c, c->videos->id);
     c->natlas = c->nramp = 0;
 }
 
@@ -289,11 +595,13 @@ static void flush(void) {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_q * 6 * sizeof(GLushort), idx, GL_STATIC_DRAW);
     }
     glUseProgram(prog);
-    glUniform2f(u_view, (float)fb_w, (float)fb_h);
-    glUniform1i(u_atlas, 0); glUniform1i(u_ramp, 1); glUniform1i(u_tex, 2);
+    glUniform3f(u_view, (float)fb_w, (float)fb_h, fb_top_down ? -1.0f : 1.0f);
+    glUniform1i(u_atlas, 0); glUniform1i(u_ramp, 1); glUniform1i(u_tex, 2); glUniform1i(u_tex2, 3); glUniform1i(u_tex3, 4);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlas_tex);
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, ramp_tex);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, cur_tex);
+    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, cur_tex2);
+    glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, cur_tex3);
     glActiveTexture(GL_TEXTURE0);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
@@ -492,12 +800,51 @@ static void draw_layer(gfx_client *c, uint32_t id, float lx, float ly, const gfx
     flush();
 }
 
-/* pixel image id into device rect x0,y0..x1,y1 (top row of the image at the top) */
-static void draw_image(gfx_client *c, uint32_t id, float x0, float y0, float x1, float y1) {
-    gfx_layer *l = find_image(c, id);
-    if (!l) return;
+/* picture over the device rect, corner radius r; the quad reaches 1 px further for the anti-aliased edge (uv
+   runs on past 0..1 there, clamped to the edge texel) */
+static void draw_image(gfx_image *m, float x, float y, float w, float h, float r) {
+    if (!(w > 0 && h > 0 && w < 65536 && h < 65536 && isfinite(x) && isfinite(y))) return;
+    if (r > w / 2) r = w / 2;
+    if (r > h / 2) r = h / 2;
+    if (!(r > 0)) r = 0;
     flush();
-    cur_tex = l->tex;
+    cur_tex = m->tex;
+    float x0 = floorf(x) - 1, y0 = floorf(y) - 1, x1 = ceilf(x + w) + 1, y1 = ceilf(y + h) + 1;
+    vert *v = quad(x0, y0, x1, y1, K_IMG);
+    set4(v, 4, x + w / 2, y + h / 2, w / 2, h / 2);
+    set4(v, 8, r, 0, 0, 0);
+    float u0 = (x0 - x) / w, u1 = (x1 - x) / w, v0 = (y0 - y) / h, v1 = (y1 - y) / h;
+    v[0].v[12] = u0; v[0].v[13] = v0; v[1].v[12] = u1; v[1].v[13] = v0;
+    v[2].v[12] = u1; v[2].v[13] = v1; v[3].v[12] = u0; v[3].v[13] = v1;
+    setcol(v, 0xffffffff);
+    flush();
+}
+
+/* the video's newest frame fitted into the device rect (aspect kept, centred), corner radius r */
+static void draw_video(gfx_video *m, float x, float y, float w, float h, float r) {
+    if (!m->w || !(w > 0 && h > 0 && w < 65536 && h < 65536 && isfinite(x) && isfinite(y))) return;
+    float a = (float)m->w / m->h;
+    if (w / h > a) { float fw = h * a; x += (w - fw) / 2; w = fw; } else { float fh = w / a; y += (h - fh) / 2; h = fh; }
+    if (r > w / 2) r = w / 2;
+    if (r > h / 2) r = h / 2;
+    if (!(r > 0)) r = 0;
+    flush();
+    cur_tex = m->tex[0]; cur_tex2 = m->tex[1]; cur_tex3 = m->tex[2];
+    float x0 = floorf(x) - 1, y0 = floorf(y) - 1, x1 = ceilf(x + w) + 1, y1 = ceilf(y + h) + 1;
+    vert *v = quad(x0, y0, x1, y1, K_YUV);
+    set4(v, 4, x + w / 2, y + h / 2, w / 2, h / 2);
+    set4(v, 8, r, (float)m->matrix, (float)m->full, 0);
+    float u0 = (x0 - x) / w, u1 = (x1 - x) / w, v0 = (y0 - y) / h, v1 = (y1 - y) / h;
+    v[0].v[12] = u0; v[0].v[13] = v0; v[1].v[12] = u1; v[1].v[13] = v0;
+    v[2].v[12] = u1; v[2].v[13] = v1; v[3].v[12] = u0; v[3].v[13] = v1;
+    setcol(v, 0xffffffff);
+    flush();
+}
+
+/* upstream: pixel image into device rect x0,y0..x1,y1 (top row of the image at the top), nearest pixel */
+static void draw_image_upstream(gfx_image *m, float x0, float y0, float x1, float y1) {
+    flush();
+    cur_tex = m->tex;
     vert *v = quad(roundf(x0), roundf(y0), roundf(x1), roundf(y1), K_TEX);
     v[0].v[12] = 0; v[0].v[13] = 0; v[1].v[12] = 1; v[1].v[13] = 0;
     v[2].v[12] = 1; v[2].v[13] = 1; v[3].v[12] = 0; v[3].v[13] = 1;
@@ -615,7 +962,25 @@ static void run(gfx_client *c, const gfx_xf *xf0, const uint32_t *cmd, size_t n,
             break;
         }
         case OP_LAYER: NEED(3); if (depth == 0) draw_layer(c, U(i), F(i + 1), F(i + 2), xf); i += 3; break;
-        case OP_IMAGE: NEED(6); draw_image(c, U(i), X(F(i + 2)), Y(F(i + 3)), X(F(i + 2) + F(i + 4)), Y(F(i + 3) + F(i + 5))); i += 6; break;
+        case OP_IMAGE: {
+            NEED(6);
+            if (c->upstream_ops) {
+                gfx_image *m = find_image(c, U(i));
+                if (m) draw_image_upstream(m, X(F(i + 2)), Y(F(i + 3)), X(F(i + 2) + F(i + 4)), Y(F(i + 3) + F(i + 5)));
+            } else {
+                gfx_image *m = find_image(c, U(i + 5));
+                if (m) draw_image(m, X(F(i)), Y(F(i + 1)), L(F(i + 2)), L(F(i + 3)), L(F(i + 4)));
+            }
+            i += 6;
+            break;
+        }
+        case OP_VIDEO: {
+            NEED(6);
+            gfx_video *m = depth == 0 ? find_video(c, U(i + 5)) : NULL;     /* not in cached layers: they are drawn once */
+            if (m) draw_video(m, X(F(i)), Y(F(i + 1)), L(F(i + 2)), L(F(i + 3)), L(F(i + 4)));
+            i += 6;
+            break;
+        }
         case OP_CLIP: {
             NEED(4);
             flush();
@@ -624,7 +989,7 @@ static void run(gfx_client *c, const gfx_xf *xf0, const uint32_t *cmd, size_t n,
             glEnable(GL_SCISSOR_TEST);
             int sx = (int)floorf(x), sy = (int)floorf(y), sw = (int)ceilf(x + w) - sx, sh = (int)ceilf(y + h) - sy;
             if (sw < 0) sw = 0; if (sh < 0) sh = 0;
-            glScissor(sx, fb_h - (sy + sh), sw, sh);           /* GL: origin bottom-left */
+            glScissor(sx, fb_top_down ? sy : fb_h - (sy + sh), sw, sh);   /* GL: origin bottom-left */
             break;
         }
         case OP_NOCLIP: flush(); glDisable(GL_SCISSOR_TEST); break;
@@ -648,15 +1013,16 @@ static void run(gfx_client *c, const gfx_xf *xf0, const uint32_t *cmd, size_t n,
 #undef NEED
 }
 
-void gfx_draw(gfx_client *c, const gfx_xf *xf, int fbw, int fbh, const uint32_t *cmd, size_t n, int clear_transparent) {
-    fb_w = fbw; fb_h = fbh; g_alpha = 1;
+void gfx_draw(gfx_client *c, const gfx_xf *xf, int fbw, int fbh, const uint32_t *cmd, size_t n, int flags) {
+    fb_w = fbw; fb_h = fbh; fb_top_down = (flags & GFX_TOP_DOWN) != 0; g_alpha = 1;
     glViewport(0, 0, fbw, fbh);
     glDisable(GL_SCISSOR_TEST);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    if (clear_transparent) { glClearColor(0, 0, 0, 0); glClear(GL_COLOR_BUFFER_BIT); }
+    if (flags & GFX_CLEAR) { glClearColor(0, 0, 0, 0); glClear(GL_COLOR_BUFFER_BIT); }
     nv = 0;
+    for (gfx_video *v = c->videos; v; v = v->next) video_update(c, v);
     run(c, xf, cmd, n, 0);
     flush();
     glDisable(GL_SCISSOR_TEST);
@@ -687,8 +1053,8 @@ int gfx_layer_def(gfx_client *c, uint32_t id, float w, float h, float scale, con
     }
     /* drawn the right way up in GL terms; draw_layer flips it back */
     gfx_xf lx = { scale, 0, 0 };
-    int save_w = fb_w, save_h = fb_h;
-    fb_w = pw; fb_h = ph; g_alpha = 1;
+    int save_w = fb_w, save_h = fb_h, save_td = fb_top_down;
+    fb_w = pw; fb_h = ph; fb_top_down = 0; g_alpha = 1;
     glViewport(0, 0, pw, ph);
     glDisable(GL_SCISSOR_TEST);
     glEnable(GL_BLEND);
@@ -697,7 +1063,7 @@ int gfx_layer_def(gfx_client *c, uint32_t id, float w, float h, float scale, con
     nv = 0;
     run(c, &lx, cmd, n, 1);
     flush();
-    fb_w = save_w; fb_h = save_h;
+    fb_w = save_w; fb_h = save_h; fb_top_down = save_td;
     glBindFramebuffer(GL_FRAMEBUFFER, prev);
     l->next = c->layers; c->layers = l;
     return 0;

@@ -25,6 +25,10 @@ BUILT = os.path.join(RENDERD, 'build', 'mgu-renderd')
 PRE_DIR = os.path.join(RENDERD, 'prebuilt')
 PRE = os.path.join(PRE_DIR, 'mgu-renderd')
 PRE_SUM = os.path.join(PRE_DIR, 'SOURCE_SHA256')
+# the renderer's script files, shipped beside it (kit and prebuilt/, which the Store installs from):
+# the foreground gate it starts, and the HMI page template's generator and mount script (renderd-embed)
+RENDERD_FILES = [('js/foreground_gate.js', 'foreground_gate.js'), ('js/hmi_template.js', 'hmi_template.js'),
+                 ('systemd/mgu-render-hmi.sh', 'mgu-render-hmi.sh')]
 # files copied next to the apps; text, so always shipped with Unix line endings
 CAR_FILES = [('car/deploy-car.sh', 'deploy-car.sh'), ('mgu-app-install.sh', 'mgu-app-install.sh'),
              ('mainapp-patch.js', 'mainapp-patch.js'), ('car/README.txt', 'README.txt')]
@@ -109,6 +113,18 @@ def pick_renderer():
     return ask('No prebuilt renderer and no Docker to build one (see kit/renderd/README.md).', None)
 
 
+def renderd_files(dest):
+    """the renderer's script files into dest (Unix line endings); the names that changed"""
+    changed = []
+    for src, dst in RENDERD_FILES:
+        data = open(os.path.join(RENDERD, src), 'rb').read().replace(b'\r\n', b'\n')
+        p = os.path.join(dest, dst)
+        if not os.path.isfile(p) or open(p, 'rb').read() != data:
+            open(p, 'wb').write(data)
+            changed.append(dst)
+    return changed
+
+
 def gate_of(rd):
     """the controller gate (mgu-inputgate.so, loaded into the HMI) built next to the renderer"""
     return os.path.join(os.path.dirname(rd), 'mgu-inputgate.so')
@@ -151,9 +167,13 @@ def main():
     if rd: shutil.copyfile(rd, os.path.join(OUT, 'mgu-renderd'))
     if gate: shutil.copyfile(gate_of(rd), os.path.join(OUT, 'mgu-inputgate.so'))
     if not rd: print('note: no mgu-renderd in the kit - the apps install with software rendering only')
+    if rd:
+        renderd_files(OUT)
+        if renderd_files(PRE_DIR): print('renderer: script files changed - updated kit/renderd/prebuilt/ (commit it)')
 
     names = ['deploy-car.sh', 'mgu-app-install.sh', 'mainapp-patch.js'] + \
-            ['apps/' + n for n in sorted(os.listdir(os.path.join(OUT, 'apps')))] + (['mgu-renderd'] if rd else []) + (['mgu-inputgate.so'] if gate else [])
+            ['apps/' + n for n in sorted(os.listdir(os.path.join(OUT, 'apps')))] + (['mgu-renderd'] if rd else []) + (['mgu-inputgate.so'] if gate else []) + \
+            ([d for _, d in RENDERD_FILES] if rd else [])
     with open(os.path.join(OUT, 'KIT_SUMS'), 'w', encoding='utf-8', newline='\n') as f:
         for n in names: f.write('%s  %s\n' % (md5(os.path.join(OUT, n)), n))
 

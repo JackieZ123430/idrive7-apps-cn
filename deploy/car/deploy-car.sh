@@ -41,6 +41,8 @@
 #                               mgu-inputgate.so) into the HMI from the next head-unit start, so
 #                               Doom can have the iDrive controller; the guard leaves it out if the
 #                               HMI fails to come up with it twice (NO_INPUTGATE=1: skip it)
+#   /etc/systemd/system/mgu-render-hmi.service           (new, only with renderd-embed) the renderer's
+#                               HMI page template, mounted before the HMI starts (restore removes it)
 # MainApp's own /usr/lib/oap-mainapp/src/main.js is never written: the patched
 # copy is bind-mounted over it at boot, and only while that file is unchanged
 # (after a firmware update the hook switches itself off).
@@ -374,6 +376,14 @@ cmd_restore() {
         say "  removed the controller gate"
     fi
     rm -f /run/systemd/system/hmi.service.d/zz-mgu-inputgate.conf /run/mgu-inputgate.env
+    # the renderer's optional page template (renderd-embed): its unit, and its widget mount (in /run)
+    if [ -e /etc/systemd/system/mgu-render-hmi.service ] || [ -L /etc/systemd/system/hmi.service.wants/mgu-render-hmi.service ]; then
+        rootfs_rw || die "cannot remount / rw"
+        rm -f /etc/systemd/system/mgu-render-hmi.service /etc/systemd/system/hmi.service.wants/mgu-render-hmi.service
+        rmdir /etc/systemd/system/hmi.service.wants 2>/dev/null
+        say "  removed the renderer's page template"
+    fi
+    grep -q " /mgu-render/hmi-widget " /proc/self/mountinfo && umount /mnt/dataro/data/hmi/bmw/widget 2>/dev/null
     systemctl daemon-reload
     rootfs_ro
     [ "$(md5sum "$MAINJS" | cut -d' ' -f1)" = "$(cat "$B/mainjs.md5")" ] || warn "MainApp main.js differs from backup time (firmware update?)"

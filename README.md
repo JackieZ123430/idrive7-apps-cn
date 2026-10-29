@@ -41,8 +41,9 @@ image box. It's the only route the SDK offers for custom graphics, and it tops o
 of frames per second: on the head unit's Atom CPU, just compressing one 1600 × 520 PNG takes
 about 60 ms, before anything is drawn or sent.
 
-These apps don't do that. They ship with **`mgu-renderd`**, a small render engine written for
-this project in C on OpenGL ES 2. An app doesn't send pictures at all: it sends a few kilobytes
+These apps don't do that. They ship with **`mgu-renderd`**, a render engine in C on OpenGL ES 2
+(since 2.0 [mgu-render](kit/renderd/README.md#the-engine-mgu-render) by Robert Nisipeanu and
+IterioDev, grown out of this project's first engine). An app doesn't send pictures at all: it sends a few kilobytes
 of **drawing commands** per frame, and the engine draws them on the head unit's Intel GPU, on
 its own compositor layer, in step with the display's refresh. Result: **a true 60 fps**, with
 needles and bars that glide instead of jump.
@@ -559,8 +560,9 @@ the internet.
    from the unit's firmware**, registers the app as preinstalled, and fixes ownership and
    permissions.
 5. **Installs the GPU renderer** `mgu-renderd` (kit/renderd) as a systemd service that starts
-   with the app platform. It runs as a throwaway user with only the compositor, GPU and app
-   groups. If it can't be installed the apps still work, drawn in software.
+   with the app platform. It runs as root in the compositor's group (its foreground gate reads
+   which app is in front over SOME/IP; touch routing for apps that claim touch uses nft).
+   If it can't be installed the apps still work, drawn in software.
 6. **Sets up the controller gate** `mgu-inputgate.so` to load into the HMI (a systemd drop-in for
    `hmi.service`; other preloads are kept). While a full-screen app asks
    for the controller (Doom while you play), the HMI gets the knob, press and tilt as "untouched",
@@ -825,8 +827,9 @@ kit/runtime/          app runtime: mgu.js (platform glue), record.js + display.j
                       (GPU path), canvas.js (software path), gauges.js, themes.js,
                       car.js (signals + demo), sim.js (demo drive), signals.js (SOME/IP),
                       diag.js (UDS over TASU), fonts/
-kit/renderd/          mgu-renderd: the GPU renderer service (C, GLES2, Wayland/ivi);
-                      prebuilt/ = the ready binary + the source fingerprint it was built from
+kit/renderd/          mgu-renderd: the GPU renderer service (mgu-render: C, GLES2, Wayland/ivi),
+                      GPL-3.0-or-later; prebuilt/ = the ready binary + the source fingerprint it
+                      was built from; inputgate/ = the controller gate
 kit/platform/         permissions template used by build.py
 kit/tools/            build.py, make_kit.py, preview.js, make_gif.sh, make_icon.js, render_icons.py,
                       bake_fonts.py, extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
@@ -848,9 +851,14 @@ Not in the repository, on purpose:
 BMW's interface generator (needed at install time) is likewise **loaded from the unit's own
 firmware** by `kit/tools/oapgen/gen.js`, so no BMW code is shipped here.
 
-### Doom licences
+### Doom and renderer licences
 
-The repository is MIT-licensed, except the Doom app: `apps/doom` contains `doom.wasm`, the
+The repository is MIT-licensed, except two parts. The GPU renderer, `kit/renderd`, is
+[mgu-render](https://github.com/robertnisipeanu/mgu-store) by Robert Nisipeanu and IterioDev,
+GPL-3.0-or-later (`kit/renderd/LICENSE`); the parts it took from this repository's first renderer
+stay MIT too (`kit/renderd/LICENSE.mgu-renderd`), and the controller gate in
+`kit/renderd/inputgate` is MIT. It runs as its own program, so the apps that talk to it over its
+socket stay MIT. The other is the Doom app: `apps/doom` contains `doom.wasm`, the
 [doomgeneric](https://github.com/ozkl/doomgeneric) engine (GPL-2.0) compiled to WebAssembly, so
 the app as a whole is distributed under the GPL-2.0 (`apps/doom/LICENSE`, `apps/doom/NOTICE`).
 Its complete source, with the changes made for the app, is in `third_party/doomgeneric`;

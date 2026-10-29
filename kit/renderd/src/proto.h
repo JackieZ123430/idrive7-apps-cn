@@ -1,18 +1,36 @@
 /*
- * mgu-renderd wire protocol (shared by the daemon and kit/runtime/renderd.js).
+ * mgu-render wire protocol. PROTOCOL.md describes it in full.
  *
  * Stream socket, little endian. Every message: u32 type, u32 payload length, payload.
  * Draw commands are a stream of 32-bit words: an opcode word, then its arguments
  * (f32 coordinates in the app's logical pixels, u32 colours as 0xRRGGBBAA).
+ *
+ * Three dialects share the socket (ours, /run/mgu-render/render.sock, and the community one linked to it) and messages 1-8:
+ *   upstream  idrive7-apps kit/renderd (protocol 1): 9 IMAGE, 10 GRAB, 105 CCU
+ *   iterio    IterioDev mgu-renderd (protocol 4):    9 CLAIM, 10 IMAGE, 11 DROP_IMAGE, 13 VIDEO, 14 DROP_VIDEO,
+ *                                                    105 TOUCH, 106 CLOSED
+ *   native    mgu-render/1, asked for in HELLO:      the iterio messages + the X_* extensions below
+ * A legacy connection's dialect is read from the first message only one of them sends (dialect.c).
+ *
+ * Derived from mgu-renderd src/proto.h (idrive7-apps kit/renderd, MIT, Copyright (c) 2026
+ * cauliflowermossgrape; touch routing, pictures and video by IterioDev).
  */
 #ifndef MGU_PROTO_H
 #define MGU_PROTO_H
+#include <stdint.h>
 
-#define MGU_PROTO_VERSION 1
+/* E_READY's version word, which iterio's kit reads (>= 3: pictures, >= 4: video); upstream's kit ignores it */
+#define MGU_PROTO_VERSION 4
+/* the native dialect's version (X_READY) */
+#define MGU_NATIVE_VERSION 1
+#define MGU_NATIVE_TOKEN "proto=mgu-render/"
 
-/* client -> daemon */
+/* DBR: display-bridge's protocol (dbr.h), its own framing, told by its magic in a connection's first bytes */
+enum { DIALECT_UNKNOWN = 0, DIALECT_UPSTREAM = 1, DIALECT_ITERIO = 2, DIALECT_NATIVE = 3, DIALECT_DBR = 4 };
+
+/* client -> daemon, all dialects */
 enum {
-    M_HELLO = 1,      /* utf8 app id */
+    M_HELLO = 1,      /* utf8 app id; native: app id, NUL, "proto=mgu-render/1" (NUL-separated key=value fields) */
     M_PLACE = 2,      /* i32 x, y, w, h (screen px), f32 scale, f32 ox, f32 oy: device = logical * scale + (ox, oy) */
     M_SHOW = 3,       /* u32 on */
     M_ATLAS = 4,      /* u32 id, u32 w, u32 h, w*h alpha bytes (padded to 4) */
@@ -20,23 +38,101 @@ enum {
     M_LAYER = 6,      /* u32 id, f32 w, f32 h, commands: drawn once into a cached texture */
     M_FRAME = 7,      /* commands: the next frame */
     M_DROP_LAYER = 8, /* u32 id */
-    M_IMAGE = 9,      /* u32 id, u32 w, u32 h, w*h RGBA bytes (opaque): a pixel image, replaced on every upload */
-    M_GRAB = 10,      /* u32 on: this app wants the iDrive controller to itself (mgu-inputgate.so in the HMI).
-                         Holds while the app is shown and repeats it at least every GRAB_US; see inputgate/ */
 };
 
-/* daemon -> client */
+/* client -> daemon, upstream */
 enum {
-    E_READY = 101,    /* u32 version, u32 screen w, u32 screen h */
+    MU_IMAGE = 9,     /* u32 id, u32 w, u32 h, w*h RGBA bytes (opaque): a pixel image, replaced on every upload */
+    MU_GRAB = 10,     /* u32 on: this app wants the iDrive controller to itself (the HMI's controller gate) */
+};
+
+/* client -> daemon, iterio and native */
+enum {
+    MI_CLAIM = 9,     /* u32 n, (f32 x y w h)*n logical px: touch there is this app's while it is shown (n 0 = none) */
+    MI_IMAGE = 10,    /* u32 id, u32 w, u32 h (1..1024), w*h*4 bytes RGBA premultiplied, rows top-down; same id replaces */
+    MI_DROP_IMAGE = 11,/* u32 id */
+    MI_FPS = 12,      /* u32 max frames a second (0 = no cap, at most 1000): faster frames wait, TICK comes at that rate;
+                         upstream sends none, so it needs no dialect */
+    MI_VIDEO = 13,    /* u32 id, utf8 frame file path (/dev/shm/mgu-video-*, NUL padded): that video's frames; same id
+                         replaces; upstream sends none (13 and 14 need no dialect either) */
+    MI_DROP_VIDEO = 14,/* u32 id */
+};
+
+/*
+ * Video frames (MI_VIDEO): another program (a player) writes them to a file /dev/shm/mgu-video-<name>; the app names
+ * the file and draws OP_VIDEO where the picture goes. The file: struct mgu_video_head, then nslot frames of w*h*3/2
+ * bytes each, I420 (the Y plane, then U, then V, rows without padding). The writer fills slot (slot + 1) % nslot,
+ * then sets slot, then seq + 1; the renderer reads seq + slot, then that slot - with 3 slots the writer is two frames
+ * away from the one being read. A newer seq draws the app's last frame again, without a message from the app.
+ */
+#define MGU_VIDEO_MAGIC 0x4656474du   /* "MGVF" */
+struct mgu_video_head {
+    uint32_t magic, version;          /* MGU_VIDEO_MAGIC, 1 */
+    uint32_t w, h;                    /* even, 16..2048 */
+    uint32_t seq, slot, nslot;        /* frames written so far, the newest one's slot, slots (1..4) */
+    uint32_t matrix, full;            /* colours: 0 BT.601 / 1 BT.709; 0 limited (16-235) / 1 full range */
+    uint32_t pad[7];                  /* 64 bytes */
+};
+
+/* client -> daemon, native only ("MR" + n: clear of every number the other dialects use) */
+enum {
+    X_MODE = 0x4d520001,    /* u32 mode (MODE_*): where the surface goes; before PLACE, or again to move it */
+    X_GRAB = 0x4d520002,    /* u32 on: as MU_GRAB, events come as X_CCU */
+    X_PIXMAP = 0x4d520003,  /* u32 id, u32 w, u32 h (1..GFX_PIXMAP_SIDE), u32 format (PIX_*), u32 filter (0 nearest,
+                               1 linear): an image the app writes in regions (X_PIXELS); drawn with OP_IMAGE */
+    X_PIXELS = 0x4d520004,  /* u32 id, u32 n (1..64), (u32 x y w h)*n, then each rect's pixels in turn, rows top-down,
+                               packed (w * bytes per pixel per row), the whole padded to 4 */
+    X_PALETTE = 0x4d520005, /* u32 id, 256 * 3 bytes RGB: an INDEX8 pixmap's colours, for the whole picture */
+};
+
+/* pixmap formats */
+enum { PIX_RGBA_PREMUL = 1, PIX_RGBA_OPAQUE = 2, PIX_INDEX8 = 3 };
+
+/* placement modes */
+enum { MODE_LAYER = 1, MODE_EMBED = 2 };
+
+/* daemon -> client, all dialects */
+enum {
+    E_READY = 101,    /* u32 version, u32 screen w, u32 screen h, u32 touch routing on */
     E_TICK = 102,     /* u32 frame number, u32 ms since start: the compositor took the last frame, send the next */
     E_ERROR = 103,    /* utf8 text */
-    E_STATS = 104,    /* u32 frames shown in the last second, u32 avg render us, u32 max render us */
-    E_CCU = 105,      /* the iDrive controller event the HMI didn't get (while this app holds M_GRAB):
-                         FrontCCU RotaryEncoderStateFront as on the wire - u8 sequence, u16 BE knob,
-                         u8 press, u8 tilt, ... */
+    E_STATS = 104,    /* u32 frames shown in the last second, u32 avg render us, u32 max render us; native: u32 STATS_* */
+};
+enum { STATS_ZERO_COPY = 1 };   /* the frames were drawn straight into the HMI compositor's GPU buffer (embed) */
+/* while this file exists, each shown app's stats are logged once a second (info) */
+#define STATS_LOG_FILE "/run/mgu-render/stats-log"
+
+/* daemon -> client, upstream */
+enum {
+    EU_CCU = 105,     /* the controller event the HMI didn't get (while this app holds the grab): FrontCCU
+                         RotaryEncoderStateFront as on the wire - u8 sequence, u16 BE knob, u8 press, u8 tilt, ... */
 };
 
-/* draw opcodes */
+/* daemon -> client, iterio and native */
+enum {
+    EI_TOUCH = 105,   /* u32 phase (1 down, 2 move, 3 up), f32 x, f32 y logical px: a gesture that began in a claim */
+    EI_CLOSED = 106,  /* (none) the HMI was touched outside the claims: the user left the app, it is hidden (SHOW 0) */
+};
+
+/* daemon -> client, native only */
+enum {
+    X_READY = 0x4d520101,   /* before E_READY: u32 native version, u32 modes (bit per MODE_*), u32 caps (CAP_*),
+                               i32 embed box x y w h (0 0 0 0: no embed), i32 app area x y w h, u32 pixmap side,
+                               u32 refresh mHz */
+    X_STATE = 0x4d520102,   /* u32 mode, u32 on screen, u32 in front (the HMI shows the app's screen): on change */
+    X_CCU = 0x4d520103,     /* as EU_CCU */
+};
+
+enum {
+    CAP_TOUCH_ROUTE = 1,    /* claims take touch (MI_CLAIM) */
+    CAP_CONTROLLER = 2,     /* GRAB holds the controller back from the HMI (the HMI's controller gate is loaded) */
+    CAP_FRONT_GATE = 4,     /* surfaces show only while the app's screen is in front */
+    CAP_PIXMAP = 8,         /* X_PIXMAP / X_PIXELS / X_PALETTE */
+    CAP_VIDEO = 16,         /* MI_VIDEO / MI_DROP_VIDEO / OP_VIDEO */
+    CAP_EMBED_ZERO_COPY = 32, /* embed frames are drawn straight into the HMI compositor's GPU buffers (no readback) */
+};
+
+/* draw opcodes, all dialects */
 enum {
     OP_CLEAR = 1,     /* c */
     OP_RECT = 2,      /* x y w h c */
@@ -55,7 +151,10 @@ enum {
     OP_QUAD = 15,     /* x0 y0 x1 y1 x2 y2 x3 y3 c  convex quad, anti-aliased edges */
     OP_ALPHA = 16,    /* a  global opacity for what follows (0..1) */
     OP_XF = 17,       /* s ox oy  transform for what follows: device = v * s + (ox, oy); s <= 0: back to the placement's */
-    OP_IMAGE = 18,    /* id ver x y w h  pixel image (M_IMAGE) scaled into the rect, nearest pixel; ver: the app's upload count */
+    OP_IMAGE = 18,    /* upstream: id ver x y w h  pixel image scaled into the rect, nearest pixel;
+                         iterio, native: x y w h r id  picture (or pixmap) over the rect, corner radius r */
+    OP_VIDEO = 19,    /* iterio, native: x y w h r id  video id's newest frame fitted into the rect (aspect kept, centred),
+                         corner radius r; no frame yet: nothing drawn; not in layers (they are drawn once) */
 };
 
 #endif

@@ -17,6 +17,11 @@
 #   sh mgu-app-install.sh renderd [--persist]           install / start the GPU renderer
 #                                                       (mgu-renderd next to this script)
 #   sh mgu-app-install.sh renderd-remove                stop and remove it
+#   sh mgu-app-install.sh renderd-embed [--now]         optional: let apps that ask for it draw inside
+#                                                       their HMI page (the renderer's page template,
+#                                                       from the next head-unit start; --now: restart
+#                                                       the HMI now, VM / bench only)
+#   sh mgu-app-install.sh renderd-embed-remove [--now]  take the page template out again
 #   sh mgu-app-install.sh inputgate [--now]             let full-screen apps (Doom) have the iDrive
 #                                                       controller (mgu-inputgate.so in the HMI).
 #                                                       Loads at the next head-unit start; a boot
@@ -72,6 +77,8 @@ NODE=${NODE:-/usr/bin/node}
 # GPU renderer (kit/renderd): apps draw through it at 60 fps when it runs, else in software
 RENDERD_DIR=/var/opt/mgu-renderd
 RENDERD_UNIT=mgu-renderd.service
+RENDERD_FILES="foreground_gate.js hmi_template.js mgu-render-hmi.sh"
+EMBED_UNIT=mgu-render-hmi.service
 # controller gate for full-screen apps (kit/renderd/inputgate): preloaded into the HMI
 GATE_SO=$RENDERD_DIR/mgu-inputgate.so
 GATE_DROPIN_NAME=hmi.service.d/zz-mgu-inputgate.conf
@@ -426,20 +433,25 @@ renderd_unit() {   # the unit file text
     cat <<UNIT
 # added by mgu-app-install.sh - GPU renderer for the custom apps (remove: sh mgu-app-install.sh renderd-remove)
 [Unit]
-Description=mgu-renderd (GPU renderer for custom apps)
+Description=mgu-renderd (GPU renderer for custom apps: mgu-render)
 After=winston.service
 StartLimitIntervalSec=0
 
 [Service]
-# its own throwaway user: only the compositor (mgu_wayland), the GPU (video) and the apps' group
-DynamicUser=yes
-SupplementaryGroups=mgu_wayland video tm_oap_app
+# root for the touch divert (nft) and the foreground gate (SOME/IP as root), in the compositor's group
+User=root
+Group=mgu_wayland
 Environment=XDG_RUNTIME_DIR=/run/wayland
 RuntimeDirectory=mgu-renderd
 RuntimeDirectoryMode=0755
-ExecStart=$RENDERD_DIR/mgu-renderd --group $APP_GID
+ExecStartPre=/bin/sh -c 'until [ -S /run/wayland/wayland-0 ]; do sleep 1; done'
+ExecStart=$RENDERD_DIR/mgu-renderd -s socket_path=/run/mgu-renderd/renderd.sock -s socket_group=$APP_GID
+# a stopped renderer leaves no touch divert behind (only its own table)
+ExecStopPost=-/bin/sh -c 'nft delete table ip mgu_render 2>/dev/null; true'
 Restart=always
 RestartSec=3
+TimeoutStartSec=150
+TimeoutStopSec=5
 
 [Install]
 WantedBy=oapcontroller.service
@@ -462,6 +474,13 @@ install_renderd() {
     same=0; cmp -s "$src" "$RENDERD_DIR/mgu-renderd" 2>/dev/null && same=1
     # a running binary can be replaced by rename: the old process keeps its copy until restarted
     mkdir -p "$RENDERD_DIR" && cp "$src" "$RENDERD_DIR/mgu-renderd.new" && mv "$RENDERD_DIR/mgu-renderd.new" "$RENDERD_DIR/mgu-renderd" || die "copy failed"
+    # its script files: the foreground gate it starts (shows an app only while its screen is in front),
+    # and the page template's generator and mount script (renderd-embed)
+    for f in $RENDERD_FILES; do
+        [ -f "$SELF_DIR/$f" ] || continue
+        cmp -s "$SELF_DIR/$f" "$RENDERD_DIR/$f" || { [ "$f" = foreground_gate.js ] && same=0; }
+        cp "$SELF_DIR/$f" "$RENDERD_DIR/$f" || die "copy failed"
+    done
     chown -R 0:0 "$RENDERD_DIR"; chmod 755 "$RENDERD_DIR" "$RENDERD_DIR/mgu-renderd"
     if [ "${1:-}" = "--persist" ]; then
         rm -f "/run/systemd/system/$RENDERD_UNIT"
@@ -485,14 +504,77 @@ install_renderd() {
 
 remove_renderd() {
     remove_inputgate
+    remove_embed
     systemctl stop "$RENDERD_UNIT" 2>/dev/null
     rm -f "/run/systemd/system/$RENDERD_UNIT"
     if [ -e "/etc/systemd/system/$RENDERD_UNIT" ] || [ -L "/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT" ]; then
-        rootfs_rw_do sh -c "rm -f '/etc/systemd/system/$RENDERD_UNIT' '/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT'; rmdir /etc/systemd/system/oapcontroller.service.wants 2>/dev/null; true"
+        rootfs_rw_do sh -c "rm -f '/etc/systemd/system/$RENDERD_UNIT' '/etc/systemd/system/oapcontroller.service.wants/$RENDERD_UNIT' && { rmdir /etc/systemd/system/oapcontroller.service.wants 2>/dev/null; true; }"
     fi
     systemctl daemon-reload
     rm -rf "$RENDERD_DIR"
     say "renderer removed (apps draw in software again)"
+}
+
+# ---- in-page drawing: the renderer's HMI page template (kit/renderd/systemd/mgu-render-hmi.sh) ----
+# Apps that ask for it (mgu-render's own protocol, display-bridge's apps) can draw inside their HMI page instead
+# of over it. The template is made once here from the installed HmiMain3D; mgu-render-hmi.service mounts it into
+# the HMI's widgets before each HMI start (a copy in /run, nothing on the unit is written), only while it was made
+# for this HmiMain3D, else the stock widgets stay. Our own apps don't need it.
+embed_unit() {
+    cat <<UNIT
+# added by mgu-app-install.sh - the renderer's page template in the HMI (remove: sh mgu-app-install.sh renderd-embed-remove)
+[Unit]
+Description=mgu-render page template for the HMI
+DefaultDependencies=no
+Before=hmi.service
+RequiresMountsFor=$RENDERD_DIR /mnt/dataro/data/hmi
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# mounts the template made at install, nothing more: without one for this HmiMain3D, on any failure
+# or after 30 s, the stock widgets stay and the HMI starts as usual
+TimeoutStartSec=30
+ExecStart=-/bin/sh $RENDERD_DIR/mgu-render-hmi.sh $RENDERD_DIR $RENDERD_DIR/hmi
+
+[Install]
+WantedBy=hmi.service
+UNIT
+}
+
+install_embed() {
+    [ -x "$RENDERD_DIR/mgu-renderd" ] || die "install the renderer first (sh $0 renderd --persist)"
+    for f in hmi_template.js mgu-render-hmi.sh; do
+        [ -f "$SELF_DIR/$f" ] || die "$f not found next to $0"
+        cp "$SELF_DIR/$f" "$RENDERD_DIR/$f" || die "copy failed"
+    done
+    say "making the page template from this HMI (up to 2 min)..."
+    sh "$RENDERD_DIR/mgu-render-hmi.sh" --build "$RENDERD_DIR" "$RENDERD_DIR/hmi"
+    grep -q '"template": "ok"' "$RENDERD_DIR/status.json" 2>/dev/null || die "no page template: $(sed -n 's/^"reason": //p' "$RENDERD_DIR/status.json" 2>/dev/null)"
+    embed_unit > "$TMP.unit" || die "tmp"
+    rootfs_rw_do sh -c "cp '$TMP.unit' '/etc/systemd/system/$EMBED_UNIT' && mkdir -p /etc/systemd/system/hmi.service.wants && ln -sf '../$EMBED_UNIT' '/etc/systemd/system/hmi.service.wants/$EMBED_UNIT'" || die "cannot write /etc/systemd/system/$EMBED_UNIT"
+    rm -f "$TMP.unit"
+    systemctl daemon-reload
+    if [ "${1:-}" = "--now" ]; then
+        say "restarting the HMI with the template (VM / bench only)..."
+        systemctl stop hmi.service; systemctl start "$EMBED_UNIT"; systemctl start hmi.service
+        systemctl restart "$RENDERD_UNIT" 2>/dev/null
+    else
+        say "in-page drawing set up: from the next head-unit start"
+    fi
+}
+
+remove_embed() {
+    if [ -e "/etc/systemd/system/$EMBED_UNIT" ] || [ -L "/etc/systemd/system/hmi.service.wants/$EMBED_UNIT" ]; then
+        rootfs_rw_do sh -c "rm -f '/etc/systemd/system/$EMBED_UNIT' '/etc/systemd/system/hmi.service.wants/$EMBED_UNIT' && { rmdir /etc/systemd/system/hmi.service.wants 2>/dev/null; true; }"
+        systemctl daemon-reload
+        say "page template taken out: the stock widgets come back at the next head-unit start"
+    fi
+    if [ "${1:-}" = "--now" ] && grep -q " /mgu-render/hmi-widget " /proc/self/mountinfo; then
+        systemctl stop hmi.service; umount /mnt/dataro/data/hmi/bmw/widget; rm -f /run/mgu-render/hmi-template
+        systemctl start hmi.service
+    fi
+    rm -rf "$RENDERD_DIR/hmi" "$RENDERD_DIR/hmi.new" "$RENDERD_DIR/status.json" "$RENDERD_DIR/hmi_template.js" "$RENDERD_DIR/mgu-render-hmi.sh"
 }
 
 # ---- controller gate (kit/renderd/inputgate/mgu-inputgate.cpp) ----
@@ -632,7 +714,7 @@ gate_files_remove() {
     rm -f "/run/systemd/system/$GATE_DROPIN_NAME" /run/mgu-inputgate.env
     rmdir /run/systemd/system/hmi.service.d 2>/dev/null
     if [ -e "/etc/systemd/system/$GATE_DROPIN_NAME" ] || [ -e "/etc/systemd/system/$GATE_UNIT" ] || [ -e "/etc/systemd/system/$GATE_CHECK" ]; then
-        rootfs_rw_do sh -c "rm -f '/etc/systemd/system/$GATE_DROPIN_NAME' '/etc/systemd/system/$GATE_UNIT' '/etc/systemd/system/$GATE_CHECK'; rmdir /etc/systemd/system/hmi.service.d 2>/dev/null; true"
+        rootfs_rw_do sh -c "rm -f '/etc/systemd/system/$GATE_DROPIN_NAME' '/etc/systemd/system/$GATE_UNIT' '/etc/systemd/system/$GATE_CHECK' && { rmdir /etc/systemd/system/hmi.service.d 2>/dev/null; true; }"
     fi
     rm -f "$RENDERD_DIR/inputgate.env" "$RENDERD_DIR/inputgate.strikes" "$GATE_GUARD"
     systemctl daemon-reload
@@ -712,8 +794,10 @@ case "$cmd" in
     unpatch)   unpatch_mainapp; apply ;;
     renderd)   install_renderd "${1:-}" ;;
     renderd-remove) remove_renderd ;;
+    renderd-embed) install_embed "${1:-}" ;;
+    renderd-embed-remove) remove_embed "${1:-}" ;;
     inputgate) install_inputgate "${1:-}" ;;
     inputgate-remove) remove_inputgate "${1:-}" ;;
     inputgate-status) echo "controller gate: $(gate_state)" ;;
-    *) sed -n '2,30p' "$0"; exit 2 ;;
+    *) sed -n '2,35p' "$0"; exit 2 ;;
 esac

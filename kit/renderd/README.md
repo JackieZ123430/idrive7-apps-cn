@@ -12,6 +12,33 @@ gauges.js templates                  cached layers / glyph atlases            (l
 ctx.loop  <----------------tick----  wl_surface.frame (vsync)
 ```
 
+## The engine: mgu-render
+
+Since 2.0 the daemon is **mgu-render** by Robert Nisipeanu and IterioDev, from
+[robertnisipeanu/mgu-store](https://github.com/robertnisipeanu/mgu-store) (`native/mgu-render`),
+built here under the old name. It grew out of this folder's first renderer and keeps its drawing
+code and wire protocol, so our apps run unchanged: their recorded sessions replay byte for byte
+the same as through the first renderer (`make test`, below). On top of that it adds:
+
+- **The other community apps.** It also speaks IterioDev's renderer protocol (his App Manager
+  apps), display-bridge's (mgu-apps DOOM, draw_gallery), and its own, mgu-render/1
+  ([PROTOCOL.md](PROTOCOL.md)): pixmaps, video frames from a player, state events.
+- **Foreground gate.** `foreground_gate.js` (started by the renderer, Node) reads which app's
+  screen the HMI has in front; an app's surface is hidden while another app is in front, on top
+  of the app hiding itself. A gate that reads nothing changes nothing.
+- **Touch routing.** Apps that claim an area (mgu-render/1, IterioDev's apps) get the touches
+  that start there (an nft rule on the display's touch port, only while such an app is shown;
+  a guard process removes it if the renderer dies). Our apps claim nothing: touch stays the HMI's.
+- **In-page drawing (optional).** Apps that ask for it can draw inside their HMI page instead of
+  over it, through a page template made from the installed HMI (`renderd-embed`, below). Our
+  apps don't use it.
+
+[README.mgu-render.md](README.mgu-render.md) is its own README (internals, settings, the
+car checklist); [CHANGELOG.md](CHANGELOG.md) its history. Its paths there (`/var/opt/mgu-render`,
+`mgu-render.socket`) are those of its Store package; here it is installed as below.
+
+What stays as it was:
+
 - **No change for touch / iDrive.** The surface has an empty input region. Taps and the controller
   still go to the HMI's own screen underneath, and its buttons sit where they always were.
 - **Fallback.** If the socket `/run/mgu-renderd/renderd.sock` is missing, or the setting
@@ -36,6 +63,10 @@ ctx.loop  <----------------tick----  wl_surface.frame (vsync)
   popup. Apps send a frame at least once a second; the renderer hides a surface that goes quiet
   for 3 s (hung app). It's destroyed when the app disconnects or exits.
 
+Measured on the VM (Doom, a new game left alone for a minute, five runs alternating the first
+renderer and this one): the same, 35 game frames a second, 60-80 frames a second shown, about
+9 ms a frame, 3-6 % CPU.
+
 ## Build
 
 Build in Ubuntu 18.04 (glibc 2.27, like the unit):
@@ -44,19 +75,23 @@ Build in Ubuntu 18.04 (glibc 2.27, like the unit):
 cd kit/renderd
 docker build --platform linux/amd64 -t mgu-renderd-build docker      # x86-64 like the head unit, also on ARM machines
 docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v $PWD:/src mgu-renderd-build make
-# build/mgu-renderd, build/ivi-probe
+# build/mgu-renderd, build/mgu-inputgate.so, build/ivi-probe
+docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v $PWD:/src mgu-renderd-build make check-target
+make test     # (Docker, Ubuntu 24.04 + Mesa) unit tests, and recorded sessions of every dialect replayed
+              # through the original daemons (test/reference) and this one, frames compared byte for byte
 ```
 
-`deploy/make-car-kit.sh` (`kit/tools/make_kit.py`) does this automatically when Docker is
-available, and puts the binary in the kit.
+`deploy/make-car-kit.sh` (`kit/tools/make_kit.py`) does the build automatically when Docker is
+available, and puts the binary and its script files (`foreground_gate.js`, `hmi_template.js`,
+`mgu-render-hmi.sh`) in the kit.
 
 ### Prebuilt binary
 
 So nobody needs Linux or Docker just to install the apps, the binary is committed in
-`prebuilt/mgu-renderd` (and the controller gate `prebuilt/mgu-inputgate.so`), with
-`prebuilt/SOURCE_SHA256`: a fingerprint of `src/`, `inputgate/*.cpp`, `protocol/*.xml`, `docker/`
-and the `Makefile` they were built from (line endings ignored, so a
-Windows checkout matches). The kit builder:
+`prebuilt/mgu-renderd` (and the controller gate `prebuilt/mgu-inputgate.so`, and the script files),
+with `prebuilt/SOURCE_SHA256`: a fingerprint of `src/`, `inputgate/*.cpp`, `protocol/*.xml`,
+`docker/` and the `Makefile` they were built from (line endings ignored, so a Windows checkout
+matches). The kit builder:
 
 - **with Docker:** compiles the source (`make` skips it when nothing changed). If the source
   differs from the prebuilt's fingerprint, it copies the new binary to `prebuilt/` and updates
@@ -73,12 +108,47 @@ Windows checkout matches). The kit builder:
 sh mgu-app-install.sh renderd --persist   # copy to /var/opt/mgu-renderd, unit, start
 sh mgu-app-install.sh renderd             # same, but gone after a reboot (/run unit)
 sh mgu-app-install.sh renderd-remove
-journalctl -u mgu-renderd                 # its log (clients, errors)
+journalctl -u mgu-renderd                 # its log (apps, the gate, touch, errors)
 ```
 
-The unit runs it as a throwaway user (`DynamicUser`) with only the groups it needs:
-`mgu_wayland` (compositor), `video` (GPU) and `tm_oap_app` (the apps may use its socket).
-`deploy-car.sh restore` removes it.
+The unit (`mgu-renderd.service`, started with the app platform) runs it as root in the
+compositor's group, which the touch rule (nft) and the foreground gate (SOME/IP as root) need:
+
+```
+mgu-renderd -s socket_path=/run/mgu-renderd/renderd.sock -s socket_group=12202
+```
+
+Settings are `-s key=value` (or `-c FILE`, see [mgu-render.conf](mgu-render.conf) for every key);
+the old flags `--socket`, `--group` and `--screen` still work. It finds `foreground_gate.js`
+beside itself; `-s foreground_gate=` turns the gate off. `deploy-car.sh restore` removes it all.
+
+**Through the Store** (`mgu-repo.json`, tool `idrive7-renderd`), only the binary is installed and
+it runs as a throwaway user (`DynamicUser`, groups `mgu_wayland video tm_oap_app`) with the gate
+off: the apps draw exactly as with the first renderer; touch routing and in-page drawing need root
+and stay off.
+
+### In-page drawing (optional)
+
+```sh
+sh mgu-app-install.sh renderd-embed          # make the page template (up to 2 min); in use from the next head-unit start
+sh mgu-app-install.sh renderd-embed --now    # VM / bench only: restart the HMI now (on a car that reboots the unit)
+sh mgu-app-install.sh renderd-embed-remove   # take it out again (stock widgets from the next start)
+```
+
+The template is made once from the installed `HmiMain3D` into `/var/opt/mgu-renderd/hmi/`
+(`status.json` beside it says how it went). `mgu-render-hmi.service` (before the HMI, at most
+30 s) mounts a copy of the HMI's widget folder with the template added, from `/run`, over the
+original: nothing on the unit's partitions is written, and without a template made for this
+`HmiMain3D` the stock widgets stay. `deploy-car.sh` doesn't install it.
+
+## Licence
+
+This folder is **GPL-3.0-or-later** ([LICENSE](LICENSE)): mgu-render is Copyright (C) 2026 Robert
+Nisipeanu and IterioDev under that licence. The parts it took from this repository's first
+renderer stay MIT as well ([LICENSE.mgu-renderd](LICENSE.mgu-renderd)), as do the Wayland ivi
+protocol files (DENSO, BMW Car IT; notice in each file) and the reference copies of both earlier
+renderers in `test/reference/`. The controller gate (`inputgate/`) is this repository's, MIT
+(its vsomeip headers MPL-2.0). The rest of the repository stays MIT.
 
 ## Controller gate (inputgate/)
 
@@ -132,7 +202,8 @@ second in real time, and [`kit/tools/make_gif.sh`](../tools/make_gif.sh) turns t
 
 ## Protocol (src/proto.h)
 
-Messages are `u32 type, u32 len, payload`. The client sends HELLO, PLACE (surface rect + logical
+This is the protocol our apps speak (mgu-render calls it the upstream dialect); [PROTOCOL.md](PROTOCOL.md)
+describes all of mgu-render's. Messages are `u32 type, u32 len, payload`. The client sends HELLO, PLACE (surface rect + logical
 scale/offset), SHOW, ATLAS / RAMP / LAYER (uploaded once), IMAGE (a pixel image: id, w, h + RGBA
 bytes, sent again only when the app changes it, e.g. each frame of a game), FRAME (draw ops) and
 DROP_LAYER, GRAB (the controller to this app, see above).
