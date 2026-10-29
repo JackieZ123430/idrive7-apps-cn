@@ -1,5 +1,12 @@
 # mgu-render changelog
 
+## idrive7-apps mgu-renderd 2.0.1
+
+- From mgu-render 0.6.1: the HMI page template, its folder and the boot's copy are readable by the HMI's user
+  whatever umask the install or the boot runs with (under umask 077 the app's page showed empty).
+- `mgu-app-install.sh`'s template unit (`mgu-renderd-hmi.service`) stands down once the Store's `idrive7-renderd`
+  has taken its renderer over (the program gone), so only the Store's template unit mounts.
+
 ## idrive7-apps mgu-renderd 2.0.0 (mgu-render 0.5.1)
 
 - This repository's renderer is now mgu-render, from robertnisipeanu/mgu-store `native/mgu-render` (1d9dfec), built

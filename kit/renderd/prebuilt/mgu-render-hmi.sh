@@ -17,6 +17,9 @@
 # its widget directories) is made in /run and mounted over it, else the stock widgets stay. Nothing on
 # /mnt/dataro is written, and the copy is made afresh at each boot. The marker tells the renderer the
 # template is in place for this HMI start.
+#
+# The HMI runs as its own user (not root): the template, its folder and the copy are made readable by
+# everyone (0644 files, 0755 folders) whatever umask the install or the boot runs with.
 # Undo: umount /mnt/dataro/data/hmi/bmw/widget
 set -eu
 BUILD=
@@ -44,6 +47,7 @@ status() {
 # one value of status.json as written above, without its quotes
 field() { sed -n "s/^\"$1\": //p" "$STATUS" 2>/dev/null | sed 's/,$//; s/^"//; s/"$//'; }
 built() { [ "$(cat "$OUT/stamp" 2>/dev/null)" = "$stamp" ] && ls "$OUT"/*.pbw >/dev/null 2>&1; }
+readable() { chmod 0755 "$OUT" && chmod 0644 "$OUT"/*.pbw "$OUT/stamp"; }
 
 [ -n "$BUILD" ] || rm -f "$MARKER"
 if [ ! -e "$HMI" ]; then
@@ -58,6 +62,7 @@ stamp="$(stat -L -c '%s %Y' "$HMI") $(md5sum < "$DIR/hmi_template.js" | cut -d' 
 
 if [ -n "$BUILD" ]; then
 	if built; then
+		readable
 		[ "$(field template)" = ok ] && [ "$(field stamp)" = "$stamp" ] || status ok "" false
 		echo "mgu-render-hmi: the page template is in place for this HmiMain3D"
 		exit 0
@@ -89,6 +94,7 @@ if [ -n "$BUILD" ]; then
 		echo "$stamp" > "$NEW/stamp"
 		rm -rf "$OUT"
 		mv "$NEW" "$OUT"
+		readable
 		status ok "" false
 		echo "mgu-render-hmi: page template made: $(cd "$OUT" && ls *.pbw)"
 		exit 0
@@ -120,6 +126,8 @@ rm -rf "$RUN"
 mkdir -p "$RUN"
 cp -a "$WIDGETS"/. "$RUN"/
 cp "$OUT"/*.pbw "$RUN"/
+chmod 0755 "$RUN"
+(cd "$OUT" && for f in *.pbw; do chmod 0644 "$RUN/$f"; done)
 mount --bind "$RUN" "$WIDGETS"
 touch "$MARKER"
 echo "mgu-render-hmi: $(cd "$OUT" && ls *.pbw) added to $WIDGETS"
