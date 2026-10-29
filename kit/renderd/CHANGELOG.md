@@ -1,5 +1,9 @@
 # mgu-render changelog
 
+## idrive7-apps mgu-renderd 2.1.4
+
+- An app's layer goes back on the centre screen, on top, each time it is shown: another renderer (the MGU Store's beside idrive7-apps') or the HMI could set the screen's layers without it, and the app then showed a black page (seen on the car after opening the Store, then an app).
+
 ## idrive7-apps mgu-renderd 2.1.3
 
 - Merged with this repository's 2.0.2: serving the community socket, our layers and surfaces use the community

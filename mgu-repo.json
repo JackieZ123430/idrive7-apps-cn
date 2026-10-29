@@ -5,7 +5,7 @@
     "manifest": "app.json",
     "icon": "icon.png",
     "mguHmi": ["ID7"],
-    "requires": { "idrive7-renderd": "2.1.3", "mgu-inputgate": "1.0.0" },
+    "requires": { "idrive7-renderd": "2.1.4", "mgu-inputgate": "1.0.0" },
     "build": {
       "python": "kit/tools/build.py",
       "args": ["{id}"],
