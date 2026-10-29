@@ -79,6 +79,12 @@ const ctx = {
     ui, settings, spec, dataDir: out, log, display,
     canvas: (w, h) => display.canvas(w, h),
     onTab(fn) { display.onTab = fn; },
+    // as kit/mgu.js: the kit's own screen (tabs, page buttons, sheets, scrolling) where the renderer has the app
+    onTap(fn) { display.onTap = fn; },
+    sheet: (sh) => display.openSheet(sh),
+    hideButton(id) { display.hideButton(id); },
+    onScroll(fn) { display.onScroll = fn; },
+    controller: { grab(on) { display.grab(on); }, onInput(fn) { display.onCcu = fn; } },
     signals: { watch: async (iface) => ({ iface, error: 'preview' }), proxy: async () => { throw new Error('preview'); } },
     theme: themeFn,
     loop: (n, fps, fn) => { loops[n] = fn; return { stop() {}, kick() {} }; },

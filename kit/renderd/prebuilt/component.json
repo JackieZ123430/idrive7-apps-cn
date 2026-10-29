@@ -1,9 +1,9 @@
 {
   "id": "idrive7-renderd",
   "kind": "tool",
-  "version": "2.0.2",
+  "version": "2.1.3",
   "title": "GPU renderer",
-  "description": "Draws the apps at 60 fps with the GPU (mgu-render), over the HMI or inside the app's page; without it they draw in software",
+  "description": "The apps' own GPU renderer (mgu-render): draws them at 60 fps, beside the MGU Store's Renderer; installed with the apps",
   "mguProvides": "renderer",
   "mguHmi": ["ID7"],
   "optional": true,
@@ -15,6 +15,7 @@
     { "path": "hmi_template.js", "mode": "0644" },
     { "path": "mgu-render-hmi.sh", "mode": "0644" },
     { "path": "mgu-render-hmi-guard.sh", "mode": "0644" },
+    { "path": "idrive7-renderd-install.sh", "mode": "0644" },
     { "path": "LICENSE", "mode": "0644" },
     { "path": "LICENSE.mgu-renderd", "mode": "0644" }
   ],
@@ -34,5 +35,5 @@
   "recmgr": ["idrive7-renderd", "idrive7-renderd-hmi"],
   "restart": ["idrive7-renderd.service"],
   "keepRunning": true,
-  "postInstall": ["mgu-render-hmi.sh", "--build"]
+  "postInstall": ["idrive7-renderd-install.sh"]
 }

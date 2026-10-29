@@ -1,22 +1,39 @@
 # mgu-render changelog
 
-## idrive7-apps mgu-renderd 2.0.2
+## idrive7-apps mgu-renderd 2.1.3
 
-- Beside mgu-store's mgu-render (`/var/opt/mgu-render/current/mgu-render`), the touch divert is mgu-render's: serving
-  the community socket, we leave its ports (30570/30571) and table (`ip mgu_render`) alone, and exit once (systemd
-  restarts us) when mgu-render is installed or removed while we run, to hand them over. The units' `ExecStopPost`
-  deletes the table only without mgu-render.
-- Serving the community socket, our layers and surfaces use the community renderer's ivi ids (`0x4d470000`,
-  `0x4d470100`), so no app of ours shares an id with one of mgu-render's.
+- Merged with this repository's 2.0.2: serving the community socket, our layers and surfaces use the community
+  renderer's ivi ids (`0x4d470000`, `0x4d470100`), so an app on ours and one on the Store's mgu-render (its own
+  `0x4d520000`, `0x4d520100`) never share a layer or surface.
 - `mgu-app-install.sh renderd` removes an `idrive7-renderd` installed through the Store (with the Store's deploy tool)
   before installing its own.
+- The units pass `touch_area=84,0,1836,720`: apps may claim the title strip too, where the kit draws its page tabs
+  (iDrive 7's default left it out, so a tab could not be tapped). Only what an app claims is its; the HMI's own icons
+  there stay the HMI's.
+- 2.0.2's touch hand-over (ours leaving touch to an installed mgu-render) is gone: each has its own divert (2.1.0).
 
-## idrive7-apps mgu-renderd 2.0.1
+## idrive7-apps mgu-renderd 2.1.2
 
-- From mgu-render 0.6.1: the HMI page template, its folder and the boot's copy are readable by the HMI's user
-  whatever umask the install or the boot runs with (under umask 077 the app's page showed empty).
-- `mgu-app-install.sh`'s template unit (`mgu-renderd-hmi.service`) stands down once the Store's `idrive7-renderd`
-  has taken its renderer over (the program gone), so only the Store's template unit mounts.
+- Installed from the Store (idrive7-renderd 2.1.2, which every app requires), it removes the old renderer it replaces
+  (`idrive7-renderd-install.sh`, its postInstall, at every install): the kit installer's `mgu-renderd.service` and its
+  enablement, `/var/opt/mgu-renderd/mgu-renderd` and the unit copies set aside in `/var/opt/mgu-renderd/retired/`. A
+  `mgu-renderd` the Store installed itself stays. Then the HMI page template is made, as before.
+- `mgu-app-install.sh`'s template unit (`mgu-renderd-hmi.service`) stands down once the Store's `idrive7-renderd` has
+  taken its renderer over, so only the Store's template unit mounts (the original repository's Renderer 2.0.1).
+
+## idrive7-apps mgu-renderd 2.1.1
+
+- The HMI page template, its folder and the boot's copy of the HMI's widgets are readable by the HMI's user (0644
+  files, 0755 folders) whatever umask the install runs with: with umask 077 the HMI showed an in-page app's page empty
+  (robertnisipeanu/mgu-store mgu-render 0.6.1, pull request #48).
+
+## idrive7-apps mgu-renderd 2.1.0
+
+- Runs beside the MGU Store's mgu-render: the apps' renderer, the Store's its own. The touch divert has its own table
+  and ports (`touch_table`, `touch_port`: `ip idrive7_render`, 30572 in and 30573 out; the Store's stays `ip mgu_render`,
+  30570 and 30571), and on `lo` each lets the other's re-injections through. The units delete only that table when they stop.
+- The apps connect to `/run/mgu-renderd/renderd.sock` first, the Store's `/run/mgu-render/render.sock` only when theirs is not there.
+- In the Store the apps require it (idrive7-renderd 2.1.0), so updating the apps installs it again where it was removed.
 
 ## idrive7-apps mgu-renderd 2.0.0 (mgu-render 0.5.1)
 

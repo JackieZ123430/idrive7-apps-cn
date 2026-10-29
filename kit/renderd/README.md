@@ -147,7 +147,8 @@ the template is made by the install (`postInstall`, needs mgu-deploy 0.6.1).
 | this repository's earlier renderer (installer) | `renderd --persist` (and `deploy-car.sh`) replaces it in place: program, unit (root now), files |
 | `idrive7-renderd` installed through the Store | `renderd --persist` removes it through the Store's own deploy tool (the Store then shows it removed), then installs its own |
 | the installer's renderer, then `idrive7-renderd` from the Store | the Store takes it over (removes the installer's unit and program); the installer's template unit stands down |
-| mgu-store's own **mgu-render** beside ours, in either order | both run. mgu-render serves the apps that use its socket (this kit's apps prefer it) and has the page template and touch; ours keeps the community socket for older apps, on its own ivi ids (`0x4d470000`/`0x4d470100`, as the first renderer), and leaves touch alone. mgu-render installed or removed while ours runs: ours restarts once (systemd starts it again at once) to hand the touch ports over |
+| mgu-store's own **mgu-render** beside ours, in either order | both run, each fully: this kit's apps draw on ours (`/run/mgu-renderd/renderd.sock` first), the Store's own apps on mgu-render. Each has its own touch divert (ours: table `ip idrive7_render`, ports 30572/30573; mgu-render: `ip mgu_render`, 30570/30571) and its own ivi ids (ours `0x4d470000`/`0x4d470100`, as the first renderer; mgu-render `0x4d520000`/`0x4d520100`). The page template is mgu-render's while it is installed |
+| our renderer from the Store (2.1.x) | every app in the Store requires it, so it comes with the apps; its install step removes the installer's renderer it replaces |
 
 ### In-page drawing: the page template
 

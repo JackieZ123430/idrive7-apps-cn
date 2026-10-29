@@ -114,18 +114,19 @@ echo 'generator 4' > "$CUR/hmi_template.js"
 ok 'build under umask 077: the template readable, its folder searchable' \
 	'[ "$(runs)" = 9 ] && [ "$(mode "$ROOT/hmi")" = 755 ] && [ "$(mode "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw")" = 644 ] &&
 	 [ "$(mode "$ROOT/hmi/stamp")" = 644 ]'
-rm -rf "$T/run/hmi-widget"
+# a stock folder the copy would take 0700 from, and a stock widget with a mode of its own
+chmod 0700 "$T/widget"; chmod 0640 "$T/widget/stock.pbw"
 (umask 077 && boot)
 ok 'boot under umask 077: the copy and its template readable, the stock widgets as they were' \
 	'[ "$(mode "$T/run/hmi-widget")" = 755 ] && [ "$(mode "$T/run/hmi-widget/LT_State_A4A_WelcomeApp.pbw")" = 644 ] &&
-	 [ "$(mode "$T/run/hmi-widget/stock.pbw")" = "$(mode "$T/widget/stock.pbw")" ]'
+	 [ "$(mode "$T/run/hmi-widget/stock.pbw")" = 640 ]'
+chmod 0755 "$T/widget"; chmod 0644 "$T/widget/stock.pbw"
 # a template an earlier install left unreadable: made readable by the next install, not made again
 chmod 0700 "$ROOT/hmi"; chmod 0600 "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw" "$ROOT/hmi/stamp"
 (umask 077 && build)
 ok 'build: an unreadable template in place for this stamp is made readable, not made again' \
 	'[ "$(runs)" = 9 ] && [ "$(mode "$ROOT/hmi")" = 755 ] && [ "$(mode "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw")" = 644 ]'
 chmod 0600 "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw"
-rm -rf "$T/run/hmi-widget"
 (umask 077 && boot)
 ok 'boot: an unreadable template is copied readable' '[ "$(mode "$T/run/hmi-widget/LT_State_A4A_WelcomeApp.pbw")" = 644 ]'
 
