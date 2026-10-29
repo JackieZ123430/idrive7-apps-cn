@@ -1,0 +1,25 @@
+# idrive7-apps GPU renderer (mgu-render), installed from the Store (kit/renderd/prebuilt/component.json).
+[Unit]
+Description=GPU renderer for custom apps (idrive7-renderd: mgu-render)
+After=winston.service
+RequiresMountsFor=/var/opt
+StartLimitIntervalSec=0
+
+[Service]
+# root for the touch divert (nft) and the foreground gate (SOME/IP as root), in the compositor's group
+User=root
+Group=mgu_wayland
+Environment=XDG_RUNTIME_DIR=/run/wayland
+RuntimeDirectory=mgu-renderd
+RuntimeDirectoryMode=0755
+ExecStartPre=/bin/sh -c 'until [ -S /run/wayland/wayland-0 ]; do sleep 1; done'
+ExecStart=/var/opt/idrive7-renderd/current/mgu-renderd -s socket_path=/run/mgu-renderd/renderd.sock -s socket_group=tm_oap_app -s embed_marker=/run/mgu-renderd-hmi/hmi-template
+# a stopped renderer leaves no touch divert behind (only its own table)
+ExecStopPost=-/bin/sh -c 'nft delete table ip mgu_render 2>/dev/null; true'
+Restart=always
+RestartSec=3
+TimeoutStartSec=150
+TimeoutStopSec=5
+
+[Install]
+WantedBy=oapcontroller.service

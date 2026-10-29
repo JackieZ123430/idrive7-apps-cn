@@ -1,0 +1,38 @@
+{
+  "id": "idrive7-renderd",
+  "kind": "tool",
+  "version": "2.0.0",
+  "title": "GPU renderer",
+  "description": "Draws the apps at 60 fps with the GPU (mgu-render), over the HMI or inside the app's page; without it they draw in software",
+  "mguProvides": "renderer",
+  "mguHmi": ["ID7"],
+  "optional": true,
+  "uninstallable": true,
+  "requires": { "mgu-deploy": "0.6.1" },
+  "files": [
+    { "path": "mgu-renderd", "mode": "0755" },
+    { "path": "foreground_gate.js", "mode": "0644" },
+    { "path": "hmi_template.js", "mode": "0644" },
+    { "path": "mgu-render-hmi.sh", "mode": "0644" },
+    { "path": "mgu-render-hmi-guard.sh", "mode": "0644" },
+    { "path": "LICENSE", "mode": "0644" },
+    { "path": "LICENSE.mgu-renderd", "mode": "0644" }
+  ],
+  "units": [
+    { "name": "idrive7-renderd.service" },
+    { "name": "idrive7-renderd-hmi.service" }
+  ],
+  "enable": [
+    { "unit": "idrive7-renderd.service", "target": "oapcontroller.service" },
+    { "unit": "idrive7-renderd-hmi.service", "target": "hmi.service" }
+  ],
+  "dropins": [
+    { "unit": "display-bridge.socket", "name": "idrive7-renderd.conf", "from": "display-bridge-standdown.conf" },
+    { "unit": "display-bridge.service", "name": "idrive7-renderd.conf", "from": "display-bridge-standdown.conf" },
+    { "unit": "display-bridge-hmi.service", "name": "idrive7-renderd.conf", "from": "display-bridge-standdown.conf" }
+  ],
+  "recmgr": ["idrive7-renderd", "idrive7-renderd-hmi"],
+  "restart": ["idrive7-renderd.service"],
+  "keepRunning": true,
+  "postInstall": ["mgu-render-hmi.sh", "--build"]
+}

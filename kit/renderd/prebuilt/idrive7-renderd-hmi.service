@@ -1,0 +1,20 @@
+# idrive7-apps GPU renderer: its HMI page template for in-page drawing (kit/renderd/prebuilt/component.json).
+[Unit]
+Description=GPU renderer page template for the HMI (idrive7-renderd: in-page drawing)
+DefaultDependencies=no
+Before=hmi.service
+RequiresMountsFor=/var/opt /mnt/dataro/data/hmi
+# mgu-store's own mgu-render, when installed, puts its template in instead
+ConditionPathExists=!/var/opt/mgu-render/current/mgu-render
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# mounts the template made at install, nothing more: without one for this HmiMain3D, on any failure, after two
+# starts the HMI did not survive with it, or after 30 s, the stock widgets stay and the HMI starts as usual
+TimeoutStartSec=30
+Environment=MGU_RENDER_RUN=/run/mgu-renderd-hmi/hmi-widget MGU_RENDER_MARKER=/run/mgu-renderd-hmi/hmi-template
+ExecStart=-/bin/sh /var/opt/idrive7-renderd/current/mgu-render-hmi-guard.sh /var/opt/idrive7-renderd/current /var/opt/idrive7-renderd/hmi
+
+[Install]
+WantedBy=hmi.service

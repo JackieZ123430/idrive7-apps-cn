@@ -113,7 +113,7 @@ if ! built; then
 	exit 0
 fi
 # our own earlier mount only (another tool's mount over the same folder stays, and is copied)
-if grep -q " /mgu-render/hmi-widget $WIDGETS " /proc/self/mountinfo; then
+if grep -q " ${RUN#/run} $WIDGETS " /proc/self/mountinfo; then
 	umount "$WIDGETS"
 fi
 rm -rf "$RUN"

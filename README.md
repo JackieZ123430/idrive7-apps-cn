@@ -562,6 +562,9 @@ the internet.
 5. **Installs the GPU renderer** `mgu-renderd` (kit/renderd) as a systemd service that starts
    with the app platform. It runs as root in the compositor's group (its foreground gate reads
    which app is in front over SOME/IP; touch routing for apps that claim touch uses nft).
+   It also makes the **page template** for in-page drawing from the unit's HMI (up to 2 min;
+   mounted from `/run` before each HMI start behind a boot guard, nothing on the partitions is
+   written; `NO_EMBED=1` skips it). How apps use it: [kit/renderd](kit/renderd/README.md#using-it-in-an-app).
    If it can't be installed the apps still work, drawn in software.
 6. **Sets up the controller gate** `mgu-inputgate.so` to load into the HMI (a systemd drop-in for
    `hmi.service`; other preloads are kept). While a full-screen app asks
@@ -594,6 +597,8 @@ Files it touches:
 /var/opt/public/oap/oap_12221 ... oap_12299/              (new) the apps
 /var/opt/mgu-renderd/                                    (new) the GPU renderer
 /etc/systemd/system/mgu-renderd.service                  (new) its service (+ oapcontroller.service.wants link)
+/etc/systemd/system/mgu-renderd-hmi.service              (new) mounts the page template before the HMI (+ hmi.service.wants link)
+/etc/systemd/system/display-bridge*.d/mgu-renderd.conf   (new) display-bridge stands down while the renderer is installed
 /etc/systemd/system/hmi.service.d/zz-mgu-inputgate.conf  (new) loads the controller gate into the HMI
 /etc/systemd/system/mgu-inputgate-guard.service          (new) decides at each start whether it loads
 /etc/systemd/system/mgu-inputgate-check.service          (new) confirms the HMI is healthy with it

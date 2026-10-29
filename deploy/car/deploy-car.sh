@@ -41,8 +41,12 @@
 #                               mgu-inputgate.so) into the HMI from the next head-unit start, so
 #                               Doom can have the iDrive controller; the guard leaves it out if the
 #                               HMI fails to come up with it twice (NO_INPUTGATE=1: skip it)
-#   /etc/systemd/system/mgu-render-hmi.service           (new, only with renderd-embed) the renderer's
-#                               HMI page template, mounted before the HMI starts (restore removes it)
+#   /etc/systemd/system/mgu-renderd-hmi.service (+ hmi.service.wants link)  (new) mounts the renderer's
+#                               HMI page template (in-page drawing) before the HMI starts, behind a
+#                               boot guard; /var/opt/mgu-renderd/hmi/ holds the template
+#   /etc/systemd/system/display-bridge{.socket,.service,-hmi.service}.d/mgu-renderd.conf  (new)
+#                               display-bridge (mgu-apps), if installed, stands down: the renderer
+#                               serves its apps
 # MainApp's own /usr/lib/oap-mainapp/src/main.js is never written: the patched
 # copy is bind-mounted over it at boot, and only while that file is unchanged
 # (after a firmware update the hook switches itself off).
@@ -376,14 +380,15 @@ cmd_restore() {
         say "  removed the controller gate"
     fi
     rm -f /run/systemd/system/hmi.service.d/zz-mgu-inputgate.conf /run/mgu-inputgate.env
-    # the renderer's optional page template (renderd-embed): its unit, and its widget mount (in /run)
-    if [ -e /etc/systemd/system/mgu-render-hmi.service ] || [ -L /etc/systemd/system/hmi.service.wants/mgu-render-hmi.service ]; then
-        rootfs_rw || die "cannot remount / rw"
-        rm -f /etc/systemd/system/mgu-render-hmi.service /etc/systemd/system/hmi.service.wants/mgu-render-hmi.service
-        rmdir /etc/systemd/system/hmi.service.wants 2>/dev/null
-        say "  removed the renderer's page template"
-    fi
-    grep -q " /mgu-render/hmi-widget " /proc/self/mountinfo && umount /mnt/dataro/data/hmi/bmw/widget 2>/dev/null
+    # the renderer's page template (in-page drawing) and display-bridge's stand-down drop-ins; the HMI's
+    # widget mount (in /run) goes with the HMI restart below / the next start
+    for f in /etc/systemd/system/mgu-renderd-hmi.service /etc/systemd/system/hmi.service.wants/mgu-renderd-hmi.service \
+             /etc/systemd/system/display-bridge.socket.d/mgu-renderd.conf /etc/systemd/system/display-bridge.service.d/mgu-renderd.conf \
+             /etc/systemd/system/display-bridge-hmi.service.d/mgu-renderd.conf; do
+        if [ -e "$f" ] || [ -L "$f" ]; then rootfs_rw || die "cannot remount / rw"; rm -f "$f"; say "  removed $f"; fi
+    done
+    for d in hmi.service.wants display-bridge.socket.d display-bridge.service.d display-bridge-hmi.service.d; do rmdir "/etc/systemd/system/$d" 2>/dev/null; done
+    grep -q " /mgu-renderd-hmi/hmi-widget " /proc/self/mountinfo && umount /mnt/dataro/data/hmi/bmw/widget 2>/dev/null
     systemctl daemon-reload
     rootfs_ro
     [ "$(md5sum "$MAINJS" | cut -d' ' -f1)" = "$(cat "$B/mainjs.md5")" ] || warn "MainApp main.js differs from backup time (firmware update?)"

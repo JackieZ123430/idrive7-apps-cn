@@ -26,9 +26,10 @@ PRE_DIR = os.path.join(RENDERD, 'prebuilt')
 PRE = os.path.join(PRE_DIR, 'mgu-renderd')
 PRE_SUM = os.path.join(PRE_DIR, 'SOURCE_SHA256')
 # the renderer's script files, shipped beside it (kit and prebuilt/, which the Store installs from):
-# the foreground gate it starts, and the HMI page template's generator and mount script (renderd-embed)
+# the foreground gate it starts, the HMI page template's generator, mount script and boot guard, its licences
 RENDERD_FILES = [('js/foreground_gate.js', 'foreground_gate.js'), ('js/hmi_template.js', 'hmi_template.js'),
-                 ('systemd/mgu-render-hmi.sh', 'mgu-render-hmi.sh')]
+                 ('systemd/mgu-render-hmi.sh', 'mgu-render-hmi.sh'), ('systemd/mgu-render-hmi-guard.sh', 'mgu-render-hmi-guard.sh'),
+                 ('LICENSE', 'LICENSE'), ('LICENSE.mgu-renderd', 'LICENSE.mgu-renderd')]
 # files copied next to the apps; text, so always shipped with Unix line endings
 CAR_FILES = [('car/deploy-car.sh', 'deploy-car.sh'), ('mgu-app-install.sh', 'mgu-app-install.sh'),
              ('mainapp-patch.js', 'mainapp-patch.js'), ('car/README.txt', 'README.txt')]

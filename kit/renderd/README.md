@@ -29,9 +29,14 @@ the same as through the first renderer (`make test`, below). On top of that it a
 - **Touch routing.** Apps that claim an area (mgu-render/1, IterioDev's apps) get the touches
   that start there (an nft rule on the display's touch port, only while such an app is shown;
   a guard process removes it if the renderer dies). Our apps claim nothing: touch stays the HMI's.
-- **In-page drawing (optional).** Apps that ask for it can draw inside their HMI page instead of
-  over it, through a page template made from the installed HMI (`renderd-embed`, below). Our
-  apps don't use it.
+- **In-page drawing.** Apps that ask for it draw inside their own HMI page instead of over it,
+  through a page template made from the installed HMI: the HMI's title bar, popups, the camera,
+  BACK and HOME then behave as on any stock page. Installed with the renderer (below); today's
+  apps draw over the HMI as before.
+- **Pixel pictures and video.** Pixmaps updated in regions (INDEX8 with a palette for a game, or
+  RGBA), and video frames a player process writes to a file, drawn under and over the app's ops.
+
+See [Using it in an app](#using-it-in-an-app) for how an app uses each of these.
 
 [README.mgu-render.md](README.mgu-render.md) is its own README (internals, settings, the
 car checklist); [CHANGELOG.md](CHANGELOG.md) its history. Its paths there (`/var/opt/mgu-render`,
@@ -111,35 +116,108 @@ sh mgu-app-install.sh renderd-remove
 journalctl -u mgu-renderd                 # its log (apps, the gate, touch, errors)
 ```
 
-The unit (`mgu-renderd.service`, started with the app platform) runs it as root in the
-compositor's group, which the touch rule (nft) and the foreground gate (SOME/IP as root) need:
+`renderd --persist` sets up everything:
+
+| | what |
+|---|---|
+| `/var/opt/mgu-renderd/` | `mgu-renderd`, `foreground_gate.js`, the page template's `hmi_template.js`, `mgu-render-hmi.sh`, `mgu-render-hmi-guard.sh`, the licences; `hmi/` the template, `status.json` how its build went |
+| `mgu-renderd.service` | the renderer, started with the app platform, as root in the compositor's group (the touch rule needs nft, the foreground gate SOME/IP as root) |
+| `mgu-renderd-hmi.service` | before each HMI start: mounts the page template into the HMI's widgets |
+| `display-bridge{.socket,.service,-hmi.service}.d/mgu-renderd.conf` | display-bridge (mgu-apps), if installed, stands down: the renderer serves its apps |
+
+The renderer runs as
 
 ```
-mgu-renderd -s socket_path=/run/mgu-renderd/renderd.sock -s socket_group=12202
+mgu-renderd -s socket_path=/run/mgu-renderd/renderd.sock -s socket_group=12202 -s embed_marker=/run/mgu-renderd-hmi/hmi-template
 ```
 
 Settings are `-s key=value` (or `-c FILE`, see [mgu-render.conf](mgu-render.conf) for every key);
 the old flags `--socket`, `--group` and `--screen` still work. It finds `foreground_gate.js`
 beside itself; `-s foreground_gate=` turns the gate off. `deploy-car.sh restore` removes it all.
 
-**Through the Store** (`mgu-repo.json`, tool `idrive7-renderd`), only the binary is installed and
-it runs as a throwaway user (`DynamicUser`, groups `mgu_wayland video tm_oap_app`) with the gate
-off: the apps draw exactly as with the first renderer; touch routing and in-page drawing need root
-and stay off.
+**Through the Store** (`mgu-repo.json`, tool `idrive7-renderd`): the same, packed by
+[`prebuilt/component.json`](prebuilt/component.json) with the units in `prebuilt/`
+(`idrive7-renderd.service`, `idrive7-renderd-hmi.service`), in `/var/opt/idrive7-renderd/current/`;
+the template is made by the install (`postInstall`, needs mgu-deploy 0.6.1). mgu-store's own
+mgu-render is the same engine: install one of the two (with both, the community socket is ours and
+mgu-render puts its page template in instead of ours).
 
-### In-page drawing (optional)
+### In-page drawing: the page template
+
+The template is made from the installed `HmiMain3D` at install (up to 2 minutes, at low
+priority) into `/var/opt/mgu-renderd/hmi/`, for that HMI build only. Before each HMI start,
+`mgu-renderd-hmi.service` (at most 30 s) mounts a copy of the HMI's widget folder with the
+template added, from `/run/mgu-renderd-hmi/`, over the original: nothing on the unit's
+partitions is written, and without a template made for this `HmiMain3D` the stock widgets stay.
+Apps are offered in-page drawing from the first head-unit start after the install.
+
+**Boot guard.** An HMI that fails reboots a car's head unit, so the mount runs behind a guard
+(`mgu-render-hmi-guard.sh`): each start counts a strike in `hmi/strikes`, and the same HMI process
+running for a minute (checked 2 minutes after the start) clears it. Two starts in a row without
+that, and the template stays out (the journal says so) until it is made again (a firmware or
+renderer update) or `renderd-embed` runs.
 
 ```sh
-sh mgu-app-install.sh renderd-embed          # make the page template (up to 2 min); in use from the next head-unit start
-sh mgu-app-install.sh renderd-embed --now    # VM / bench only: restart the HMI now (on a car that reboots the unit)
-sh mgu-app-install.sh renderd-embed-remove   # take it out again (stock widgets from the next start)
+sh mgu-app-install.sh renderd-embed          # make the template again (and reset the guard)
+sh mgu-app-install.sh renderd-embed --now    # VM / bench only: restart the HMI with it now (on a car that reboots the unit)
+sh mgu-app-install.sh renderd-embed-remove   # take it out (stock widgets from the next start; --now: now)
+NO_EMBED=1 sh mgu-app-install.sh renderd --persist   # the renderer without in-page drawing
+cat /var/opt/mgu-renderd/status.json         # the template's build: ok / failed and why
 ```
 
-The template is made once from the installed `HmiMain3D` into `/var/opt/mgu-renderd/hmi/`
-(`status.json` beside it says how it went). `mgu-render-hmi.service` (before the HMI, at most
-30 s) mounts a copy of the HMI's widget folder with the template added, from `/run`, over the
-original: nothing on the unit's partitions is written, and without a template made for this
-`HmiMain3D` the stock widgets stay. `deploy-car.sh` doesn't install it.
+## Using it in an app
+
+**Apps made with this kit** (`ctx.canvas`, `gauges.js`) need nothing: the kit speaks the protocol
+below over `/run/mgu-renderd/renderd.sock` and draws on its own layer over the HMI, at 60 fps,
+falling back to software without the renderer. The foreground gate and the rest apply by themselves.
+
+**New features** (in-page drawing, pixmaps, video, touch, state events, a frame cap) are
+mgu-render's own protocol, mgu-render/1 ([PROTOCOL.md](PROTOCOL.md)), through its client
+[`js/mgu_render_client.js`](js/mgu_render_client.js) (Node 8, `net`/`fs`/`events` only; copy it into
+the app). It connects to `/run/mgu-render/render.sock` (mgu-store's renderer) or
+`/run/mgu-renderd/renderd.sock` (this one), whichever is there:
+
+```js
+const { RenderClient, imageOp } = require('./mgu_render_client');
+const gpu = new RenderClient('my_app', log, { mode: 'embed', kit: require('./record') });
+gpu.on('ready', (screen, info) => {
+    if (!info) { /* an older renderer: draw in software */ return; }
+    if (info.modes.indexOf('embed') < 0) gpu.mode('layer');        // no page template on this unit yet
+    const box = gpu.mode() === 'embed' ? info.embedBox : info.appArea;
+    gpu.place({ x: box.x, y: box.y, w: box.w, h: box.h, scale: 1, ox: 0, oy: 0 });
+    gpu.show(true);
+});
+gpu.fps(30);                                        // optional: at most 30 frames a second
+gpu.on('tick', () => gpu.frame(recorder));          // a kit Recorder, or gpu.frameWords(ops)
+gpu.on('state', (s) => { /* { mode, onScreen, front } */ });
+gpu.on('touch', (phase, x, y) => { /* in claimed areas: gpu.claim([{ x, y, w, h }]) */ });
+gpu.connect();
+```
+
+- **In-page drawing** (`mode: 'embed'`): the page the app draws in must use the template as its
+  state's widget. The RHMI page (`application.xml`) of such a state:
+
+  ```xml
+  <container id="1" type="state" widget="LT_State_A4A_WelcomeApp">
+      <layoutGroup id="100" name="Titlebar"><component id="10" type="title"/></layoutGroup>
+  </container>
+  ```
+
+  The picture is drawn in `info.embedBox` (104,88 1796x632 on iDrive 7) and shown only while
+  that page is in front. Offered (`info.modes` has `embed`) once the template is mounted, i.e. from
+  the first head-unit start after the install: fall back to `layer` until then. `build.py` has no
+  screen kind for it yet; write the state as above.
+- **Pixmaps**: `gpu.pixmap(1, 320, 200, 'index8', 'nearest')`, `gpu.palette(1, rgb768)`,
+  `gpu.pixels(1, rects, indices)` for what changed, and `imageOp(1, x, y, w, h)` in each frame
+  (`test/pixel_client.js` is a complete example).
+- **Video** (`info.video`): a player writes decoded frames (I420) to `/dev/shm/mgu-video-<name>`
+  (PROTOCOL.md, "Video"); the app names it with `gpu.video(1, path)` and draws `videoOp(1, x, y, w, h, r)`.
+- **Touch** (`info.touch`): `gpu.claim([...])` areas; a touch that starts there comes as `touch`
+  events and the HMI does not get it.
+- **Controller**: `gpu.grab(true)` holds the knob, press and tilt back from the HMI while the app
+  is shown (`info.controller`: the controller gate below is loaded); the events come as `ccu`.
+
+More detail: [README.mgu-render.md](README.mgu-render.md) ("Apps", "Embed buffers", "Settings").
 
 ## Licence
 
