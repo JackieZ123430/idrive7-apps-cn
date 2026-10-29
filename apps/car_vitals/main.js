@@ -27,7 +27,9 @@ const { DidReader } = require('./kit/dids');
 
 const W = 1600, H = 520;
 const PAGES = ['engine', 'thermal', 'fuel', 'chassis'];
-const FUEL = ['iat', 'hpfp', 'lpfp', 'timing'];          // engine unit values read fast on the Fuel & ignition page
+const FUEL = ['iat', 'hpfp', 'lpfp', 'timing', 'boostCtl', 'load'];   // engine unit values read fast on the Fuel & ignition page
+/** Target-vs-actual pairs on the Fuel & ignition page: read together, [target, actual] keys of config.dme. */
+const PAIR = { boostCtl: ['boostTarget', 'boostActual'], load: ['loadTarget', 'loadActual'] };
 const HIST_SEC = 300;
 /*
  * Plausible ranges (deg C / bar). A value outside is the car's "no data" marker or a field this
@@ -36,7 +38,7 @@ const HIST_SEC = 300;
 const TYRE_T = [-40, 150], TYRE_P = [0.5, 6], TYRE_PT = [1, 6];
 const RANGE = {
     rpm: [0, 12000], coolant: [-40, 160], oil: [-40, 170], gearbox: [-40, 160], egs: [-40, 160], ambient: [-50, 60], timing: [-64, 64],
-    boostFes: [-1, 4], boostDme: [-1, 4], tFL: TYRE_T, tFR: TYRE_T, tRL: TYRE_T, tRR: TYRE_T,
+    boostFes: [-1, 4], boostDme: [-1, 4], boostTarget: [-1, 4], boostActual: [-1, 4], loadTarget: [0, 250], loadActual: [0, 250], tFL: TYRE_T, tFR: TYRE_T, tRL: TYRE_T, tRR: TYRE_T,
     pFL: TYRE_P, pFR: TYRE_P, pRL: TYRE_P, pRR: TYRE_P, ptFL: TYRE_PT, ptFR: TYRE_PT, ptRL: TYRE_PT, ptRR: TYRE_PT,
 };
 /*
@@ -48,13 +50,15 @@ const RANGE = {
 const MOVE = { gearbox: 1, egs: 1, boostFes: 0.03, boostDme: 0.03 };
 /** Remembered per car: which groups sent real data (the "Auto" setting shows only those). */
 const GROUP = { gearbox: 'gearbox', boostFes: 'boost', boostDme: 'boost', tFL: 'tyreTemp', tFR: 'tyreTemp', tRL: 'tyreTemp', tRR: 'tyreTemp',
-    pFL: 'tyres', pFR: 'tyres', pRL: 'tyres', pRR: 'tyres', iat: 'iat', hpfp: 'hpfp', lpfp: 'lpfp', timing: 'timing', egs: 'egs' };
+    pFL: 'tyres', pFR: 'tyres', pRL: 'tyres', pRR: 'tyres', iat: 'iat', hpfp: 'hpfp', lpfp: 'lpfp', timing: 'timing', egs: 'egs',
+    boostTarget: 'boostCtl', boostActual: 'boostCtl', loadTarget: 'load', loadActual: 'load' };
 /**
  * "Auto / Show / Hide" setting of each group. Auto: shown once the car / engine unit has sent real
  * data for it (remembered), so values a car doesn't have never take space.
  */
 const SHOW = { boost: 'showBoost', gearbox: 'showGearbox', tyres: 'showTyres', tyreTemp: 'showTyreTemp',
-    iat: 'showIat', hpfp: 'showHpfp', lpfp: 'showLpfp', timing: 'showTiming', misfire: 'showMisfire', egs: 'showEgs' };
+    iat: 'showIat', hpfp: 'showHpfp', lpfp: 'showLpfp', timing: 'showTiming', misfire: 'showMisfire', egs: 'showEgs',
+    boostCtl: 'showBoostCtl', load: 'showLoad' };
 const TYRES = ['FL', 'FR', 'RL', 'RR'];
 // gearbox enum: names or wire numbers (G1 = 3 ... G10 = 12, R = 1, N_OR_P = 2), as in kit/car.js
 const GEARS = { G1: 1, G2: 2, G3: 3, G4: 4, G5: 5, G6: 6, G7: 7, G8: 8, G9: 9, G10: 10, R: -1, N_OR_P: 0 };
@@ -96,7 +100,8 @@ mgu.run({
         };
 
         /* ---------- live data ---------- */
-        const live = {}, peak = {}, demoPeak = {}, hist = { coolant: [], oil: [], gearbox: [], egs: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [], timing: [] };
+        const live = {}, peak = {}, demoPeak = {}, hist = { coolant: [], oil: [], gearbox: [], egs: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [], timing: [],
+            boostTarget: [], boostActual: [], loadTarget: [], loadActual: [] };
         /*
          * Peak hold: a peak follows new highs, and "peakHold" s after it was last raised it drops back
          * to the current value (0 = until "Reset peaks"). Called per sample and per frame, so it also
@@ -369,9 +374,30 @@ mgu.run({
         }
         /** Boost from the engine unit: charge / manifold pressure (absolute, kPa) minus outside air pressure. */
         async function readBoost() {
-            if (Date.now() - baroT > 60000) { baroT = Date.now(); const b = await rd.value('baro', dme.baro); if (b !== null) baro = b; }
+            await freshBaro();
             const m = await rd.value('boost', dme.boost);
             return m === null ? null : (m - baro) / 100;
+        }
+        /** Outside air pressure (kPa), read again once a minute: boost = absolute pressure minus it. */
+        async function freshBaro() {
+            if (Date.now() - baroT > 60000) { baroT = Date.now(); const b = await rd.value('baro', dme.baro); if (b !== null) baro = b; }
+        }
+        /**
+         * A target-vs-actual pair (PAIR): { target, actual }, or null while the target doesn't answer.
+         * Boost comes as absolute kPa and is turned into bar above the outside air pressure;
+         * air charge is in % as the engine unit sends it.
+         */
+        async function readPair(k) {
+            const [tk, ak] = PAIR[k];
+            let target = await rd.value(tk, dme[tk]);
+            if (target === null) return null;
+            let actual = await rd.value(ak, dme[ak]);
+            if (k === 'boostCtl') {
+                await freshBaro();
+                target = (target - baro) / 100;
+                actual = actual === null ? null : (actual - baro) / 100;
+            }
+            return { target, actual };
         }
         /** Front axle torque from the transfer case (Nm); the raw reply goes to the log once per new value shape. */
         async function readLmv() {
@@ -393,7 +419,7 @@ mgu.run({
             // oil temperature from the engine unit while the car's own signal has none (a 330e sends none)
             const needOil = (dme.oil || []).length > 0 && now - oilCarT > 15000;
             // a value set to Hide is not asked for at all
-            const want = (k) => settings.get(SHOW[k]) !== 'off' && (k === 'misfire' ? !!dme.misfire : (dme[k] || []).length > 0);
+            const want = (k) => settings.get(SHOW[k]) !== 'off' && (k === 'misfire' ? !!dme.misfire : (dme[PAIR[k] ? PAIR[k][0] : k] || []).length > 0);
             const onFuelPage = now - fuelSeen < 1500;
             // transfer case: only on the Chassis page with the xDrive card shown, and only while the car's own split is missing
             const onChassis = now - chassisSeen < 1500 && xcfg.front.length > 0 && settings.get('xdrive') !== 'off'
@@ -409,12 +435,16 @@ mgu.run({
                         if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
                         fuelTry[k] = Date.now();
                         if (k === 'lmv') { await readLmv(); continue; }
-                        const v = k === 'boost' ? await readBoost() : k === 'misfire' ? await readMisfire() : await rd.value(k, dme[k]);
+                        const v = k === 'boost' ? await readBoost() : k === 'misfire' ? await readMisfire() : PAIR[k] ? await readPair(k) : await rd.value(k, dme[k]);
                         if (k === 'egs' || k === 'timing') { const c = dme[k][rd.pick[k] || 0], r = c && rd.raws[rd.key(c)]; if (r) logRaw(k === 'egs' ? 'EGS' : 'timing', r.bytes || r.why); }
+                        // the first replies of the target / actual identifiers go to the log, to check their scaling
+                        if (PAIR[k]) PAIR[k].forEach((x) => { const c = (dme[x] || [])[rd.pick[x] || 0], r = c && rd.raws[rd.key(c)]; if (r) logRaw(x + ' ' + DidReader.label(c), r.bytes || r.why); });
                         if (k === 'oil' && v !== null && Date.now() - oilCarT < 15000) continue;      // the car's own value came meanwhile
                         if (v === null) { fuelFail[k] = (fuelFail[k] || 0) + 1; continue; }
                         fuelT[k] = Date.now(); fuelFail[k] = 0;
-                        if (k === 'misfire') { logRaw('misfires', v); live.misfire = v; lastCar = Date.now(); remember(['misfire']); } else put(k === 'boost' ? 'boostDme' : k, v);
+                        if (k === 'misfire') { logRaw('misfires', v); live.misfire = v; lastCar = Date.now(); remember(['misfire']); }
+                        else if (PAIR[k]) { put(PAIR[k][0], v.target); if (v.actual !== null) put(PAIR[k][1], v.actual); else delete live[PAIR[k][1]]; }
+                        else put(k === 'boost' ? 'boostDme' : k, v);
                     }
                 }
             } catch (e) { log.warn('engine unit poll: ' + e); }
@@ -429,7 +459,7 @@ mgu.run({
             if (!link.p) return 'no diagnostic link';
             if (!link.available) return 'diagnostic link down';
             const r = k === 'misfire' ? Object.keys(rd.raws).filter((x) => /MID A2|F6A2/.test(x)).map((x) => rd.raws[x])
-                : (dme[k] || []).map((c) => rd.raws[rd.key(c)]).filter(Boolean);
+                : (dme[PAIR[k] ? PAIR[k][0] : k] || []).map((c) => rd.raws[rd.key(c)]).filter(Boolean);
             if (!r.length) return 'reading...';
             // plain words on the tile; the reply codes are in the log
             if (r.every((x) => /NRC 31|NRC 11|NRC 12/.test(x.why))) return 'not available on this car';
@@ -443,7 +473,8 @@ mgu.run({
             const fuelOk = (k) => usingDemo() || (fuelT[k] && Date.now() - fuelT[k] < 15000);
             Object.keys(hist).forEach((k) => {
                 let v = d[k] == null ? null : d[k];
-                if (FUEL.indexOf(k) >= 0 && !fuelOk(k)) v = null;
+                const fk = GROUP[k] && PAIR[GROUP[k]] ? GROUP[k] : k;
+                if (FUEL.indexOf(fk) >= 0 && !fuelOk(fk)) v = null;
                 if (k === 'iatRise') v = fuelOk('iat') && G.isNum(d.iat) && G.isNum(d.ambient) ? d.iat - d.ambient : null;
                 hist[k].push(v); if (hist[k].length > HIST_SEC) hist[k].shift();
             });
@@ -571,7 +602,7 @@ mgu.run({
          * width. From 7 tiles there are three rows - too low for a graph, so stat() leaves it out.
          */
         function grid(n) {
-            const per = n <= 2 ? Math.max(1, n) : n <= 4 ? 2 : 3, rows = Math.ceil(n / per), gap = 16;
+            const per = n <= 2 ? Math.max(1, n) : n <= 4 ? 2 : n <= 6 ? 3 : 4, rows = Math.ceil(n / per), gap = 16;
             const h = (G.BOTTOM - G.TOP - gap * (rows - 1)) / rows, out = [];
             for (let r = 0; r < rows; r++) {
                 const k = Math.min(per, n - r * per), w = (1552 - 24 * (k - 1)) / k;
@@ -633,11 +664,50 @@ mgu.run({
             });
         }
 
+        /**
+         * Target against actual (boost, air charge): the actual value big, the target beside it, how far
+         * under / over it is, and both over the last 5 minutes (target as a thin line). Only judged while
+         * the target asks for something (above 'idle'): at idle a gap means nothing.
+         */
+        function pairTile(cv, t, x, y, w, h, g) {
+            G.panel(cv, t, x, y, w, h, g.label);
+            const a = g.actual, tg = g.target, has = G.isNum(a), big = h > 200 ? 84 : 56;
+            const gap = has && G.isNum(tg) ? a - tg : null, judged = G.isNum(gap) && tg > g.idle;
+            const col = !has ? t.dim : !judged || Math.abs(gap) < g.tol ? t.text : gap > 0 ? t.crit : t.warn;
+            const base = y + 52 + big * 0.78;
+            const vw = cv.text(has ? G.fmt(a, g.decimals) : '--', x + 18, base, big, col, { font: 'num' });
+            if (has) cv.text(g.unit, x + 26 + vw, base, 26, t.dim);
+            // target, top right
+            const r = x + w - 18;
+            cv.text(g.targetLabel, r, y + 76, 18, t.dim, { font: 'bold', spacing: 1.5, align: 'right' });
+            cv.text(G.isNum(tg) ? G.fmt(tg, g.decimals) : '--', r, y + 76 + (h > 200 ? 46 : 36), h > 200 ? 40 : 30, G.isNum(tg) ? t.text : t.dim, { font: 'num', align: 'right' });
+            if (h > 200) {
+                // both over the last 5 minutes, on one scale
+                const ha = g.histA || [], ht = g.histT || [], all = ha.concat(ht).filter(G.isNum);
+                if (all.length > 2) {
+                    const hx = x + 18, hw = w - 36, hy = y + h - 44, hh = Math.min(56, h * 0.24);
+                    let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+                    if (hi - lo < 1e-6) { lo -= 1; hi += 1; }
+                    const pts = (hs) => hs.map((p, i) => [hx + (i / Math.max(1, hs.length - 1)) * hw, G.isNum(p) ? hy - ((p - lo) / (hi - lo)) * hh : hy]);
+                    if (ha.filter(G.isNum).length > 2) { const pa = pts(ha); cv.fillUnder(pa, hy, withAlpha(t.accent, 0.16)); cv.polyline(pa, 2.5, withAlpha(t.accent, 0.85)); }
+                    if (ht.filter(G.isNum).length > 2) cv.polyline(pts(ht), 1.5, withAlpha(t.text, 0.55));
+                }
+            }
+            const sub = !G.isNum(tg) ? g.why : !has ? 'target only: the actual value does not answer'
+                : !judged ? 'on target' + (G.isNum(gap) ? ' (idle)' : '')
+                    : Math.abs(gap) < g.tol ? 'on target  ·  ' + (gap >= 0 ? '+' : '') + G.fmt(gap, g.decimals) + ' ' + g.unit
+                        : (gap > 0 ? '+' : '') + G.fmt(gap, g.decimals) + ' ' + g.unit + (gap > 0 ? ' over target' : ' under target');
+            cv.text(sub, x + 18, y + h - 16, 22, judged && Math.abs(gap) >= g.tol ? col : t.dim, { spacing: 0.5 });
+        }
+
         function drawFuel(cv, t, d) {
             fuelSeen = Date.now();
             kickFuel();
             const pu = settings.get('pressUnit'), running = G.isNum(d.rpm) && d.rpm > 500;
-            const val = (k) => (usingDemo() || (fuelT[k] && Date.now() - fuelT[k] < 15000) ? d[k] : null);
+            const val = (k) => {
+                const fk = GROUP[k] && PAIR[GROUP[k]] ? GROUP[k] : k;
+                return usingDemo() || (fuelT[fk] && Date.now() - fuelT[fk] < 15000) ? d[k] : null;
+            };
             const dT = (x) => (G.isNum(x) ? (settings.get('tempUnit') === 'F' ? x * 1.8 : x) : null);
             const iatRise = G.isNum(val('iat')) && G.isNum(d.ambient) ? d.iat - d.ambient : null;
             const off = running ? '' : '  ·  engine off';
@@ -656,6 +726,14 @@ mgu.run({
                     sub: G.isNum(iatRise) ? mm(hist.iatRise, dT, 0, 'heat soak') : 'needs IAT + outside temperature' },
                 shown('timing') && { label: 'Ignition timing (before TDC)', value: val('timing'), unit: '°', decimals: 1, history: hist.timing,
                     sub: G.isNum(val('timing')) ? mm(hist.timing, (x) => x, 1) : fuelWhy('timing') },
+                shown('boostCtl') && { draw: (c, th, x, y, w, h) => pairTile(c, th, x, y, w, h, {
+                    label: 'Boost: target vs actual', targetLabel: 'TARGET', actual: P(val('boostActual')), target: P(val('boostTarget')),
+                    unit: pu, decimals: pu === 'psi' ? 1 : 2, tol: P(0.15), idle: P(0.2), why: fuelWhy('boostCtl'),
+                    histA: hist.boostActual.map(P), histT: hist.boostTarget.map(P) }) },
+                shown('load') && { draw: (c, th, x, y, w, h) => pairTile(c, th, x, y, w, h, {
+                    label: 'Air charge: requested vs actual', targetLabel: 'REQUESTED', actual: val('loadActual'), target: val('loadTarget'),
+                    unit: '%', decimals: 0, tol: 10, idle: 40, why: fuelWhy('load'),
+                    histA: hist.loadActual, histT: hist.loadTarget }) },
                 shown('misfire') && { draw: (c, th, x, y, w, h) => misfireTile(c, th, x, y, w, h, usingDemo() ? d.misfire : fuelT.misfire && Date.now() - fuelT.misfire < 30000 ? live.misfire : null) },
             ].filter(Boolean));
         }
