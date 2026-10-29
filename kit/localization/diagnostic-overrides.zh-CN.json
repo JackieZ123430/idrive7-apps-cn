@@ -1,0 +1,22 @@
+{
+  "ZGM: FlexRay synchronisation process failed": "ZGM：FlexRay 同步过程失败",
+  "Driver’s side rear seat-heating electronics (LIN): LIN components missing or communication not possible": "驾驶员侧后排座椅加热电子装置（LIN）：LIN 部件缺失或无法通信",
+  "Passenger’s side rear seat-heating electronics (LIN): LIN components missing or communication not possible": "乘客侧后排座椅加热电子装置（LIN）：LIN 部件缺失或无法通信",
+  "Message missing (ASIL Gong 1, 0x26D), receiver RAM": "报文缺失（ASIL Gong 1 警示音，0x26D），接收方 RAM",
+  "Missing message (status emergency call, 0x2C3), receiver RAM, transmitter TCB": "报文缺失（紧急呼叫状态，0x2C3），接收方 RAM，发送方 TCB",
+  "Message missing (engine status, 0x032), RAM as receiver, DME/DDE / CCU as transmitter": "报文缺失（发动机状态，0x032），接收方 RAM，发送方 DME/DDE / CCU",
+  "HU-H: deletion of all personal data cannot be performed (Clear All button)": "HU-H：无法执行删除全部个人数据操作（“清除全部”按钮）",
+  "GM: General module 5: Processor internal fault": "GM：通用模块 5，处理器内部故障",
+  "Power-window motor, driver's side, rear: thermal fuse, window motor or wiring": "驾驶员侧后部电动车窗电机：热熔断器、车窗电机或线路故障",
+  "GM: Info-memory entry: power supply BC1 open circuit": "GM：信息存储器记录，BC1 供电线路断路",
+  "Message absent (KAFAS object data status, 0x23F), receiver ACC, transmitter KAFAS": "报文缺失（KAFAS 目标数据状态，0x23F），接收方 ACC，发送方 KAFAS",
+  "JBE: internal fault in control unit, software": "JBE：控制单元内部软件故障",
+  "HU-H: Ethernet: Signal quality poor": "HU-H：以太网信号质量差",
+  "HU-B, Ethernet: Signal quality is poor": "HU-B：以太网信号质量差",
+  "Head unit: Ethernet: Low signal quality": "主机：以太网信号质量低",
+  "Headunit: Ethernet: Weak signal quality": "主机：以太网信号质量弱",
+  "Electronics of touch detection: LIN slave missing": "触摸检测电子装置：LIN 从节点缺失",
+  "Driver assistance system operating facility (LIN): missing LIN-slave": "驾驶辅助系统操作装置（LIN）：LIN 从节点缺失",
+  "Inside mirror: LIN component missing": "车内后视镜：LIN 部件缺失",
+  "Rain-light-solar-condensation sensor: Communication with LIN component not possible": "雨量、光照、日照及结露传感器：无法与 LIN 部件通信"
+}
