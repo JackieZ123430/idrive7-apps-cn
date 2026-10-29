@@ -273,6 +273,7 @@ class Display {
         if (!L) return;
         const r = this.sheetRec && this.sheetRec.textScale === sc ? this.sheetRec : (this.sheetRec = new Recorder(PAGE.w, PAGE.h, { textScale: sc }));
         r.reset();
+        r.extra = this.place.extra || 0;
         let targets = [];
         try { targets = this.sheet.draw(r, this.theme()) || []; } catch (e) { this.log.error('sheet draw', e); }
         this.sheetTargets = targets;

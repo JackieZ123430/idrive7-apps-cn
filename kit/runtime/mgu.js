@@ -449,7 +449,7 @@ function wireSettings(ctx) {
         ui.onClick('BTN_SETTINGS', () => {
             const d = ctx.display;
             if (d.sheet && d.sheet.settings) { d.closeSheet(); return null; }
-            const sh = listSheet(settings);
+            const sh = listSheet(settings, null, { version: SPEC.version });
             sh.settings = true;
             sh.onClose = () => refresh();
             if (d.openSheet(sh)) return null;

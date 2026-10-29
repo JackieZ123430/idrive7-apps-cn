@@ -214,7 +214,8 @@ mgu.run({
             G.panel(cv, t, 24, 44, 640, 468, 'Best times' + (settings.get('rollout') ? ' (rollout)' : ''));
             G.button(cv, t, 664 - 20 - 200, 56, 200, 40, clearArmed ? 'Yes, clear' : 'Reset best', act, { key: 'clear', color: clearArmed ? t.crit : null });
             sp.forEach((s, i) => {
-                const y = 95 + i * 83, b = store.best[bestKey(s.key)];
+                // (the page reaching lower on screen: the rows clear of Reset best)
+                const y = 95 + (cv.extra ? 25 : 0) + i * 83, b = store.best[bestKey(s.key)];
                 cv.text(s.label, 48, y + 34, 28, t.text, { font: 'bold' });
                 cv.text(b ? secs(b.s) : '--.--', 560, y + 40, 52, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
                 cv.text('s', 568, y + 40, 24, t.dim);

@@ -49,7 +49,8 @@ function fit(r, s, size, w, font) {
  * Draws them from y0, keeps row `focus` in view (smooth), returns the rows' rects.
  */
 function list(r, t, key, rows, focus, y0, controller) {
-    const S = t.sel || t.accent, H = BOTTOM - y0;
+    // (r.extra: the page reaches lower on screen, display.js)
+    const S = t.sel || t.accent, bottom = BOTTOM + (r.extra || 0), H = bottom - y0;
     const total = rows.length * (ROW_H + GAP) - GAP;
     const fy = focus * (ROW_H + GAP);
     // st.y: where the list should be; st.show: where it is drawn (glides there, follows a finger at once).
@@ -67,7 +68,7 @@ function list(r, t, key, rows, focus, y0, controller) {
     r.clip(0, y0, W, H);
     rows.forEach((row, i) => {
         const y = y0 + i * (ROW_H + GAP) - sy;
-        if (y + ROW_H < y0 || y > BOTTOM) return;
+        if (y + ROW_H < y0 || y > bottom) return;
         const x = 40, w = W - 80, on = i === focus && controller;
         r.roundRect(x, y, w, ROW_H, 14, on ? withAlpha(S, 0.22) : withAlpha('#ffffff', 0.05));
         if (on) r.strokeRoundRect(x, y, w, ROW_H, 14, 2, S);
@@ -81,7 +82,7 @@ function list(r, t, key, rows, focus, y0, controller) {
         const vw = row.value != null ? Math.min(560, r.textWidth(String(row.value), 26)) : 0;
         if (row.value != null) r.text(fit(r, row.value, 26, 560), right, cy + 9, 26, row.on && row.kind === 'radio' ? t.text : t.dim, { align: 'right' });
         r.text(fit(r, row.label, 28, right - vw - 40 - (x + 28)), x + 28, cy + 10, 28, t.text);
-        rects.push({ i, x, y: Math.max(y, y0), w, h: Math.min(y + ROW_H, BOTTOM) - Math.max(y, y0) });
+        rects.push({ i, x, y: Math.max(y, y0), w, h: Math.min(y + ROW_H, bottom) - Math.max(y, y0) });
     });
     r.noclip();
     if (total > H) {
@@ -100,7 +101,9 @@ function values(s) {
     return null;
 }
 
-function listSheet(settings, title) {
+/** opts: { version } (the app's, shown at the settings' top) */
+function listSheet(settings, title, opts) {
+    const version = opts && opts.version;
     const schema = settings.schema.filter((s) => !s.hidden);
     const sh = {
         title: title || 'Settings',
@@ -120,6 +123,7 @@ function listSheet(settings, title) {
             const rows = this.rows();
             // the header's tab names the sheet; a value list names its setting here
             if (this.open) r.text(this.open.label, 44, TOP + 40, 32, t.text, { font: 'bold' });
+            else if (version) r.text('Version ' + version, 44, TOP + 38, 24, t.dim);
             const targets = [];
             // Back (a value list) / Done (the settings): top right
             const bw = 150, bx = W - 40 - bw, by = TOP + 8;
@@ -189,8 +193,8 @@ function cardSheet(spec) {
             r.clear(t.bg);
             const targets = [];
             const actions = get('actions') || [];
-            this.focus = Math.min(this.focus, Math.max(0, actions.length - 1));
-            const x = 40, y = TOP + 6, w = W - 80, h = BOTTOM - y - 4;
+            this.focus = Math.max(-1, Math.min(this.focus, actions.length - 1));
+            const x = 40, y = TOP + 6, w = W - 80, h = BOTTOM + (r.extra || 0) - y - 4;
             r.roundRect(x, y, w, h, 18, withAlpha('#ffffff', 0.05));
             const accent = get('color') || t.sel || t.accent;
             r.roundRect(x, y, 8, h, 4, accent);
@@ -199,7 +203,7 @@ function cardSheet(spec) {
             if (sub) r.text(fit(r, sub, 24, w - 90), x + 44, y + 102, 24, accent);
             // close: top right
             const cw = 150, cx = x + w - cw - 24, cy = y + 24;
-            pill(r, t, cx, cy, cw, 46, 'Close', false);
+            pill(r, t, cx, cy, cw, 46, 'Close', this.controller && this.focus === -1);
             targets.push({ x: cx - 10, y: cy - 6, w: cw + 20, h: 58, act: () => 'close' });
             // label / value tiles
             const rows = (get('rows') || []).filter(Boolean);
@@ -218,7 +222,7 @@ function cardSheet(spec) {
             for (let i = actions.length - 1; i >= 0; i--) {
                 const a = actions[i], aw = Math.max(200, r.textWidth(a.label, 24, { font: 'bold' }) + 80);
                 ax -= aw;
-                pill(r, t, ax, ay, aw, 58, a.label, this.controller ? i === this.focus : !!a.primary, { color: a.color });
+                pill(r, t, ax, ay, aw, 58, a.label, this.controller ? i === this.focus : !!a.primary, { color: a.color });   // (-1: Close)
                 targets.push({ x: ax, y: ay, w: aw, h: 58, act: () => a.run && a.run() });
                 ax -= 20;
             }
@@ -227,14 +231,17 @@ function cardSheet(spec) {
         move(d) {
             this.controller = true;
             const n = (get('actions') || []).length;
-            this.focus = Math.max(0, Math.min(n - 1, this.focus + d));
+            this.focus = Math.max(-1, Math.min(n - 1, this.focus + d));     // -1: Close
         },
         press() {
             this.controller = true;
+            if (this.focus === -1) return 'close';
             const a = (get('actions') || [])[this.focus];
             return a && a.run ? a.run() : null;
         },
         back() { return 'close'; },
+        /** on Close: pushed up, the controller goes to the header's tabs */
+        top() { return this.focus === -1; },
     };
     return sh;
 }
