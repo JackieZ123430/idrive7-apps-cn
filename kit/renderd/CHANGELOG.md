@@ -1,5 +1,11 @@
 # mgu-render changelog
 
+## idrive7-apps mgu-renderd 2.1.1
+
+- The HMI page template, its folder and the boot's copy of the HMI's widgets are readable by the HMI's user (0644
+  files, 0755 folders) whatever umask the install runs with: with umask 077 the HMI showed an in-page app's page empty
+  (robertnisipeanu/mgu-store mgu-render 0.6.1, pull request #48).
+
 ## idrive7-apps mgu-renderd 2.1.0
 
 - Runs beside the MGU Store's mgu-render: the apps' renderer, the Store's its own. The touch divert has its own table

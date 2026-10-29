@@ -2,7 +2,8 @@
 # systemd/mgu-render-hmi.sh with a stand-in HmiMain3D, generator (node), widget folder and mount:
 # the boot run only mounts a template made for this stamp and never generates; --build makes it
 # (an earlier install stuck without one included), records a real failure and does not try again
-# until the stamp changes, and tries again after a timeout, a signal, or a memory or disk error.
+# until the stamp changes, and tries again after a timeout, a signal, or a memory or disk error; under
+# umask 077 the template and the boot's copy are readable by the HMI's user.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 SCRIPT=$HERE/../systemd/mgu-render-hmi.sh
@@ -106,12 +107,35 @@ echo 'generator 3' > "$CUR/hmi_template.js"
 build
 ok 'build: a build left at building is made again' '[ "$(runs)" = 8 ] && [ "$(field template)" = ok ]'
 
+# an install and a boot under umask 077: the template, its folder and the copy readable by the HMI's user
+mode() { stat -c %a "$1"; }
+echo 'generator 4' > "$CUR/hmi_template.js"
+(umask 077 && build)
+ok 'build under umask 077: the template readable, its folder searchable' \
+	'[ "$(runs)" = 9 ] && [ "$(mode "$ROOT/hmi")" = 755 ] && [ "$(mode "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw")" = 644 ] &&
+	 [ "$(mode "$ROOT/hmi/stamp")" = 644 ]'
+# a stock folder the copy would take 0700 from, and a stock widget with a mode of its own
+chmod 0700 "$T/widget"; chmod 0640 "$T/widget/stock.pbw"
+(umask 077 && boot)
+ok 'boot under umask 077: the copy and its template readable, the stock widgets as they were' \
+	'[ "$(mode "$T/run/hmi-widget")" = 755 ] && [ "$(mode "$T/run/hmi-widget/LT_State_A4A_WelcomeApp.pbw")" = 644 ] &&
+	 [ "$(mode "$T/run/hmi-widget/stock.pbw")" = 640 ]'
+chmod 0755 "$T/widget"; chmod 0644 "$T/widget/stock.pbw"
+# a template an earlier install left unreadable: made readable by the next install, not made again
+chmod 0700 "$ROOT/hmi"; chmod 0600 "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw" "$ROOT/hmi/stamp"
+(umask 077 && build)
+ok 'build: an unreadable template in place for this stamp is made readable, not made again' \
+	'[ "$(runs)" = 9 ] && [ "$(mode "$ROOT/hmi")" = 755 ] && [ "$(mode "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw")" = 644 ]'
+chmod 0600 "$ROOT/hmi/LT_State_A4A_WelcomeApp.pbw"
+(umask 077 && boot)
+ok 'boot: an unreadable template is copied readable' '[ "$(mode "$T/run/hmi-widget/LT_State_A4A_WelcomeApp.pbw")" = 644 ]'
+
 # iDrive 8: no HmiMain3D
 rm "$T/HmiMain3D"
 build
-ok 'build: no HmiMain3D, no template and no status' '[ "$(runs)" = 8 ] && [ ! -e "$ROOT/status.json" ]'
+ok 'build: no HmiMain3D, no template and no status' '[ "$(runs)" = 9 ] && [ ! -e "$ROOT/status.json" ]'
 boot
-ok 'boot: no HmiMain3D, nothing mounted' '[ "$(runs)" = 8 ]'
+ok 'boot: no HmiMain3D, nothing mounted' '[ "$(runs)" = 9 ]'
 
 # the generator's error is one line: exit status 1 for HmiMain3D lacking identifiers, 3 for anything else
 if PATH=${PATH#$T/bin:} command -v node >/dev/null 2>&1; then
