@@ -89,9 +89,10 @@ class Recorder {
         this.atlases = new Set();    // glyph atlases and colour ramps it uses (uploaded once by the transport)
         this.ramps = new Set();
         this.images = new Set();     // pixel images it draws (setImage)
+        this.targets = [];           // what a tap or the controller can press on the page: { x, y, w, h, run, key } (target)
         this.recording = true;
     }
-    reset() { this.n = 0; this._cnStamped = false; if (this.layersUsed) this.layersUsed.clear(); this.atlases.clear(); this.ramps.clear(); this.images.clear(); return this; }
+    reset() { this.n = 0; this._cnStamped = false; this.targets = []; this.scroll = false; if (this.layersUsed) this.layersUsed.clear(); this.atlases.clear(); this.ramps.clear(); this.images.clear(); return this; }
     _grow(k) {
         if (this.n + k <= this.u.length) return;
         let len = this.u.length * 2;
@@ -102,6 +103,12 @@ class Recorder {
     }
     /** the recorded words (a view, valid until the next draw call) */
     words() { return this.u.subarray(0, this.n); }
+    /**
+     * Something on the page a tap (or the iDrive controller, turned onto it and pressed) runs: run().
+     * key names it from frame to frame (the controller stays on it). Drawn by the caller; where the kit
+     * runs the screen (display.js) it rings the one the controller is on.
+     */
+    target(x, y, w, h, run, key, r) { this.targets.push({ x, y, w, h, run, key: String(key), r }); return this; }
 
     /* ---------- canvas.js API ---------- */
     /** Draw pixel image `id` (see setImage) scaled into x, y, w, h (nearest pixel). */

@@ -25,14 +25,31 @@
  *   standard  the HMI's own title and bar; the renderer covers only the app's image area.
  *
  * Tabs: on a renderer that routes touch (mgu-render), the app's header and page are claimed and
- * a tap on a tab calls the app's ctx.onTab(i); the bar, the back column and the HMI's status
- * icons still go to the HMI.
+ * a tap on a tab calls the app's ctx.onTab(i); the back column and the HMI's status icons still
+ * go to the HMI.
+ *
+ * mgu-render/1 (the Store's renderer), full-screen layout: the kit runs the screen itself. The
+ * header, page and slim bar are claimed (a tap on a bar button presses it here, so the HMI never
+ * takes the screen away), and the iDrive controller is held while the screen shows: turning moves
+ * along the page tabs and then the bar buttons, press opens the tab or presses the button.
+ * Sheets (sheet.js: the settings, cards) are drawn over the page and take the controller and
+ * touch while open (a finger drags their lists); push left goes back. Doom ("chrome": false)
+ * keeps the upstream dialect. Should the renderer's foreground gate not have the app in front
+ * while its screen shows, the app draws in the HMI's own image meanwhile (blocked).
  */
 const { Recorder, play } = require('./record');
 const { Canvas } = require('./canvas');
 const { RenderClient } = require('./renderd');
 const G = require('./gauges');
 const { drawCredit } = require('./credits');
+
+// FrontCCU deflection: short / long push per direction (DREHGEBER enums as numbers)
+const TILT = { 1: 'N', 2: 'N', 4: 'E', 5: 'E', 7: 'S', 8: 'S', 10: 'W', 11: 'W' };
+const PAGE = { w: 1600, h: 520 };
+// bar buttons that only turn pages (Next page, Previous page)
+const PAGER = ['BTN_PAGE', 'BTN_PREV'];
+// px between the header (and the screen's bottom) and a page with no bar under it
+const PAGE_GAP = 6;
 
 /* HMI geometry on the 1920 x 720 centre display (measured on the unit's HMI) */
 const HMI = {
@@ -44,6 +61,7 @@ const HMI = {
     btn: { x: 132, pad: 180, size: 40, k: 1.465 },
     left: 84,                                   // the HMI's back arrow column (x 0..84): kept see-through
     barTop: 596,                                // top of the HMI's own button bar (its 2 px edge line; body from 600)
+    colEnd: 530,                                // the back arrow column shows the HMI down to here (home, back arrow)
     headBg: '#000000',                          // the HMI's title / status strip
     status: { x: 1340, h: 76 },                 // status icons top right (notifications .. clock)
 };
@@ -72,16 +90,23 @@ class Display {
         this.bgShown = null;
         this.place = null;
         this.frames = 0; this.jsMs = 0; this.statT = Date.now();
+        this.sheet = null;                           // sheet.js page drawn over the app's (openSheet)
+        this.ccuLast = null;                         // last controller state (knob counter, press, push)
+        this.ownHidden = new Set();                  // more bar buttons left out where the kit runs the screen (hideButton)
+        G.onConfirm(() => { this.lastWords = null; this.tickHandlers.forEach((fn) => fn()); });   // a reset asks / runs out
         const canvasScreens = (spec.screens || []).filter((s) => s.kind === 'canvas');
         this.screen = canvasScreens[0] || null;
         if (!this.screen) return;
         this.ui.onVisible((name, v) => {
+            if (name === 'SETTINGS') { this._syncVisible(); if (!v) this._lost(); return; }
             if (name !== this.screen.name) return;
             if (v) this.barOff = 0;                   // the HMI builds the screen afresh
+            if (!v) this.closeSheet();
             this._syncVisible();
         });
         if (this.ui.onFocus) this.ui.onFocus((name) => { if (name === this.screen.name) { this._syncVisible(); this._lost(); } });
         settings.onChange((k) => {
+            if (k === 'layout' || k === 'renderer') this.closeSheet();
             if (k === 'layout') { this._place(); this.lastWords = null; }
             if (k === 'theme') this.bgShown = null;
             if (k === 'renderer') this._mode();
@@ -105,7 +130,7 @@ class Display {
             });
             c.on('focus', (ev) => {
                 if (!ev || typeof ev.value !== 'boolean') return;          // (row-only events)
-                if (ev.value) { inFront(); this.focused = b[0]; this._scroll(); } else if (this.focused === b[0]) this.focused = null;
+                if (ev.value) { inFront(); this.focused = b[0]; this.focusTab = null; this.focusKey = 'bar:' + b[0]; this._scroll(); } else if (this.focused === b[0]) this.focused = null;
                 this._repaint();
             });
         });
@@ -130,12 +155,33 @@ class Display {
     }
 
     _startGpu(file) {
-        const gpu = this.gpu = new RenderClient(this.spec.id, this.log, file ? { file } : undefined);
-        gpu.on('ready', () => { if (this.gpu !== gpu) return; this._place(); this._syncVisible(); });
-        gpu.on('tick', () => { if (this.gpu === gpu) this.tickHandlers.forEach((fn) => fn()); });
-        gpu.on('close', () => { if (this.gpu === gpu) this._lost(); });
+        // mgu-render/1 for every app that draws no pixel images (Doom: "chrome": false)
+        const native = this.screen.chrome !== false && process.env.MGU_RENDERD_PROTO !== 'upstream';
+        const gpu = this.gpu = new RenderClient(this.spec.id, this.log, Object.assign({ native }, file ? { file } : {}));
+        gpu.on('ready', () => { if (this.gpu !== gpu) return; this._place(); this._syncVisible(); this._grab(); });
+        gpu.on('tick', () => { if (this.gpu === gpu) { this.tickT = Date.now(); this.tickHandlers.forEach((fn) => fn()); } });
+        gpu.on('close', () => { if (this.gpu === gpu) { this.blocked = false; this._lost(); } });
         gpu.on('stats', (s) => { this.gpuStats = s; });
-        gpu.on('ccu', (v) => { if (this.gpu === gpu && this.onCcu) this.onCcu(v); });
+        // mgu-render/1: the renderer shows the app only while its foreground gate has it in front. A screen
+        // that stays shown here while the gate says otherwise (seen: a leftover install claiming the same
+        // RHMI uuid, which the gate then ignores) is drawn in the HMI's own image until the gate agrees.
+        gpu.on('state', (st) => {
+            if (this.gpu !== gpu) return;
+            if (st.front) {
+                if (this.blocked) { this.blocked = false; this.log.info('display: renderer has the app in front again'); this.lastWords = null; this._syncVisible(); this._grab(); this._hmiBar(); }
+                return;
+            }
+            clearTimeout(this.frontTimer);
+            this.frontTimer = setTimeout(() => {
+                if (this.gpu !== gpu || gpu.onScreen || this.blocked || !this._shown()) return;
+                this.blocked = true;
+                this.log.warn('display: the renderer does not have this app in front while its screen shows - drawing in the HMI (journalctl -u mgu-render says why)');
+                this.closeSheet();
+                this._grab();
+                this._lost();                       // (shows the HMI's bar again)
+            }, 1500);
+        });
+        gpu.on('ccu', (v) => { if (this.gpu !== gpu) return; if (this.onCcu && !this.own()) this.onCcu(v); else this._ccu(v); });
         gpu.on('touch', (phase, x, y) => { if (this.gpu === gpu) this._touch(phase, x, y); });
         // the HMI was touched outside the tabs: shown again unless that left the screen
         gpu.on('closed', () => setTimeout(() => { if (this.gpu === gpu) this._syncVisible(); }, 700));
@@ -147,12 +193,259 @@ class Display {
     /** the iDrive controller to this app alone while on (GPU renderer + mgu-inputgate.so needed) */
     grab(on) {
         this.grabbing = !!on;
-        if (this.gpu) this.gpu.grab(this.grabbing);
+        this._grab();
+    }
+    /** held: the app asked (grab), or the kit runs the screen (own) and the HMI has the controller gate */
+    _grab() {
+        if (!this.gpu) return;
+        const gate = !this.gpu.native || !this.gpu.info || this.gpu.info.controller;
+        this.gpu.grab(this.grabbing || (this.own() && gate && !process.env.MGU_NO_GRAB));
     }
 
-    /** Touch on a tab (logical px): a tap (down and up on the same tab) opens its page. */
+    /** The kit runs the screen: mgu-render/1 with touch, full-screen layout. */
+    own() { return !!(this.gpu && this.gpu.ready && !this.blocked && this.gpu.native && this.gpu.touch && this.place && this.place.full); }
+    /** own() but for the placement, which depends on it (the bar's height): the renderer and layout allow it. */
+    ownable() {
+        const g = this.gpu;
+        return !!(g && g.ready && g.native && g.touch && this.layout() === 'full' && g.screen.w === HMI.screen.w && g.screen.h === HMI.screen.h);
+    }
+    /** Settings is the header's last tab where the kit runs the screen (the app has a Settings button). */
+    hasSettings() { return !!(this.screen && (this.screen.buttons || []).some((b) => b[0] === 'BTN_SETTINGS')); }
+    /** The header's tabs: the app's, then Settings. { tabs, sel, badges, settings: index or -1 } */
+    _tabList() {
+        const base = this.tabInfo || { tabs: [], sel: -1, badges: [] };
+        const tabs = (base.tabs || []).slice();
+        const settings = this.own() && this.hasSettings() ? tabs.push('Settings') - 1 : -1;
+        const sel = this.sheet && this.sheet.settings ? settings : this.sheet ? -1 : base.sel;
+        return { tabs, sel, badges: base.badges || [], settings };
+    }
+    /** Open header tab i: the app's page, or the settings (Settings tab). */
+    _openTab(i) {
+        const tl = this._tabList();
+        if (i === tl.settings) { if (!(this.sheet && this.sheet.settings)) this._click('BTN_SETTINGS'); return; }
+        this.closeSheet();
+        if (this.onTab) try { Promise.resolve(this.onTab(i)).catch((e) => this.log.error('tab', e)); } catch (e) { this.log.error('tab', e); }
+    }
+    /** What the controller's knob goes through, in order: the header's tabs, the page's targets, the bar. */
+    _ring() {
+        const tl = this._tabList();
+        const tabs = tl.tabs.length > 1 || tl.settings >= 0 ? tl.tabs.map((x, i) => ({ k: 'tab:' + i, tab: i })) : [];
+        const scroll = this.pageScroll && this.onScroll ? [{ k: 'scroll', scroll: true }] : [];
+        return tabs.concat(scroll, (this.pageTargets || []).map((q) => ({ k: 'tgt:' + q.key, tgt: q })), this.buttons().map((b) => ({ k: 'bar:' + b.id, bar: b.id })));
+    }
+    /** HMI back (the controller pushed left): the app's screen closes as with the HMI's back arrow. */
+    _back() {
+        this.log.info('display: back (controller pushed left)');
+        Promise.resolve(this.ui.close(this.screen.name)).catch((e) => this.log.warn('back: ' + e));
+    }
+    /** A sheet can be shown now (else the app falls back to the HMI's own screens). */
+    canSheet() { return this.own() && this.active(); }
+
+    /** Draw sheet over the page until it closes (sheet.js). false: not possible now. */
+    openSheet(sheet) {
+        if (!this.canSheet()) return false;
+        if (!this.sheet) this.saved = this.app;          // the app's last frame, back when the sheet closes
+        this.sheetHead = false;
+        this.sheet = sheet; this.sheetDown = -1;
+        if (!this.sheetTimer) this.sheetTimer = setInterval(() => this._paintSheet(), 33);   // scrolling glides
+        this._paintSheet();
+        return true;
+    }
+    closeSheet() {
+        if (!this.sheet) return;
+        const sh = this.sheet;
+        this.sheet = null; this.sheetTargets = null; this.sheetHead = false;
+        if (this.sheetTimer) { clearInterval(this.sheetTimer); this.sheetTimer = null; }
+        if (this.saved) { this.app = this.saved; this.saved = null; }
+        this.lastWords = null;
+        this._repaint();
+        this.tickHandlers.forEach((fn) => fn());         // the app draws its next frame
+        if (sh.onClose) try { sh.onClose(); } catch (e) { this.log.error(e); }
+    }
+    _sheetResult(res) {
+        Promise.resolve(res).then((v) => { if (v === 'close') this.closeSheet(); else this._paintSheet(); })
+            .catch((e) => { this.log.error('sheet', e); this._paintSheet(); });
+    }
+    _paintSheet() {
+        if (!this.sheet) return;
+        if (!this.active() || !this.place.full) return;
+        const L = this.last, sc = this.place.scale;
+        if (!L) return;
+        const r = this.sheetRec && this.sheetRec.textScale === sc ? this.sheetRec : (this.sheetRec = new Recorder(PAGE.w, PAGE.h, { textScale: sc }));
+        r.reset();
+        r.extra = this.place.extra || 0;
+        let targets = [];
+        try { targets = this.sheet.draw(r, this.theme()) || []; } catch (e) { this.log.error('sheet draw', e); }
+        this.sheetTargets = targets;
+        // the header keeps the app's tabs (Settings lit for the settings): a tab leaves the sheet for that page
+        this.app = {
+            name: L.name, softImage: L.softImage, w: r.w, h: r.h, textScale: sc, words: new Uint32Array(r.words()),
+            atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), images: new Set(r.images || []),
+            tabs: this.tabInfo || { tabs: [], sel: -1, badges: [] },
+        };
+        this._send(L.name, this._compose(), L.softImage, false);
+        this._claimTabs(this.chromeRec.tabRects, null);
+    }
+
+    /** Press bar button id, as the HMI does for a tap or the controller's press. */
+    _click(id) {
+        const c = this.ui.rhmi && this.ui.rhmi.getByName(id);
+        if (!c || !c.emit) return;
+        if (this.sheet && !this.sheet.keepOnBar) this.closeSheet();
+        c.emit('action', {});
+    }
+
+    /** The controller (held by the kit): knob, press and push, from the renderer. */
+    _ccu(v) {
+        const k = Number(v.frontRotaryEncoderOperation), pb = Number(v.frontRotaryEncoderPushButton), df = Number(v.frontRotaryEncoderDeflection);
+        const L = this.ccuLast;
+        this.ccuLast = { k, pb, df };
+        if (pb === 15 && df === 15) return;              // no controller behind it
+        let d = L ? ((k - L.k + 32768) & 0xffff) - 32768 : 0;
+        if (Math.abs(d) > 64) d = 0;                     // a counter reset
+        const down = (x) => x === 1 || x === 2;
+        const press = down(pb) && !(L && down(L.pb));
+        const tilt = TILT[df] && !(L && TILT[L.df] === TILT[df]) ? TILT[df] : null;
+        const tl = this._tabList(), here = Math.max(0, tl.sel >= 0 ? tl.sel : tl.settings);
+        if (this.sheet) {
+            // pushed up: the header's tabs (the knob along them, press opens one); pushed down: back to the sheet
+            if (tilt === 'N' && !this.sheetHead && tl.tabs.length && (!this.sheet.top || this.sheet.top())) { this.sheetHead = true; this._focus({ k: 'tab:' + here, tab: here }); this._paintSheet(); return; }
+            if (!this.sheetHead && (tilt === 'N' || tilt === 'S')) { this.sheet.move(tilt === 'N' ? -1 : 1); this._paintSheet(); return; }
+            if (this.sheetHead) {
+                if (tilt === 'S') { this.sheetHead = false; this._focus(null); this._paintSheet(); return; }
+                if (tilt === 'E' || tilt === 'W') d = tilt === 'E' ? 1 : -1;
+                if (d) { const i = Math.max(0, Math.min(tl.tabs.length - 1, (this.focusTab != null ? this.focusTab : here) + d)); this._focus({ k: 'tab:' + i, tab: i }); this._paintSheet(); }
+                if (press && this.focusTab != null) { this.sheetHead = false; this._openTab(this.focusTab); }
+                return;
+            }
+            if (d) { this.sheet.move(d); this._paintSheet(); }
+            if (press) this._sheetResult(this.sheet.press());
+            if (tilt === 'W') this._sheetResult(this.sheet.back());
+            return;
+        }
+        // pushed up / down / left / right: the nearest place that way; left with nothing there goes back (leaves the app)
+        if (tilt) {
+            const to = this._toward(tilt, here);
+            if (to) { this._focus(to); this._repaint(); } else if (tilt === 'W') this._back();
+            return;
+        }
+        // one row of places for the knob: the header's tabs, the page's buttons and rows, the bar
+        const ring = this._ring();
+        let i = ring.findIndex((p) => p.k === this.focusKey);
+        if (d && i >= 0 && ring[i].scroll && this._scrollBy(d * 70)) return;
+        if (d && ring.length) {
+            // the first turn lands on the page shown (or the first place there is)
+            const sel = this._tabList().sel;
+            i = i < 0 ? Math.max(0, ring.findIndex((p) => p.tab === sel)) : Math.max(0, Math.min(ring.length - 1, i + d));
+            this._focus(ring[i]);
+            this._repaint();
+        }
+        if (press && i >= 0) {
+            const p = ring[i];
+            if (p.tab != null) this._openTab(p.tab);
+            else if (p.tgt) { try { Promise.resolve(p.tgt.run()).catch((e) => this.log.error('target', e)); } catch (e) { this.log.error('target', e); } this.pressed = p.k; this.pressedT = Date.now(); this._repaint(); }
+            else if (p.bar) this._click(p.bar);
+        }
+    }
+    /** A scrolling page (ctx.onScroll) moved by dy logical px; false when it was at its end already. */
+    _scrollBy(dy) {
+        let moved = false;
+        try { moved = !!this.onScroll(dy); } catch (e) { this.log.error('scroll', e); }
+        if (moved) this.tickHandlers.forEach((fn) => fn());
+        return moved;
+    }
+    /** Where place p of the ring is on screen (the surface's px): { x, y, w, h }. */
+    _rectOf(p) {
+        const pl = this.place, k = pl.scale;
+        if (p.tab != null) return ((this.chromeRec && this.chromeRec.tabRects) || []).find((q) => q.i === p.tab) || null;
+        if (p.tgt) return { x: p.tgt.x * k + pl.ox, y: p.tgt.y * k + pl.oy, w: p.tgt.w * k, h: p.tgt.h * k };
+        if (p.bar) { const b = this.buttons().find((q) => q.id === p.bar); return b ? { x: b.x - this.barOff - pl.x, y: pl.h - this.barH(), w: b.w, h: this.barH() } : null; }
+        if (p.scroll) { const hx = HMI.left - pl.x; return { x: hx, y: this.headH(), w: pl.w - hx, h: pl.h - this.barH() - this.headH() }; }
+        return null;
+    }
+    /**
+     * The place nearest the controller's one in direction dir (N, S, E, W), by the places' centres: the
+     * distance that way, the sideways one counting double. Nothing focused yet: the page's tab (left: none).
+     */
+    _toward(dir, here) {
+        const ring = this._ring().filter((p) => !p.scroll || this.focusKey === 'scroll');
+        const cur = ring.find((p) => p.k === this.focusKey), cr = cur && this._rectOf(cur);
+        if (!cr) return dir === 'W' ? null : ring.find((p) => p.tab === here) || ring[0] || null;
+        const cx = cr.x + cr.w / 2, cy = cr.y + cr.h / 2;
+        let best = null, score = Infinity;
+        ring.forEach((p) => {
+            if (p === cur || p.scroll) return;
+            const r = this._rectOf(p);
+            if (!r) return;
+            const dx = r.x + r.w / 2 - cx, dy = r.y + r.h / 2 - cy;
+            const ahead = dir === 'E' ? dx : dir === 'W' ? -dx : dir === 'S' ? dy : -dy, side = dir === 'E' || dir === 'W' ? Math.abs(dy) : Math.abs(dx);
+            if (ahead <= 4) return;
+            const sc = ahead + 2 * side;
+            if (sc < score) { score = sc; best = p; }
+        });
+        return best;
+    }
+    /** The controller is on place p of the ring (null: nowhere). */
+    _focus(p) {
+        this.focusKey = p ? p.k : null;
+        this.focusTab = p && p.tab != null ? p.tab : null;
+        this.focused = p && p.bar ? p.bar : null;
+        if (this.focused) this._scroll();
+    }
+
+    /**
+     * Touch (logical px): a tap (down and up on the same thing) on a tab opens its page; with the kit
+     * running the screen also on a bar button (pressed), a sheet's targets, or the page (ctx.onTap).
+     */
     _touch(phase, x, y) {
-        const at = (this.tabs || []).find((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+        const inside = (r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+        if (this.own()) {
+            const pl = this.place, sx = x * pl.scale + pl.ox, sy = y * pl.scale + pl.oy;
+            const bar = sy >= pl.h - this.barH() ? this.buttons().find((b) => sx >= b.x - this.barOff - pl.x && sx < b.x - this.barOff - pl.x + b.w) : null;
+            // the header's tabs (Settings among them) work over a sheet too
+            const tab = !bar && (this.tabs || []).find(inside);
+            const tgt = !bar && !tab && !this.sheet ? (this.pageTargets || []).find(inside) : null;
+            const key = bar ? 'bar:' + bar.id : tab ? 'tab:' + tab.i : tgt ? 'tgt:' + tgt.key : this.sheet ? 'sheet:' + (this.sheetTargets || []).findIndex(inside) : null;
+            if (phase === 3 && this.dragging && !this.sheet) { this.dragging = false; this.ownDown = null; return; }
+            if (phase === 3 && !this.dragging && key && key === this.ownDown && (tab || tgt)) {
+                this.ownDown = null;
+                if (tab) this._openTab(tab.i);
+                else {
+                    this.pressed = key; this.pressedT = Date.now(); this._repaint();
+                    setTimeout(() => this._repaint(), 320);
+                    try { Promise.resolve(tgt.run()).catch((e) => this.log.error('target', e)); } catch (e) { this.log.error('target', e); }
+                }
+                return;
+            }
+            // a finger moved on a sheet: its list follows (no tap then)
+            if (phase === 1) { this.ownDown = key; this.downAt = { x, y }; this.lastY = y; this.dragging = false; } else if (phase === 2) {
+                if (!this.sheet && this.pageScroll && this.onScroll && !bar && !tab && this.downAt) {
+                    if (!this.dragging && Math.abs(y - this.downAt.y) > 14) this.dragging = true;
+                    if (this.dragging) this._scrollBy(this.lastY - y);
+                }
+                if (this.sheet && this.sheet.scroll && !bar && this.downAt) {
+                    if (!this.dragging && Math.abs(y - this.downAt.y) > 14) this.dragging = true;
+                    if (this.dragging) { this.sheet.scroll(this.lastY - y); this._paintSheet(); }
+                }
+                this.lastY = y;
+            } else if (phase === 3) {
+                const was = this.ownDown;
+                this.ownDown = null;
+                if (this.dragging) { this.dragging = false; if (this.sheet && this.sheet.release) this.sheet.release(); return; }
+                if (bar && was === key) { this._click(bar.id); return; }
+                if (this.sheet) {
+                    const i = (this.sheetTargets || []).findIndex(inside);
+                    if (i >= 0 && was === key) this._sheetResult(this.sheetTargets[i].act());
+                    return;
+                }
+                if (was && was.indexOf('bar:') === 0) return;
+            }
+            if (bar || this.sheet || tab || tgt) return;
+        }
+        const at = (this.tabs || []).find(inside);
+        if (!at && this.onTap && this.own() && phase === 3 && this.downAt && Math.abs(x - this.downAt.x) < 30 && Math.abs(y - this.downAt.y) < 30) {
+            Promise.resolve().then(() => this.onTap(x, y)).catch((e) => this.log.error('tap', e));
+        }
         if (phase === 1) this.tabDown = at ? at.i : -1;
         else if (phase === 3) {
             const i = this.tabDown;
@@ -166,8 +459,13 @@ class Display {
         const pl = this.place;
         const logical = (q) => (r ? q : { i: q.i, x: (q.x - pl.ox) / pl.scale, y: (q.y - pl.oy) / pl.scale, w: q.w / pl.scale, h: q.h / pl.scale });
         this.tabs = (rects || []).map(logical);
-        if (!this.onTab || this.tabs.length < 2) { this.gpu.claim([]); return; }
         const W = pl.w, hx = HMI.left - pl.x, by = pl.h - this.barH();
+        if (this.own()) {
+            // header (tabs), page and the slim bar: the back column and the status corner stay the HMI's
+            this.gpu.claim([{ x: hx, y: 0, w: this.headEnd - hx, h: this.headH() }, { x: hx, y: this.headH(), w: W - hx, h: pl.h - this.headH() }].map(logical));
+            return;
+        }
+        if (!this.onTab || this.tabs.length < 2) { this.gpu.claim([]); return; }
         this.gpu.claim(r ? [{ x: 0, y: 0, w: r.w, h: r.h }]
             : [{ x: hx, y: 0, w: this.headEnd - hx, h: this.headH() }, { x: hx, y: this.headH(), w: W - hx, h: by - this.headH() }].map(logical));
     }
@@ -178,13 +476,26 @@ class Display {
         this.ui._invalidate && this.ui._invalidate();
         // the HMI's image still shows the plain background: draw the last frame there at once
         // (apps that draw only on changes would otherwise leave it blank)
+        // Where the kit runs the screen and only an HMI popup (Option, a call) covers it, the HMI's image
+        // stays plain: the renderer's picture comes back when the popup goes.
         const L = this.last;
         if (L && !this.active() && this.ui.isVisible(this.screen.name)) {
+            const plain = this.ownable() && !this.blocked;
             const cv = new Canvas(L.w, L.h);
-            play(L.frame.words(), cv);
+            if (plain) cv.clear(this.theme().bg); else play(L.frame.words(), cv);
             Promise.resolve(L.softImage(L.name, cv)).catch(() => {});
         }
+        this._hmiBar();
         this.tickHandlers.forEach((fn) => fn());
+    }
+
+    /** The HMI's own bar buttons: hidden where the kit runs the screen (its bar, tabs and page buttons
+     *  take their place), so none shows around an HMI popup; shown for every other path. */
+    _hmiBar() {
+        const hide = this.ownable() && !this.blocked;
+        if (this.hmiBarHidden === hide) return;
+        this.hmiBarHidden = hide;
+        (this.screen.buttons || []).forEach((b) => { if (this.ui.visible) this.ui.visible(b[0], !hide); });
     }
 
     layout() {
@@ -211,27 +522,40 @@ class Display {
                 ox: HMI.left + Math.round((w - src.w * s) / 2 - src.x * s),
                 oy: Math.round(this.headH() + (ah - src.h * s) / 2 - src.y * s),
             };
+            // no bar under the page (the kit's, emptied): the page starts under the header and its panels
+            // reach down to the screen's bottom (extra: logical px below the app's 520, G.panel)
+            const spare = ah - 2 * PAGE_GAP - src.h * s;
+            if (!this.barH() && spare > 0) {
+                pl.oy = Math.round(this.headH() + PAGE_GAP - src.y * s);
+                pl.extra = Math.floor(spare / s);
+            }
         }
         this.place = pl;
         this.gpu.place(pl);
+        this._grab();
+        this._hmiBar();
         this.recorders.clear();             // text sizes depend on the scale
         this.app = null; this.outRec = null;
         this.log.info('display: renderer placement ' + JSON.stringify(pl) + ' (layout ' + v + ')');
     }
 
     /** the screen is up and not covered by an HMI popup */
-    _shown() { return this.ui.isVisible(this.screen.name) && (!this.ui.hasFocus || this.ui.hasFocus(this.screen.name)); }
+    _shown() {
+        // the HMI's settings screen over ours (no drawn settings: another renderer, software): it shows, not our picture
+        return this.ui.isVisible(this.screen.name) && !this.ui.isVisible('SETTINGS') && (!this.ui.hasFocus || this.ui.hasFocus(this.screen.name));
+    }
 
     _syncVisible() {
         if (!this.gpu) return;
         const on = this._shown();
+        if (on && !this.gpu.visible) { this.shownT = Date.now(); this.softDone = false; }
         this.gpu.show(on);
         if (on) this.lastWords = null;
     }
 
     /** GPU path usable for this screen right now? */
     active(stateName) {
-        return !!(this.gpu && this.gpu.ready && this.place && (!stateName || stateName === this.screen.name) && this._shown());
+        return !!(this.gpu && this.gpu.ready && this.place && !this.blocked && (!stateName || stateName === this.screen.name) && this._shown());
     }
 
     /** The surface to draw a frame on (reused). */
@@ -246,6 +570,9 @@ class Display {
         r.chrome = this.active() && this.place.full && this.screen.chrome !== false ? { tabs: null } : null;
         // where the frame lands on screen (apps that draw some parts in screen pixels, r.xf)
         r.place = this.active() ? this.place : null;
+        // the kit runs the screen: buttons drawn on the page (G.button) take the place of the bar's
+        r.own = this.own() && this.active();
+        r.extra = r.own && this.place.extra ? this.place.extra : 0;
         return r;
     }
 
@@ -255,6 +582,17 @@ class Display {
      */
     present(name, r, softImage) {
         if (!(r instanceof Recorder)) return softImage(name, r);
+        if (r.chrome && r.chrome.tabs) this.tabInfo = r.chrome.tabs;
+        else if (r.tabInfo) this.tabInfo = r.tabInfo;
+        if (!this.sheet) { this.pageTargets = r.targets || []; this.pageScroll = !!r.scroll; }
+        // a sheet is over the page: the app's frames wait (the last one comes back when it closes)
+        if (this.sheet && this.active() && this.place.full) {
+            if (r.chrome) this.saved = Object.assign({}, this.saved || {}, {
+                name, softImage, w: r.w, h: r.h, textScale: r.textScale, words: new Uint32Array(r.words()),
+                atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), images: new Set(r.images || []), tabs: r.chrome.tabs,
+            });
+            return Promise.resolve();
+        }
         // Standard/software layout: keep the rightmost 96 px free for the DEMO badge.
         // Full-screen GPU layout draws it below the native status strip in _drawChrome.
         if (!(r.chrome && this.active() && this.place.full) && !r._cnStamped) {
@@ -274,6 +612,7 @@ class Display {
             } else this.app = null;
             this._send(name, out, softImage, false);
             if (this.place.full && r.chrome) this._claimTabs(this.chromeRec.tabRects, null);
+            else if (this.own()) this._claimTabs(null, null);
             else this._claimTabs(r.tabRects, r);
             // the HMI's own image under the renderer's surface: a plain background, once
             const t = this.theme();
@@ -285,6 +624,8 @@ class Display {
         }
         this.app = null;
         this._keep(name, r, softImage);
+        // an HMI popup covers the screen the kit runs: the HMI's image stays plain (_lost) meanwhile
+        if (this.ownable() && !this.blocked && this.gpu.visible === false && this.ui.isVisible(this.screen.name)) return Promise.resolve();
         const cv = new Canvas(r.w, r.h);
         play(r.words(), cv);
         return softImage(name, cv);
@@ -336,9 +677,25 @@ class Display {
             this.keepTimer = setInterval(() => {
                 // apps that draw only on changes still send a frame every second (renderer watchdog)
                 if (this.last && this.active() && Date.now() - this.lastSent >= 1000) { this.lastSent = Date.now(); this.gpu.frame(this.last.frame); }
+                this._softIfNoTick();
             }, 500);
             if (this.keepTimer.unref) this.keepTimer.unref();
         }
+    }
+
+    /**
+     * Shown for 2 s and the renderer has not taken a frame (no tick): it may not be on screen yet (the
+     * first app opened after the head unit started showed only the HMI's empty page). The last frame
+     * goes into the HMI's own image too, once; the renderer's surface covers it when it comes.
+     */
+    _softIfNoTick() {
+        const L = this.last;
+        if (!L || this.softDone || !this.active() || !this.shownT || Date.now() - this.shownT < 2000 || (this.tickT || 0) > this.shownT) return;
+        this.softDone = true;
+        this.log.info('display: no frame taken by the renderer 2 s after showing - the last frame drawn in the HMI too');
+        const cv = new Canvas(L.w, L.h);
+        play(L.frame.words(), cv);
+        Promise.resolve(L.softImage(L.name, cv)).catch(() => {});
     }
 
     _stats() {
@@ -360,13 +717,26 @@ class Display {
         const pl = this.place, t = this.theme(), W = pl.w, H = pl.h;
         const c = this.chromeRec || (this.chromeRec = new Recorder(W, H));
         c.reset();
-        const tb = r.chrome.tabs || { tabs: [], sel: -1, badges: [] };
+        const tb = this.own() ? this._tabList() : r.chrome.tabs || { tabs: [], sel: -1, badges: [] };
         // compact header in the HMI strip's own black, only as wide as its name, tabs and badges:
         // right of it the HMI's strip shows through (radio station, phone signal, status icons)
         const hx = HMI.left - pl.x;
         const end = G.header(c, Object.assign({}, t, { bg: HMI.headBg }), hx, 0, HMI.status.x - pl.x - hx, FULL.headH,
             this.screen.title || this.spec.title, tb.tabs, tb.sel, tb.badges, true, true);
-        const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(end));
+        // the HMI's own title is in the strip under the header: a narrower header (a sheet: no tabs) stays
+        // as wide as the app's widest, so none of that title shows beside it
+        if (!this.sheet) this.headMax = Math.max(this.headMax || 0, end);
+        const sx = this.headEnd = Math.min(HMI.status.x - pl.x, Math.ceil(Math.max(end, this.headMax || 0)));
+        if (sx > end) { c.fillRect(end, 0, sx - end, FULL.headH - 2, HMI.headBg); c.fillRect(end, FULL.headH - 2, sx - end, 2, G.withAlpha('#ffffff', 0.22)); }
+        // the tab the controller is on (the kit holds it: Display._ccu)
+        const ft = this.focusTab != null && (!this.sheet || this.sheetHead) && (c.tabRects || []).find((q) => q.i === this.focusTab);
+        if (ft) c.strokeRoundRect(ft.x + 4, ft.y + 10, ft.w - 8, ft.h - 20, 10, 2, t.sel || t.accent);
+        // the page button (or row) the controller is on, and one just pressed
+        const k = pl.scale, onPage = (key) => !this.sheet && key && (this.pageTargets || []).find((q) => 'tgt:' + q.key === key);
+        const pt = onPage(this.focusKey), pp = Date.now() - this.pressedT < 300 && onPage(this.pressed);
+        if (pp) c.roundRect(pp.x * k + pl.ox, pp.y * k + pl.oy, pp.w * k, pp.h * k, (pp.r != null ? pp.r : pp.h / 2) * k, G.withAlpha(t.sel || t.accent, 0.35));
+        if (this.focusKey === 'scroll' && this.pageScroll && !this.sheet) c.strokeRoundRect(hx + 6, FULL.headH + 6, W - hx - 12, H - this.barH() - FULL.headH - 12, 14, 3, G.withAlpha(t.sel || t.accent, 0.8));
+        if (pt) c.strokeRoundRect(pt.x * k + pl.ox - 5, pt.y * k + pl.oy - 5, pt.w * k + 10, pt.h * k + 10, (pt.r != null ? pt.r : pt.h / 2) * k + 5, 3, t.sel || t.accent);
         // the strip's bottom edge continues under the see-through part
         c.fillRect(sx, 0, W - sx, FULL.headH, HMI.headBg);
         c.fillRect(sx, FULL.headH - 2, W - sx, 2, G.withAlpha('#ffffff', 0.22));
@@ -377,9 +747,10 @@ class Display {
         const focus = btns.findIndex((b) => b.id === this.focused);
         if (btns.length && this.barH()) G.menuBar(c, t, 0, by, W, FULL.barH, btns, focus, 'slim', flash);
         // the HMI's status icons and its back arrow column (home button, back arrow) show through;
-        // the column under them is covered, so the HMI's own bar doesn't show at the bottom left
+        // the column under them is covered, so the HMI's own bar doesn't show at the bottom left, nor the
+        // mark the HMI draws above it when its bar is wider than the screen (eDrive's "Reset drive totals")
         c.clip(sx, 0, W - sx, HMI.status.h).clear(0).noclip();
-        if (hx > 0) c.clip(0, 0, hx, HMI.barTop - pl.y).clear(0).noclip();
+        if (hx > 0) c.clip(0, 0, hx, HMI.colEnd - pl.y).clear(0).noclip();
         drawCredit(c, W - 18, FULL.headH + 17);
         r.xf(1, 0, 0).append(c).xf();
     }
@@ -413,16 +784,31 @@ class Display {
      * Height of the kit's slim bar: 0 for a screen with "bar": false in app.json (a game: its
      * bar buttons still exist in the HMI under the surface, for focus and taps, but aren't drawn).
      */
-    barH() { return this.screen && (this.screen.bar === false || this.screen.chrome === false) ? 0 : FULL.barH; }
+    barH() {
+        if (this.screen && (this.screen.bar === false || this.screen.chrome === false)) return 0;
+        // the kit's bar with nothing left on it (its buttons on the page, Settings a tab): no bar
+        return this.ownable() && !this.buttons().length ? 0 : FULL.barH;
+    }
+    /** Leave bar button id out where the kit runs the screen (the app draws it on the page there). */
+    hideButton(id) {
+        this.ownHidden.add(id); this._btns = null;
+        if (this.place) this._place();
+    }
     /** Header height: 0 for "chrome": false (the app draws the whole screen itself, e.g. a game). */
     headH() { return this.screen && this.screen.chrome === false ? 0 : FULL.headH; }
 
-    /** The HMI's bar buttons in screen pixels, unscrolled: [{ id, label, x, w }]. */
+    /**
+     * The HMI's bar buttons in screen pixels, unscrolled: [{ id, label, x, w }]. Where the kit runs
+     * the screen, the bar is its own: the page buttons are left out (the tabs, touched or pushed to
+     * with the controller, turn the pages); they stay in the HMI's bar for the other paths.
+     */
     buttons() {
-        if (this._btns) return this._btns;
+        const own = this.ownable();
+        if (this._btns && this._btnsOwn === own) return this._btns;
+        this._btnsOwn = own;
         const m = new Recorder(1, 1);
         let x = HMI.btn.x;
-        this._btns = (this.screen.buttons || []).map((b) => {
+        this._btns = (this.screen.buttons || []).filter((b) => !own || (PAGER.indexOf(b[0]) < 0 && b[0] !== 'BTN_SETTINGS' && !this.ownHidden.has(b[0]))).map((b) => {
             const label = this.labels[b[0]] != null ? this.labels[b[0]] : String(b[1] || b[0]);
             const w = Math.round(m.textWidth(label, HMI.btn.size, { font: 'label' }) * HMI.btn.k) + HMI.btn.pad;
             const r = { id: b[0], label, x, w };

@@ -46,7 +46,7 @@ mgu.run({
         /* ---------- pull detection ---------- */
         let pull = null;            // { segs: [{k, pts: []}], start }
         let live = { power: null, state: 'idle' };
-        let lastRun = null, lastT = 0;
+        let lastRun = null, lastT = 0, cleared = false;     // cleared: Reset on the Peak panel, until the next pull
 
         function finishPull() {
             const p = pull; pull = null;
@@ -60,7 +60,7 @@ mgu.run({
             const st = store();
             st.runs.unshift(run); st.runs = st.runs.slice(0, 20);
             if (st === saved) save();
-            lastRun = run; live.state = 'done'; live.until = Date.now() + 6000;
+            lastRun = run; cleared = false; live.state = 'done'; live.until = Date.now() + 6000;
             log.info('dyno run ' + Math.round(run.peakP / 745.7) + ' hp @' + run.peakPrpm + ', ' + Math.round(run.peakT) + ' Nm @' + run.peakTrpm);
         }
 
@@ -171,7 +171,7 @@ mgu.run({
 
         function drawMain(cv, t) {
             const st = store();
-            const cur = lastRun && st.runs.indexOf(lastRun) >= 0 ? lastRun : st.runs[0];
+            const cur = cleared ? null : lastRun && st.runs.indexOf(lastRun) >= 0 ? lastRun : st.runs[0];
             const base = st.baseline;
             G.panel(cv, t, 24, 44, 1120, 468, 'Dyno sheet');
             plot(cv, t, 104, 135, 960, 294, [cur, base]);
@@ -185,6 +185,8 @@ mgu.run({
             }
 
             G.panel(cv, t, 1168, 44, 408, 468, live.state === 'pull' ? 'Recording' : 'Peak');
+            // Reset: the power and torque shown go blank until the next pull (saved runs stay)
+            if (live.state !== 'pull') G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { cleared = true; lastRun = null; return render(); }, { key: 'reset', busy: !cur, confirm: true });
             const now = Date.now();
             if (live.state === 'pull') {
                 cv.circle(1540, 84, 9, Math.floor(now / 300) % 2 ? t.crit : withAlpha(t.crit, 0.3));
@@ -216,6 +218,8 @@ mgu.run({
                 const y = 174 + i * 41, d = new Date(r.at), p = (n) => String(n).padStart(2, '0');
                 const isBase = st.baseline && st.baseline.at === r.at, isSel = i === sel;
                 if (isSel) cv.roundRect(36, y - 28, 1528, 38, 6, withAlpha(t.accent, 0.18));
+                // a run tapped (or pressed with the controller) is the one the dyno sheet shows
+                if (cv.own) cv.target(36, y - 28, 1528, 38, () => { sel = i; lastRun = r; cleared = false; return render(); }, 'run' + i, 6);
                 cv.text(p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' + p(d.getHours()) + ':' + p(d.getMinutes()), cols[0], y, 24, t.text);
                 cv.text(Math.round(pw(r.peakP)) + ' ' + pU() + ' @ ' + r.peakPrpm, cols[1], y, 24, t.accent, { font: 'bold' });
                 cv.text(Math.round(tq(r.peakT)) + ' ' + tU() + ' @ ' + r.peakTrpm, cols[2], y, 24, t.accent2, { font: 'bold' });
@@ -245,6 +249,8 @@ mgu.run({
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
         ctx.onTab((i) => i !== page && flip());
+        // the bar's Baseline / Next run: where the HMI draws the bar (the kit's has neither)
+        ctx.hideButton('BTN_ACTION');
         ui.onClick('BTN_ACTION', () => {
             const st = store();
             if (page === 1) { if (st.runs.length) sel = (sel + 1) % Math.min(8, st.runs.length); lastRun = st.runs[sel] || null; return render(); }

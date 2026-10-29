@@ -16,14 +16,38 @@
  *                              the cluster works out the new date / distance itself)
  *   check                    : 22 10 01 -> 12 bytes per item: id, .., [5] availability %, [4]&0x1F count
  * Only brake fluid (0x03) and the vehicle check (0x64) - the items kept in the cluster that were tried -
- * and only when the cluster itself reports no reason against it. Select the item with "Next item",
- * press "Reset service", then "Reset service" again within 15 s to confirm.
+ * and only when the cluster itself reports no reason against it. Where the renderer draws the cards
+ * (mgu-render/1), a tap on an item (or "Details") opens its card: due date, time and distance left,
+ * the car's hint, and Reset, then "Confirm reset" within 5 s. Elsewhere: select the item with
+ * "Next item", press "Reset service", then "Reset service" again within 5 s to confirm.
  */
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { Diag, hex, NRC } = require('./kit/diag');
 const { fitText } = require('./kit/text-layout');
+const { cardSheet } = require('./kit/sheet');
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const STATUS = ['', 'Due now', 'Due soon', 'OK', 'Due soon'];
+/**
+ * The car's due date ("09/2027", "09.2027", "15.09.2027", "2027-09") as { text: "September 2027",
+ * left: "in 11 months" / "2 months overdue", months }; null for anything else.
+ */
+function parseDue(s, now) {
+    s = String(s || '').trim();
+    let m, d = null, mo, y;
+    if ((m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(s))) { d = +m[1]; mo = +m[2]; y = +m[3]; } else if ((m = /^(\d{1,2})[./-](\d{4})$/.exec(s))) { mo = +m[1]; y = +m[2]; } else if ((m = /^(\d{4})[./-](\d{1,2})$/.exec(s))) { y = +m[1]; mo = +m[2]; } else return null;
+    if (mo < 1 || mo > 12) return null;
+    now = now || new Date();
+    const months = (y - now.getFullYear()) * 12 + (mo - 1 - now.getMonth());
+    const n = Math.abs(months), unit = n === 1 ? ' month' : ' months';
+    return {
+        text: (d ? d + ' ' : '') + MONTHS[mo - 1] + ' ' + y,
+        left: months > 0 ? 'in ' + n + unit : months === 0 ? 'this month' : n + unit + ' overdue',
+        months,
+    };
+}
 
 const W = 1600, H = 520, PER_PAGE = 5;
 const GO = '#2fd27a';
@@ -31,7 +55,7 @@ const KOMBI = 'de.bmw.infotainment.KombiInterface_2';
 const COLORS = { DEFAULT: 0, RED: 1, YELLOW: 2, GREEN: 3, ORANGE: 4 };
 const KOMBI_ECU = 0x60;
 const RESETTABLE = { 0x03: 'Brake fluid', 0x64: 'Vehicle check' };
-const CONFIRM_MS = 15000;
+const CONFIRM_MS = 5000;
 
 /**
  * the object holding `key` somewhere inside v (unions arrive wrapped in their member's name). With
@@ -138,7 +162,7 @@ mgu.run({
             return out;
         }
         /** "Reset service": the first press asks the cluster and arms the reset of the selected item; a
-         *  second press within 15 s confirms it. Anything else (Next item, Details) disarms it. */
+         *  second press within 5 s confirms it. Anything else (Next item, Details) disarms it. */
         async function resetPress() {
             if (settings.get('resetOn') !== true) return showMsg('Reset is off - turn on "Service reset" in Settings');
             if (useDemo()) return showMsg('No reset in demo mode');
@@ -164,7 +188,7 @@ mgu.run({
                 }
                 const name = (cur && cur.id === id && cur.name) || RESETTABLE[id];
                 reset = { item: { id, name }, at: Date.now(), busy: false };
-                showMsg('Reset ' + name + '?  Press "Reset service" again to confirm (15 s)');
+                showMsg('Reset ' + name + '?  Press ' + (ctx.display.sheet ? '"Confirm reset"' : '"Reset service" again') + ' to confirm (5 s)');
             } catch (e) {
                 reset = null;
                 log.warn('reset list: ' + e);
@@ -194,6 +218,37 @@ mgu.run({
             }
         }
 
+        /* ---------- an item's card (drawn by the renderer over the page, kit sheet) ---------- */
+        function openCard(i) {
+            const it = items()[i];
+            if (!it) return false;
+            sel = i;
+            hint = null; msg = '';
+            reset = reset && reset.busy ? reset : null;
+            const due = parseDue(it.date);
+            const card = cardSheet({
+                title: it.name,
+                heading: it.name,
+                subtitle: () => STATUS[it.colour] || '',
+                color: () => [null, '#ef2b2d', '#ffb020', GO, '#ffb020'][it.colour] || null,
+                rows: () => [
+                    ['Due by', due ? due.text : it.date || '--', due && due.months < 0 ? '#ef2b2d' : null],
+                    due ? ['Time left', due.left] : null,
+                    ['Distance left', it.way || '--'],
+                ],
+                note: () => msg || (hint && hint.text) || '',
+                actions: () => [{
+                    label: reset && reset.item && reset.item.id === it.id && !reset.busy ? 'Confirm reset' : 'Reset',
+                    color: reset && reset.item && reset.item.id === it.id ? '#ef2b2d' : null,
+                    run: () => { resetPress(); return null; },
+                }],
+            });
+            card.onClose = () => { hint = null; msg = ''; reset = reset && reset.busy ? reset : null; changed(); };
+            if (!ctx.sheet(card)) return false;
+            details();
+            return true;
+        }
+
         /* ---------- drawing ---------- */
         const pages = () => (settings.get('diagPage') ? ['Service', 'Diagnostics'] : ['Service']);
         const COL = (t, c) => [t.dim, t.crit, t.warn, GO, t.warn][c] || t.dim;
@@ -217,7 +272,8 @@ mgu.run({
             tile(cv, t, 1198, 378, 'Due now', String(red), 'items', red ? t.crit : GO);
             G.panel(cv, t, 24, 176, 1552, 336, 'Service requirements' + (its.length > PER_PAGE ? '  ' + (Math.floor(sel / PER_PAGE) + 1) + '/' + Math.ceil(its.length / PER_PAGE) : ''));
             // the bottom line: an item's details, or what the last button did (reset)
-            const line = hint ? hint.name + ':  ' + hint.text : msg;
+            // (where the kit runs the screen the item's card shows its hint and the reset's progress)
+            const line = cv.own ? '' : hint ? hint.name + ':  ' + hint.text : msg;
             if (line) {
                 cv.roundRect(40, 470, 1520, 38, 8, withAlpha(t.accent, 0.12));
                 cv.text(fit(cv, line, 22, 1490), 56, 496, 22, t.text);
@@ -230,7 +286,9 @@ mgu.run({
             const first = Math.floor(sel / per) * per;
             its.slice(first, first + per).forEach((it, i) => {
                 const y = 232 + i * 55, col = COL(t, it.colour);
-                if (first + i === sel) cv.roundRect(40, y - 4, 1520, 50, 8, withAlpha(t.accent, 0.18));
+                // a row tapped, or pressed with the controller: its card
+                if (cv.own) cv.target(40, y - 4, 1520, 50, () => openCard(first + i), 'item' + it.id, 8);
+                if (!cv.own && first + i === sel) cv.roundRect(40, y - 4, 1520, 50, 8, withAlpha(t.accent, 0.18));   // (the kit rings the row the controller is on)
                 cv.roundRect(48, y + 4, 8, 34, 4, col);
                 cv.text(fit(cv, it.name, 30, 720, { font: 'bold' }), 76, y + 32, 30, t.text, { font: 'bold' });
                 cv.text(it.way || '--', 1040, y + 32, 30, it.way ? t.text : t.dim, { align: 'right', font: 'bold' });
@@ -278,8 +336,13 @@ mgu.run({
             else if (pages().length > 1) page = 1; else sel = 0;
             changed();
         });
-        ui.onClick('BTN_DETAILS', () => { reset = reset && reset.busy ? reset : null; msg = ''; details(); });
+        ui.onClick('BTN_DETAILS', () => {
+            if (page === 0 && openCard(sel)) return;
+            reset = reset && reset.busy ? reset : null; msg = ''; details();
+        });
         ui.onClick('BTN_RESET', () => { resetPress(); });
+        // where the kit runs the screen the rows open their cards (with Reset): none of these in its bar
+        ['BTN_SELECT', 'BTN_DETAILS', 'BTN_RESET'].forEach((b) => ctx.hideButton(b));
         ctx.onTab((i) => { if (i !== page) { page = i; sel = 0; msg = ''; changed(); } });
 
         ctx.loop('MAIN', 2, () => render(false));

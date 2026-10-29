@@ -24,6 +24,7 @@ const { OnlineApp, logging } = require('oap-sdk');
 const themes = require('./themes');
 const { Display } = require('./display');
 const { HmiText } = require('./hmi-text');
+const { listSheet } = require('./sheet');
 
 const sdkLog = logging.getSDKLogger();
 const SPEC = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-spec.json'), 'utf8'));
@@ -441,7 +442,20 @@ function wireSettings(ctx) {
             });
         } else ui.onClick(comp, () => { settings.cycle(s.key); return refresh(); });
     });
-    if (ui.comp('BTN_SETTINGS')) ui.onClick('BTN_SETTINGS', () => refresh().then(() => ui.open('SETTINGS')));
+    // Settings: drawn over the page by the renderer (sheet.js) where the kit runs the screen,
+    // else the HMI's settings screen. The HMI's screen shows the values chosen in either.
+    settings.onChange(() => { if (!ctx.display.sheet) refresh(); });
+    if (ui.comp('BTN_SETTINGS')) {
+        ui.onClick('BTN_SETTINGS', () => {
+            const d = ctx.display;
+            if (d.sheet && d.sheet.settings) { d.closeSheet(); return null; }
+            const sh = listSheet(settings, null, { version: SPEC.version });
+            sh.settings = true;
+            sh.onClose = () => refresh();
+            if (d.openSheet(sh)) return null;
+            return refresh().then(() => ui.open('SETTINGS'));
+        });
+    }
     return refresh();
 }
 
@@ -500,8 +514,22 @@ async function runInner(impl) {
         // onInput(fn): while grabbed, fn gets each controller event the HMI didn't (same fields
         // as FrontCCU.statusRotaryEncoderState, enums as numbers)
         controller: { grab(on) { display.grab(on); }, onInput(fn) { display.onCcu = fn; } },
-        /** onTab(fn): fn(i) when the page tab i is tapped on the touchscreen (renderer with touch routing). */
+        /**
+         * onTab(fn): fn(i) when page tab i is tapped on the touchscreen (renderer with touch
+         * routing), or pressed with the controller after turning onto it.
+         */
         onTab(fn) { display.onTab = fn; },
+        /** onTap(fn): fn(x, y) for a tap on the page (app drawing px), where the kit runs the screen. */
+        onTap(fn) { display.onTap = fn; },
+        /** Show a sheet (sheet.js) over the page; false where it can't be (software path, other renderers). */
+        sheet(sh) { return display.openSheet(sh); },
+        /** hideButton(id): leave bar button id out where the kit runs the screen (its job is on the page there). */
+        hideButton(id) { display.hideButton(id); },
+        /**
+         * onScroll(fn): fn(dy) scrolls a page drawn with cv.scroll = true by dy px (+ = further down), from a
+         * finger dragged on it or the controller turned while on it; returns false when already at that end.
+         */
+        onScroll(fn) { display.onScroll = fn; },
         /** The surface to draw one frame on (record.js Recorder, reused): pass it to ui.image. */
         canvas(w, h) { return display.canvas(w, h); },
         /**
@@ -559,8 +587,10 @@ async function runInner(impl) {
         },
     };
 
-    // visibility of our states (pauses rendering when the user leaves)
-    (SPEC.screens || []).forEach((s) => {
+    // visibility of our states (pauses rendering when the user leaves); the HMI's settings screen too (the
+    // drawn screen gives way to it: display.js)
+    const tracked = (SPEC.screens || []).concat(SPEC.settings && SPEC.settings.length ? [{ name: 'SETTINGS' }] : []);
+    tracked.forEach((s) => {
         const st = ui.comp(s.name);
         if (st && st.on) st.on('visible', (ev) => ui._setVisible(s.name, !!(ev && ev.visible)));
         // a popup over the screen (options, warnings, calls) takes its focus: the display hides
@@ -572,9 +602,12 @@ async function runInner(impl) {
         Promise.resolve().then(() => (shown ? app.registerHmiVisible() : app.unregisterHmiVisible()))
             .catch((e) => log.warn('hmi visible: ' + e));
         const open = [].concat.apply([], Object.keys(stack || {}).map((k) => stack[k] || []));
-        (SPEC.screens || []).forEach((s) => {
+        tracked.forEach((s) => {
             const st = ui.comp(s.name);
             if (st) ui._setVisible(s.name, open.indexOf(st.getId ? st.getId() : -1) >= 0);
+            // back in front (reopened after Home or another app): the HMI does not always say the
+            // screen has its focus again, and without it the drawn screen stayed hidden
+            if (st && shown && ui.isVisible(s.name)) ui._setFocus(s.name, true);
         });
     });
 

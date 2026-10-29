@@ -161,7 +161,9 @@ module.exports = function live(ctx, sh) {
             if (kw > 0) {
                 trip.out += kw * h;
                 // the part of it the climate took (compressor, heater, blower, seats, pumps): never more than the battery gave
-                const cl = climatePower(data(), now).kw;
+                // (estimated from what the car reports, or that is nothing: eDrive's typical climate draw)
+                const cp = climatePower(data(), now);
+                const cl = cp.how === 'estimated' && !(cp.kw > 0) && sh.climateKw ? sh.climateKw() : cp.kw;
                 if (G.isNum(cl) && cl > 0) trip.climate += Math.min(cl, kw) * h;
             }
             else if (moving) trip.regen -= kw * h;

@@ -119,6 +119,8 @@ mgu.run({
             const d = car.data(), low = mainTest();
             // ---- result / live panel
             G.panel(cv, t, 24, 44, 470, 468, run ? 'Stopping' : last ? 'Last stop' : 'Ready');
+            // the panel's own button (where the kit runs the screen; else the bar's Cancel run)
+            G.button(cv, t, 494 - 20 - 170, 56, 170, 40, 'Cancel run', act, { key: 'cancel', busy: !run && !last });
             const showKey = last ? (last.result[low.key] ? low.key : Object.keys(last.result)[0]) : low.key;
             const lab = tests().find((x) => x.key === showKey) || low;
             const dist = run ? run.dist : last && last.result[showKey] ? last.result[showKey].m : null;
@@ -193,6 +195,7 @@ mgu.run({
 
         function drawHistory(cv, t) {
             G.panel(cv, t, 24, 44, 1552, 468, 'All stops');
+            G.button(cv, t, 1576 - 20 - 200, 56, 200, 40, clearArmed ? 'Yes, clear' : 'Clear log', act, { key: 'clear', color: clearArmed ? t.crit : null, busy: !store.runs.length });
             const ts = tests();
             const cols = [48, 330, 640, 950, 1180, 1400];
             ['WHEN', ts[1].label.toUpperCase(), ts[0].label.toUpperCase(), 'PEAK DECEL', 'FROM', ''].forEach((h, i) => cv.text(h, cols[i], 127, 22, t.dim, { font: 'bold', spacing: 1 }));
@@ -230,13 +233,16 @@ mgu.run({
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
         ctx.onTab((i) => i !== page && flip());
-        ui.onClick('BTN_ACTION', () => {
+        // Cancel run (Brake test) / Clear log, pressed twice (History): on the page, or the bar's button
+        function act() {
             if (page === 0) { run = null; last = null; state = 'arm'; return render(); }
             if (!clearArmed) { clearArmed = setTimeout(() => { clearArmed = null; actionLabel(); }, 5000); return actionLabel(); }
             clearTimeout(clearArmed); clearArmed = null;
             store.best = {}; store.runs = []; save(); actionLabel();
             return render();
-        });
+        }
+        ui.onClick('BTN_ACTION', act);
+        ctx.hideButton('BTN_ACTION');
         // every screen refresh (60 fps) with the GPU renderer; 8 fps in software (PNG frames)
         ctx.loop('MAIN', 8, render);
         render().then(() => log.info('first frame done')).catch((e) => log.warn('first render: ' + e));

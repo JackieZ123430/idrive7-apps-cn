@@ -48,10 +48,14 @@ const startLive = require('./live');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
-// the live pages (battery; the battery unit and scan with the diagnostics) are live.js's
-const PAGES_HYBRID = ['main', 'energy', 'battery', 'log', 'diag', 'unit', 'scan', 'signals'];
-const PAGES_12V = ['main', 'diag', 'signals'];
-const DIAG_PAGES = ['diag', 'unit', 'scan', 'signals'];
+// the live pages (battery; the battery unit and scan in the Diagnostic page) are live.js's
+const PAGES_HYBRID = ['main', 'energy', 'battery', 'log', 'diag'];
+const PAGES_12V = ['main', 'diag'];
+const DIAG_PAGES = ['diag'];
+// the Diagnostic page: one scrolling page of these parts (the battery unit and scan: hybrids only)
+const DIAG_PARTS_HYBRID = ['diag', 'unit', 'scan', 'signals'];
+const DIAG_PARTS_12V = ['diag', 'signals'];
+const DIAG_STEP = 492;           // each part is a full page (panel 44..512) plus a gap
 /** Comfort consumers, estimated from their levels (kW): seat heating per level 0..3, steering wheel. */
 const SEAT_KW = [0, 0.04, 0.07, 0.1];
 const WHEEL_KW = 0.06;
@@ -573,8 +577,15 @@ mgu.run({
 
         /* ---------- drawing ---------- */
         let page = 0;
-        const lv = startLive(ctx, { diag, reader, exclusive, live, page: () => pages()[page] });
-        const isLive = (p) => lv.PAGES.indexOf(p) >= 0 || lv.DIAG.indexOf(p) >= 0;
+        // the climate's typical draw for this drive's totals while nothing better is known (the Energy page's estimate)
+        const climateKw = () => {
+            if (live.climate === false || live.climate == null) return 0;
+            const k = kwhPerPct();
+            return Math.max(0, (model.auxRate(live.ambient, k, live.climate).rate - model.auxRate(live.ambient, k, false).rate) * k);
+        };
+        // (the scan runs while the Diagnostic page, which shows it, is up)
+        const lv = startLive(ctx, { diag, reader, exclusive, live, climateKw, page: () => (pages()[page] === 'diag' ? 'scan' : pages()[page]) });
+        const isLive = (p) => lv.PAGES.indexOf(p) >= 0;
         // the first bar button: "Read now", on the live pages their own action (this drive's totals, the scan)
         let actionText = 'Read now';
         const actionLabel = () => {
@@ -590,10 +601,19 @@ mgu.run({
             if (isLive(p) && lv.actionLabel(p)) { lv.action(p); return render(); }
             return poll(true).then(render);
         });
+        // where the kit runs the screen the values are read on their own (poll) and the resets are on the page
+        ctx.hideButton('BTN_READ');
+        const diagScroll = { y: 0, max: 0 };
+        ctx.onScroll((dy) => {
+            if (pages()[page] !== 'diag') return false;
+            const y = G.clamp(diagScroll.y + dy, 0, diagScroll.max), moved = y !== diagScroll.y;
+            diagScroll.y = y;
+            return moved;
+        });
 
         /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t, d) {
-            const names = Object.assign({ main: isHybrid() ? 'Range' : '12 V battery', energy: 'Energy', log: 'Charge log', diag: 'Diagnostics', signals: 'Signals' }, lv.NAMES);
+            const names = Object.assign({ main: isHybrid() ? 'Range' : '12 V battery', energy: 'Energy', log: 'Charge log', diag: 'Diagnostic', signals: 'Signals' }, lv.NAMES);
             G.frame(cv, t, pages().map((p) => names[p]), page, [d.demo && { text: 'DEMO' }]);
         }
 
@@ -705,6 +725,42 @@ mgu.run({
             const holds = G.isNum(d.soh) ? settings.get('designKwh') * d.soh / 100 : settings.get('designKwh');
             const inBat = has ? [G.fmt(holds * d.soc / 100, 1), G.fmt(holds, 1)] : ['--', G.fmt(holds, 1)];
             lv.drawTrip(cv, t, 1172, 44, 404, 468, climFoot, inBat);
+            G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { lv.action('battery'); return render(); }, { key: 'trip', confirm: true });
+        }
+
+        /**
+         * The Diagnostic page: the battery diagnostics, the battery unit, the scan and the car's signals, one
+         * under the other, scrolled by a finger or the controller (ctx.onScroll). In software (no renderer to
+         * move the parts) only the first part.
+         */
+        function renderDiagAll(cv, t, d) {
+            const parts = (isHybrid() ? DIAG_PARTS_HYBRID : DIAG_PARTS_12V).map((p) => ({
+                diag: () => renderDiag(cv, t, d), signals: () => renderSignals(cv, t, d),
+                unit: () => lv.draw('unit', cv, t),
+                scan: () => { lv.draw('scan', cv, t); G.button(cv, t, 1576 - 20 - 120, 56, 120, 40, 'Reset', () => { lv.action('scan'); return render(); }, { key: 'scan', confirm: true }); },
+            })[p]);
+            const pl = cv.place;
+            if (!pl) { parts[0](); return; }
+            cv.scroll = true;
+            diagScroll.max = Math.max(0, parts.length * DIAG_STEP - (H + (cv.extra || 0) - 44));
+            diagScroll.y = G.clamp(diagScroll.y, 0, diagScroll.max);
+            const sy = G.smooth('diagScroll', diagScroll.y, 22);
+            const extra = cv.extra;
+            cv.extra = 0;                // (each part is a page of its own height)
+            cv.clip(0, 38, W, H + extra - 38);
+            parts.forEach((draw, i) => {
+                const oy = i * DIAG_STEP - sy;
+                if (oy > H || oy + DIAG_STEP < 0) return;
+                const n0 = cv.targets.length;
+                cv.xf(pl.scale, pl.ox, pl.oy + oy * pl.scale);
+                draw();
+                cv.xf();
+                for (let k = n0; k < cv.targets.length; k++) cv.targets[k].y += oy;
+            });
+            cv.noclip();
+            cv.extra = extra;
+            const vis = H + extra - 44, bh = Math.max(40, vis * vis / (vis + diagScroll.max));
+            cv.roundRect(W - 9, 44 + (vis - bh) * (diagScroll.max ? sy / diagScroll.max : 0), 6, bh, 3, withAlpha('#ffffff', 0.3));
         }
 
         /** Battery health (capacity vs. new), energy in the pack now and its temperature - on the Battery page, under the cells. */
@@ -942,8 +998,7 @@ mgu.run({
                 d = lv.draw(pg[page], cv, t);
                 if (pg[page] === 'battery') renderHealth(cv, t, own, 24, 44, 560, 468);
             }
-            else if (pg[page] === 'diag') renderDiag(cv, t, d);
-            else if (pg[page] === 'signals') renderSignals(cv, t, d);
+            else if (pg[page] === 'diag') renderDiagAll(cv, t, d);
             else if (pg[page] === 'energy') renderEnergy(cv, t, d);
             else if (pg[page] === 'log') renderLog(cv, t, d);
             else if (isHybrid()) renderMain(cv, t, d);

@@ -161,6 +161,7 @@ mgu.run({
             cv.text(stTxt, 284, 446, 26, col, { align: 'center', font: 'bold', spacing: 3 });
             cv.text('PEAK ' + (peakG > 0 ? peakG.toFixed(2) : '-.--') + ' g', 44, 493, 22, t.dim, { font: 'bold', spacing: 1 });
             if (G.isNum(live.rpm)) cv.text(Math.round(live.rpm) + ' rpm', 524, 493, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
+            G.button(cv, t, 214, 466, 140, 38, 'Reset run', act, { key: 'reset', confirm: true });
 
             // --- speed trace ---
             G.panel(cv, t, 568, 44, 520, 468, 'Speed trace');
@@ -211,8 +212,10 @@ mgu.run({
         function drawBest(cv, t) {
             const sp = splits();
             G.panel(cv, t, 24, 44, 640, 468, 'Best times' + (settings.get('rollout') ? ' (rollout)' : ''));
+            G.button(cv, t, 664 - 20 - 200, 56, 200, 40, clearArmed ? 'Yes, clear' : 'Reset best', act, { key: 'clear', color: clearArmed ? t.crit : null });
             sp.forEach((s, i) => {
-                const y = 95 + i * 83, b = store.best[bestKey(s.key)];
+                // (the page reaching lower on screen: the rows clear of Reset best)
+                const y = 95 + (cv.extra ? 25 : 0) + i * 83, b = store.best[bestKey(s.key)];
                 cv.text(s.label, 48, y + 34, 28, t.text, { font: 'bold' });
                 cv.text(b ? secs(b.s) : '--.--', 560, y + 40, 52, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
                 cv.text('s', 568, y + 40, 24, t.dim);
@@ -253,7 +256,8 @@ mgu.run({
         ui.onClick('BTN_PAGE', flip);
         ui.onClick('BTN_PREV', flip);
         ctx.onTab((i) => i !== page && flip());
-        ui.onClick('BTN_ACTION', () => {
+        // Reset run (Drag timer) / Reset best, pressed twice (Best times): on the page, or the bar's button
+        function act() {
             if (page === 0) { timer.reset(); peakG = 0; lastNewBest = {}; return render(); }
             if (!clearArmed) {
                 clearArmed = setTimeout(() => { clearArmed = null; actionLabel(); }, 5000);
@@ -264,7 +268,9 @@ mgu.run({
             log.info('best times cleared');
             actionLabel();
             return render();
-        });
+        }
+        ui.onClick('BTN_ACTION', act);
+        ctx.hideButton('BTN_ACTION');
 
         // every screen refresh (60 fps) with the GPU renderer; 8 fps in software (PNG frames)
         ctx.loop('MAIN', 8, render);
