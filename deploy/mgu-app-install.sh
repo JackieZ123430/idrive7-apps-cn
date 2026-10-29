@@ -552,6 +552,8 @@ Before=hmi.service
 RequiresMountsFor=$RENDERD_DIR /mnt/dataro/data/hmi
 # mgu-store's own mgu-render, when installed, puts its template in instead
 ConditionPathExists=!/var/opt/mgu-render/current/mgu-render
+# the Store's idrive7-renderd took this renderer over (it removes the program, not this unit): its own unit mounts
+ConditionPathExists=$RENDERD_DIR/mgu-renderd
 
 [Service]
 Type=oneshot

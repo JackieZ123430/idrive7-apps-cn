@@ -6,6 +6,8 @@
   (`idrive7-renderd-install.sh`, its postInstall, at every install): the kit installer's `mgu-renderd.service` and its
   enablement, `/var/opt/mgu-renderd/mgu-renderd` and the unit copies set aside in `/var/opt/mgu-renderd/retired/`. A
   `mgu-renderd` the Store installed itself stays. Then the HMI page template is made, as before.
+- `mgu-app-install.sh`'s template unit (`mgu-renderd-hmi.service`) stands down once the Store's `idrive7-renderd` has
+  taken its renderer over, so only the Store's template unit mounts (the original repository's Renderer 2.0.1).
 
 ## idrive7-apps mgu-renderd 2.1.1
 
