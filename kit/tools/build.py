@@ -13,7 +13,7 @@ The RHMI layout (application.xml + uiDescription.json) is GENERATED from the
 "screens" + "settings" in app.json, using only widget templates that BMW's own
 apps use on this firmware (see reference/rhmi-widget-cells.md).
 """
-import json, os, re, shutil, sys, tarfile, uuid
+import json, os, re, shutil, sys, tarfile, tempfile, uuid
 from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pack_data  # noqa: E402
@@ -422,6 +422,13 @@ def build(app_id, language='en'):
             shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', f))
             print('  %s (committed)' % f)
     # kit runtime
+    if app_id == 'dtc_scanner' and language == 'zh-CN':
+        from build_diagnostic_zh import catalog
+        with tempfile.TemporaryDirectory(prefix='mgu-diagnostic-') as temporary:
+            data = os.path.join(temporary, 'zh-CN.json')
+            with open(data, 'w', encoding='utf-8', newline='\n') as file:
+                json.dump(catalog(), file, ensure_ascii=False, separators=(',', ':'))
+            pack_data.pack(temporary, os.path.join(src, 'javascript', 'diagnostic_i18n.pack'))
     kr = os.path.join(KIT, 'runtime')
     for f in os.listdir(kr):
         p = os.path.join(kr, f)
@@ -430,6 +437,10 @@ def build(app_id, language='en'):
         else:
             shutil.copy(p, os.path.join(src, 'javascript', 'kit', f))
     if language == 'zh-CN':
+        # Diagnostic glyphs are Chinese-only; keep the English runtime atlas intact.
+        if app_id == 'dtc_scanner':
+            shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'diagnostic-zh-CN.json'),
+                        os.path.join(src, 'javascript', 'kit', 'fonts', 'cjk.json'))
         # Retain localization authorship in the installed Chinese entry code as plain comments.
         entry = os.path.join(src, 'javascript', 'app.js')
         credit = ('// 中文汉化署名：抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430\n'

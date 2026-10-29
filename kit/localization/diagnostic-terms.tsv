@@ -1,0 +1,794 @@
+# Diagnostic-only phrases. Never applied to signal names or ordinary UI text.
+short circuit to battery positive	对蓄电池正极短路
+shorted to battery positive	对蓄电池正极短路
+short circuit to negative terminal	对负极短路
+short to negative terminal	对负极短路
+short circuit to positive	对正极短路
+short circuit against B+	对B+短路
+short circuit with B+	对B+短路
+short circuit to B+	对B+短路
+short to B+	对B+短路
+short to positive	对正极短路
+short circuit against ground	对地短路
+short circuit to ground	对地短路
+short circuit to earth	对地短路
+ground short circuit	对地短路
+shorted to ground	对地短路
+short to ground	对地短路
+open circuit inside	内部断路
+open circuit	断路
+circuit open	断路
+disconnected line	线路断开
+cable break	线缆断路
+wire break	导线断路
+line break	线路断路
+line incorrectly connected	线路连接错误
+short circuit present	存在短路
+short circuit	短路
+current overload detected	检测到过电流
+current overload	过电流
+overvoltage was detected	检测到过电压
+undervoltage was detected	检测到欠电压
+voltage excessively high	电压过高
+voltage excessively low	电压过低
+voltage too high	电压过高
+voltage too low	电压过低
+temperature excessively high	温度过高
+temperature excessively low	温度过低
+temperature too high	温度过高
+temperature too low	温度过低
+pressure excessively high	压力过高
+pressure excessively low	压力过低
+pressure too high	压力过高
+pressure too low	压力过低
+resistance excessively high	电阻过大
+resistance excessively low	电阻过小
+resistance too high	电阻过大
+resistance too low	电阻过小
+internal control unit fault	控制单元内部故障
+internal fault in control unit	控制单元内部故障
+fault inside unit	单元内部故障
+fault in hardware	硬件故障
+fault in software	软件故障
+fault in communication	通信故障
+communication malfunction	通信故障
+faulty communication	通信故障
+communication error	通信错误
+communication fault	通信故障
+invalid signal	信号无效
+signal not valid	信号无效
+implausible signal	信号不可信
+signal implausible	信号不可信
+signal invalid	信号无效
+no response	无响应
+not responding	无响应
+not received	未接收到
+not present	不存在
+not available	不可用
+not valid	无效
+not expected	不符合预期
+transport mode is active	运输模式已启用
+control unit is not in field mode	控制单元未处于正常使用模式
+lin slave not present	LIN从节点不存在
+lin slave not expected	LIN从节点不符合预期
+power-window motor	电动车窗电机
+power window regulator	电动车窗升降器
+power-window regulator	电动车窗升降器
+power window motor	电动车窗电机
+power supply	供电
+supply voltage	供电电压
+battery voltage	蓄电池电压
+battery positive	蓄电池正极
+battery negative	蓄电池负极
+internal fault	内部故障
+internal error	内部错误
+internal malfunction	内部故障
+general module	通用模块
+processor internal fault	处理器内部故障
+driver's side	驾驶员侧
+passenger's side	乘客侧
+front passenger	前排乘客
+front left	左前
+front right	右前
+rear left	左后
+rear right	右后
+left front	左前
+right front	右前
+left rear	左后
+right rear	右后
+front axle	前轴
+rear axle	后轴
+control unit	控制单元
+control module	控制模块
+engine control	发动机控制
+engine speed	发动机转速
+vehicle speed	车速
+wheel speed	车轮转速
+wheel-speed	车轮转速
+steering angle	转向角
+steering-angle	转向角
+steering wheel	方向盘
+steering column	转向柱
+brake pedal	制动踏板
+brake pressure	制动压力
+brake light	制动灯
+brake booster	制动助力器
+brake fluid	制动液
+parking brake	驻车制动
+parking lock	驻车锁
+parking light	驻车灯
+parking lights	驻车灯
+parking assistance	泊车辅助
+parking assist	泊车辅助
+fuel pressure	燃油压力
+fuel tank	燃油箱
+fuel pump	燃油泵
+fuel level	燃油液位
+fuel injection	燃油喷射
+injection valve	喷油阀
+ignition coil	点火线圈
+ignition circuit	点火电路
+ignition switch	点火开关
+ignition timing	点火正时
+exhaust gas	废气
+exhaust-gas	废气
+exhaust temperature	排气温度
+oxygen sensor	氧传感器
+lambda probe	氧传感器
+lambda sensor	氧传感器
+intake air	进气
+intake-air	进气
+charge air	增压空气
+charge-air	增压空气
+air mass	空气质量流量
+air-mass	空气质量流量
+mass air flow	空气质量流量
+throttle valve	节气门
+throttle-valve	节气门
+throttle position	节气门位置
+camshaft sensor	凸轮轴传感器
+crankshaft sensor	曲轴传感器
+camshaft position	凸轮轴位置
+crankshaft position	曲轴位置
+boost pressure	增压压力
+charging pressure	增压压力
+oil pressure	机油压力
+oil temperature	机油温度
+oil level	机油液位
+coolant temperature	冷却液温度
+coolant pump	冷却液泵
+coolant valve	冷却液阀
+water pump	水泵
+electric motor	电动机
+electric drive	电驱动
+electrical machine	电机
+high-voltage battery	高压蓄电池
+high voltage battery	高压蓄电池
+high-voltage system	高压系统
+high voltage system	高压系统
+high-voltage	高压
+high voltage	高压
+low-voltage	低压
+low voltage	低压
+charging socket	充电插座
+charging cable	充电电缆
+charging flap	充电口盖板
+charging current	充电电流
+charging voltage	充电电压
+battery cell	电池单体
+cell voltage	单体电压
+state of charge	荷电状态
+state of health	健康状态
+dc/dc converter	DC/DC转换器
+dc-dc converter	DC/DC转换器
+dc converter	直流转换器
+dc link	直流母线
+dc-link	直流母线
+air conditioning	空调
+air-conditioning	空调
+air conditioner	空调
+air-conditioning compressor	空调压缩机
+refrigerant pressure	制冷剂压力
+refrigerant temperature	制冷剂温度
+ambient temperature	环境温度
+outside temperature	车外温度
+interior temperature	车内温度
+interior lighting	车内照明
+interior lights	车内灯
+interior light	车内灯
+low-beam headlights	近光灯
+low beam	近光灯
+low-beam	近光灯
+high-beam headlights	远光灯
+high beam	远光灯
+high-beam	远光灯
+tail light	尾灯
+tail lights	尾灯
+fog light	雾灯
+fog lights	雾灯
+reversing light	倒车灯
+reverse light	倒车灯
+direction indicator	转向灯
+turn indicator	转向灯
+side marker light	侧标志灯
+side light	示宽灯
+license-plate light	牌照灯
+number plate light	牌照灯
+luggage-compartment lighting	行李厢照明
+luggage compartment	行李厢
+anti-theft alarm system	防盗报警系统
+alarm system	报警系统
+central locking	中央门锁
+door lock	车门锁
+door handle	车门把手
+exterior mirror	外后视镜
+interior mirror	内后视镜
+passenger mirror	乘客侧后视镜
+seat heating	座椅加热
+seat heater	座椅加热器
+seat adjustment	座椅调节
+seat occupancy	座椅占用
+seat belt	安全带
+seat-belt	安全带
+belt tensioner	安全带张紧器
+belt buckle	安全带锁扣
+crash sensor	碰撞传感器
+rain sensor	雨量传感器
+light sensor	光线传感器
+temperature sensor	温度传感器
+pressure sensor	压力传感器
+position sensor	位置传感器
+speed sensor	转速传感器
+voltage sensor	电压传感器
+current sensor	电流传感器
+level sensor	液位传感器
+height sensor	高度传感器
+acceleration sensor	加速度传感器
+yaw rate	横摆角速度
+roll rate	侧倾角速度
+longitudinal acceleration	纵向加速度
+lateral acceleration	横向加速度
+transmission oil	变速箱油
+transfer box	分动箱
+transfer case	分动箱
+torque converter	液力变矩器
+transmission ratio	传动比
+gear ratio	传动比
+gear selector	换挡选择器
+gearshift lever	换挡杆
+gear shift	换挡
+cooling fan	冷却风扇
+radiator fan	散热风扇
+fan motor	风扇电机
+blower motor	鼓风机电机
+fan activation	风扇驱动
+activation line	驱动线路
+control line	控制线路
+signal line	信号线路
+data line	数据线路
+bus communication	总线通信
+bus signal	总线信号
+message missing	报文缺失
+message absent	报文缺失
+missing message	报文缺失
+message timeout	报文超时
+timeout message	报文超时
+message error	报文错误
+checksum error	校验和错误
+checksum fault	校验和故障
+alive counter	存活计数器
+rolling counter	滚动计数器
+counter error	计数器错误
+signal error	信号错误
+signal fault	信号故障
+signal missing	信号缺失
+signal absent	信号缺失
+functional limitation	功能受限
+function limitation	功能受限
+function restricted	功能受限
+function deactivated	功能已停用
+function disabled	功能已禁用
+emergency operation	应急运行
+emergency mode	应急模式
+failsafe mode	故障保护模式
+limp-home mode	应急运行模式
+operating voltage	工作电压
+operating temperature	工作温度
+operating condition	工作条件
+operating conditions	工作条件
+test operation	测试运行
+test mode	测试模式
+transport mode	运输模式
+energy management	能量管理
+power management	电源管理
+power output	功率输出
+output stage	输出级
+output-stage	输出级
+input stage	输入级
+internal resistance	内阻
+insulation resistance	绝缘电阻
+insulation fault	绝缘故障
+reference voltage	参考电压
+reference signal	参考信号
+specified value	目标值
+actual value	实际值
+target value	目标值
+measured value	测量值
+limit value	限值
+upper limit	上限
+lower limit	下限
+value too high	数值过高
+value too low	数值过低
+above threshold	高于阈值
+below threshold	低于阈值
+upper threshold	上阈值
+lower threshold	下阈值
+out of range	超出范围
+outside range	超出范围
+not initialized	未初始化
+not initialised	未初始化
+not calibrated	未校准
+not coded	未编码
+not programmed	未编程
+incorrect coding	编码错误
+incorrect variant	变体错误
+incorrect version	版本错误
+incorrect checksum	校验和错误
+incorrect signal	信号错误
+incorrect value	数值错误
+incorrect installation	安装错误
+initialization fault	初始化故障
+initialisation fault	初始化故障
+calibration fault	校准故障
+adaptation fault	自适应故障
+mechanical fault	机械故障
+electrical fault	电气故障
+hardware fault	硬件故障
+software fault	软件故障
+memory fault	存储器故障
+memory error	存储器错误
+info-memory entry	信息存储器记录
+information memory	信息存储器
+fault memory	故障存储器
+thermal fuse	热熔断器
+pulse generator	脉冲发生器
+spray-nozzle heater	喷水嘴加热器
+reset	复位
+processor	处理器
+microprocessor	微处理器
+software	软件
+hardware	硬件
+firmware	固件
+malfunction	故障
+defective	损坏
+faulty	故障
+fault	故障
+error	错误
+failure	失效
+implausible	不可信
+plausibility	可信度
+invalid	无效
+valid	有效
+missing	缺失
+absent	缺失
+outdated	过期
+timeout	超时
+checksum	校验和
+telegram	报文
+message	报文
+receiver	接收方
+transmitter	发送方
+sender	发送方
+communication	通信
+internal	内部
+external	外部
+intermittent	间歇性
+permanent	永久性
+sporadic	偶发性
+overvoltage	过电压
+undervoltage	欠电压
+overcurrent	过电流
+overtemperature	温度过高
+overheating	过热
+overload	过载
+underload	负载过低
+stuck	卡滞
+jammed	卡滞
+sticks	卡滞
+blocked	堵塞
+blocking	阻塞
+leakage	泄漏
+leak	泄漏
+leaking	泄漏
+wiring	线路
+wire	导线
+wires	导线
+cable	线缆
+connector	连接器
+connection	连接
+contact	触点
+contacts	触点
+fuse	熔断器
+relay	继电器
+motor	电机
+valve	阀
+pump	泵
+sensor	传感器
+actuator	执行器
+switch	开关
+button	按钮
+controller	控制器
+module	模块
+unit	单元
+system	系统
+electronics	电子装置
+electronic	电子
+electrical	电气
+electric	电动
+mechanical	机械
+hydraulic	液压
+pneumatic	气动
+optical	光学
+voltage	电压
+resistance	电阻
+temperature	温度
+pressure	压力
+frequency	频率
+speed	速度
+torque	扭矩
+position	位置
+angle	角度
+acceleration	加速度
+deceleration	减速度
+rotation	旋转
+direction	方向
+flow	流量
+level	液位
+volume	容积
+distance	距离
+time	时间
+counter	计数器
+count	计数
+status	状态
+state	状态
+data	数据
+signal	信号
+signals	信号
+value	数值
+values	数值
+threshold	阈值
+limit	限值
+range	范围
+input	输入
+output	输出
+activation	驱动
+deactivation	停用
+monitoring	监控
+adjustment	调节
+adaptation	自适应
+calibration	校准
+initialization	初始化
+initialisation	初始化
+coding	编码
+programming	编程
+configuration	配置
+identification	识别
+version	版本
+variant	变体
+function	功能
+operation	运行
+operating	工作
+active	激活
+inactive	未激活
+activated	已激活
+deactivated	已停用
+enabled	已启用
+disabled	已禁用
+detected	已检测到
+present	存在
+available	可用
+received	已接收
+exceeded	已超出
+excessively high	过高
+excessively low	过低
+too high	过高
+too low	过低
+incorrect	错误
+unexpected	非预期
+unexpectedly	异常
+correct	正确
+normal	正常
+abnormal	异常
+maximum	最大
+minimum	最小
+ground	搭铁
+earth	搭铁
+front	前部
+rear	后部
+left	左侧
+right	右侧
+upper	上部
+lower	下部
+inside	内部
+outside	外部
+centre	中央
+center	中央
+central	中央
+driver assistance	驾驶辅助
+driver temperature sensor	驱动器温度传感器
+output stage driver	输出级驱动器
+passenger	乘客
+door	车门
+window	车窗
+mirror	后视镜
+seat	座椅
+roof	车顶
+tailgate	尾门
+bonnet	发动机盖
+hood	发动机盖
+trunk	行李厢
+headlight	前照灯
+headlights	前照灯
+lamp	灯
+light	灯
+lighting	照明
+heater	加热器
+heating	加热
+cooling	冷却
+airbag	安全气囊
+brake	制动
+brakes	制动
+steering	转向
+suspension	悬架
+damper	减振器
+dampers	减振器
+spring	弹簧
+wheel	车轮
+wheels	车轮
+tyre	轮胎
+tire	轮胎
+engine	发动机
+transmission	变速箱
+gearbox	变速箱
+clutch	离合器
+cylinder	气缸
+camshaft	凸轮轴
+crankshaft	曲轴
+injector	喷油器
+ignition	点火
+fuel	燃油
+diesel	柴油
+petrol	汽油
+gasoline	汽油
+oil	油
+coolant	冷却液
+refrigerant	制冷剂
+air	空气
+exhaust	排气
+catalytic converter	催化转化器
+catalyst	催化器
+particulate filter	颗粒捕集器
+filter	滤清器
+flap	翻板
+fan	风扇
+blower	鼓风机
+compressor	压缩机
+condenser	冷凝器
+evaporator	蒸发器
+radiator	散热器
+thermostat	节温器
+thermostatic switch	温控开关
+battery	蓄电池
+charging	充电
+charger	充电机
+alternator	发电机
+starter	起动机
+inverter	逆变器
+converter	转换器
+capacitor	电容器
+contactor	接触器
+cell	单体
+terminal	端子
+bus	总线
+network	网络
+ethernet	以太网
+antenna	天线
+radar	雷达
+camera	摄像头
+display	显示屏
+audio	音频
+speaker	扬声器
+amplifier	放大器
+microphone	麦克风
+telephone	电话
+navigation	导航
+telematics	远程通信
+vehicle	车辆
+trailer	挂车
+interior	车内
+exterior	车外
+comfort	舒适
+safety	安全
+assistance	辅助
+start	启动
+stop	停止
+starting	启动
+stopping	停止
+shutdown	关闭
+restart	重新启动
+test	测试
+mode	模式
+memory	存储器
+entry	记录
+learned	已学习
+learning	学习
+authentication	认证
+certificate	证书
+certificates	证书
+type	类型
+number	编号
+channel	通道
+stage	级
+or	或
+and	和
+not	不
+no	无
+with	与
+without	无
+from	来自
+to	至
+at	位于
+in	在
+of	的
+for	用于
+is	为
+the	
+has	有
+was	曾
+line	线路
+circuit	电路
+control	控制
+side	侧
+supply	供电
+sensors	传感器
+request	请求
+diagnosis	诊断
+wrong	错误
+protection	保护
+during	期间
+actuation	驱动
+auxiliary	辅助
+interface	接口
+due to	由于
+check	检查
+drivetrain	动力传动系统
+drive train	动力传动系统
+driving dynamics	行驶动态
+Hall sensor	霍尔传感器
+detection	检测
+nominal value	标称值
+actual	实际
+condition	条件
+conditions	条件
+ultrasonic	超声波
+slave	从节点
+master	主节点
+plausible	可信
+defined	已定义
+below	低于
+above	高于
+excessive	过大
+high	高
+low	低
+control panel	控制面板
+control valve	控制阀
+control current	控制电流
+control voltage	控制电压
+control pressure	控制压力
+control deviation	控制偏差
+position control	位置控制
+speed control	速度控制
+idle speed	怠速
+idling speed	怠速
+engine oil	机油
+motor oil	机油
+drive motor	驱动电机
+electric window	电动车窗
+electrical steering	电动转向
+electric steering	电动转向
+steering-torque sensor	转向扭矩传感器
+positive terminal	正极端子
+negative terminal	负极端子
+ambient pressure	环境压力
+atmospheric pressure	大气压力
+intake manifold	进气歧管
+exhaust manifold	排气歧管
+inlet camshaft	进气凸轮轴
+intake camshaft	进气凸轮轴
+exhaust camshaft	排气凸轮轴
+inlet valve	进气阀
+exhaust valve	排气阀
+supervision	监控
+object data	目标数据
+lane detection	车道检测
+object detection	目标检测
+function status	功能状态
+dynamic stability control	动态稳定控制
+air suspension	空气悬架
+ride height	车身高度
+wheel bearing	车轮轴承
+wheel electronics	车轮电子装置
+automatic transmission	自动变速箱
+manual transmission	手动变速箱
+cooling system	冷却系统
+exhaust system	排气系统
+exhaust emission	排放
+starter motor	起动机
+electric fuel pump	电动燃油泵
+electrical fuel pump	电动燃油泵
+power distribution	配电
+power window	电动车窗
+power windows	电动车窗
+power steering	助力转向
+power electronics	功率电子装置
+power stage	功率级
+terminal status	端子状态
+bus off	总线关闭
+bus-off	总线关闭
+shorted	短路
+short to battery	对蓄电池短路
+too long	过长
+too short	过短
+deviation	偏差
+interruption	中断
+interrupted	已中断
+interference	干扰
+disturbance	干扰
+disruption	中断
+disconnected	断开
+connected	连接
+connection ended unexpectedly	连接异常终止
+communication ended unexpectedly	通信异常终止
+line IFFH short to ground or RM IV	IFFH线路对地短路或RM IV
+line IFBH short to ground or RM IV	IFBH线路对地短路或RM IV
+current status	当前状态
+current state	当前状态
+current gear	当前挡位
+current fault	当前故障
+current measurement	电流测量
+current limit	电流限值
+current too high	电流过大
+current too low	电流过小
+current excessively high	电流过大
+current excessively low	电流过小
+cylinder bank	气缸列
+memory bank	存储区
+positive torque	正扭矩
+negative torque	负扭矩
+negative pressure	负压
+positive pressure	正压
+on driver's side	驾驶员侧
+on passenger's side	乘客侧
+ignition on	点火开关接通
+ignition off	点火开关关闭
+switched on	已接通
+switched off	已关闭
+switch on	接通
+switch off	关闭
+short to B+ or ground	对B+或对地短路
+short circuit to B+ or ground	对B+或对地短路
+fault in plausibility	可信度故障
+signal quality poor	信号质量差
+signal quality is poor	信号质量差
+low signal quality	信号质量低
+poor signal quality	信号质量差
+weak signal quality	信号质量弱
+link of low quality	链路质量低
+signal quality is low	信号质量低
+signal quality degraded	信号质量下降
+signal quality reduced	信号质量降低
+signal quality too low	信号质量过低
+signal quality insufficient	信号质量不足
+signal quality bad	信号质量差
+link quality poor	链路质量差
+link quality is poor	链路质量差

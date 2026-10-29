@@ -419,7 +419,7 @@ class Canvas {
      */
     text(str, x, y, size, c, opts) {
         opts = opts || {};
-        const s = t(str);
+        const s = opts.literal ? String(str) : t(str);
         const f = fonts.get(opts.font || 'label', size, s);
         if (!f) return 0;
         c = rgba(c);
@@ -437,7 +437,7 @@ class Canvas {
     }
 
     textWidth(str, size, opts) {
-        const s = t(str), f = fonts.get((opts && opts.font) || 'label', size, s);
+        const s = opts && opts.literal ? String(str) : t(str), f = fonts.get((opts && opts.font) || 'label', size, s);
         return f ? fonts.measure(f, s) * (size / f.size) + ((opts && opts.spacing) || 0) * Math.max(0, s.length - 1) : 0;
     }
 

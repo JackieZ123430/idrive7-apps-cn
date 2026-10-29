@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-29",
+  "database_sha256": "206da522f83c48539eb9ac0ee02d7c859a7080b0b1c50cf76df05451a3930c55",
+  "database_unique": 86735,
+  "translated_prose": 86716,
+  "preserved_identifier_only": 19,
+  "method": "diagnostic phrase glossary, contextual ambiguity rules, offline M2M100 translation of remaining prose spans, manual scan overrides",
+  "model_repo": "keisuke-miyako/m2m100_418M-ct2-int8",
+  "model_revision": "d1eca4826e8939f93f1390bae9e71b473d8a18ff",
+  "model_license": "MIT; model weights not shipped",
+  "hex_ids_lost": 0,
+  "review_status": "automated structural checks and representative review; not individually human reviewed"
+}
