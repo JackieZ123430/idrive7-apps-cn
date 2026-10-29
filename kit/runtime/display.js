@@ -98,6 +98,7 @@ class Display {
         this.screen = canvasScreens[0] || null;
         if (!this.screen) return;
         this.ui.onVisible((name, v) => {
+            if (name === 'SETTINGS') { this._syncVisible(); if (!v) this._lost(); return; }
             if (name !== this.screen.name) return;
             if (v) this.barOff = 0;                   // the HMI builds the screen afresh
             if (!v) this.closeSheet();
@@ -538,7 +539,10 @@ class Display {
     }
 
     /** the screen is up and not covered by an HMI popup */
-    _shown() { return this.ui.isVisible(this.screen.name) && (!this.ui.hasFocus || this.ui.hasFocus(this.screen.name)); }
+    _shown() {
+        // the HMI's settings screen over ours (no drawn settings: another renderer, software): it shows, not our picture
+        return this.ui.isVisible(this.screen.name) && !this.ui.isVisible('SETTINGS') && (!this.ui.hasFocus || this.ui.hasFocus(this.screen.name));
+    }
 
     _syncVisible() {
         if (!this.gpu) return;

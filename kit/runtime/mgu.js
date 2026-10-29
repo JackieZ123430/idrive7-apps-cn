@@ -587,8 +587,10 @@ async function runInner(impl) {
         },
     };
 
-    // visibility of our states (pauses rendering when the user leaves)
-    (SPEC.screens || []).forEach((s) => {
+    // visibility of our states (pauses rendering when the user leaves); the HMI's settings screen too (the
+    // drawn screen gives way to it: display.js)
+    const tracked = (SPEC.screens || []).concat(SPEC.settings && SPEC.settings.length ? [{ name: 'SETTINGS' }] : []);
+    tracked.forEach((s) => {
         const st = ui.comp(s.name);
         if (st && st.on) st.on('visible', (ev) => ui._setVisible(s.name, !!(ev && ev.visible)));
         // a popup over the screen (options, warnings, calls) takes its focus: the display hides
@@ -600,7 +602,7 @@ async function runInner(impl) {
         Promise.resolve().then(() => (shown ? app.registerHmiVisible() : app.unregisterHmiVisible()))
             .catch((e) => log.warn('hmi visible: ' + e));
         const open = [].concat.apply([], Object.keys(stack || {}).map((k) => stack[k] || []));
-        (SPEC.screens || []).forEach((s) => {
+        tracked.forEach((s) => {
             const st = ui.comp(s.name);
             if (st) ui._setVisible(s.name, open.indexOf(st.getId ? st.getId() : -1) >= 0);
             // back in front (reopened after Home or another app): the HMI does not always say the

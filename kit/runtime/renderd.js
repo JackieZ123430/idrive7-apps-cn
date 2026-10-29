@@ -22,7 +22,11 @@ const fs = require('fs');
 const EventEmitter = require('events');
 const rec = require('./record');
 
-const SOCKET = process.env.MGU_RENDERD_SOCKET || '/run/mgu-renderd/renderd.sock';
+// the Store's renderer (mgu-render) first, then the community socket (an older renderer, or mgu-render's
+// link): an older renderer still installed beside mgu-render never gets the apps
+const SOCKETS = process.env.MGU_RENDERD_SOCKET ? [process.env.MGU_RENDERD_SOCKET] : ['/run/mgu-render/render.sock', '/run/mgu-renderd/renderd.sock'];
+const SOCKET = SOCKETS[SOCKETS.length - 1];
+const isSocket = (p) => { try { return fs.statSync(p).isSocket(); } catch (e) { return false; } };
 const M = { HELLO: 1, PLACE: 2, SHOW: 3, ATLAS: 4, RAMP: 5, LAYER: 6, FRAME: 7, DROP_LAYER: 8, IMAGE: 9, GRAB: 10 };
 const E = { READY: 101, TICK: 102, ERROR: 103, STATS: 104, CCU: 105 };
 // touch (mgu-render, IterioDev's mgu-renderd): message 9 is CLAIM there; 105 and 106 come back as TOUCH and CLOSED
@@ -67,7 +71,7 @@ class RenderClient extends EventEmitter {
     }
 
     /** Socket exists (the renderer is installed and running)? */
-    static available(path) { try { return fs.statSync(path || SOCKET).isSocket(); } catch (e) { return false; } }
+    static available(path) { return path ? isSocket(path) : SOCKETS.some(isSocket); }
 
     connect() {
         if (this.opts.file) {
@@ -78,7 +82,11 @@ class RenderClient extends EventEmitter {
             setImmediate(() => this.emit('ready', this.screen));
             return this;
         }
-        const path = this.opts.socket || SOCKET;
+        // the first socket there; one nobody listens on (a stopped renderer's) passes to the next
+        const list = this.opts.socket ? [this.opts.socket] : SOCKETS.filter(isSocket);
+        if (!list.length) list.push(SOCKET);
+        const path = list[(this.at || 0) % list.length];
+        if (path !== this.path) { this.path = path; this.log.info('renderd: socket ' + path); }
         const s = net.createConnection(path);
         this.sock = s;
         s.on('connect', () => {
@@ -94,7 +102,10 @@ class RenderClient extends EventEmitter {
             if (this.grabbing && !this.opts.native) this._write(this._u32msg(M.GRAB, [1]));
         });
         s.on('data', (d) => this._data(d));
-        s.on('error', (e) => { if (!this.errLogged) { this.errLogged = true; this.log.warn('renderd: ' + e.message); } });
+        s.on('error', (e) => {
+            if (!this.connected) this.at = (this.at || 0) + 1;      // the next socket at the next try
+            if (!this.errLogged) { this.errLogged = true; this.log.warn('renderd: ' + e.message); }
+        });
         s.on('close', () => {
             const was = this.ready;
             this.connected = this.ready = this.native = false; this.sock = null; this.waiting = false; this.onScreen = null;
@@ -300,4 +311,4 @@ class RenderClient extends EventEmitter {
     }
 }
 
-module.exports = { RenderClient, SOCKET };
+module.exports = { RenderClient, SOCKET, SOCKETS };
