@@ -1,5 +1,12 @@
 # mgu-render changelog
 
+## idrive7-apps mgu-renderd 2.1.2
+
+- Installed from the Store (idrive7-renderd 2.1.2, which every app requires), it removes the old renderer it replaces
+  (`idrive7-renderd-install.sh`, its postInstall, at every install): the kit installer's `mgu-renderd.service` and its
+  enablement, `/var/opt/mgu-renderd/mgu-renderd` and the unit copies set aside in `/var/opt/mgu-renderd/retired/`. A
+  `mgu-renderd` the Store installed itself stays. Then the HMI page template is made, as before.
+
 ## idrive7-apps mgu-renderd 2.1.1
 
 - The HMI page template, its folder and the boot's copy of the HMI's widgets are readable by the HMI's user (0644
