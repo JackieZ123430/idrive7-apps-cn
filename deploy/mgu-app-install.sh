@@ -454,7 +454,7 @@ RuntimeDirectoryMode=0755
 ExecStartPre=/bin/sh -c 'until [ -S /run/wayland/wayland-0 ]; do sleep 1; done'
 ExecStart=$RENDERD_DIR/mgu-renderd -s socket_path=/run/mgu-renderd/renderd.sock -s socket_group=$APP_GID -s embed_marker=$EMBED_RUN/hmi-template
 # a stopped renderer leaves no touch divert behind (only its own table)
-ExecStopPost=-/bin/sh -c 'nft delete table ip mgu_render 2>/dev/null; true'
+ExecStopPost=-/bin/sh -c 'nft delete table ip idrive7_render 2>/dev/null; true'
 Restart=always
 RestartSec=3
 TimeoutStartSec=150

@@ -11,7 +11,9 @@
  * from port 30571, which the VM rule skips so nothing loops). Non-finger PDUs always go to the HMI. One finger.
  *
  * Beside IterioDev's renderer, which diverts the same PDUs with its own rule (table ip touchroute, ports 30568 in
- * and 30569 out): ours has its own table (ip mgu_render) and ports, so neither removes the other's rule or takes
+ * and 30569 out), and beside the other mgu-render (the Store's: table ip mgu_render, 30570 and 30571; idrive7-apps'
+ * kit renderer: table ip idrive7_render, 30572 and 30573; touch_table and touch_port, touch_ports()):
+ * ours has its own table and ports, so neither removes the other's rule or takes
  * the other's port. Each diverts only while one of its own apps is shown with claims, so they take turns. Were
  * both in at once, the first chain to see a PDU takes it; on lo our rule lets IterioDev's re-injections (from
  * 30569) through as well as ours, and his catches ours, so a PDU passes each renderer at most once.
@@ -39,8 +41,12 @@
 #include <unistd.h>
 #include "touch.h"
 
-enum { PORT_HMI = 30567, PORT_IN = 30570, PORT_OUT = 30571, PORT_OTHER_OUT = 30569, GUARD_MS = 1500 };
-#define TABLE "ip mgu_render"
+/* re-injections of the other renderers: IterioDev's (30569), the Store's mgu-render (30571), the kit's (30573) */
+enum { PORT_HMI = 30567, PORT_OTHER_OUT = 30569, PORT_STORE_OUT = 30571, PORT_KIT_OUT = 30573, GUARD_MS = 1500 };
+static int port_in = 30572, port_out = 30573;
+static char table[48] = "ip idrive7_render";
+#define PORT_IN port_in
+#define PORT_OUT port_out
 enum { DOWN = 1, MOVE = 2, UP = 3 };
 enum { NONE = -1, HMI = -2, GONE = -3 };       /* gesture owner, else a client slot; GONE: its app left */
 
@@ -66,11 +72,20 @@ static int rule_in(void)
 {
     if (open_fw[0] && system(open_fw) != 0) fprintf(stderr, "[mgu-render] touch: opening the firewall for %d failed\n", PORT_IN);
     char s[768];
-    snprintf(s, sizeof s, "table " TABLE "\ndelete table " TABLE "\ntable " TABLE " {\n"
-        "chain pre {\ntype filter hook prerouting priority -300; policy accept;\n%s\n}\n}\n", rule);
+    snprintf(s, sizeof s, "table %s\ndelete table %s\ntable %s {\n"
+        "chain pre {\ntype filter hook prerouting priority -300; policy accept;\n%s\n}\n}\n", table, table, table, rule);
     return nft(s);
 }
-static void rule_out(void) { nft("table " TABLE "\ndelete table " TABLE "\n"); }
+static void rule_out(void) { char s[160]; snprintf(s, sizeof s, "table %s\ndelete table %s\n", table, table); nft(s); }
+
+int touch_ports(int in_port, const char *name)
+{
+    if (in_port < 1024 || in_port > 65534 || in_port == PORT_HMI || !name || !*name || strlen(name) > 32) return -1;
+    for (const char *q = name; *q; q++) if (!((*q >= 'a' && *q <= 'z') || (*q >= '0' && *q <= '9') || *q == '_')) return -1;
+    port_in = in_port; port_out = in_port + 1;
+    snprintf(table, sizeof table, "ip %s", name);
+    return 0;
+}
 
 /* The guard: beats are '0' (no rule) / '1' (rule in). Dead renderer (pipe closed) -> rule out; hung with the
  * rule in -> rule out + kill it. A hang without the rule (start-up, nothing claimed) touches nobody's input. */
@@ -105,9 +120,9 @@ static int touch_rules(const char *iface, const char *saddr)
     for (const char *q = saddr; q && *q; q++) if (!((*q >= '0' && *q <= '9') || *q == '.')) return -1;
     if (!strcmp(iface, "lo")) {
         /* the HMI's touch comes from a local sender: re-injections (ours from PORT_OUT, IterioDev's renderer's from
-         * PORT_OTHER_OUT) go on to the HMI */
-        snprintf(rule, sizeof rule, "iifname \"lo\" udp sport { %d, %d } accept\n"
-                 "iifname \"lo\" udp dport %d notrack udp dport set %d", PORT_OTHER_OUT, PORT_OUT, PORT_HMI, PORT_IN);
+         * PORT_OTHER_OUT, the other mgu-render's) go on to the HMI */
+        snprintf(rule, sizeof rule, "iifname \"lo\" udp sport { %d, %d, %d } accept\n"
+                 "iifname \"lo\" udp dport %d notrack udp dport set %d", PORT_OTHER_OUT, PORT_STORE_OUT, PORT_KIT_OUT, PORT_HMI, PORT_IN);
         open_fw[0] = 0;
     } else {
         char src[64] = "";
@@ -130,7 +145,7 @@ int touch_init(const char *iface, const char *saddr, const int area[4])
     in = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
     out = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
     if (bind(in, (struct sockaddr *)&a, sizeof a) || bind(out, (struct sockaddr *)&o, sizeof o)) {
-        perror("touch: bind 30570/30571"); close(in); close(out); in = out = -1; return -1;
+        fprintf(stderr, "touch: bind %d/%d: ", PORT_IN, PORT_OUT); perror(NULL); close(in); close(out); in = out = -1; return -1;
     }
     int p[2];
     pid_t me = getpid();

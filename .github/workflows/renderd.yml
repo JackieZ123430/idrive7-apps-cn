@@ -1,0 +1,37 @@
+# Builds the apps' GPU renderer (kit/renderd: mgu-renderd and the controller gate) in its Ubuntu 18.04 container and
+# runs its tests, on branches other than main and by hand. The binaries are kept as the run's artifact, to be
+# committed as kit/renderd/prebuilt/ (with SOURCE_SHA256 from kit/tools/make_kit.py). Publishes nothing.
+name: Renderer
+
+on:
+  push:
+    branches-ignore: [main]
+    paths: ["kit/renderd/**", ".github/workflows/renderd.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (Ubuntu 18.04 container)
+        working-directory: kit/renderd
+        run: |
+          docker build -q -t mgu-renderd-build docker >/dev/null
+          docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" -w /src mgu-renderd-build make
+          ls -l build
+      - name: Check the binary
+        working-directory: kit/renderd
+        run: make check-target
+      - name: Tests
+        working-directory: kit/renderd
+        run: make test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mgu-renderd
+          path: |
+            kit/renderd/build/mgu-renderd
+            kit/renderd/build/mgu-inputgate.so

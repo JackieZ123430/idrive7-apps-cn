@@ -53,8 +53,8 @@ static char *slurp(void)
 }
 static int count(const char *hay, const char *needle) { int n = 0; for (const char *p = hay; (p = strstr(p, needle)); p++) n++; return n; }
 /* rules loaded, and taken out (a load also deletes the table first, to replace it) */
-static int loads(void) { return count(slurp(), "table ip mgu_render {"); }
-static int outs(void) { return count(slurp(), "delete table ip mgu_render") - loads(); }
+static int loads(void) { return count(slurp(), "table ip idrive7_render {"); }
+static int outs(void) { return count(slurp(), "delete table ip idrive7_render") - loads(); }
 
 int main(void)
 {
@@ -71,18 +71,18 @@ int main(void)
 
     /* the car's rule and firewall line: our ports, the display's address */
     CHECK(touch_rules("vlan73", "160.48.199.115") == 0 &&
-          !strcmp(rule, "iifname \"vlan73\" ip saddr 160.48.199.115 udp dport 30567 notrack udp dport set 30570") &&
-          strstr(open_fw, "nft insert rule ip filter input iifname vlan73 ip saddr 160.48.199.115 udp dport 30570 accept"),
+          !strcmp(rule, "iifname \"vlan73\" ip saddr 160.48.199.115 udp dport 30567 notrack udp dport set 30572") &&
+          strstr(open_fw, "nft insert rule ip filter input iifname vlan73 ip saddr 160.48.199.115 udp dport 30572 accept"),
           "car rule: %s / %s", rule, open_fw);
 
     /* lo: our rule lets both renderers' re-injections through */
     const int area[4] = { 0, 0, 0, 0 };
     if (touch_init("lo", "", area) != 0) { printf("touch_init failed\n"); return 1; }
-    CHECK(strstr(rule, "iifname \"lo\" udp sport { 30569, 30571 } accept\n") &&
-          strstr(rule, "iifname \"lo\" udp dport 30567 notrack udp dport set 30570") && !open_fw[0], "lo rule: %s", rule);
+    CHECK(strstr(rule, "iifname \"lo\" udp sport { 30569, 30571, 30573 } accept\n") &&
+          strstr(rule, "iifname \"lo\" udp dport 30567 notrack udp dport set 30572") && !open_fw[0], "lo rule: %s", rule);
     CHECK(outs() == 1 && loads() == 0, "start: a leftover of ours is not removed");
     touch_tick(1);
-    CHECK(loads() == 1 && strstr(slurp(), "udp dport set 30570"), "claimed: rule not in");
+    CHECK(loads() == 1 && strstr(slurp(), "udp dport set 30572"), "claimed: rule not in");
     touch_tick(1);
     CHECK(loads() == 1, "claimed twice: loaded twice");
     touch_tick(0);

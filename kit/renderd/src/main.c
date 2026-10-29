@@ -1375,6 +1375,10 @@ static int touch_start(void) {
     if (!strcmp(iface, "auto")) snprintf(iface, sizeof iface, "%s", access("/sys/class/net/vlan73", F_OK) == 0 ? "vlan73" : "lo");
     int area[4];
     touch_defaults(area);
+    if (touch_ports(cfg.touch_port, cfg.touch_table) < 0) {
+        log_error("touch_port %d / touch_table '%s': a port 1024..65534 and a name of a-z, 0-9, _", cfg.touch_port, cfg.touch_table);
+        return 0;
+    }
     return touch_init(iface, strcmp(iface, "lo") ? cfg.touch_saddr : "", area) == 0;
 }
 

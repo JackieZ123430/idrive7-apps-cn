@@ -10,6 +10,9 @@
  * the emulator); saddr may be empty. area x,y,w,h (screen px) apps may claim, w 0 = all. Forks the guard: call
  * before the compositor connection. -1 = off. */
 int touch_init(const char *iface, const char *saddr, const int area[4]);
+/* the divert's table (ip <name>) and ports (in_port, in_port + 1) in place of the defaults; before touch_init.
+ * -1 for a bad name or port. */
+int touch_ports(int in_port, const char *name);
 int touch_fd(void);                  /* the diverted PDUs (poll it), -1 when off */
 void touch_read(void);               /* route what came in */
 void touch_tick(int claimed);        /* every loop turn: claimed = a visible app has claims -> rule in or out */

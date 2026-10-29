@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range, live battery power, cells and climate power, HV battery health (SOH) and energy, last charge, charge log, 12 V battery voltage and a home-screen widget",
-  "version": "2.6.6",
+  "version": "2.6.7",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",

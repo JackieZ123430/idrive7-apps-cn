@@ -1,5 +1,13 @@
 # mgu-render changelog
 
+## idrive7-apps mgu-renderd 2.1.0
+
+- Runs beside the MGU Store's mgu-render: the apps' renderer, the Store's its own. The touch divert has its own table
+  and ports (`touch_table`, `touch_port`: `ip idrive7_render`, 30572 in and 30573 out; the Store's stays `ip mgu_render`,
+  30570 and 30571), and on `lo` each lets the other's re-injections through. The units delete only that table when they stop.
+- The apps connect to `/run/mgu-renderd/renderd.sock` first, the Store's `/run/mgu-render/render.sock` only when theirs is not there.
+- In the Store the apps require it (idrive7-renderd 2.1.0), so updating the apps installs it again where it was removed.
+
 ## idrive7-apps mgu-renderd 2.0.0 (mgu-render 0.5.1)
 
 - This repository's renderer is now mgu-render, from robertnisipeanu/mgu-store `native/mgu-render` (1d9dfec), built

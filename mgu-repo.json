@@ -5,7 +5,7 @@
     "manifest": "app.json",
     "icon": "icon.png",
     "mguHmi": ["ID7"],
-    "requires": { "mgu-render": "0.5.3", "mgu-inputgate": "1.0.0" },
+    "requires": { "idrive7-renderd": "2.1.0", "mgu-inputgate": "1.0.0" },
     "build": {
       "python": "kit/tools/build.py",
       "args": ["{id}"],
@@ -18,9 +18,8 @@
     {
       "id": "idrive7-renderd",
       "path": "kit/renderd/prebuilt",
-      "title": "GPU renderer (kit)",
-      "description": "Only if the apps' screen does not show: if your screen works, do not install it. The kit's own copy of mgu-render; the Store's Renderer is used otherwise",
-      "optional": true,
+      "title": "GPU renderer",
+      "description": "The apps' own GPU renderer (mgu-render): draws them at 60 fps, beside the MGU Store's Renderer; installed with the apps",
       "provides": "renderer",
       "mguHmi": ["ID7"]
     },
@@ -31,7 +30,6 @@
       "title": "Controller gate",
       "description": "Lets the apps have the iDrive controller (tabs, page buttons, settings, Doom); loads into the HMI at the next start",
       "needs": ["renderer"],
-      "requires": { "mgu-render": "0.5.3" },
       "optional": false,
       "mguHmi": ["ID7"],
       "preload": {

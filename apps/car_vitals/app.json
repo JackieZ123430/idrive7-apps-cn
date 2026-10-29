@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
