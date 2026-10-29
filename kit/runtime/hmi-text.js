@@ -1,5 +1,4 @@
 'use strict';
-// Chinese Unicode support: Bilibili 小白151 / GitHub JackieZ123430.
 // RHMI Text is not a reliable Unicode transport on this firmware. Use the SDK's
 // UTF-8 StringBundle and StringId handles for non-ASCII values instead.
 const { t } = require('./i18n');

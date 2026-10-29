@@ -39,7 +39,7 @@ def main():
         from build_diagnostic_zh import catalog
         words.update(catalog())
     # Only the app's own translated glyphs, ASCII and its units/symbols: never the full CJK block.
-    credit_source = (ROOT / 'kit/runtime/credits.js').read_text(encoding='utf-8')
+    credit_source = (ROOT / 'kit/localization/credit.zh-CN.json').read_text(encoding='utf-8')
     chars = ''.join(sorted(set(baker.TEXT + ''.join(words.values()) + credit_source)))
     for size in (48, 44, 40, 36, 32):
         atlas = baker.bake(font.name, (500,), size, chars)

@@ -1,5 +1,4 @@
 'use strict';
-// 诊断汉化：小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430.
 // Never apply the instrument/UI word-replacement dictionary to diagnostic prose.
 const path = require('path');
 const { getLanguage, dict } = require('./kit/i18n');

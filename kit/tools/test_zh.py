@@ -7,6 +7,12 @@ import build
 from localize import unicode_resources, localize_spec, languages, load_locale
 
 root = Path(__file__).resolve().parent.parent.parent
+# The translation credit ships in Chinese builds only (build.py adds it from kit/localization/credit.zh-CN.json):
+# nothing every package carries (an app's folder, the kit runtime) names the translator.
+for shipped in sorted(list((root / 'apps').rglob('*')) + list((root / 'kit/runtime').rglob('*'))):
+    if shipped.is_file() and shipped.suffix in ('.js', '.json', '.py', '.md', '.txt', '.xml'):
+        text = shipped.read_text(encoding='utf-8', errors='ignore')
+        assert not any(n in text for n in ('JackieZ123430', '小白', '抖音')), shipped
 count = 0
 for manifest in sorted((root / 'apps').glob('*/app.json')):
     original = json.loads(manifest.read_text(encoding='utf-8'))
@@ -27,7 +33,7 @@ for manifest in sorted((root / 'apps').glob('*/app.json')):
         # translation credit: Chinese builds only; the project credit: every build
         cn = [k for k in strings if k.endswith('_CN_CREDITS_TITLE') or k.endswith('_CN_CREDITS_LINK')]
         if language == 'zh-CN':
-            assert '汉化 Translation by：抖音 小白科技杂物社 / BiliBili 小白151' in strings.values()
+            assert 'Translation by: 抖音 小白科技杂物社 / BiliBili 小白151' in strings.values()
             assert len(cn) == 2
         else:
             assert not cn and not any('JackieZ123430' in v or '小白' in v for v in strings.values())

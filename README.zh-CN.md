@@ -4,9 +4,9 @@
 
 <p align="center"><b>为 BMW MGU 主机（iDrive 7）打造的自定义应用，使用独立 GPU 渲染引擎，以真正的 60 fps 绘制。</b><br>同时提供一套完整的应用开发工具。</p>
 
-<p align="center"><b>中文翻译：抖音 小白科技杂物社 · BiliBili 小白151 · GitHub <a href="https://github.com/JackieZ123430">JackieZ123430</a></b></p>
+<p align="center"><b>Translation by：抖音 小白科技杂物社 · BiliBili 小白151 · GitHub <a href="https://github.com/JackieZ123430">JackieZ123430</a></b></p>
 
-> 本文完整翻译自同一提交中的 [英文 README](README.md)，保留原文的章节、示例、参数和媒体。原作者及第三方版权归各自权利人所有；中文翻译署名不替代原项目版权。另见 [中文汉化声明](NOTICE.zh-CN.md)。
+> 本文完整翻译自同一提交中的 [英文 README](README.md)，保留原文的章节、示例、参数和媒体。原作者及第三方版权归各自权利人所有；中文翻译署名不替代原项目版权。另见 [翻译署名与来源](NOTICE.zh-CN.md)。
 
 <p align="center">
   <img alt="60 fps" src="https://img.shields.io/badge/frame%20rate-60%20fps-2ea44f?style=for-the-badge">
@@ -214,7 +214,7 @@ node kit/tools/preview.js dist/redline preview wait=10   # 在电脑上预览 ->
 
 Windows 将 `python3` 换成 `python`。默认构建英文；`--language zh-CN` 将所有应用构建为简体中文，语言在构建时固定，不受车机语言设置影响。安装另一语言包相当于更新同一应用，不会另装一套。
 
-中文汉化：小白151（[JackieZ123430](https://github.com/JackieZ123430)，[idrive7-apps-cn](https://github.com/JackieZ123430/idrive7-apps-cn)）。本中文指南即 [README.zh-CN.md](README.zh-CN.md)。示例中的版本后缀会随应用版本和语言修订变化。
+Translation by：小白151（[JackieZ123430](https://github.com/JackieZ123430)，[idrive7-apps-cn](https://github.com/JackieZ123430/idrive7-apps-cn)）。本中文指南即 [README.zh-CN.md](README.zh-CN.md)。示例中的版本后缀会随应用版本和语言修订变化。
 
 `.mgu` 文件包含 BMW SDK，仅供自己的车机使用，请勿公开发布。
 
@@ -664,4 +664,4 @@ third_party/doomgeneric/  Doom's engine source (GPL-2.0) with the changes for th
 
 ---
 
-**中文翻译署名 / Translation credit：抖音 小白科技杂物社 · BiliBili 小白151 · GitHub [JackieZ123430](https://github.com/JackieZ123430)。**
+**Translation by：抖音 小白科技杂物社 · BiliBili 小白151 · GitHub [JackieZ123430](https://github.com/JackieZ123430)。**

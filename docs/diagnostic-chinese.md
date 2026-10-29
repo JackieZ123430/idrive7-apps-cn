@@ -68,8 +68,9 @@ budget and is copied only into the Simplified Chinese Fault Scanner package.
 
 ## Credits
 
-中文汉化：抖音 小白科技杂物社 / BiliBili 小白151 /
+Translation by: 抖音 小白科技杂物社 / BiliBili 小白151 /
 GitHub [JackieZ123430](https://github.com/JackieZ123430).
-Existing Chinese-only settings/header credits are retained. This document and
-README.zh-CN.md preserve attribution; the English app does not gain Chinese credits.
+The translation credit ships in Chinese (zh-CN) builds only: the settings rows, the
+header corner and the entry file's comment, all from `kit/localization/credit.zh-CN.json`.
+English builds carry no translation credit.
 The Noto Sans SC atlas retains the repository's existing OFL notice and license.

@@ -1,5 +1,4 @@
 'use strict';
-// Chinese localization: 抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430.
 const { t } = require('./i18n');
 
 /** Translate complete sentences before measuring or truncating them. */

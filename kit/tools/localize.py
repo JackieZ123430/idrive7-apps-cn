@@ -1,11 +1,16 @@
 """Fixed-language packages. Add a locales/<tag>.json catalog to build another language."""
-# Chinese contribution: 小白科技杂物社 / Bilibili 小白151 / GitHub JackieZ123430
+# Translation by: 抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430
 import copy
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 LOCALES = ROOT / 'kit/runtime/locales'
+
+
+def zh_credit():
+    """The translation credit (corner, settings rows, entry comment): Chinese (zh-CN) builds only."""
+    return json.loads((ROOT / 'kit/localization/credit.zh-CN.json').read_text(encoding='utf-8'))
 
 
 def languages():
@@ -72,7 +77,7 @@ def unicode_resources(ui, strings, language='en'):
     for key in strings:
         strings[key] = text(strings[key], words)
         if language == 'zh-CN' and key.endswith('_CN_CREDITS_TITLE'):
-            strings[key] = '汉化 Translation by：抖音 小白科技杂物社 / BiliBili 小白151'
+            strings[key] = zh_credit()['settingsTitle']
     for n in range(256):
         strings['SID_CN_DYNAMIC_%04d' % n] = ''
     if len(strings) > 1024:
