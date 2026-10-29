@@ -5,6 +5,7 @@
     "manifest": "app.json",
     "icon": "icon.png",
     "mguHmi": ["ID7"],
+    "requires": { "mgu-render": "0.5.3", "mgu-inputgate": "1.0.0" },
     "build": {
       "python": "kit/tools/build.py",
       "args": ["{id}"],
@@ -21,6 +22,8 @@
       "title": "Controller gate",
       "description": "Lets the apps have the iDrive controller (tabs, page buttons, settings, Doom); loads into the HMI at the next start",
       "needs": ["renderer"],
+      "requires": { "mgu-render": "0.5.3" },
+      "optional": false,
       "mguHmi": ["ID7"],
       "preload": {
         "library": "mgu-inputgate.so",
