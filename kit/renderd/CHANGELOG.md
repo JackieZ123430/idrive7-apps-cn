@@ -1,5 +1,16 @@
 # mgu-render changelog
 
+## idrive7-apps mgu-renderd 2.0.2
+
+- Beside mgu-store's mgu-render (`/var/opt/mgu-render/current/mgu-render`), the touch divert is mgu-render's: serving
+  the community socket, we leave its ports (30570/30571) and table (`ip mgu_render`) alone, and exit once (systemd
+  restarts us) when mgu-render is installed or removed while we run, to hand them over. The units' `ExecStopPost`
+  deletes the table only without mgu-render.
+- Serving the community socket, our layers and surfaces use the community renderer's ivi ids (`0x4d470000`,
+  `0x4d470100`), so no app of ours shares an id with one of mgu-render's.
+- `mgu-app-install.sh renderd` removes an `idrive7-renderd` installed through the Store (with the Store's deploy tool)
+  before installing its own.
+
 ## idrive7-apps mgu-renderd 2.0.1
 
 - From mgu-render 0.6.1: the HMI page template, its folder and the boot's copy are readable by the HMI's user

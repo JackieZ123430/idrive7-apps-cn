@@ -68,8 +68,12 @@
 
 #define MAX_CLIENTS 16
 #define MAX_MSG (24u << 20)
-#define LAYER_BASE 0x4d520000u      /* "MR"; the community renderers use "MG", 0x4d470000 and 0x4d470100 */
-#define SURF_BASE 0x4d520100u
+#define LAYER_BASE layer_base      /* "MR"; the community renderers use "MG", 0x4d470000 and 0x4d470100 */
+#define SURF_BASE surf_base
+static uint32_t layer_base = 0x4d520000u, surf_base = 0x4d520100u;
+/* idrive7-apps: serving the community socket itself (as idrive7-apps' mgu-renderd), beside mgu-store's mgu-render */
+#define MGU_RENDER_INSTALLED "/var/opt/mgu-render/current/mgu-render"
+static int community;
 #define WATCHDOG_US 3000000ull       /* an app on screen that says nothing for this long is hidden */
 #define GRAB_US 1500000ull           /* a GRAB holds this long unless repeated */
 #define GATE_TOUCH_US 200000ull      /* the controller gate's file is refreshed this often while held */
@@ -1422,8 +1426,19 @@ static void beside_binary(int gate_given) {
             if (access(js, R_OK) == 0) snprintf(cfg.foreground_gate, sizeof cfg.foreground_gate, "/usr/bin/node %s", js);
         }
     }
-    if (cfg.shared_path[0] && !strcmp(cfg.shared_path, cfg.socket_path)) cfg.shared_path[0] = 0;
+    if (cfg.shared_path[0] && !strcmp(cfg.shared_path, cfg.socket_path)) {
+        cfg.shared_path[0] = 0;
+        /* the community renderer's ivi ids ("MG", as idrive7-apps' first renderer), so an app of ours and one of an
+         * installed mgu-render never share a layer or surface */
+        community = 1;
+        layer_base = 0x4d470000u; surf_base = 0x4d470100u;
+    }
 }
+
+/* idrive7-apps: the touch divert (its ports 30570/30571 and table ip mgu_render, the same in both) is mgu-render's
+ * while mgu-render is installed beside us: we leave it alone. Installed or removed while we run: we exit, and
+ * systemd (Restart=always) starts us again with the divert handed over. */
+static int touch_wanted(void) { return cfg.touch && !(community && access(MGU_RENDER_INSTALLED, F_OK) == 0); }
 
 static void usage(const char *a0) {
     fprintf(stderr, "usage: %s [-c FILE] [-s key=value]... [-v] [--share | --unshare] | --replay FILE --out FILE.pam [--raw FILE.rgba] [--uid N]\n", a0);
@@ -1478,7 +1493,9 @@ int main(int argc, char **argv) {
     if (!comp || !iapp || !ictl) { log_error("compositor lacks wl_compositor / ivi_application / ivi_controller"); return 1; }
     log_info("compositor: %d screens, centre output %dx%d", nscreens, screen_w, screen_h);
     /* forks the guard: before the GL driver loads */
-    if (cfg.touch) touch_on = touch_start();
+    int touch_want = touch_wanted();
+    if (cfg.touch && !touch_want) log_info("touch: left to mgu-render (installed beside us)");
+    if (touch_want) touch_on = touch_start();
     if (egl_setup((EGLNativeDisplayType)dpy, 0) < 0) return 1;
     /* a context needs a surface to be made current on some drivers: a tiny one for resources and embed mode */
     struct wl_surface *ts = wl_compositor_create_surface(comp);
@@ -1516,7 +1533,13 @@ int main(int argc, char **argv) {
         render_embed();
         ctl_gate_update(tnow);
         if (touch_on) touch_tick(any_claim());
-        if (tnow >= share_next) { share_next = tnow + SHARE_US; share_tick(); }
+        if (tnow >= share_next) {
+            share_next = tnow + SHARE_US; share_tick();
+            if (touch_wanted() != touch_want) {
+                log_info("mgu-render %s: restarting to hand the touch divert over", touch_want ? "installed" : "removed");
+                quit = 1;
+            }
+        }
         if (cfg.foreground_gate[0] && gate_fd() < 0 && tnow > gate_retry) {
             gate_retry = tnow + 5000000;
             gate_start(cfg.foreground_gate);

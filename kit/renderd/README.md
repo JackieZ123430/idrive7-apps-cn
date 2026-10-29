@@ -138,9 +138,16 @@ beside itself; `-s foreground_gate=` turns the gate off. `deploy-car.sh restore`
 **Through the Store** (`mgu-repo.json`, tool `idrive7-renderd`): the same, packed by
 [`prebuilt/component.json`](prebuilt/component.json) with the units in `prebuilt/`
 (`idrive7-renderd.service`, `idrive7-renderd-hmi.service`), in `/var/opt/idrive7-renderd/current/`;
-the template is made by the install (`postInstall`, needs mgu-deploy 0.6.1). mgu-store's own
-mgu-render is the same engine: install one of the two (with both, the community socket is ours and
-mgu-render puts its page template in instead of ours).
+the template is made by the install (`postInstall`, needs mgu-deploy 0.6.1).
+
+**Updating, and other renderers.** Any order works, and each was tested on the VM through a cold start:
+
+| on the unit | what happens |
+|---|---|
+| this repository's earlier renderer (installer) | `renderd --persist` (and `deploy-car.sh`) replaces it in place: program, unit (root now), files |
+| `idrive7-renderd` installed through the Store | `renderd --persist` removes it through the Store's own deploy tool (the Store then shows it removed), then installs its own |
+| the installer's renderer, then `idrive7-renderd` from the Store | the Store takes it over (removes the installer's unit and program); the installer's template unit stands down |
+| mgu-store's own **mgu-render** beside ours, in either order | both run. mgu-render serves the apps that use its socket (this kit's apps prefer it) and has the page template and touch; ours keeps the community socket for older apps, on its own ivi ids (`0x4d470000`/`0x4d470100`, as the first renderer), and leaves touch alone. mgu-render installed or removed while ours runs: ours restarts once (systemd starts it again at once) to hand the touch ports over |
 
 ### In-page drawing: the page template
 

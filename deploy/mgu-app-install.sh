@@ -454,7 +454,7 @@ RuntimeDirectoryMode=0755
 ExecStartPre=/bin/sh -c 'until [ -S /run/wayland/wayland-0 ]; do sleep 1; done'
 ExecStart=$RENDERD_DIR/mgu-renderd -s socket_path=/run/mgu-renderd/renderd.sock -s socket_group=$APP_GID -s embed_marker=$EMBED_RUN/hmi-template
 # a stopped renderer leaves no touch divert behind (only its own table)
-ExecStopPost=-/bin/sh -c 'nft delete table ip mgu_render 2>/dev/null; true'
+ExecStopPost=-/bin/sh -c '[ -e /var/opt/mgu-render/current/mgu-render ] || nft delete table ip mgu_render 2>/dev/null; true'
 Restart=always
 RestartSec=3
 TimeoutStartSec=150
@@ -473,9 +473,25 @@ rootfs_rw_do() {   # run "$@" with / writable (remounts rw only if it has to)
     return $r
 }
 
+# This repository's renderer installed earlier through mgu-store (tool idrive7-renderd): one of ours is
+# enough, two fight over the socket and the controller. Removed through the Store's own deploy tool, so the
+# Store knows it is gone (it can be installed from the Store again later: it then takes this one over).
+retire_store_renderer() {
+    [ -e /var/opt/idrive7-renderd/current ] || [ -e /etc/systemd/system/idrive7-renderd.service ] || return 0
+    if [ -f /var/opt/mgu-deploy/mgu-deploy.sh ]; then
+        say "removing the renderer installed through the Store (idrive7-renderd): this one replaces it"
+        if sh /var/opt/mgu-deploy/mgu-deploy.sh uninstall idrive7-renderd --yes > "$TMP.dep" 2>&1; then
+            rm -f "$TMP.dep"; return 0
+        fi
+        sed 's/^/    /' "$TMP.dep" >&2; rm -f "$TMP.dep"
+    fi
+    die "the Store's idrive7-renderd is installed and could not be removed: remove it in the Store, then run this again"
+}
+
 install_renderd() {
     src=$SELF_DIR/mgu-renderd
     [ -f "$src" ] || die "mgu-renderd not found next to $0"
+    retire_store_renderer
     # everything is put in place first and the running renderer is restarted only at the end, in
     # one step (the apps draw in software only for those few seconds); unchanged: not restarted
     same=0; cmp -s "$src" "$RENDERD_DIR/mgu-renderd" 2>/dev/null && same=1

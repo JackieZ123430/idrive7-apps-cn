@@ -1,7 +1,7 @@
 {
   "id": "idrive7-renderd",
   "kind": "tool",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "title": "GPU renderer",
   "description": "Draws the apps at 60 fps with the GPU (mgu-render), over the HMI or inside the app's page; without it they draw in software",
   "mguProvides": "renderer",
