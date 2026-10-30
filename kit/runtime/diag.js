@@ -71,20 +71,23 @@ class Diag extends EventEmitter {
      * functional request a few seconds after the first: APP_REQUEST_TEMPORARILY_NOT_ACCEPTED), so
      * such a verdict is retried a few times with a growing pause (1, 2, 3, 4 s).
      */
-    async send(target, sid, data) {
+    async send(target, sid, data, opts) {
         if (!this.p) throw new Error(this.error || 'no diagnostic link');
         const d = data || [];
+        const maxRetries = opts && opts.maxRetries != null ? opts.maxRetries : 4;
+        const callTimeoutMs = opts && opts.callTimeoutMs || 8000;
+        const retryBaseMs = opts && opts.retryBaseMs || 1000;
         if (!this.quiet) this.log.info('UDS -> ' + hex(target) + ': ' + hex(sid) + ' ' + d.map((x) => hex(x)).join(' '));
         for (let attempt = 0; ; attempt++) {
             const r = await this.signals.call(this.p, 'sendTasuRequest', {
                 sourceAddress: TESTER, targetAddress: target, serviceID: sid, subroutineID: 0,
                 udsDataLength: d.length, udsData: Buffer.from(d), deadlockTime: 0,
-            }, 8000);
+            }, callTimeoutMs);
             const v = r && typeof r === 'object' ? (r.TasuErrorEnum || Object.keys(r).map((k) => r[k]).find((x) => typeof x === 'string')) : r;
             const verdict = v === undefined ? 'NO_ERROR' : String(v);
-            if (!/TEMPORARILY_NOT_ACCEPTED|BUSY/i.test(verdict) || attempt >= 4) return verdict;
+            if (!/TEMPORARILY_NOT_ACCEPTED|BUSY/i.test(verdict) || attempt >= maxRetries) return verdict;
             this.log.info('transport busy (' + verdict + '), retrying');
-            await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
+            await new Promise((res) => setTimeout(res, retryBaseMs * (attempt + 1)));
         }
     }
 
@@ -124,20 +127,30 @@ class Diag extends EventEmitter {
      * accept(uds) (optional) skips replies that aren't ours - another app may be
      * talking to the same ECU at the same time.
      */
-    async physical(target, sid, data, timeoutMs, accept) {
-        let t, onFrame, finish;
+    async physical(target, sid, data, timeoutMs, accept, opts) {
+        let t, hardTimer, onFrame, finish, done = false;
         const got = new Promise((resolve) => {
-            finish = (v) => { clearTimeout(t); this.removeListener('frame', onFrame); resolve(v); };
+            finish = (v) => {
+                if (done) return;
+                done = true;
+                clearTimeout(t); clearTimeout(hardTimer);
+                this.removeListener('frame', onFrame); resolve(v);
+            };
             onFrame = (f) => {
                 if (f.ecu !== target) return;
-                if (f.uds[0] === 0x7F && f.uds[2] === 0x78) { clearTimeout(t); t = setTimeout(() => finish(null), 10000); return; }
+                if (f.uds[0] === 0x7F && f.uds[2] === 0x78) {
+                    clearTimeout(t);
+                    t = setTimeout(() => finish(null), opts && opts.pendingTimeoutMs || 10000);
+                    return;
+                }
                 if (accept && !accept(f.uds)) return;
                 finish(f.uds);
             };
             this.on('frame', onFrame);
+            if (opts && opts.hardTimeoutMs) hardTimer = setTimeout(() => finish(null), opts.hardTimeoutMs);
         });
-        try { this._check(await this.send(target, sid, data)); } catch (e) { finish(null); throw e; }
-        if (!t) t = setTimeout(() => finish(null), timeoutMs || 4000);       // from when the transport took it
+        try { this._check(await this.send(target, sid, data, opts)); } catch (e) { finish(null); throw e; }
+        if (!done && !t) t = setTimeout(() => finish(null), timeoutMs || 4000); // from when the transport took it
         return got;
     }
 }

@@ -1,0 +1,189 @@
+{
+  "id": "zf8hp",
+  "title": "ZF 8HP",
+  "description": "Experimental transmission monitor: live data, clutch fill adaptations, shift maps and temperature history",
+  "version": "1.0.0",
+  "vendor": "custom",
+  "loggingId": "OAZF",
+  "iconGlyph": "8HP",
+  "signals": {
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "ZF 8HP",
+      "buttons": [
+        [
+          "BTN_PAGE",
+          "Next page"
+        ],
+        [
+          "BTN_SELECT",
+          "Next item"
+        ],
+        [
+          "BTN_ACTION",
+          "View / refresh"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "autoRefresh",
+      "label": "Refresh while visible",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "liveInterval",
+      "label": "Live refresh interval",
+      "type": "number",
+      "unit": "s",
+      "default": 2,
+      "steps": [
+        1,
+        2,
+        3,
+        5,
+        10
+      ]
+    },
+    {
+      "key": "mapFamily",
+      "label": "Shift map family",
+      "type": "choice",
+      "default": "1",
+      "options": [
+        [
+          "1",
+          "KF1"
+        ],
+        [
+          "2",
+          "KF2"
+        ],
+        [
+          "cold1",
+          "Cold KF1"
+        ],
+        [
+          "cold2",
+          "Cold KF2"
+        ]
+      ]
+    },
+    {
+      "key": "shiftGroup",
+      "label": "Shift table",
+      "type": "choice",
+      "default": "up",
+      "options": [
+        [
+          "up",
+          "Upshifts"
+        ],
+        [
+          "down",
+          "Downshifts"
+        ],
+        [
+          "skip",
+          "Skip downshifts"
+        ]
+      ]
+    },
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ],
+        [
+          "m_red",
+          "M Red"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "Screen layout",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "Full screen"
+        ],
+        [
+          "standard",
+          "Standard"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "Renderer",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 fps"
+        ],
+        [
+          "software",
+          "Software"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "Demo data",
+      "type": "choice",
+      "default": "off",
+      "reset": 1,
+      "options": [
+        [
+          "off",
+          "Never"
+        ],
+        [
+          "on",
+          "Always"
+        ]
+      ]
+    }
+  ],
+  "config": {
+    "egsAddress": 24,
+    "expectedSgbdIndex": "0F25D0",
+    "readOnly": true
+  }
+}
