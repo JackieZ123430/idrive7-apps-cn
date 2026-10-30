@@ -530,6 +530,11 @@ async function runInner(impl) {
          * finger dragged on it or the controller turned while on it; returns false when already at that end.
          */
         onScroll(fn) { display.onScroll = fn; },
+        /**
+         * onLayout(fn): fn() when where the frame goes changed (the renderer came or went, touch routing, the
+         * layout setting): an app that draws only when its data changes draws again then.
+         */
+        onLayout(fn) { display.onLayout(fn); },
         /** The surface to draw one frame on (record.js Recorder, reused): pass it to ui.image. */
         canvas(w, h) { return display.canvas(w, h); },
         /**

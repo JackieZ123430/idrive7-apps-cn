@@ -83,7 +83,8 @@ to the main menu; the app list stands in for it here.
 The panel docks at the bottom, left or right (its own control at the top, or
 `?panel=bottom|left|right` in the URL). In a narrow window it goes to the bottom by itself.
 
-- **App:** switch to another app, or build and restart this one.
+- **App:** switch to another app, or build and restart this one. **Screenshot** saves the screen as shown
+  (the HMI around the app and the app itself) as a 1920 x 720 PNG.
 - **HMI:** the app's HMI screen, and buttons for what the HMI would do: Back, Home, Open app,
   and the screen's own bar buttons (the menus and buttons of Doom, for example).
 - **Renderer:** frames per second, the draw time, ticks and bytes per second, the app's

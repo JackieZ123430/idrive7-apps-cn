@@ -28,36 +28,39 @@ function draw(cv, G, t, v, act) {
     // by cv.extra to fill the screen's bottom, so there is no dark band under it — that's
     // the "faixa" the other apps hide and we weren't drawing. ---
     G.panel(cv, t, 24, G.TOP, W - 48, G.BOTTOM - G.TOP, null);
+    // the panel's real bottom: the word and buttons sit on it, the figure grows into the room above them;
+    // the buttons (where the kit runs the screen) end G.MARGIN over it, as the other apps' last lines
+    const bottom = G.pageBottom(cv) - (cv.own ? G.MARGIN : 0);
 
     // --- valve figure: twin tailpipes seen end-on, butterfly opening/closing ---
-    drawExhaust(cv, G, t, W / 2 - 310, G.TOP + 18, 620, 250, v);
+    drawExhaust(cv, G, t, W / 2 - 310, G.TOP + 18, 620, 250 + bottom - G.BOTTOM, v);
 
     // --- state word (big), centered below the figure (no DME/version clutter) ---
     const word = v.confirmed !== 'UNKNOWN' ? v.confirmed : v.requested;
     const col = word === 'OPEN' ? (t.accent2 || '#81c4ff') : word === 'CLOSED' ? (t.crit || '#ef2b2d') : t.text;
-    cv.text(word, W / 2, G.BOTTOM - 96, 48, col, { align: 'center', font: 'bold', spacing: 2 });
+    cv.text(word, W / 2, bottom - 96, 48, col, { align: 'center', font: 'bold', spacing: 2 });
 
     // only a genuine safety block speaks up; a timeout / no-answer (car asleep) shows
     // NOTHING, and no "sending…" clutter either.
     if (v.error) {
-        cv.text('! ' + v.error, W / 2, G.BOTTOM - 64, 14, t.crit, { align: 'center', font: 'label' });
+        cv.text('! ' + v.error, W / 2, bottom - 64, 14, t.crit, { align: 'center', font: 'label' });
     }
 
     // --- the three mode buttons on the canvas, the selected one red — like the other
     // apps (G.button draws when the app owns the screen; the HMI bar is hidden). ---
-    drawButtons(cv, G, t, v, act);
+    drawButtons(cv, G, t, v, act, bottom);
     return cv;
 }
 
 /** OPEN · CLOSE · OEM across the bottom; the selected (requested) mode is filled red. */
-function drawButtons(cv, G, t, v, act) {
+function drawButtons(cv, G, t, v, act, bottom) {
     act = act || {};
     const modes = [
         { k: 'OPEN', label: 'Open', run: act.open },
         { k: 'CLOSED', label: 'Close', run: act.close },
         { k: 'OEM', label: 'OEM', run: act.oem },
     ];
-    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    const bw = 236, bh = 56, gap = 30, by = bottom - 56;
     let bx = (W - (modes.length * bw + (modes.length - 1) * gap)) / 2;
     for (const m of modes) {
         const on = m.k === v.requested;

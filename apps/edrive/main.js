@@ -639,6 +639,8 @@ mgu.run({
                 else if (v >= 12.2) { state = 'HALF  (about 50 %) - drive or charge soon'; col = t.warn; }
                 else { state = 'LOW - charge the battery'; col = t.crit; }
             }
+            // the room below the page (if any): the tile's trace and sub line follow its panel's bottom (G.stat)
+            const ex = G.pageBottom(cv) - G.BOTTOM;
             G.stat(cv, t, 24, 44, 1040, 468, {
                 label: '12 V battery', value: v, unit: 'V', decimals: 2, size: 150, history: v12hist,
                 zones: [{ from: 0, to: 12.2, color: 'crit' }, { from: 12.2, to: 12.4, color: 'warn' }],
@@ -650,7 +652,7 @@ mgu.run({
             cv.text(tU(), 1552, 199, 32, t.dim, { align: 'right' });
             G.panel(cv, t, 1088, 287, 488, 225, 'No hybrid system');
             ['No high-voltage battery answered, so', 'eDrive shows the 12 V battery only.', 'Hybrid car? Settings > Hybrid system > Yes'].forEach((l, i) =>
-                cv.text(l, 1112, 376 + i * 34, 22, i === 2 ? t.dim : t.text));
+                cv.text(l, 1112, 376 + Math.round(ex / 2) + i * 34, 22, i === 2 ? t.dim : t.text));
         }
 
         function renderMain(cv, t, d) {
@@ -658,14 +660,16 @@ mgu.run({
             const ec = estimate(d.soc, d.ambient, d.climate, d.pace, comfortKw(d));      // the climate line's figures
 
             // ---- range: what is left until the engine starts
-            G.panel(cv, t, 24, 44, 720, 468, 'Real electric range');
+            // the room under the page (if any): the bars and the last charge go down with the panels' bottom
+            const ex = G.panel(cv, t, 24, 44, 720, 468, 'Real electric range').h - 468, ey = Math.round(ex / 2);
             const hold = has && d.soc <= HOLD_TOP + 0.5;       // low-battery hybrid zone
             if (hold) {
                 cv.text('HYBRID', 48, 196, 96, t.warn, { font: 'bold' });
                 cv.text('battery held at 5-' + HOLD_TOP + ' %', 720, 196, 26, t.dim, { align: 'right' });
             } else {
-                const rw = cv.text(has ? String(Math.round(D(e.mid))) : '--', 48, 206, 130, has ? t.text : t.dim, { font: 'num' });
-                cv.text(dU(), 62 + rw, 206, 40, t.dim, { font: 'bold' });
+                // (the tabs' big value alike: 120 on y 196, the unit 38 beside it, as Energy and Battery)
+                const rw = cv.text(has ? String(Math.round(D(e.mid))) : '--', 48, 196, 120, has ? t.text : t.dim, { font: 'num' });
+                cv.text(dU(), 58 + rw, 196, 38, t.dim, { font: 'bold' });
                 if (has) cv.text(Math.round(D(e.lo)) + ' - ' + Math.round(D(e.hi)) + ' ' + dU(), 720, 150, 30, t.text, { font: 'bold', align: 'right' });
                 cv.text('engine starts at ' + G.fmt(e.res, 0) + ' %', 720, 196, 26, t.dim, { align: 'right' });
                 cv.text(e.learned ? 'learned from ' + Math.round(D(st.learn.km)) + ' ' + dU() : 'Learns while driving', 720, 236, 22, t.dim, { align: 'right' });
@@ -683,11 +687,12 @@ mgu.run({
             } else if (!has) cv.text(diagHint('no charge reading yet'), 48, 250, 24, t.dim);
             else if (d.stale) cv.text('charge read ' + ago(d.socAge), 48, 250, 24, t.warn);
             // the range on a bar (full charge at the end)
-            G.bar(cv, t, 48, 262, 672, 92, {
+            G.bar(cv, t, 48, 262 + ey, 672, 92, {
                 label: 'Full: ' + Math.round(D(e.full)) + ' ' + dU(), value: has ? D(e.mid) : null, unit: dU(), max: D(e.full), niceMax: true, ramp: 'hot',
             });
-            // the battery's power now: regen to the left, use to the right (live.js)
-            lv.drawPowerBar(cv, t, 48, 428, 672);
+            // the battery's power now: regen to the left, use to the right (live.js), as the Full bar above it
+            // (its scale ends G.MARGIN over the panel's bottom)
+            lv.drawPowerBar(cv, t, 48, G.BOTTOM - G.MARGIN - 92 + ex, 672);
             // climate control + on-board electrics: costs range by the hour (off: the on-board draw only)
             const ac = ec.climate !== false && ec.auxKw >= 1.5 ? t.warn : t.dim;
             const what = ec.climate === false ? 'CLIMATE OFF  ·  ON-BOARD  ' : ec.climate ? 'CLIMATE ON' + (d.ac ? ' (A/C)' : '') + '  ' : 'CLIMATE & ON-BOARD  ';
@@ -706,19 +711,24 @@ mgu.run({
             cv.text('%', 950 + sw / 2, 296, 34, t.dim, { font: 'bold' });
             // 12 V battery: resting ~12.4-12.8 V, 13.5-14.8 V while the DC/DC or alternator charges it
             const v = d.v12, vcol = !G.isNum(v) ? t.dim : v < 11.8 ? t.crit : v < 12.2 || v > 15.2 ? t.warn : t.text;
-            const vw = cv.text(G.isNum(v) ? v.toFixed(2) + ' V' : '--', 1124, 340, 28, vcol, { font: 'bold', align: 'right' });
-            cv.text('12 V', 792, 340, 22, t.dim, { font: 'bold', spacing: 1.5 });
+            const vw = cv.text(G.isNum(v) ? v.toFixed(2) + ' V' : '--', 1124, 340 + ey, 28, vcol, { font: 'bold', align: 'right' });
+            cv.text('12 V', 792, 340 + ey, 22, t.dim, { font: 'bold', spacing: 1.5 });
             void vw;
-            cv.fillRect(792, 357, 332, 1, t.tick);
-            const c = d.charge;
-            cv.text(c && c.open ? 'CHARGING' : 'LAST CHARGE', 792, 393, 22, c && c.open ? GO : t.dim, { font: 'bold', spacing: 1.5 });
+            cv.fillRect(792, 357 + ey, 332, 1, t.tick);
+            // (the last charge's lines end G.MARGIN over the panel's bottom)
+            const c = d.charge, lc = G.toMargin(ex, 18);
+            cv.text(c && c.open ? 'CHARGING' : 'LAST CHARGE', 792, 393 + lc, 22, c && c.open ? GO : t.dim, { font: 'bold', spacing: 1.5 });
             if (c) {
                 const add = c.to - c.from;
-                const aw = cv.text('+' + add.toFixed(0) + ' %', 792, 446, 44, GO, { font: 'bold' });
-                cv.text('+' + Math.round(D(kmOf(add))) + ' ' + dU(), 806 + aw, 444, 28, t.text, { font: 'bold' });
-                cv.text(Math.round(c.from) + ' > ' + Math.round(c.to) + ' %  ·  ' + (c.open ? 'now' : ago(Date.now() - c.toT)), 792, 489, 24, t.dim);
+                const aw = cv.text('+' + add.toFixed(0) + ' %', 792, 446 + lc, 44, GO, { font: 'bold' });
+                cv.text('+' + Math.round(D(kmOf(add))) + ' ' + dU(), 806 + aw, 444 + lc, 28, t.text, { font: 'bold' });
+                // from -> to: the arrow drawn ('→' isn't in the baked fonts), as the text's colour and weight
+                const ly = 489 + lc, fw = cv.text(String(Math.round(c.from)), 792, ly, 24, t.dim), ax = 792 + fw + 9, ay = ly - 8;
+                cv.line(ax, ay, ax + 18, ay, 2, t.dim);
+                cv.polyline([[ax + 12, ay - 5], [ax + 18, ay], [ax + 12, ay + 5]], 2, t.dim);
+                cv.text(Math.round(c.to) + ' %  ·  ' + (c.open ? 'now' : ago(Date.now() - c.toT)), ax + 27, ly, 24, t.dim);
             } else {
-                cv.text('none yet', 792, 446, 28, t.dim);
+                cv.text('none yet', 792, 446 + lc, 28, t.dim);
             }
 
             // ---- this drive (from the battery's own power readings, live.js)
@@ -768,28 +778,31 @@ mgu.run({
             const soh = d.soh, kwh = settings.get('designKwh');
             const cap = G.isNum(soh) ? kwh * soh / 100 : null;                     // what a full charge holds today
             const now = G.isNum(cap) && G.isNum(d.soc) ? cap * d.soc / 100 : null;  // energy in the pack right now
-            G.panel(cv, t, x, y, w, h, 'Battery health');
+            // room below the page (ex): the energy now goes down until it ends G.MARGIN over the panel's bottom, as the
+            // Cells panel's chart; the Holds bar half as far
+            const ex = G.panel(cv, t, x, y, w, h, 'Battery health').h - h, dy = G.toMargin(ex, 49), dh = Math.round(dy / 2);
             const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
             // HV battery temperature (the car's own value): cold packs give less range and charge slower
             const bt = d.batt && d.batt.avg, btc = !G.isNum(bt) ? t.dim : bt < 5 || bt > 45 ? t.warn : t.text;
             if (h >= 300) {
                 // the full layout: health, how much a full charge holds (bar against new), in it now, temperature
-                const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', x + 24, y + 136, 100, hc, { font: 'num' });
-                cv.text('%', x + 32 + hw, y + 136, 34, t.dim, { font: 'bold' });
+                // (the tabs' big value alike: 120 on y + 152, the unit 38 beside it, as Range and Energy)
+                const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 0) : '--', x + 24, y + 152, 120, hc, { font: 'num' });
+                cv.text('%', x + 34 + hw, y + 152, 38, t.dim, { font: 'bold' });
                 if (!G.isNum(soh)) cv.text(diagHint('not read yet'), x + 24, y + 170, 22, t.dim);
-                G.bar(cv, t, x + 24, y + 178, w - 48, 92, {
+                G.bar(cv, t, x + 24, y + 178 + dh, w - 48, 92, {
                     label: 'Holds', value: cap, unit: 'kWh', decimals: 1, max: kwh, step: kwh / 4, scaleDecimals: kwh % 4 ? 1 : 0, ramp: 'hot',
                     zones: [{ from: 0, to: kwh * 0.7, color: 'crit' }, { from: kwh * 0.7, to: kwh * 0.8, color: 'warn' }],
                 });
-                cv.fillRect(x + 24, y + 304, w - 48, 1, t.panelEdge);
-                cv.text('IN THE BATTERY NOW', x + 24, y + 342, 22, t.dim, { font: 'bold', spacing: 1.5 });
-                const ew = cv.text(G.isNum(now) ? G.fmt(now, 1) : '--', x + 24, y + 418, 72, G.isNum(now) ? t.text : t.dim, { font: 'num' });
-                cv.text('kWh', x + 34 + ew, y + 418, 28, t.dim);
+                cv.fillRect(x + 24, y + 304 + dy, w - 48, 1, t.panelEdge);
+                cv.text('IN THE BATTERY NOW', x + 24, y + 342 + dy, 22, t.dim, { font: 'bold', spacing: 1.5 });
+                const ew = cv.text(G.isNum(now) ? G.fmt(now, 1) : '--', x + 24, y + 418 + dy, 72, G.isNum(now) ? t.text : t.dim, { font: 'num' });
+                cv.text('kWh', x + 34 + ew, y + 418 + dy, 28, t.dim);
                 // (the temperature: the Cells panel's, from the battery unit)
                 return;
             }
             const tall = false, hy = y + 118;
-            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 1) : '--', x + 24, hy, 64, hc, { font: 'num' });
+            const hw = cv.text(G.isNum(soh) ? G.fmt(soh, 0) : '--', x + 24, hy, 64, hc, { font: 'num' });
             cv.text(G.isNum(soh) ? '%' : diagHint('not read yet'), x + 32 + hw, hy, G.isNum(soh) ? 26 : 18, t.dim, { font: 'bold' });
             const r = x + w - 24, line = (yy, label, val, c) => {
                 const vw2 = cv.text(val, r, yy, 22, c || t.text, { font: 'bold', align: 'right' });
@@ -811,17 +824,20 @@ mgu.run({
             const kwhOf = (c) => (G.isNum(c.kwh) ? c.kwh : 0);
 
             // ---- list, newest first
-            G.panel(cv, t, 24, 44, 1040, 468, 'Charges' + (all.length ? '  (' + all.length + ')' : ''));
+            const ex = G.panel(cv, t, 24, 44, 1040, 468, 'Charges' + (all.length ? '  (' + all.length + ')' : '')).h - 468;
+            // room below the page: another row where a whole one fits, the rest spread over the rows
+            const nRows = 8 + Math.floor(ex / 43), rowP = 43 + (ex - (nRows - 8) * 43) / nRows;
             const cols = [48, 230, 380, 590, 760, 920];
             ['DATE', 'ADDED', 'FROM - TO', 'ENERGY', 'RANGE', price() > 0 ? 'COST' : ''].forEach((h, i) => cv.text(h, cols[i], 121, 22, t.dim, { font: 'bold', spacing: 1 }));
             cv.fillRect(48, 133, 992, 1, t.panelEdge);
             if (!all.length) {
-                cv.text('No charges logged yet.', 544, 284, 32, t.dim, { align: 'center', font: 'bold' });
-                cv.text('Every charge of ' + cfg.chargeMinPct + ' % or more shows up here,', 544, 330, 26, t.dim, { align: 'center' });
-                cv.text('also overnight charges.', 544, 366, 26, t.dim, { align: 'center' });
+                const ny = Math.round(ex / 2);
+                cv.text('No charges logged yet.', 544, 284 + ny, 32, t.dim, { align: 'center', font: 'bold' });
+                cv.text('Every charge of ' + cfg.chargeMinPct + ' % or more shows up here,', 544, 330 + ny, 26, t.dim, { align: 'center' });
+                cv.text('also overnight charges.', 544, 366 + ny, 26, t.dim, { align: 'center' });
             }
-            all.slice(-8).reverse().forEach((c, i) => {
-                const y = 174 + i * 43;
+            all.slice(-nRows).reverse().forEach((c, i) => {
+                const y = Math.round(174 + i * rowP);
                 if (i % 2 === 0) cv.roundRect(40, y - 28, 1008, 38, 8, withAlpha(t.track, 0.55));
                 const add = c.to - c.from;
                 cv.text(dateOf(c.toT), cols[0], y, 24, t.text, { font: 'label' });
@@ -853,7 +869,8 @@ mgu.run({
             const days = [];
             for (let i = 13; i >= 0; i--) days.push(sum(all.filter((c) => c.toT >= today0 - i * day && c.toT < today0 - (i - 1) * day)));
             const top = Math.max(4, Math.max.apply(null, days));
-            const gx = 1112, gy = 470, gh = 132, bw = 440 / 14;
+            // (taller into the room below the page; its label then ends G.MARGIN over the panel's bottom, as the list's rows)
+            const dg = G.toMargin(ex, 9), gx = 1112, gy = 470 + dg, gh = 132 + dg, bw = 440 / 14;
             cv.text('KWH PER DAY, 14 DAYS', gx, 318, 22, t.dim, { font: 'bold', spacing: 1 });
             days.forEach((v, i) => {
                 const h = v > 0 ? Math.max(6, v / top * gh) : 0;
@@ -924,8 +941,6 @@ mgu.run({
         function renderEnergy(cv, t, d) {
             const k = kwhPerPct(), comfort = comfortKw(d);
             const e = estimate(d.soc, d.ambient, d.climate, d.pace, comfort), has = G.isNum(d.soc);
-            const kwh100 = (pctPerKm) => (G.isNum(pctPerKm) ? pctPerKm * k * 100 : null);
-            const per = MI() ? 'kWh/100 mi' : 'kWh/100 km', U = (x) => (G.isNum(x) ? (MI() ? x / KM_MI : x) : null);
 
             // ---- the battery's power now: kW, bar, the last two minutes (live.js)
             lv.drawPower(cv, t, 24, 44, 740, 468);
@@ -936,7 +951,7 @@ mgu.run({
 
             // ---- where the power goes now
             const x0 = 788, w0 = 788;
-            G.panel(cv, t, x0, 44, w0, 468, 'Where the power goes now');
+            const ex = G.panel(cv, t, x0, 44, w0, 468, 'Where the power goes now').h - 468;   // (room below the page: rows spread, range at the bottom)
             const base = model.auxRate(d.ambient, k, false).rate * k;
             // the climate: measured from the battery or the climate unit's figures (live.js) when there are, else the estimate
             // (the measurement holds the seat and wheel heating too: they have rows of their own)
@@ -968,7 +983,7 @@ mgu.run({
             ];
             ['', 'KW', 'RANGE', ''].forEach((h, i) => cv.text(h, [x0 + 24, x0 + 400, x0 + 500, 0][i], 116, 20, t.dim, { font: 'bold', spacing: 1, align: 'right' }));
             rows.forEach(([name, kw, km, note], i) => {
-                const y = 160 + i * 52;
+                const y = Math.round(160 + i * (52 + ex / 5));
                 cv.text(name, x0 + 24, y, 24, t.text, { font: 'bold' });
                 cv.text(G.isNum(kw) ? G.fmt(kw, kw < 1 ? 2 : 1) : '-', x0 + 400, y, 24, G.isNum(kw) && kw >= 1.5 ? t.warn : t.text, { font: 'bold', align: 'right' });
                 cv.text(G.isNum(km) && km >= 0.5 ? '-' + Math.round(D(km)) + ' ' + dU() : '', x0 + 500, y, 22, t.text, { align: 'right' });
@@ -983,8 +998,8 @@ mgu.run({
             void sent;
             // learned range vs. the range at the rate measured lately
             const kmTxt = (km) => (G.isNum(km) && has ? Math.round(D(km)) + ' ' + dU() : '--');
-            cv.text('RANGE AT THIS RATE', x0 + 24, 486, 22, t.dim, { font: 'bold', spacing: 1.5 });
-            cv.text(kmTxt(rr), x0 + w0 - 24, 490, 40, measured ? t.text : t.dim, { font: 'bold', align: 'right' });
+            cv.text('RANGE AT THIS RATE', x0 + 24, 486 + ex, 22, t.dim, { font: 'bold', spacing: 1.5 });
+            cv.text(kmTxt(rr), x0 + w0 - 24, 490 + ex, 40, measured ? t.text : t.dim, { font: 'bold', align: 'right' });
         }
 
         function render() {
