@@ -1,0 +1,122 @@
+{
+  "id": "live_adjustments",
+  "title": "Live Adjustments",
+  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM (hand back to the DME), OPEN and CLOSE the flap over the car's own diagnostic link, with per-DME adapters",
+  "version": "0.0.1",
+  "vendor": "custom",
+  "loggingId": "OAA0",
+  "iconGlyph": "sliders",
+  "signals": {
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": ["sendTasuRequest"],
+      "_broadcasts": ["sendTasuResponse"]
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Live Adjustments",
+      "buttons": [
+        [
+          "BTN_OPEN",
+          "Open"
+        ],
+        [
+          "BTN_CLOSE",
+          "Close"
+        ],
+        [
+          "BTN_OEM",
+          "OEM"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "arm",
+      "label": "Exhaust Flap",
+      "type": "choice",
+      "default": "off",
+      "options": [
+        [
+          "off",
+          "Disarmed · simulated (safe)"
+        ],
+        [
+          "on",
+          "Armed · actuates the real valve"
+        ]
+      ]
+    },
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "Renderer",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 fps (default)"
+        ],
+        [
+          "software",
+          "Software"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "Demo data",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Always"
+        ],
+        [
+          "off",
+          "Never"
+        ]
+      ]
+    }
+  ]
+}
