@@ -240,6 +240,44 @@ let toastT = null;
 function toast(t, info) { const e = $('#toast'); clearTimeout(toastT); e.hidden = !t; e.classList.toggle('info', !!info); e.textContent = t || ''; if (t) toastT = setTimeout(() => { e.hidden = true; }, 6000); }
 $('#app').onchange = (e) => { send({ t: 'app', id: e.target.value }); $('#log').replaceChildren(); };
 $('#restart').onclick = () => send({ t: 'restart' });
+$('#shot').onclick = () => screenshot().catch((e) => { console.warn('screenshot:', e); toast('Screenshot failed: ' + (e.message || e)); });
+
+/* ---------------- screenshot: the screen as shown, a 1920 x 720 PNG ---------------- */
+// The HMI around the app (the stage's other parts: a copy of their HTML drawn as an SVG image, at 1920 x 720, so
+// --u is 1 px) under the renderer's own picture of the app (gfx.readPixels, see-through where the HMI shows).
+async function screenshot() {
+  const out = el('canvas', { width: W, height: H }), g = out.getContext('2d');
+  const copy = stage.cloneNode(true);
+  copy.querySelectorAll('canvas, #overlay, #toast').forEach((e) => e.remove());
+  copy.classList.remove('kbd-focus');
+  copy.style.cssText = `width:${W}px;height:${H}px;border-radius:0;box-shadow:none`;
+  // an SVG image loads nothing: its pictures go in as data URLs
+  await Promise.all([...copy.querySelectorAll('img')].map(async (im) => {
+    if (im.hidden || !im.getAttribute('src') || im.src.startsWith('data:')) return;
+    try {
+      const b = await (await fetch(im.src)).blob();
+      im.src = await new Promise((r) => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
+    } catch (e) { im.remove(); }
+  }));
+  const css = [...document.styleSheets].map((s) => { try { return [...s.cssRules].map((r) => r.cssText).join('\n'); } catch (e) { return ''; } }).join('\n');
+  const bs = getComputedStyle(document.body);       // (the copy is outside <body>: its font and colour come along)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject width="100%" height="100%">` +
+    `<div xmlns="http://www.w3.org/1999/xhtml" style="font:${bs.font.replace(/"/g, "'")};color:${bs.color}"><style>${css.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</style>${new XMLSerializer().serializeToString(copy)}</div></foreignObject></svg>`;
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  await img.decode();
+  g.drawImage(img, 0, 0, W, H);
+  // the app, as the renderer shows it (not while the HMI's app picker has the screen)
+  if (gfx && getComputedStyle(canvas).visibility !== 'hidden') {
+    const px = gfx.readPixels(), layer = el('canvas', { width: W, height: H });
+    layer.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(px.buffer, px.byteOffset, px.length), W, H), 0, 0);
+    g.drawImage(layer, 0, 0);
+  }
+  const blob = await new Promise((r) => out.toBlob(r, 'image/png'));
+  const a = el('a', { href: URL.createObjectURL(blob), download: `emulator-${S.app || 'screen'}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png` });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
 document.querySelectorAll('[data-hmi]').forEach((b) => { b.onclick = () => send({ t: 'hmi', a: b.dataset.hmi }); });
 $('#touchroute').onchange = (e) => send({ t: 'touch-routing', on: e.target.checked });
 $('#fps').onchange = (e) => send({ t: 'fps', n: Number(e.target.value) });
