@@ -6,7 +6,11 @@ established. The app displays an EXPERIMENTAL badge on every page.
 
 An independent iDrive 7 app for the verified GSZFBCE / SGBD `0F25D0` controller
 on the G22. It reads EGS `0x18` through the MGU's InternalTasu service, without
-an ENET cable after installation. A different EGS identification stops data
+an ENET cable after installation. The hybrid 8HP of the G20 330e (SGBD `0F21E0`) is read too:
+every record was read once on such a car; it has no torque converter, so its converter, lock-up and
+histogram records are refused and shown as not on this EGS, its KF2 return-shift counters (`4137`) have 18
+values, and five records with another length (`4143`, `4144`, `4440`, `4441`, `6090`) show raw. Any other
+EGS identification stops data
 polling before these decoders are applied, unless the setting *EGS variant* is
 *Try any (unverified)*: it is then read with the same decoders and marked LIVE · UNVERIFIED.
 Each record must still match its identifier and exact length, so a layout that differs shows as
