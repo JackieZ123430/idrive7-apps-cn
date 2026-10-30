@@ -99,6 +99,17 @@ mgu.run({
             return raw * c.factor + (c.offset || 0);
         };
 
+        /**
+         * A tyre pressure in bar: app.json's scaling (0.1 bar per bit), else the kPa (raw 50-600) or 0.1 kPa
+         * (raw 600-6000) a car sends instead - each unit's plausible raw values lie apart, so only one fits.
+         */
+        const tyreP = (raw) => {
+            const v = sc('tyrePress', raw);
+            if (v === null || (v >= TYRE_P[0] && v <= TYRE_P[1])) return v;
+            const b = [0.01, 0.001].map((k) => raw * k).find((x) => x >= TYRE_P[0] && x <= TYRE_P[1]);
+            return b === undefined ? v : b;
+        };
+
         /* ---------- live data ---------- */
         const live = {}, peak = {}, demoPeak = {}, hist = { coolant: [], oil: [], gearbox: [], egs: [], ambient: [], iat: [], hpfp: [], lpfp: [], iatRise: [], timing: [],
             boostTarget: [], boostActual: [], loadTarget: [], loadActual: [] };
@@ -257,15 +268,17 @@ mgu.run({
                     put('tFL', sc('tyreTemp', v.actualValueTemperatureTyreFLH)); put('tFR', sc('tyreTemp', v.actualValueTemperatureTyreFRH));
                     put('tRL', sc('tyreTemp', v.actualValueTemperatureTyreRLH)); put('tRR', sc('tyreTemp', v.actualValueTemperatureTyreRRH));
                 },
-                // bar = 0.1 x raw, >= 65532 invalid (BMW x_call's converter)
+                // bar = 0.1 x raw, >= 65532 invalid (BMW x_call's converter); tyreP takes the other units some cars send
                 statusTyrePressure: (v) => {
                     logRaw('tyre pressure', [v.actualValuePressureTyreFLH, v.actualValuePressureTyreFRH, v.actualValuePressureTyreRLH, v.actualValuePressureTyreRRH]);
-                    put('pFL', sc('tyrePress', v.actualValuePressureTyreFLH)); put('pFR', sc('tyrePress', v.actualValuePressureTyreFRH));
-                    put('pRL', sc('tyrePress', v.actualValuePressureTyreRLH)); put('pRR', sc('tyrePress', v.actualValuePressureTyreRRH));
+                    if (v && v.actualValuePressureTyreFLH === undefined) logRaw('tyre pressure fields', Object.keys(v));
+                    put('pFL', tyreP(v.actualValuePressureTyreFLH)); put('pFR', tyreP(v.actualValuePressureTyreFRH));
+                    put('pRL', tyreP(v.actualValuePressureTyreRLH)); put('pRR', tyreP(v.actualValuePressureTyreRRH));
                 },
                 statusTargetTyrePressure: (v) => {
-                    put('ptFL', sc('tyrePress', v.targetPressureTyreFLH)); put('ptFR', sc('tyrePress', v.targetPressureTyreFRH));
-                    put('ptRL', sc('tyrePress', v.targetPressureTyreRLH)); put('ptRR', sc('tyrePress', v.targetPressureTyreRRH));
+                    logRaw('target tyre pressure', [v.targetPressureTyreFLH, v.targetPressureTyreFRH, v.targetPressureTyreRLH, v.targetPressureTyreRRH]);
+                    put('ptFL', tyreP(v.targetPressureTyreFLH)); put('ptFR', tyreP(v.targetPressureTyreFRH));
+                    put('ptRL', tyreP(v.targetPressureTyreRLH)); put('ptRR', tyreP(v.targetPressureTyreRRH));
                 },
             }],
             ['de.bmw.infotainment.misc.MDrive', {

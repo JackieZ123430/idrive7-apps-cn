@@ -2,7 +2,7 @@
   "id": "dyno",
   "title": "Virtual Dyno",
   "description": "Power and torque curves from a full-throttle pull, saved and compared",
-  "version": "1.4.9",
+  "version": "1.4.10",
   "vendor": "custom",
   "loggingId": "OA98",
   "iconGlyph": "dyno",
