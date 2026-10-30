@@ -30,6 +30,13 @@ mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
         const reader = new Reader(ctx);
+        // temperatures come from the EGS in °C; shown in the unit picked in Settings (as M Vitals)
+        const fahr = () => settings.get('tempUnit') === 'F';
+        const tU = () => (fahr() ? '°F' : '°C');
+        const T = (c) => (E.finite(c) ? (fahr() ? c * 9 / 5 + 32 : c) : null);
+        const tN = (c, digits) => n(T(c), digits);
+        // "-40..-20" / ">160" (°C bands from the catalog) in the picked unit
+        const tRange = (s) => String(s).split('..').map((part) => part.replace(/-?\d+/, (x) => tN(Number(x)))).join('..');
         let page = 0, pack = 0, shift = 0, thermal = 0, graphMetric = 0, detailMode = 0, recordPage = 0, matrixGear = 0;
         let message = '', messageUntil = 0;
         const demo = () => settings.get('demo') === 'on';
@@ -116,7 +123,7 @@ mgu.run({
         }
         function live(cv, t) {
             const oil = value('6000'), gear = C.gearNames[value('DA2E')], selector = C.selectorNames[value('DA2E', 1)];
-            card(cv, t, 24, 374, 'Transmission oil', n(oil), 'C', age(rec('6000')), BLUE);
+            card(cv, t, 24, 374, 'Transmission oil', tN(oil), tU(), age(rec('6000')), BLUE);
             card(cv, t, 418, 374, 'Actual gear', gear || '--', selector || '', age(rec('DA2E')));
             card(cv, t, 812, 374, 'Turbine / input', n(value('DA2A')), 'rpm', age(rec('DA2A')));
             card(cv, t, 1206, 370, 'Output shaft', n(value('DA2A', 1)), 'rpm', 'Measured at the transmission');
@@ -127,7 +134,7 @@ mgu.run({
             [0, 0.5, 1].forEach((f) => {
                 const y = py + ph * (1 - f);
                 cv.line(px, y, px + pw, y, 1, withAlpha(t.text, 0.13));
-                cv.text(String(Math.round(f * 140)), px - 12, y + 6, 18, t.dim, { align: 'right' });
+                cv.text(tN(f * 140), px - 12, y + 6, 18, t.dim, { align: 'right' });
             });
             if (points.length > 1) {
                 const start = points[0].t, end = Math.max(start + 1000, points[points.length - 1].t);
@@ -136,9 +143,9 @@ mgu.run({
             } else cv.text('Waiting for fresh temperature samples', px + pw / 2, py + 85, 24, t.dim, { align: 'center' });
             G.panel(cv, t, 1004, 210, 572, 278, 'Mechatronics / converter');
             const win = values('DB03');
-            const rows = [['EGS chip 1', n(value('6005')) + ' C'], ['EGS chip 2', n(value('601D')) + ' C'],
+            const rows = [['EGS chip 1', tN(value('6005')) + ' ' + tU()], ['EGS chip 2', tN(value('601D')) + ' ' + tU()],
                 ['Engine speed', n(value('DA34')) + ' rpm'], ['Converter clutch', E.TCC[value('DA22')] || '--'],
-                ['Reported oil-service window', win.length === 2 ? n(win[0]) + '..' + n(win[1]) + ' C' : '--']];
+                ['Reported oil-service window', win.length === 2 ? tN(win[0]) + '..' + tN(win[1]) + ' ' + tU() : '--']];
             rows.forEach((r, i) => { cv.text(r[0], 1022, 287 + i * 39, 20, t.dim); cv.text(r[1], 1558, 287 + i * 39, 22, t.text, { align: 'right' }); });
             footer(cv, t, 'Next item: change plotted temperature.  ' + freshness(['6000', 'DA2A', 'DA34', '6005', '601D', 'DA22']));
         }
@@ -217,7 +224,7 @@ mgu.run({
                     if (i >= C.ranges.length) continue;
                     const y = 177 + row * 40, v = vs[i];
                     cv.fillRect(x + 14, y - 23, 474 * (E.finite(v) ? v / max : 0), 29, withAlpha(BLUE, 0.14));
-                    cv.text(C.ranges[i] + ' C', x + 18, y, 22, t.text);
+                    cv.text(tRange(C.ranges[i]) + ' ' + tU(), x + 18, y, 22, t.text);
                     cv.text(E.finite(v) ? n(v / 3600, 2) + ' h' : '--', x + 356, y, 23, t.text, { align: 'right', font: 'num' });
                     cv.text(E.finite(v) && total ? n(v / total * 100, 1) + '%' : '--', x + 484, y, 19, t.dim, { align: 'right' });
                 }
@@ -238,7 +245,7 @@ mgu.run({
                 const right = [['Engagement offset D1 / D2 / R', values('412F').map((v) => signed(v)).join(' / ') + ' mbar'],
                     ['Release offset D1 / D2 / R', values('41B0').map((v) => signed(v)).join(' / ') + ' mbar'],
                     ['Engagement evaluations', values('415F').map((v) => n(v)).join(' / ')], ['Release evaluations', values('41B1').map((v) => n(v)).join(' / ')],
-                    ['EGS oil-service temperature window', win.length ? win.join('..') + ' C' : '--'], ['EGS oil-service RPM window', rpm.length ? rpm.join('..') + ' rpm' : '--']];
+                    ['EGS oil-service temperature window', win.length ? win.map((v) => tN(v)).join('..') + ' ' + tU() : '--'], ['EGS oil-service RPM window', rpm.length ? rpm.join('..') + ' rpm' : '--']];
                 right.forEach((r, i) => { cv.text(r[0], 840, 165 + i * 50, 20, t.dim); cv.text(r[1], 1552, 191 + i * 50, 24, BLUE, { align: 'right' }); });
                 footer(cv, t, 'View / refresh: save snapshot. ' + freshness(DETAIL_DIDS));
             } else if (detailMode === 1) {
@@ -256,7 +263,8 @@ mgu.run({
                     const r = rec(d), y = 179 + i * 41, meta = C.records[d];
                     cv.text(d, 44, y, 24, BLUE, { font: 'num' });
                     cv.text(fit(cv, meta.name.replace(/^_/, ''), 690, 19), 150, y, 19, t.text);
-                    const v = r && r.ok ? (r.decoded ? r.values.slice(0, 5).map((x) => n(x, meta.fields[0] && meta.fields[0].unit === 'bar' ? 2 : 0)).join(' / ') : r.bytes + ' bytes / raw') : r && r.error || 'not read';
+                    const deg = meta.fields[0] && meta.fields[0].unit === '°C';
+                    const v = r && r.ok ? (r.decoded ? r.values.slice(0, 5).map((x) => deg ? tN(x) : n(x, meta.fields[0] && meta.fields[0].unit === 'bar' ? 2 : 0)).join(' / ') + (deg ? ' ' + tU() : '') : r.bytes + ' bytes / raw') : r && r.error || 'not read';
                     cv.text(fit(cv, v, 440, 22), 1300, y, 22, t.text, { align: 'right' });
                     cv.text(age(r), 1554, y, 18, t.dim, { align: 'right' });
                 });

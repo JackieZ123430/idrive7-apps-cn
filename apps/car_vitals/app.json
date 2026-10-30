@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.20.1",
+  "version": "2.21.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -14,6 +14,10 @@
     "de.bmw.infotainment.vehicle.CDS2": {
       "statusLongitudinalAccelerationMassCenter": "rs",
       "statusLateralAccelerationMassCenter": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "the car's display units; tyre pressures / temperatures are then guessed from their values",
+      "statusNewCurrentUnitsStatusExt": "rs"
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
       "statusCarSpeed2": "rs"
@@ -675,7 +679,7 @@
         "factor": 1,
         "offset": -40,
         "invalid": 65535,
-        "note": "deg C + 40: a G05 PHEV sent raw 53-57 on a ~10 deg C day (2.8.0 log), not deci-Kelvin. Values outside -40..150 deg C are shown as no data; the raw values go to the log ('raw tyre temperature')"
+        "note": "degrees + 40, in the car's temperature unit (deg F on a car set to Fahrenheit: main.js converts it): a G05 PHEV sent raw 53-57 on a ~10 deg C day (2.8.0 log), not deci-Kelvin. Values outside -40..150 deg C are shown as no data; the raw values go to the log ('raw tyre temperature')"
       },
       "torqueSplitRear": {
         "factor": 0.01,
@@ -686,7 +690,7 @@
         "factor": 0.1,
         "offset": 0,
         "invalidFrom": 65532,
-        "note": "0.1 bar per bit (BMW x_call: raw * 0.1, valid up to 530; a car sent raw 22-25 = 2.2-2.5 bar). Read as 0.1 kPa before, every tyre came out at 0.02 bar and was hidden."
+        "note": "0.1 per bit in the car's pressure unit (bar / kPa / psi, from Vehicle.statusNewCurrentUnitsStatusExt; main.js converts it to bar). BMW x_call: raw * 0.1, valid up to 530; a car in bar sent raw 22-25 = 2.2-2.5 bar, a car in psi about 410 = 41 psi. Read as 0.1 kPa before, every tyre came out at 0.02 bar and was hidden."
       },
       "sportPct": {
         "factor": 1,

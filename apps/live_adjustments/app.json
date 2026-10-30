@@ -1,8 +1,8 @@
 {
   "id": "live_adjustments",
   "title": "Engine Config",
-  "description": "Engine Config for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link, with per-DME adapters. On a tuned DME (read-only unlock check): Map slot 1-4 (MHD, BM3), Max cooling (MHD), Burbles and Active Sound Design (BM3)",
-  "version": "0.5.1",
+  "description": "Engine Config for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. With BM3 or MHD picked in Settings: engine map switching, burbles, ASD and Max Cooling",
+  "version": "0.6.0",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",
@@ -39,6 +39,10 @@
           "OEM"
         ],
         [
+          "BTN_PAGE",
+          "Next page"
+        ],
+        [
           "BTN_SETTINGS",
           "Settings"
         ]
@@ -48,7 +52,7 @@
   "settings": [
     {
       "key": "arm",
-      "label": "Car control",
+      "label": "Exhaust Flap",
       "type": "choice",
       "default": "off",
       "options": [
@@ -58,27 +62,27 @@
         ],
         [
           "on",
-          "Armed · sends to the DME"
+          "Armed · actuates the real valve"
         ]
       ]
     },
     {
-      "key": "platform",
-      "label": "Platform",
+      "key": "tuner",
+      "label": "Tuning software",
       "type": "choice",
-      "default": "auto",
+      "default": "off",
       "options": [
         [
-          "auto",
-          "Auto detect"
+          "off",
+          "Off · nothing is sent to the car (safe)"
         ],
         [
           "bm3",
-          "Bootmod3"
+          "BM3 · engine map, burbles, ASD"
         ],
         [
           "mhd",
-          "MHD"
+          "MHD · engine map, Max Cooling"
         ]
       ]
     },
@@ -144,7 +148,6 @@
     }
   ],
   "config": {
-    "comment": "bm3MarkerAddress: where the BM3 CustomROM marker sits in DME memory (BM3 unlock check), firmware dependent; the default is BM3 Live's (idrive7-apps PR #29).",
     "bm3MarkerAddress": "807FFE50"
   }
 }

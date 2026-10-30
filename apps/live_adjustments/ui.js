@@ -1,36 +1,30 @@
 'use strict';
 /**
- * ui.js - the Engine Config screens, a PURE draw(cv, G, t, v) so it
- * renders both on the car (main.js) and in the PC preview harness.
+ * ui.js - the Live Adjustments screen, a PURE draw(cv, G, t, v) so it renders both on the
+ * car (main.js) and in the PC preview harness. v.pages = the tabs this car gets, v.page =
+ * the one shown: 'Exhaust Flap' always; 'Engine Map', 'Max Cooling', 'Burbles', 'Active Sound'
+ * for the tune picked in Settings (tune.js).
  *
  * House style of the other apps: an "Exhaust Flap" title with the M→white underline up
- * top, the twin tailpipes side by side seen end-on with the butterfly valves opening/closing in the
+ * top, the twin tailpipes seen end-on with the butterfly valves opening/closing in the
  * middle, the big state word, and the three mode buttons (OEM / Open / Close) across the
  * bottom — the selected one filled red, like the other apps (drawn with G.button; the
  * HMI bar is hidden in main.js). A fifth arg `act` carries the press callbacks.
- *
- * Pages (tabs): Exhaust Flap, Map (map slot 1..4, MHD or BM3), Max cooling (on/off, MHD), Burbles
- * (aggression 0..12, BM3) and Sound (Active Sound Design on/off, BM3). The tune pages work only on
- * a DME with that flash; they say what the read-only unlock check found.
  *
  * GPU-safe: only circle / arc / roundRect / strokeRoundRect / line / text / gradientRect
  * (the car's Recorder has no cv.convex / N-point polygon fill).
  */
 
 const W = 1600, H = 520;
-const PAGES = ['Exhaust Flap', 'Map', 'Max cooling', 'Burbles', 'Sound'];
 
 function draw(cv, G, t, v, act) {
     cv.clear(t.bg);
-    const page = v.page || 0;
 
-    // --- page tabs in the house style. On the car G.frame pushes the tabs up into the HMI's
-    // title strip; in preview it's a slim tab bar. ---
-    G.frame(cv, t, PAGES, page, [v.source === 'sim' ? { text: 'SIM', color: t.warn || '#d29922' } : null]);
-    if (page === 1) return drawMap(cv, G, t, v, act || {});
-    if (page === 2) return drawCooling(cv, G, t, v, act || {});
-    if (page === 3) return drawBurbles(cv, G, t, v, act || {});
-    if (page === 4) return drawAsd(cv, G, t, v, act || {});
+    // --- page tabs in the house style, one per adjustment. On the car G.frame pushes the
+    // tabs up into the HMI's title strip; in preview it's a slim tab bar. ---
+    const pages = v.pages || ['Exhaust Flap'];
+    const page = pages.indexOf(v.page) >= 0 ? v.page : pages[0];
+    G.frame(cv, t, pages, pages.indexOf(page), [v.simulated ? { text: 'SIM', color: t.warn || '#d29922' } : null]);
 
     // --- the house content panel (grey card) over the whole content area, EXACTLY like
     // the other apps (e.g. car_vitals). A panel that reaches the page bottom extends down
@@ -39,10 +33,15 @@ function draw(cv, G, t, v, act) {
     G.panel(cv, t, 24, G.TOP, W - 48, G.BOTTOM - G.TOP, null);
     // the panel's real bottom: the word and buttons sit on it, the figure grows into the room above them;
     // the buttons (where the kit runs the screen) end G.MARGIN over it, as the other apps' last lines
-    const bottom = pageBottom(cv, G);
+    const bottom = G.pageBottom(cv) - (cv.own ? G.MARGIN : 0);
 
-    // --- valve figure: twin tailpipes side by side seen end-on, butterfly opening/closing ---
-    drawExhaust(cv, G, t, W / 2 - 360, G.TOP + 18, 720, 250 + bottom - G.BOTTOM, v);
+    if (page === 'Engine Map') return drawMap(cv, G, t, v.tune || {}, act || {}, bottom);
+    if (page === 'Max Cooling') return drawCooling(cv, G, t, v.tune || {}, act || {}, bottom);
+    if (page === 'Burbles') return drawBurbles(cv, G, t, v.tune || {}, act || {}, bottom);
+    if (page === 'Active Sound') return drawAsd(cv, G, t, v.tune || {}, act || {}, bottom);
+
+    // --- valve figure: twin tailpipes seen end-on, butterfly opening/closing ---
+    drawExhaust(cv, G, t, W / 2 - 310, G.TOP + 18, 620, 250 + bottom - G.BOTTOM, v);
 
     // --- state word (big), centered below the figure (no DME/version clutter) ---
     const word = v.confirmed !== 'UNKNOWN' ? v.confirmed : v.requested;
@@ -58,117 +57,6 @@ function draw(cv, G, t, v, act) {
     // --- the three mode buttons on the canvas, the selected one red — like the other
     // apps (G.button draws when the app owns the screen; the HMI bar is hidden). ---
     drawButtons(cv, G, t, v, act, bottom);
-    return cv;
-}
-
-/** The panel's real bottom (the room below the page); the kit's buttons end G.MARGIN over it. */
-function pageBottom(cv, G) { return G.pageBottom(cv) - (cv.own ? G.MARGIN : 0); }
-
-/**
- * Whether the page's controls reach the DME. need: 'map' (MHD, or a BM3 ROM with a known layout),
- * 'cooling' (MHD), 'burbles' (a BM3 ROM with a known layout), 'asd' (Bootmod3). The Platform
- * setting stands in for the unlock check, except where BM3 needs the ROM's memory layout.
- */
-function unlocked(v, need) {
-    const mhd = !!(v.mhd && v.mhd.flashed) || v.platform === 'mhd', rom = !!(v.bm3 && v.bm3.flashed);
-    const bm3 = rom || v.platform === 'bm3';
-    return need === 'map' ? mhd || rom : need === 'cooling' ? mhd : need === 'burbles' ? rom : bm3;
-}
-
-const NEEDS = { map: 'an MHD flash or an identified BM3 ROM', cooling: 'an MHD flash', burbles: 'an identified BM3 ROM', asd: 'Bootmod3' };
-
-/** What the unlock check found, and whether presses reach the car. */
-function unlockLine(v, need) {
-    const m = v.mhd, b = v.bm3;
-    let found;
-    if (!m && !b) found = v.platform === 'mhd' ? 'Platform: MHD' : v.platform === 'bm3' ? 'Platform: Bootmod3' : 'Unlock check: not read (no diagnostic link)';
-    else if (m && m.flashed) found = 'MHD flash detected' + (m.tag ? ' (' + m.tag + ')' : '');
-    else if (b && b.flashed) found = 'BM3 ROM ' + b.rom + ' detected';
-    else if (v.platform === 'mhd') found = 'Platform: MHD (no MHD tag found: ' + (m.reason || 'no answer') + ')';
-    else if (v.platform === 'bm3') found = 'Platform: Bootmod3 (ROM not identified: ' + (b.reason || 'no answer') + ')';
-    else found = 'No MHD or BM3 flash on this DME (' + ((b && b.reason) || (m && m.reason) || 'no answer') + ')';
-    if (!unlocked(v, need)) found += ': needs ' + NEEDS[v.platform === 'bm3' && need === 'map' ? 'burbles' : need];
-    return found + (v.source === 'sim' ? '  ·  Disarmed: simulated, nothing is sent' : '');
-}
-
-/** A tune page: the panel, the big state word, the unlock line and whether the DME took it. */
-function tunePage(cv, G, t, v, word, color, accepted, need) {
-    G.panel(cv, t, 24, G.TOP, W - 48, G.BOTTOM - G.TOP, null);
-    cv.text(word, W / 2, G.TOP + 150, 80, color, { align: 'center', font: 'bold', spacing: 2 });
-    cv.text(unlockLine(v, need), W / 2, G.TOP + 210, 20, unlocked(v, need) ? t.text : (t.warn || '#d29922'), { align: 'center', font: 'label' });
-    const err = v.tune && v.tune.error;
-    const note = err ? '! ' + err : accepted === 'read' ? 'Read from the DME' : accepted === true ? (v.source === 'sim' ? 'Simulated' : 'DME took it') : accepted === false ? 'Not taken' : '';
-    if (note) cv.text(note, W / 2, G.TOP + 246, 18, err || accepted === false ? (t.crit || '#ef2b2d') : t.dim, { align: 'center', font: 'label' });
-}
-
-/** Map: the tune's map slot 1..4; a press asks for a second press to confirm. */
-function drawMap(cv, G, t, v, act) {
-    const tune = v.tune || {};
-    const map = tune.mapAccepted === false ? null : tune.map;          // a refused one is not shown as set
-    tunePage(cv, G, t, v, map ? 'MAP ' + map : 'MAP –', t.text, tune.mapAccepted, 'map');
-    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
-    let bx = (W - (4 * bw + 3 * gap)) / 2;
-    for (let n = 1; n <= 4; n++) {
-        const on = map === n;
-        G.button(cv, t, bx, by, bw, bh, 'Map ' + n, () => act.map && act.map(n),
-            Object.assign({ key: 'la_map' + n, confirm: !on }, on ? { color: t.crit || '#ef2b2d', primary: true } : {}));
-        bx += bw + gap;
-    }
-    return cv;
-}
-
-/** Max cooling: on / off. */
-function drawCooling(cv, G, t, v, act) {
-    const tune = v.tune || {};
-    const cooling = tune.coolingAccepted === false ? null : tune.cooling;
-    const word = cooling == null ? 'MAX COOLING –' : cooling ? 'MAX COOLING ON' : 'MAX COOLING OFF';
-    tunePage(cv, G, t, v, word, cooling ? (t.accent2 || '#81c4ff') : t.text, tune.coolingAccepted, 'cooling');
-    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
-    let bx = (W - (2 * bw + gap)) / 2;
-    [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {
-        const sel = cooling === on;
-        G.button(cv, t, bx, by, bw, bh, label, () => act.cooling && act.cooling(on),
-            Object.assign({ key: 'la_cool' + label }, sel ? { color: t.crit || '#ef2b2d', primary: true } : {}));
-        bx += bw + gap;
-    });
-    return cv;
-}
-
-/** Burbles: the aggression picked with - / + (v.burble, nothing sent), Apply sends it, Off turns them off. */
-function drawBurbles(cv, G, t, v, act) {
-    const tune = v.tune || {};
-    const set = tune.burblesAccepted === false ? undefined : tune.burbles;      // undefined = not known
-    const pick = v.burble == null ? 4 : v.burble;
-    tunePage(cv, G, t, v, 'AGGRESSION ' + pick, t.text, tune.burblesAccepted, 'burbles');
-    const now = set === undefined ? 'Set: –' : set === null ? 'Set: off' : 'Set: ' + set;
-    cv.text(now, W / 2, G.TOP + 290, 26, t.dim, { align: 'center', font: 'bold' });
-    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
-    let bx = (W - (4 * bw + 3 * gap)) / 2;
-    [['–', () => act.burbleStep && act.burbleStep(-0.5), {}],
-        ['+', () => act.burbleStep && act.burbleStep(0.5), {}],
-        ['Apply', () => act.burbles && act.burbles(pick), Object.assign({ confirm: true }, set === pick ? { color: t.crit || '#ef2b2d', primary: true } : {})],
-        ['Off', () => act.burbles && act.burbles(null), Object.assign({ confirm: set !== null }, set === null ? { color: t.crit || '#ef2b2d', primary: true } : {})],
-    ].forEach(([label, run, opts], i) => {
-        G.button(cv, t, bx, by, bw, bh, label, run, Object.assign({ key: 'la_burble' + i }, opts));
-        bx += bw + gap;
-    });
-    return cv;
-}
-
-/** Sound: Active Sound Design on / off. */
-function drawAsd(cv, G, t, v, act) {
-    const tune = v.tune || {};
-    const asd = tune.asdAccepted === false ? null : tune.asd;
-    const word = asd == null ? 'SOUND DESIGN –' : asd ? 'SOUND DESIGN ON' : 'SOUND DESIGN OFF';
-    tunePage(cv, G, t, v, word, t.text, tune.asdAccepted, 'asd');
-    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
-    let bx = (W - (2 * bw + gap)) / 2;
-    [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {
-        const sel = asd === on;
-        G.button(cv, t, bx, by, bw, bh, label, () => act.asd && act.asd(on),
-            Object.assign({ key: 'la_asd' + label }, sel ? { color: t.crit || '#ef2b2d', primary: true } : {}));
-        bx += bw + gap;
-    });
     return cv;
 }
 
@@ -192,53 +80,153 @@ function drawButtons(cv, G, t, v, act, bottom) {
     }
 }
 
+/* ------------------------------------------------------- tune pages (tune.js) -- */
+
+const RED = (t) => t.crit || '#ef2b2d';
+
+/** The status line just above the buttons: what the DME said, or why nothing was sent. */
+function noteLine(cv, G, t, m, bottom) {
+    if (!m.note) return;
+    const c = m.noteType === 'warn' ? (t.warn || '#d29922') : m.noteType === 'go' ? (t.go || '#2fd27a') : t.dim;
+    cv.text(m.note, W / 2, bottom - 80, 18, c, { align: 'center', font: 'label' });
+}
+
+/** A row of equal buttons centred across the page bottom; spec = [label, run, selected]. */
+function buttonRow(cv, G, t, specs, bottom, bw, busy, keyPrefix) {
+    const bh = 56, gap = 26, by = bottom - 56;
+    let bx = (W - (specs.length * bw + (specs.length - 1) * gap)) / 2;
+    specs.forEach(([label, run, on], i) => {
+        const opts = { key: keyPrefix + i, busy: !!busy };
+        if (on) Object.assign(opts, { color: RED(t), primary: true });
+        G.button(cv, t, bx, by, bw, bh, label, run || (() => {}), opts);
+        bx += bw + gap;
+    });
+}
+
+/** Engine Map: the active map big, four slot bars, MAP 1-4 (one press switches). */
+function drawMap(cv, G, t, m, act, bottom) {
+    const cy = G.TOP + (bottom - G.TOP - 96) / 2 - 20;
+    cv.text(m.map ? 'MAP ' + m.map : 'MAP –', W / 2, cy + 30, 112, m.map ? t.text : t.dim,
+        { align: 'center', font: 'bold', spacing: 4 });
+    cv.text(m.map ? (m.mapConfirmed ? 'Active map · read from the DME' : 'Selected map · accepted by the DME')
+        : 'Pick a map', W / 2, cy + 74, 18, t.dim, { align: 'center', font: 'label', spacing: 1 });
+    const pw = 120, pg = 18, px0 = (W - (4 * pw + 3 * pg)) / 2;
+    for (let i = 0; i < 4; i++) {
+        cv.roundRect(px0 + i * (pw + pg), cy + 96, pw, 8, 4, m.map === i + 1 ? RED(t) : G.withAlpha('#ffffff', 0.12));
+    }
+    // seen on the owner's MG1 (MHD): the DME flashes the engine light while it changes maps
+    if (m.features && m.features.map && !m.readback) {
+        cv.text('The engine light may flash while the map changes — that is normal', W / 2, cy + 134, 16,
+            t.dim, { align: 'center', font: 'label' });
+    }
+    noteLine(cv, G, t, m, bottom);
+    buttonRow(cv, G, t, [1, 2, 3, 4].map((n) => ['Map ' + n, act.map && act.map(n), m.map === n]),
+        bottom, 200, m.busy, 'la_map');
+    return cv;
+}
+
+/** Max Cooling: a fan that lights up when on, ON / OFF. */
+function drawCooling(cv, G, t, m, act, bottom) {
+    const on = m.cooling === 'ON';
+    const ice = t.accent2 || '#81c4ff';
+    const r = Math.min(104, (bottom - G.TOP - 200) / 2);
+    drawFan(cv, G, t, W / 2, G.TOP + 24 + r + 10, r, on ? ice : G.withAlpha('#ffffff', 0.35));
+    cv.text(m.cooling || 'OFF', W / 2, bottom - 112, 48, on ? ice : t.text, { align: 'center', font: 'bold', spacing: 2 });
+    // ON needs the engine running (tune.js MIN_COOLING_RPM); shown under the fan
+    const rpmText = m.rpm == null ? 'Engine speed unknown' : m.rpm > (m.minCoolingRpm || 500)
+        ? 'Engine running · ' + Math.round(m.rpm) + ' rpm' : 'Engine off · needs over ' + (m.minCoolingRpm || 500) + ' rpm';
+    cv.text(rpmText, W / 2, bottom - 152, 16, t.dim, { align: 'center', font: 'label' });
+    noteLine(cv, G, t, m, bottom);
+    buttonRow(cv, G, t, [['On', act.cooling && act.cooling(true), on],
+        ['Off', act.cooling && act.cooling(false), m.cooling === 'OFF']], bottom, 236, m.busy, 'la_cool');
+    return cv;
+}
+
+/** Burbles: the DME's state and the picked aggression; -/+ pick, Apply sends, Off disables. */
+function drawBurbles(cv, G, t, m, act, bottom) {
+    const cy = G.TOP + (bottom - G.TOP - 96) / 2 - 20;
+    const agg = typeof m.targetAgg === 'number' ? m.targetAgg : 0;
+    cv.text(agg.toFixed(1), W / 2, cy + 30, 112, t.text, { align: 'center', font: 'bold', spacing: 4 });
+    cv.text('Aggression 0.0 – 12.0', W / 2, cy + 74, 18, t.dim, { align: 'center', font: 'label', spacing: 1 });
+    const state = m.burbles === null || m.burbles === undefined ? 'unknown'
+        : m.burbles === 'off' ? 'off' : m.burbles === 'custom' ? 'custom value' : m.burbles;
+    cv.text('Now on the DME: ' + state, W / 2, cy + 104, 18, t.dim, { align: 'center', font: 'label' });
+    noteLine(cv, G, t, m, bottom);
+    buttonRow(cv, G, t, [['–', act.aggDown, false], ['+', act.aggUp, false],
+        ['Apply', act.burblesApply, false], ['Off', act.burblesOff, m.burbles === 'off']],
+        bottom, 200, m.busy, 'la_burb');
+    return cv;
+}
+
+/** Active Sound (ASD): the interior engine sound on / off; the DME does not report its state. */
+function drawAsd(cv, G, t, m, act, bottom) {
+    const cy = G.TOP + (bottom - G.TOP - 96) / 2 - 20;
+    const word = m.asd === true ? 'ON' : m.asd === false ? 'OFF' : '–';
+    cv.text(word, W / 2, cy + 30, 112, m.asd == null ? t.dim : t.text, { align: 'center', font: 'bold', spacing: 4 });
+    cv.text('Active Sound Design · the last setting the DME accepted', W / 2, cy + 74, 18, t.dim,
+        { align: 'center', font: 'label', spacing: 1 });
+    noteLine(cv, G, t, m, bottom);
+    buttonRow(cv, G, t, [['On', act.asd && act.asd(true), m.asd === true],
+        ['Off', act.asd && act.asd(false), m.asd === false]], bottom, 236, m.busy, 'la_asd');
+    return cv;
+}
+
+/** A radiator fan seen face-on: shroud ring, six swept blades, hub (circles + lines only). */
+function drawFan(cv, G, t, cx, cy, r, col) {
+    cv.circle(cx, cy, r + 10, G.withAlpha('#ffffff', 0.10));
+    cv.circle(cx, cy, r + 4, t.bg);
+    cv.circle(cx, cy, r, G.withAlpha(col, 0.08));
+    for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3 + 0.3, a2 = a + 0.35;
+        const mx = cx + Math.cos(a) * r * 0.55, my = cy + Math.sin(a) * r * 0.55;
+        cv.line(cx + Math.cos(a) * r * 0.2, cy + Math.sin(a) * r * 0.2, mx, my, 16, col);
+        cv.line(mx, my, cx + Math.cos(a2) * r * 0.88, cy + Math.sin(a2) * r * 0.88, 12, col);
+    }
+    cv.circle(cx, cy, r * 0.2, '#1a1e24');
+    cv.circle(cx, cy, r * 0.1, col);
+}
+
 /**
- * One tailpipe tip seen end-on: a rolled chrome rim (lit from the top left), the inner pipe with
- * depth, and the butterfly valve inside it. open 0 = shut (the plate fills the pipe), 1 = open
- * (the plate edge-on).
+ * One tailpipe tip seen end-on: a chromed round bezel with a dark bore and the butterfly
+ * valve inside. open 0 = shut (plate covers the bore), 1 = open (plate edge-on, bore
+ * reveals). Built from concentric discs for a metallic look.
  */
 function drawTip(cv, G, t, cx, cy, r, open, accent) {
     const wa = G.withAlpha;
-    cv.circle(cx, cy, r * 1.13, '#040506');                                   // cut-out in the valance
-    cv.arc(cx, cy, r * 1.13, r * 1.16, 230, 490, wa('#ffffff', 0.10));       // its lit edge
-    cv.circle(cx, cy + r * 0.06, r * 1.02, wa('#000000', 0.55));              // shadow under the tip
-    // chrome rim: colour by angle, bright top left, dark bottom right
-    cv.arc(cx, cy, r * 0.78, r, 0, 360, null, { ramp: ['#c9ced5', '#8b939d', '#4a5059', '#2f343b', '#3d434b', '#7d858f', '#e9edf1', '#fbfcfd', '#c9ced5'] });
-    cv.arc(cx, cy, r * 0.97, r, 0, 360, wa('#000000', 0.35));                 // outer edge
-    cv.arc(cx, cy, r * 0.86, r * 0.92, 285, 355, wa('#ffffff', 0.55), { round: true });   // specular on the roll
-    cv.arc(cx, cy, r * 0.86, r * 0.9, 105, 165, wa('#ffffff', 0.12), { round: true });    // bounce light
-    cv.arc(cx, cy, r * 0.76, r * 0.8, 0, 360, '#15181c');                     // lip into the pipe
-    // the pipe going in: darker toward the back
-    const rb = r * 0.74;
-    cv.circle(cx, cy, rb, '#0e1013');
-    cv.arc(cx, cy, rb * 0.86, rb, 0, 360, null, { ramp: ['#23272d', '#16191d', '#0b0d10', '#16191d', '#23272d'] });
-    cv.circle(cx, cy, rb * 0.62, '#07080a');
-    if (open > 0.4) {                                                         // light through the open valve
+    cv.circle(cx, cy + 4, r + 6, wa('#000000', 0.32));      // soft drop shadow
+    cv.circle(cx, cy, r + 2, '#0b0e12');                     // outer edge
+    cv.circle(cx, cy, r, '#9aa1ac');                         // chrome base
+    cv.circle(cx, cy, r * 0.93, '#565d68');                  // shade ring
+    cv.circle(cx, cy, r * 0.87, '#cdd2da');                  // bright lip
+    cv.circle(cx, cy, r * 0.79, '#272c34');                  // groove
+    cv.circle(cx, cy, r * 0.71, '#9ea5af');                  // inner lip
+    const rb = r * 0.65;
+    cv.circle(cx, cy, rb, '#0a0c10');                        // dark bore
+    cv.circle(cx, cy - rb * 0.1, rb * 0.9, '#050608');       // bore depth
+    if (open > 0.4) {                                        // flow glow when open
         const g = (open - 0.4) / 0.6;
-        cv.circle(cx, cy, rb * 0.62, wa(accent, 0.10 * g));
-        cv.circle(cx, cy, rb * 0.34, wa(accent, 0.18 * g));
+        cv.circle(cx, cy, rb * 0.72, wa(accent, 0.13 * g));
+        cv.circle(cx, cy, rb * 0.4, wa(accent, 0.20 * g));
     }
-    // butterfly plate on a vertical shaft: narrower as it opens
-    const pr = rb * 0.84, ws = Math.max(0.08, Math.cos(open * Math.PI / 2 * 0.95));
-    const pw = 2 * pr * ws;
-    cv.roundRect(cx - pw / 2, cy - pr, pw, 2 * pr, Math.min(pw / 2, pr), '#4f565f');
-    if (pw > 14) cv.roundRect(cx - pw / 2 + pw * 0.08, cy - pr * 0.94, pw * 0.34, pr * 1.88, Math.min(pw * 0.17, pr), wa('#ffffff', 0.16));
-    cv.line(cx, cy - rb, cx, cy + rb, 3, '#1c2026');                          // shaft
-    cv.circle(cx, cy, 6, '#2a2f36'); cv.circle(cx, cy, 2.5, '#6a727c');       // hub
+    // butterfly plate: a vertical pill whose width shrinks as it opens
+    const ws = Math.max(0.10, Math.cos(open * Math.PI / 2 * 0.95));
+    const pw = 2 * rb * ws;
+    cv.roundRect(cx - pw / 2, cy - rb, pw, 2 * rb, Math.min(pw / 2, rb), '#c7cdd5');
+    if (pw > 12) cv.roundRect(cx - pw * 0.28, cy - rb * 0.92, pw * 0.3, rb * 1.84, Math.min(pw * 0.15, rb), wa('#ffffff', 0.28));
+    cv.line(cx, cy - rb, cx, cy + rb, 2, wa('#20242b', 0.8));
+    cv.circle(cx, cy, 5.5, '#1a1e24'); cv.circle(cx, cy, 2.5, '#434a53');   // hub
+    cv.circle(cx - r * 0.4, cy - r * 0.48, r * 0.1, wa('#ffffff', 0.5));    // specular dot
 }
 
-/** The rear valance with twin tips side by side (oo), the valves opening and closing. */
+/** Twin tailpipes seen end-on, with the butterfly valves opening/closing. */
 function drawExhaust(cv, G, t, x, y, w, h, v) {
-    const wa = G.withAlpha;
     const a = (v.angle == null ? (v.confirmed === 'OPEN' ? 1 : v.confirmed === 'UNKNOWN' ? 0.5 : 0) : v.angle);
     const accent = (v.confirmed === 'OPEN' || v.requested === 'OPEN') ? (t.accent2 || '#81c4ff') : (t.crit || '#ef2b2d');
-    const cx = x + w / 2, cy = y + h / 2;
-    const r = Math.min(h * 0.38, w * 0.14);
-    // valance: dark body colour, lit along its top edge
-    cv.card(x, y + h * 0.1, w, h * 0.8, 36, [[0, '#2b3038'], [0.35, '#181b20'], [1, '#0b0d10']]);
-    cv.strokeRoundRect(x, y + h * 0.1, w, h * 0.8, 36, 2, wa('#ffffff', 0.08));
-    cv.line(x + 40, y + h * 0.1 + 10, x + w - 40, y + h * 0.1 + 10, 2, wa('#ffffff', 0.06));
-    for (const side of [-1, 1]) drawTip(cv, G, t, cx + side * r * 1.32, cy, r, a, accent);
+    const cx = x + w * 0.5, cy = y + h * 0.5;
+    const r = Math.min(h * 0.40, w * 0.19);
+    const ox = r * 0.8, oy = r * 0.32;        // diagonal offset between the twin tips
+    drawTip(cv, G, t, cx - ox, cy + oy, r, a, accent);   // left/lower
+    drawTip(cv, G, t, cx + ox, cy - oy, r, a, accent);   // right/upper
 }
 
-module.exports = { draw, W, H, PAGES };
+module.exports = { draw, W, H };

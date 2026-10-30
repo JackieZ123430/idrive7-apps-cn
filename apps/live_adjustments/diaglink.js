@@ -12,8 +12,6 @@
  * Nothing here actuates the flap. Actuation lives in adapters.js and is gated there.
  */
 const { Diag, hex, NRC } = require('./kit/diag');
-const { Bm3Protocol } = require('./bm3_protocol');
-const BM3_PROFILES = require('./bm3_profiles');
 
 const DME = 0x12;                 // DME engine (BMW diagnostic address)
 const DME2 = 0x13;                // second DME on some engines, kept for future use
@@ -30,28 +28,29 @@ const DID_SW = [0xF1, 0x95];
 const DID_ASW_EL_AGK = [0x62, 0xFD];
 const DID_ASG_EL_AGK = [0x64, 0xFD];
 const DID_ISAGK = [0x4A, 0x65];
-// MHD (the tuning flasher) leaves a tag in DME memory; MHD's own app reads it when it connects
-// (ReadMemoryByAddress 0x23, format 0x24 = 2-byte size / 4-byte address, 0x807FF750, 16 bytes) and
-// the DME answers "MHD2..." when it runs an MHD flash (capture from a1-mapping, idrive7-apps PR #23).
-const MHD_TAG = [0x24, 0x80, 0x7F, 0xF7, 0x50, 0x00, 0x10];
 
 function bytesToHex(b) { return (b || []).map((x) => hex(x)).join(' '); }
 
 class DiagLink {
-    constructor(signals, log, config) {
+    constructor(signals, log) {
         this.signals = signals;
         this.log = log;
-        this.config = config || {};
         this.diag = null;
-        this.bm3 = null;
         this.available = false;
         this.dme = DME;
+        this._onAvailable = [];
     }
+
+    /** fn(on) when the diagnostic link comes up or goes away (apps start at boot, often before it). */
+    onAvailable(fn) { this._onAvailable.push(fn); }
 
     async init() {
         this.diag = await new Diag(this.signals, this.log).init();
         this.available = !!this.diag.available;
-        this.bm3 = new Bm3Protocol(this.diag, BM3_PROFILES, { bm3MarkerAddress: this.config.bm3MarkerAddress || '807FFE50' });
+        this.diag.on('available', (on) => {
+            this.available = !!on;
+            this._onAvailable.forEach((fn) => { try { fn(this.available); } catch (e) { this.log.error(e); } });
+        });
         return this;
     }
 
@@ -72,10 +71,10 @@ class DiagLink {
 
     /**
      * Identify the DME (read-only). Returns an ident object the adapters match on:
-     *   { present, sgbdIndex(hex string), vin, hw, sw, elAgk, platform, mhd, bm3 }.
+     *   { present, sgbdIndex(hex string), vin, hw, sw }.
      * `present` is true only when the DME answered at least one identity read.
      */
-    async identifyDme(platform) {
+    async identifyDme() {
         const ident = { present: false, address: this.dme, sgbdIndex: null, vin: null, hw: null, sw: null };
         if (!this.available) return ident;
         const sg = await this.readDid(DID_SGBD_INDEX);
@@ -94,43 +93,8 @@ class DiagLink {
             commandedPct: asw.ok && asw.data.length >= 2 ? ((asw.data[0] << 8) | asw.data[1]) / 100 : null,
             positionRaw: asg.ok ? bytesToHex(asg.data) : null,
         };
-        // platform 'mhd' / 'bm3' (the Platform setting) checks only that flash; 'auto' checks MHD, then BM3
-        ident.platform = platform || 'auto';
-        ident.mhd = ident.platform !== 'bm3' ? await this.readMhd() : { flashed: false, tag: null, reason: 'not checked' };
-        ident.bm3 = ident.platform !== 'mhd' && !ident.mhd.flashed ? await this.readBm3() : { flashed: false, rom: null, reason: 'not checked' };
         this.log.info('DME ident: ' + JSON.stringify(ident));
         return ident;
-    }
-
-    /** The unlock check (read-only): is the DME MHD-flashed? Returns {flashed, tag, reason}. */
-    async readMhd() {
-        if (!this.available) return { flashed: false, tag: null, reason: 'no diagnostic link' };
-        try {
-            const reply = await this.diag.physical(this.dme, 0x23, MHD_TAG, 2000);
-            if (!reply || !reply.length) return { flashed: false, tag: null, reason: 'timeout' };
-            if (reply[0] === 0x7F) return { flashed: false, tag: null, reason: NRC[reply[2]] || ('NRC ' + hex(reply[2])) };
-            if (reply[0] !== 0x63) return { flashed: false, tag: null, reason: 'unexpected ' + hex(reply[0]) };
-            const text = String.fromCharCode.apply(null, reply.slice(1));
-            const tag = (/^[\x20-\x7e]*/.exec(text) || [''])[0];
-            return { flashed: /^MHD/.test(tag), tag: tag || null, reason: /^MHD/.test(tag) ? 'MHD flash' : 'no MHD tag' };
-        } catch (e) {
-            return { flashed: false, tag: null, reason: String(e && e.message || e) };
-        }
-    }
-
-    /**
-     * The BM3 unlock check: the CustomROM marker names a ROM whose layout is known (bm3_profiles.js).
-     * Defines a temporary identifier over the marker (0x2C) and reads it (0x22 F301); changes nothing
-     * on the car. Returns {flashed, rom, reason}.
-     */
-    async readBm3() {
-        if (!this.available) return { flashed: false, rom: null, reason: 'no diagnostic link' };
-        try {
-            const r = await this.bm3.identify();
-            return { flashed: true, rom: r.rom, reason: 'BM3 ROM ' + r.rom };
-        } catch (e) {
-            return { flashed: false, rom: null, reason: String(e && e.message || e) };
-        }
     }
 
     /** Read the electric-flap state back (read-only). Returns {supported, commandedPct, positionRaw}. */

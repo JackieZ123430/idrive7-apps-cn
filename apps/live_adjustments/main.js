@@ -1,8 +1,9 @@
 'use strict';
 /**
- * Engine Config - native live tweaks for the BMW MGU (iDrive 7). Pages: Exhaust Flap, and on a
- * tuned DME (found by a read-only unlock check) Map (slot 1..4, MHD or BM3), Max cooling (MHD),
- * Burbles and Sound (Active Sound Design) (BM3).
+ * Live Adjustments - native live tweaks for the BMW MGU (iDrive 7), one tab each:
+ *   Exhaust Flap - BMW's own 0x60FD on the DME (controller.js + adapters), always there;
+ *   Engine Map / Max Cooling / Burbles / Active Sound - the tune picked in Settings
+ *   ("Tuning software": Off, BM3, MHD) gets its own tabs (tune.js). Off sends nothing.
  *
  * Exhaust Flap modes: OEM (hand the flap back to the DME), OPEN (request it open) and
  * CLOSE (request it shut) — the bottom action buttons. The command leaves the app only
@@ -18,6 +19,14 @@ const G = require('./kit/gauges');
 const { Canvas } = require('./kit/canvas');
 const UI = require('./ui');
 const { Controller } = require('./controller');
+const { TuneControl } = require('./tune');
+const Car = require('./kit/car');
+
+/** The tabs this car gets: Exhaust Flap always, then the picked tune's pages. */
+function pagesFor(f) {
+    return ['Exhaust Flap'].concat(f.map ? ['Engine Map'] : [], f.cooling ? ['Max Cooling'] : [],
+        f.burbles ? ['Burbles'] : [], f.asd ? ['Active Sound'] : []);
+}
 
 // eased valve angle toward the current state (0 = shut, 1 = open)
 function targetAngle(v) {
@@ -32,19 +41,30 @@ mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
         const controller = new Controller(ctx);
+        // engine speed for Max Cooling's rpm threshold: live values only, never the demo drive
+        const car = new Car(ctx, ['rpm']);
+        const tune = new TuneControl(ctx, { rpm: () => { const d = car.data(); return d.demo ? null : d.rpm; } });
         let angle = 0.18;
-        let page = 0;
-        let burble = 4;                       // the aggression picked on the Burbles page, sent on Apply
+        let page = 'Exhaust Flap';          // by name: the tune's tabs come and go with the setting
 
         // the three mode presses, each kicks a repaint (used by both the HMI bar and
         // the on-canvas buttons the kit draws when the app owns the screen)
         const press = (mode) => () =>
             Promise.resolve(controller.setMode(mode)).then(() => loop && (loop.kick ? loop.kick() : render())).catch((e) => log.error('action', e));
-        const tune = (kind) => (value) =>
-            Promise.resolve(controller.setTune(kind, value)).then(() => loop && (loop.kick ? loop.kick() : render())).catch((e) => log.error('action', e));
-        const acts = { oem: press('OEM'), open: press('OPEN'), close: press('CLOSED'), map: tune('map'), cooling: tune('cooling'),
-            burbles: tune('burbles'), asd: tune('asd'),
-            burbleStep: (d) => { burble = Math.min(12, Math.max(0, burble + d)); if (loop.kick) loop.kick(); } };
+        const repaint = () => (loop && loop.kick ? loop.kick() : render());
+        // a tune action: repaint at once (shows "Sending…"), then again with the DME's answer
+        const tuneAct = (fn) => () => { const p = fn(); repaint(); return p.then(repaint).catch((e) => log.error('tune', e)); };
+        const acts = {
+            oem: press('OEM'), open: press('OPEN'), close: press('CLOSED'),
+            map: (n) => tuneAct(() => tune.setMap(n)),
+            cooling: (on) => tuneAct(() => tune.setCooling(on)),
+            aggDown: () => { tune.stepAggression(-0.5); repaint(); },
+            aggUp: () => { tune.stepAggression(0.5); repaint(); },
+            burblesApply: tuneAct(() => tune.applyBurbles(false)),
+            burblesOff: tuneAct(() => tune.applyBurbles(true)),
+            asd: (on) => tuneAct(() => tune.setAsd(on)),
+        };
+        const pages = () => pagesFor(tune.features());
 
         const render = async () => {
             const v = controller.view();
@@ -52,8 +72,11 @@ mgu.run({
             angle += (tgt - angle) * 0.25;            // simple ease per frame
             if (Math.abs(tgt - angle) < 0.003) angle = tgt;
             v.angle = angle;
+            const list = pages();
+            if (list.indexOf(page) < 0) page = list[0];   // a tab that went away (disarmed / not detected)
+            v.pages = list;
             v.page = page;
-            v.burble = burble;
+            v.tune = tune.view();
             const t = ctx.theme();
             const cv = ctx.canvas(UI.W, UI.H) || new Canvas(UI.W, UI.H);
             UI.draw(cv, G, t, v, acts);           // acts → the kit draws OEM/OPEN/CLOSE, active one red
@@ -68,10 +91,17 @@ mgu.run({
         ui.onClick('BTN_OPEN', acts.open);        // kept as a fallback if the bar button shows
         ui.onClick('BTN_CLOSE', acts.close);
         ui.onClick('BTN_OEM', acts.oem);
-        if (ctx.onTab) ctx.onTab((i) => { if (i >= 0 && i < UI.PAGES.length && i !== page) { page = i; if (loop.kick) loop.kick(); } });
-        settings.onChange(() => controller.refresh().then(() => loop.kick && loop.kick()));
+        ui.onClick('BTN_PAGE', () => { const l = pages(); page = l[(l.indexOf(page) + 1) % l.length]; return render(); });
+        ctx.onTab((i) => { const l = pages(); if (l[i]) page = l[i]; return render(); });
+        // the tune is looked at again only when it changes (a theme change sends nothing)
+        settings.onChange((key) => controller.refresh().then(() => key === 'tuner' && tune.refresh())
+            .then(repaint).catch((e) => log.error('settings', e)));
 
         await controller.start();        // read-only: detect DME + read state, no actuation
+        await tune.start(controller.link);   // nothing at all while "Tuning software" is Off
+        // the diagnostic link often comes up after the app started (at boot): detect again then
+        if (controller.link) controller.link.onAvailable(() => controller.refresh().then(() => tune.refresh())
+            .then(repaint).catch((e) => log.error('link', e)));
         await render();
         log.info('exhaust_control ready (source=' + controller.source + ', adapter=' + controller.adapter.name + ')');
     },
