@@ -3,22 +3,20 @@ name: Experimental apps
 on:
   pull_request:
     paths:
-      - 'apps/bm3_live/**'
       - 'apps/zf8hp/**'
       - 'apps/live_adjustments/**'
       - 'kit/runtime/diag.js'
-      - 'kit/tools/test_bm3_live.js'
+      - 'kit/tools/test_bm3_protocol.js'
       - 'kit/tools/test_zf8hp.js'
       - 'kit/tools/test_live_adjustments.js'
       - 'kit/tools/test_diag_options.js'
       - '.github/workflows/experimental-apps.yml'
   push:
     paths:
-      - 'apps/bm3_live/**'
       - 'apps/zf8hp/**'
       - 'apps/live_adjustments/**'
       - 'kit/runtime/diag.js'
-      - 'kit/tools/test_bm3_live.js'
+      - 'kit/tools/test_bm3_protocol.js'
       - 'kit/tools/test_zf8hp.js'
       - 'kit/tools/test_live_adjustments.js'
       - 'kit/tools/test_diag_options.js'
@@ -35,7 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node kit/tools/test_bm3_live.js
+      - run: node kit/tools/test_bm3_protocol.js
       - run: node kit/tools/test_zf8hp.js
       - run: node kit/tools/test_live_adjustments.js
       - run: node kit/tools/test_diag_options.js

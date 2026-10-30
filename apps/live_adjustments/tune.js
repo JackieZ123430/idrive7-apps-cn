@@ -1,27 +1,35 @@
 'use strict';
 /**
- * tune.js - the live adjustments a TUNED DME offers: engine map switching (maps 1-4),
- * Max Cooling and burbles. They are not BMW jobs. Everything here runs only while the
- * "Tune functions" setting is Armed (Disarmed, the default, sends nothing at all). The
- * screen never names the tune; the log does.
+ * tune.js - the live adjustments a TUNED DME offers. The "Tuning software" setting says which
+ * tune the car runs, and the tabs follow it:
  *
- *   BM3: bm3_protocol.js / bm3_profiles.js, copied from the vendor's bm3_live app - the
- *     CustomROM is identified by its marker, the map and burbles are written to the DME's
- *     memory and confirmed by reading them back.
+ *   Off (default)  nothing is sent at all and no tune tab is offered
+ *   BM3            Engine Map, Burbles, Active Sound (ASD)
+ *   MHD            Engine Map, Max Cooling
+ *
+ * Other tuning software: add a choice to "tuner" in app.json, its features in FEATURES and
+ * its commands below (the community is welcome to: see the README).
+ *
+ *   BM3 (bm3_protocol.js / bm3_profiles.js, formerly the separate BM3 Live app): the
+ *     CustomROM is identified by its marker and must match a known ROM; the map and burbles
+ *     are written to the DME's memory and confirmed by reading them back. Unknown ROMs are
+ *     rejected. ASD: 2E 5FFD 00 (on) | 01 (off), no read-back.
  *   MHD (captures by a1-mapping on PR #23; map switch confirmed on the owner's MG1,
  *     2026-10-30 - the engine note changed), DME 0x12:
  *     map switch : 2F 01 <map - 1>   -> 6F 01 <map - 1>   map 1..4 = 00..03
  *     max cooling: 2F 03 01 | 00     -> 6F 03 01 | 00     on | off
- *     MHD's marker sits at a ROM-dependent address (0x807FF750 on a1-mapping's DME_86T0;
- *     the owner's DME answered 7F 23 72 there), so it is NOT detected by a memory read:
- *     when no BM3 ROM is found, the map / cooling tabs are offered and a press counts only
- *     when the DME echoes the request back. An untuned DME refuses it ("Not available").
- *     No read-back of the active map is known.
- *
- * Burbles are BM3 only; Max Cooling is offered when no BM3 ROM is found.
+ *     MHD's marker sits at a ROM-dependent address, so it is not read: a press counts only
+ *     when the DME echoes the request back. No read-back of the active map is known.
  */
 const { Bm3Protocol } = require('./bm3_protocol');
 const bm3Profiles = require('./bm3_profiles');
+
+const TUNERS = ['off', 'bm3', 'mhd'];
+const FEATURES = {
+    off: { map: false, cooling: false, burbles: false, asd: false },
+    bm3: { map: true, cooling: false, burbles: true, asd: true },
+    mhd: { map: true, cooling: true, burbles: false, asd: false },
+};
 
 class TuneControl {
     constructor(ctx) {
@@ -34,22 +42,26 @@ class TuneControl {
     }
 
     _reset() {
-        this.kind = null;            // 'bm3' | 'echo' (MHD-style, validated per press) | null
+        this.verified = false;       // BM3: the ROM marker matched a known profile
         this.map = null;             // 1..4, the map last confirmed (bm3) or accepted (mhd)
         this.mapConfirmed = false;   // true = read back from the DME
         this.cooling = null;         // 'ON' | 'OFF' | null (accepted by the DME)
         this.burbles = null;         // DME state: 'off' | 'custom' | '4.5' | null (unknown)
+        this.asd = null;             // true | false | null (last accepted)
         this.busy = false;
         this.note = null;            // the status line under the page
         this.noteType = 'dim';       // dim | go | warn
     }
 
-    get armed() { return this.ctx.settings.get('tune') === 'on'; }
-
-    /** Which pages this car gets (Armed and the diagnostic link up only). */
-    features() {
-        return { map: !!this.kind, cooling: this.kind === 'echo', burbles: this.kind === 'bm3' };
+    /** The tune the owner picked in Settings; anything unknown counts as Off. */
+    get tuner() {
+        const v = this.ctx.settings.get('tuner');
+        return TUNERS.indexOf(v) >= 0 ? v : 'off';
     }
+    get armed() { return this.tuner !== 'off'; }
+
+    /** Which pages this car gets: the picked tune's. */
+    features() { return Object.assign({}, FEATURES[this.tuner]); }
 
     async start(link) {
         this.link = link;
@@ -57,27 +69,34 @@ class TuneControl {
         await this.refresh();
     }
 
-    /** Look for a BM3 ROM again (Armed only). Disarmed: nothing is sent, no page offered. */
+    /** The tune changed or the diagnostic link came up: start over. BM3 is identified (memory
+     * reads only); MHD has nothing to identify; Off sends nothing. */
     async refresh() {
         const target = this.targetAgg;
         this._reset();
         this.targetAgg = target;
-        if (!this.armed || !this.link || !this.link.available) return;
-        // BM3: its CustomROM marker, matched against the known ROM profiles.
-        if (this.bm3) {
+        if (!this.armed) return;
+        if (!this.link || !this.link.available) { this.note = 'Waiting for the diagnostic link'; this.noteType = 'warn'; return; }
+        if (this.tuner === 'bm3') {
             try {
-                await this.bm3.identify();
-                this.kind = 'bm3';
+                await this._identifyBm3();
                 this.map = (await this.bm3.currentMap()) + 1;
                 this.mapConfirmed = true;
                 await this._readBurbles();
-            } catch (e) { this.log.info('tune detect (BM3): ' + String(e && e.message || e)); }
+                this.note = 'BM3 ROM ' + this.bm3.rom + ' · map ' + this.map + ' active';
+                this.noteType = 'go';
+            } catch (e) {
+                this.note = 'BM3: ' + String(e && e.message || e);
+                this.noteType = 'warn';
+                this.log.info('tune detect (BM3): ' + this.note);
+            }
         }
-        // Otherwise the MHD-style commands, each one validated by the DME's echo.
-        if (!this.kind) this.kind = 'echo';
-        this.log.info('tune: ' + (this.kind === 'bm3' ? 'bm3 detected (ROM ' + this.bm3.rom + ')'
-            : 'no BM3 ROM - map / cooling offered, each press validated by the DME echo'));
-        if (this.kind === 'bm3') { this.note = 'Map ' + this.map + ' active'; this.noteType = 'go'; }
+        this.log.info('tune: ' + this.tuner + (this.verified ? ' (ROM ' + this.bm3.rom + ')' : ''));
+    }
+
+    async _identifyBm3() {
+        if (!this.bm3) throw new Error('no diagnostic link');
+        if (!this.verified) { await this.bm3.identify(); this.verified = true; }
     }
 
     async _readBurbles() {
@@ -91,10 +110,12 @@ class TuneControl {
         }
     }
 
-    /** The one place a command leaves: armed, a tune detected, and nothing else running. */
-    async _run(label, fn) {
+    /** The one place a command leaves: a tune picked, the feature is that tune's, the link is up
+     * and nothing else is running. */
+    async _run(feature, label, fn) {
         if (this.busy) return;
-        if (!this.armed || !this.kind) { this.note = 'Not available on this car'; this.noteType = 'warn'; return; }
+        if (!this.armed || !FEATURES[this.tuner][feature]) { this.note = 'Not available for this tune'; this.noteType = 'warn'; return; }
+        if (!this.link || !this.link.available) { this.note = 'Waiting for the diagnostic link'; this.noteType = 'warn'; return; }
         this.busy = true;
         this.note = 'Sending ' + label + '…'; this.noteType = 'dim';
         try {
@@ -111,9 +132,9 @@ class TuneControl {
 
     /** Map 1..4: one press switches (no confirm step, the user's choice). */
     setMap(n) {
-        return this._run('map ' + n, async () => {
-            if (this.kind === 'bm3') {
-                if (!this.bm3.profile) await this.bm3.identify();
+        return this._run('map', 'map ' + n, async () => {
+            if (this.tuner === 'bm3') {
+                await this._identifyBm3();
                 this.map = (await this.bm3.setMap(n - 1)) + 1;
                 this.mapConfirmed = true;
                 return 'Map ' + this.map + ' · confirmed by the DME';
@@ -127,8 +148,7 @@ class TuneControl {
     }
 
     setCooling(on) {
-        return this._run('cooling ' + (on ? 'on' : 'off'), async () => {
-            if (this.kind !== 'echo') throw new Error('Not available on this car');
+        return this._run('cooling', 'cooling ' + (on ? 'on' : 'off'), async () => {
             const req = [0x03, on ? 0x01 : 0x00];
             this._expectEcho(await this.link.sendToDme(0x2F, req), req);
             this.cooling = on ? 'ON' : 'OFF';
@@ -136,7 +156,7 @@ class TuneControl {
         });
     }
 
-    /** -/+ only pick the aggression on screen; nothing is sent until Apply (as bm3_live). */
+    /** -/+ only pick the aggression on screen; nothing is sent until Apply. */
     stepAggression(delta) {
         this.targetAgg = Math.max(0, Math.min(12, this.targetAgg + delta));
         this.note = 'Aggression ' + this.targetAgg.toFixed(1) + ' selected · press Apply to send';
@@ -145,16 +165,23 @@ class TuneControl {
 
     /** Apply the picked aggression, or turn the override off (off = true). */
     applyBurbles(off) {
-        return this._run(off ? 'burbles off' : 'burbles ' + this.targetAgg.toFixed(1), async () => {
-            if (this.kind !== 'bm3') throw new Error('Not available on this car');
-            if (!this.bm3.profile) await this.bm3.identify();
+        return this._run('burbles', off ? 'burbles off' : 'burbles ' + this.targetAgg.toFixed(1), async () => {
+            await this._identifyBm3();
             const v = await this.bm3.setBurbles(off ? null : this.targetAgg);
             this.burbles = v === null ? 'off' : v.toFixed(1);
             return 'Burbles ' + (v === null ? 'off' : v.toFixed(1)) + ' · confirmed by the DME';
         });
     }
 
-    /** The MHD-style press counts only when the DME echoes it; an untuned DME refuses it. */
+    /** Active Sound Design on / off (the DME accepts it; its state is not reported back). */
+    setAsd(on) {
+        return this._run('asd', 'ASD ' + (on ? 'on' : 'off'), async () => {
+            this.asd = await this.bm3.setAsd(on);
+            return 'ASD ' + (this.asd ? 'on' : 'off') + ' · accepted by the DME';
+        });
+    }
+
+    /** The MHD press counts only when the DME echoes it; an untuned DME refuses it. */
     _expectEcho(r, req) {
         const echoed = !!(r && r.ok && r.sid === 0x6F && r.data && r.data.length >= req.length
             && req.every((b, i) => r.data[i] === b));
@@ -169,12 +196,14 @@ class TuneControl {
     view() {
         return {
             armed: this.armed,
+            tuner: this.tuner,
             features: this.features(),
             map: this.map,
             mapConfirmed: this.mapConfirmed,
-            readback: this.kind === 'bm3',   // MHD-style: no read-back of the active map
+            readback: this.tuner === 'bm3',   // MHD: no read-back of the active map
             cooling: this.cooling,
             burbles: this.burbles,
+            asd: this.asd,
             targetAgg: this.targetAgg,
             busy: this.busy,
             note: this.note,
@@ -183,4 +212,4 @@ class TuneControl {
     }
 }
 
-module.exports = { TuneControl };
+module.exports = { TuneControl, TUNERS, FEATURES };

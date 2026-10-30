@@ -38,11 +38,19 @@ class DiagLink {
         this.diag = null;
         this.available = false;
         this.dme = DME;
+        this._onAvailable = [];
     }
+
+    /** fn(on) when the diagnostic link comes up or goes away (apps start at boot, often before it). */
+    onAvailable(fn) { this._onAvailable.push(fn); }
 
     async init() {
         this.diag = await new Diag(this.signals, this.log).init();
         this.available = !!this.diag.available;
+        this.diag.on('available', (on) => {
+            this.available = !!on;
+            this._onAvailable.forEach((fn) => { try { fn(this.available); } catch (e) { this.log.error(e); } });
+        });
         return this;
     }
 

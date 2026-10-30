@@ -1,6 +1,4 @@
 'use strict';
-// Copied VERBATIM from apps/bm3_live/profiles.js (idrive7-apps upstream be7913a) - ROM address
-// metadata only. Re-copy when bm3_live adds ROMs.
 
 // Protocol address metadata only. A listed ROM is not a compatibility certification.
 // No tune contents, vehicle data or account material is included.

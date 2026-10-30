@@ -2,8 +2,8 @@
 /**
  * ui.js - the Live Adjustments screen, a PURE draw(cv, G, t, v) so it renders both on the
  * car (main.js) and in the PC preview harness. v.pages = the tabs this car gets, v.page =
- * the one shown: 'Exhaust Flap' always; 'Engine Map', 'Max Cooling', 'Burbles' only on a
- * tuned DME (tune.js). The tune is never named on screen.
+ * the one shown: 'Exhaust Flap' always; 'Engine Map', 'Max Cooling', 'Burbles', 'Active Sound'
+ * for the tune picked in Settings (tune.js).
  *
  * House style of the other apps: an "Exhaust Flap" title with the M→white underline up
  * top, the twin tailpipes seen end-on with the butterfly valves opening/closing in the
@@ -38,6 +38,7 @@ function draw(cv, G, t, v, act) {
     if (page === 'Engine Map') return drawMap(cv, G, t, v.tune || {}, act || {}, bottom);
     if (page === 'Max Cooling') return drawCooling(cv, G, t, v.tune || {}, act || {}, bottom);
     if (page === 'Burbles') return drawBurbles(cv, G, t, v.tune || {}, act || {}, bottom);
+    if (page === 'Active Sound') return drawAsd(cv, G, t, v.tune || {}, act || {}, bottom);
 
     // --- valve figure: twin tailpipes seen end-on, butterfly opening/closing ---
     drawExhaust(cv, G, t, W / 2 - 310, G.TOP + 18, 620, 250 + bottom - G.BOTTOM, v);
@@ -150,6 +151,19 @@ function drawBurbles(cv, G, t, m, act, bottom) {
     buttonRow(cv, G, t, [['–', act.aggDown, false], ['+', act.aggUp, false],
         ['Apply', act.burblesApply, false], ['Off', act.burblesOff, m.burbles === 'off']],
         bottom, 200, m.busy, 'la_burb');
+    return cv;
+}
+
+/** Active Sound (ASD): the interior engine sound on / off; the DME does not report its state. */
+function drawAsd(cv, G, t, m, act, bottom) {
+    const cy = G.TOP + (bottom - G.TOP - 96) / 2 - 20;
+    const word = m.asd === true ? 'ON' : m.asd === false ? 'OFF' : '–';
+    cv.text(word, W / 2, cy + 30, 112, m.asd == null ? t.dim : t.text, { align: 'center', font: 'bold', spacing: 4 });
+    cv.text('Active Sound Design · the last setting the DME accepted', W / 2, cy + 74, 18, t.dim,
+        { align: 'center', font: 'label', spacing: 1 });
+    noteLine(cv, G, t, m, bottom);
+    buttonRow(cv, G, t, [['On', act.asd && act.asd(true), m.asd === true],
+        ['Off', act.asd && act.asd(false), m.asd === false]], bottom, 236, m.busy, 'la_asd');
     return cv;
 }
 

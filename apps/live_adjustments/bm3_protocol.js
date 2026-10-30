@@ -1,6 +1,4 @@
 'use strict';
-// Copied VERBATIM from apps/bm3_live/protocol.js (idrive7-apps upstream be7913a): each app is
-// packaged alone on the car, so it can't require() another app. Re-copy when bm3_live changes.
 
 const DME = 0x12;
 const MARKER_SIZE = 0xFF;

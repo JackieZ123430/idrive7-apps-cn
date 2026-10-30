@@ -1,7 +1,7 @@
 {
   "id": "live_adjustments",
   "title": "Live Adjustments",
-  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. On a tuned DME: engine map switching, Max Cooling and burbles",
+  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. With BM3 or MHD picked in Settings: engine map switching, burbles, ASD and Max Cooling",
   "version": "0.1.0",
   "vendor": "custom",
   "loggingId": "OAA0",
@@ -9,8 +9,12 @@
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
-      "_methods": ["sendTasuRequest"],
-      "_broadcasts": ["sendTasuResponse"]
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
     },
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs"
@@ -63,18 +67,22 @@
       ]
     },
     {
-      "key": "tune",
-      "label": "Tune functions",
+      "key": "tuner",
+      "label": "Tuning software",
       "type": "choice",
       "default": "off",
       "options": [
         [
           "off",
-          "Disarmed · nothing is sent (safe)"
+          "Off · nothing is sent to the car (safe)"
         ],
         [
-          "on",
-          "Armed · map, cooling and burbles on a tuned DME"
+          "bm3",
+          "BM3 · engine map, burbles, ASD"
+        ],
+        [
+          "mhd",
+          "MHD · engine map, Max Cooling"
         ]
       ]
     },

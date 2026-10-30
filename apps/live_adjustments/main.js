@@ -2,8 +2,8 @@
 /**
  * Live Adjustments - native live tweaks for the BMW MGU (iDrive 7), one tab each:
  *   Exhaust Flap - BMW's own 0x60FD on the DME (controller.js + adapters), always there;
- *   Engine Map / Max Cooling / Burbles - only on a tuned DME, detected while "Tune
- *   functions" is Armed (tune.js). The screen never names the tune.
+ *   Engine Map / Max Cooling / Burbles / Active Sound - the tune picked in Settings
+ *   ("Tuning software": Off, BM3, MHD) gets its own tabs (tune.js). Off sends nothing.
  *
  * Exhaust Flap modes: OEM (hand the flap back to the DME), OPEN (request it open) and
  * CLOSE (request it shut) — the bottom action buttons. The command leaves the app only
@@ -21,10 +21,10 @@ const UI = require('./ui');
 const { Controller } = require('./controller');
 const { TuneControl } = require('./tune');
 
-/** The tabs this car gets: Exhaust Flap always, the tune's pages once it is detected. */
+/** The tabs this car gets: Exhaust Flap always, then the picked tune's pages. */
 function pagesFor(f) {
     return ['Exhaust Flap'].concat(f.map ? ['Engine Map'] : [], f.cooling ? ['Max Cooling'] : [],
-        f.burbles ? ['Burbles'] : []);
+        f.burbles ? ['Burbles'] : [], f.asd ? ['Active Sound'] : []);
 }
 
 // eased valve angle toward the current state (0 = shut, 1 = open)
@@ -42,7 +42,7 @@ mgu.run({
         const controller = new Controller(ctx);
         const tune = new TuneControl(ctx);
         let angle = 0.18;
-        let page = 'Exhaust Flap';          // by name: the tune's tabs come and go with detection
+        let page = 'Exhaust Flap';          // by name: the tune's tabs come and go with the setting
 
         // the three mode presses, each kicks a repaint (used by both the HMI bar and
         // the on-canvas buttons the kit draws when the app owns the screen)
@@ -59,6 +59,7 @@ mgu.run({
             aggUp: () => { tune.stepAggression(0.5); repaint(); },
             burblesApply: tuneAct(() => tune.applyBurbles(false)),
             burblesOff: tuneAct(() => tune.applyBurbles(true)),
+            asd: (on) => tuneAct(() => tune.setAsd(on)),
         };
         const pages = () => pagesFor(tune.features());
 
@@ -89,10 +90,15 @@ mgu.run({
         ui.onClick('BTN_OEM', acts.oem);
         ui.onClick('BTN_PAGE', () => { const l = pages(); page = l[(l.indexOf(page) + 1) % l.length]; return render(); });
         ctx.onTab((i) => { const l = pages(); if (l[i]) page = l[i]; return render(); });
-        settings.onChange(() => controller.refresh().then(() => tune.refresh()).then(() => loop.kick && loop.kick()));
+        // the tune is looked at again only when it changes (a theme change sends nothing)
+        settings.onChange((key) => controller.refresh().then(() => key === 'tuner' && tune.refresh())
+            .then(repaint).catch((e) => log.error('settings', e)));
 
         await controller.start();        // read-only: detect DME + read state, no actuation
-        await tune.start(controller.link);   // nothing at all unless "Tune functions" is Armed
+        await tune.start(controller.link);   // nothing at all while "Tuning software" is Off
+        // the diagnostic link often comes up after the app started (at boot): detect again then
+        if (controller.link) controller.link.onAvailable(() => controller.refresh().then(() => tune.refresh())
+            .then(repaint).catch((e) => log.error('link', e)));
         await render();
         log.info('exhaust_control ready (source=' + controller.source + ', adapter=' + controller.adapter.name + ')');
     },

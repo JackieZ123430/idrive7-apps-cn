@@ -42,6 +42,5 @@ kit/tools/.font-cache/
 *.log
 *.core
 /kit/renderd/core
-/apps/bm3_live/data/
 /apps/zf8hp/data/
 egs-snapshot*.json
