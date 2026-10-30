@@ -173,8 +173,9 @@ mgu.run({
             const st = store();
             const cur = cleared ? null : lastRun && st.runs.indexOf(lastRun) >= 0 ? lastRun : st.runs[0];
             const base = st.baseline;
-            G.panel(cv, t, 24, 44, 1120, 468, 'Dyno sheet');
-            plot(cv, t, 104, 135, 960, 294, [cur, base]);
+            // ex: how much lower the panels reach where the screen has room below the page (else 0); the plot takes all of it
+            const sh = G.panel(cv, t, 24, 44, 1120, 468, 'Dyno sheet'), ex = sh.y + sh.h - G.BOTTOM;
+            plot(cv, t, 104, 135, 960, 294 + G.toMargin(ex, 31), [cur, base]);     // (its axis labels G.MARGIN over the bottom)
             if (base) {
                 cv.fillRect(600, 74, 26, 4, withAlpha(t.dim, 0.7));
                 cv.text('BASELINE ' + Math.round(pw(base.peakP)) + ' ' + pU(), 634, 84, 22, t.dim, { font: 'bold', spacing: 0.5 });
@@ -197,24 +198,27 @@ mgu.run({
             } else {
                 bigStat(cv, t, 1192, 131, 'POWER', cur ? pw(cur.peakP) : null, pU(), cur ? '@ ' + cur.peakPrpm + ' RPM' : null, t.accent,
                     cur && base && cur !== base ? pw(cur.peakP) - pw(base.peakP) : null);
-                bigStat(cv, t, 1192, 299, 'TORQUE', cur ? tq(cur.peakT) : null, tU(), cur ? '@ ' + cur.peakTrpm + ' RPM' : null, t.accent2,
+                bigStat(cv, t, 1192, 299 + Math.round(ex / 2), 'TORQUE', cur ? tq(cur.peakT) : null, tU(), cur ? '@ ' + cur.peakTrpm + ' RPM' : null, t.accent2,
                     cur && base && cur !== base ? tq(cur.peakT) - tq(base.peakT) : null);
                 // a dyno sheet shows power at the wheels too: the same pull without the drivetrain loss
                 let msg = cur ? 'crank (' + cur.loss + ' % loss)  ·  wheels ' + Math.round(pw(cur.peakP * (1 - cur.loss / 100))) + ' ' + pU() : 'waiting for a pull';
                 let col = t.dim;
                 if (live.state === 'done' && now < live.until) { msg = 'NEW RUN RECORDED'; col = GO; }
                 if (live.state === 'short' && now < live.until) { msg = 'pull too short'; col = t.warn; }
-                cv.text(msg, 1192, 486, 22, col, { font: 'bold', spacing: 0.5 });
+                cv.text(msg, 1192, 486 + ex, 22, col, { font: 'bold', spacing: 0.5 });
             }
         }
 
         function drawRuns(cv, t) {
             const st = store();
-            G.panel(cv, t, 24, 44, 1552, 468, 'Saved runs');
+            const sh = G.panel(cv, t, 24, 44, 1552, 468, 'Saved runs');
+            // another row where the panel reaches lower on screen and it fits whole
+            rows = 8 + Math.floor((sh.y + sh.h - G.BOTTOM) / 41);
+            if (sel >= rows) { sel = rows - 1; lastRun = st.runs[sel] || null; }     // (that row went: the room is gone)
             const cols = [48, 320, 560, 800, 1050, 1430];
             ['WHEN', 'PEAK POWER', 'PEAK TORQUE', 'SPEED RANGE', 'SETUP', ''].forEach((h, i) => cv.text(h, cols[i], 127, 22, t.dim, { font: 'bold', spacing: 1 }));
             if (!st.runs.length) cv.text('No runs yet.', 48, 210, 26, t.dim);
-            st.runs.slice(0, 8).forEach((r, i) => {
+            st.runs.slice(0, rows).forEach((r, i) => {
                 const y = 174 + i * 41, d = new Date(r.at), p = (n) => String(n).padStart(2, '0');
                 const isBase = st.baseline && st.baseline.at === r.at, isSel = i === sel;
                 if (isSel) cv.roundRect(36, y - 28, 1528, 38, 6, withAlpha(t.accent, 0.18));
@@ -243,7 +247,7 @@ mgu.run({
         }
 
         /* ---------- buttons ---------- */
-        let sel = 0;
+        let sel = 0, rows = 8;      // rows: the saved runs the list shows
         const labels = () => ui.text('BTN_ACTION', page ? 'Next run' : 'Baseline');
         const flip = () => { page = 1 - page; sel = 0; labels(); return render(); };
         ui.onClick('BTN_PAGE', flip);
@@ -253,7 +257,7 @@ mgu.run({
         ctx.hideButton('BTN_ACTION');
         ui.onClick('BTN_ACTION', () => {
             const st = store();
-            if (page === 1) { if (st.runs.length) sel = (sel + 1) % Math.min(8, st.runs.length); lastRun = st.runs[sel] || null; return render(); }
+            if (page === 1) { if (st.runs.length) sel = (sel + 1) % Math.min(rows, st.runs.length); lastRun = st.runs[sel] || null; return render(); }
             const r = lastRun && st.runs.indexOf(lastRun) >= 0 ? lastRun : st.runs[0];
             if (!r) return null;
             st.baseline = st.baseline && st.baseline.at === r.at ? null : r;

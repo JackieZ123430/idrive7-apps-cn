@@ -539,7 +539,6 @@ module.exports = function live(ctx, sh) {
     /* ---------- units ---------- */
     const F = () => settings.get('tempUnit') === 'f';
     const T = (c) => (G.isNum(c) ? (F() ? c * 9 / 5 + 32 : c) : null);
-    const dT = (c) => (G.isNum(c) ? (F() ? c * 9 / 5 : c) : null);          // a temperature difference
     const tU = () => (F() ? '°F' : '°C');
     const fmtT = (c, dec) => (G.isNum(c) ? G.fmt(T(c), dec || 0) + ' ' + tU() : '--');
 
@@ -557,26 +556,27 @@ module.exports = function live(ctx, sh) {
         return { kw: v, text: (v < -IDLE_KW ? '-' : '') + G.fmt(a, a < 10 ? 1 : 0), col: old ? t.dim : v < -IDLE_KW ? GO : a >= 60 ? t.warn : t.text, what, old };
     }
 
-    /** Centre-zero power bar: regen / charge to the left, drive to the right, scaled to the limits. */
-    function powerBar(cv, t, x, y, w, kw, lim) {
+    /**
+     * Centre-zero power bar: regen / charge to the left, drive to the right, scaled to the limits. A kit bar
+     * (G.bar, as Full and Holds), 22 px with the scale 48 under its top; head: { label, pw } adds its label / kW row
+     * (the kW as power() writes and colours it).
+     */
+    function powerBar(cv, t, x, y, w, kw, lim, head) {
         const outMax = settings.get('gaugeKw');
         const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
-        const span = outMax + inMax, x0 = x + w * inMax / span, h = 30;
-        const X = (v) => x0 + G.clamp(v, -inMax, outMax) / span * w;
-        cv.roundRect(x, y, w, h, 6, withAlpha(t.track, 0.9));
-        const sv = G.smooth('live.bar', kw, 22);
-        if (G.isNum(sv) && Math.abs(sv) > 0.05) {
-            if (sv > 0) cv.rampRect(x0, y, X(sv) - x0, h, 4, t.hotRamp || t.ramp, x0, x + w - x0);
-            else cv.roundRect(X(sv), y, x0 - X(sv), h, 4, GO);
-        }
-        cv.fillRect(Math.round(x0) - 1, y - 8, 3, h + 16, t.text);
-        // scale: every 20 kW (ticks), labels at the ends and zero
-        for (let v = -Math.floor(inMax / 20) * 20; v <= outMax; v += 20) if (v) cv.fillRect(Math.round(X(v)), y + h + 2, 2, 8, t.tick);
-        cv.text('0', x0, y + h + 30, 18, t.dim, { align: 'center', font: 'bold' });
-        const lbl = (v) => G.fmt(v, 0) + ' kW';
-        const inLim = lim && G.isNum(lim.in) && lim.in >= 15;
-        cv.text((inLim ? 'REGEN MAX ' : '') + '-' + lbl(inMax), x, y + h + 30, 18, inLim ? GO : t.dim, { font: 'bold' });
-        cv.text(lbl(outMax), x + w, y + h + 30, 18, t.dim, { font: 'bold', align: 'right' });
+        const inLim = lim && G.isNum(lim.in) && lim.in >= 15, lbl = (v) => G.fmt(v, 0) + ' kW';
+        // the scale: every 20 kW marked, labels at the ends and zero
+        const ticks = [];
+        for (let v = -Math.floor(inMax / 20) * 20; v <= outMax; v += 20) ticks.push(v);
+        G.bar(cv, t, x, y, w, head ? 92 : 60, {
+            head: !!head, label: head && head.label, unit: 'kW', text: head && head.pw.text, valueColor: head && head.pw.col,
+            value: kw, min: -inMax, max: outMax, origin: 0, ramp: 'hot', negColor: GO, smooth: 22, ticks,
+            labels: [
+                { value: -inMax, text: (inLim ? 'REGEN MAX ' : '') + '-' + lbl(inMax), color: inLim ? GO : null, align: 'left' },
+                { value: 0, text: '0' },
+                { value: outMax, text: lbl(outMax), align: 'right' },
+            ],
+        });
     }
 
     /**
@@ -617,7 +617,8 @@ module.exports = function live(ctx, sh) {
     /** Battery power now: kW, what the pack does, V / A, a bar against the battery's limits and (room permitting) the last two minutes. */
     function renderPowerPanel(cv, t, d, x, y, w, h) {
         const pw = power(d, t), lim = limitsKw(d), r = x + w - 24, big = h >= 400;
-        G.panel(cv, t, x, y, w, h, 'Live battery usage');
+        const h0 = h;
+        h = G.panel(cv, t, x, y, w, h, 'Live battery usage').h;     // (with the room below the page: a taller trace)
         const ky = y + (big ? 152 : 118);
         const vw = cv.text(pw.text, x + 24, ky, big ? 120 : 84, pw.col, { font: 'num' });
         cv.text('kW', x + 34 + vw, ky, big ? 38 : 30, t.dim, { font: 'bold' });
@@ -627,7 +628,8 @@ module.exports = function live(ctx, sh) {
         if (d.engine) cv.text('ENGINE RUNNING', r, y + 138, 20, t.warn, { font: 'bold', spacing: 1.5, align: 'right' });
         const by = ky + 30;
         powerBar(cv, t, x + 24, by, w - 48, pw.kw, lim);
-        const ty = by + 70, th = y + h - 34 - ty;
+        // (with room: its time labels end G.MARGIN over the panel's bottom, as the other panels' last lines)
+        const ty = by + 58, th = y + h0 - 34 + G.toMargin(h - h0, 9) - ty;
         if (th >= 40) {
             const top = Math.max(20, ...trace.map((p) => p[1]), 0) * 1.1, bottom = Math.max(10, ...trace.map((p) => -p[1]), 0) * 1.1;
             const tr = d.demo ? demoHistory(TRACE_S, 1, (q) => q.kw) : trace;
@@ -641,7 +643,7 @@ module.exports = function live(ctx, sh) {
         // ---- every cell's voltage: the lowest and highest marked, scaled to the spread; the cells' temperature
         const x = 608, w = 968, r = x + w - 24;
         const cvv = d.cellV, cells = cvv && cvv.cells;
-        G.panel(cv, t, x, 44, w, 468, 'Cells' + (cells ? '  (' + cells.length + ')' : ''));
+        const ex = G.panel(cv, t, x, 44, w, 468, 'Cells' + (cells ? '  (' + cells.length + ')' : '')).h - 468;   // (room below the page: taller bars)
         const spread = cvv && G.isNum(cvv.min) && G.isNum(cvv.max) ? (cvv.max - cvv.min) * 1000 : null;
         const scol = !G.isNum(spread) ? t.dim : spread > 100 ? t.crit : spread > 50 ? t.warn : GO;
         const head = (hx, label, v, c, sub) => {
@@ -662,7 +664,7 @@ module.exports = function live(ctx, sh) {
         if (G.isNum(d.soc)) cv.text('~' + G.fmt(d.soc / 100 * settings.get('designKwh'), 1) + ' kWh', r, 172, 16, t.dim, { align: 'right' });
         if (cells) {
             // bars: from a floor below the lowest cell, so the differences show
-            const x0 = x + 80, bw0 = r - x0, btop = 210, base = 420, n = cells.length, bw = bw0 / n;
+            const x0 = x + 80, bw0 = r - x0, btop = 210, base = 420 + G.toMargin(ex, 70), n = cells.length, bw = bw0 / n;
             const pad = Math.max(0.005, (cvv.max - cvv.min) * 0.6), vlo = cvv.min - pad, vhi = cvv.max + pad * 0.4;
             const Y = (v) => base - (v - vlo) / (vhi - vlo) * (base - btop);
             [vlo, vhi].forEach((v) => {
@@ -677,41 +679,18 @@ module.exports = function live(ctx, sh) {
             });
             for (let i = 0; i < n; i += 12) cv.text(String(i + 1), x0 + i * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
             cv.text(String(n), x0 + (n - 1) * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
-        } else cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', x + w / 2, 300, 24, t.dim, { align: 'center' });
+        } else cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', x + w / 2, 300 + Math.round(ex / 2), 24, t.dim, { align: 'center' });
     }
 
-    /** This drive: energy used, regen, net; what it went to (driving vs. climate); peaks. Wide (w >= 700) or tall. */
+    /** This drive: energy used, regen, net; what it went to (driving vs. climate); in the battery; the foot lines. */
     function renderTrip(cv, t, d, x, y0, w, h, foot, inBattery) {
-        const r = x + w - 24;
-        G.panel(cv, t, x, y0, w, h, 'This drive');
-        if (w < 700) return renderTripTall(cv, t, d, x, y0, w, h, foot, inBattery);
-        const tp = tripNow(d);
-        const col = (cx, label, v, c) => {
-            cv.text(label, cx, y0 + 72, 18, t.dim, { font: 'bold', spacing: 1.2 });
-            const ww = cv.text(G.fmt(v, v >= 10 ? 1 : 2), cx, y0 + 120, 42, c, { font: 'num' });
-            cv.text('kWh', cx + 6 + ww, y0 + 120, 20, t.dim);
-        };
-        col(x + 24, 'USED', tp.out, t.text);
-        col(x + 200, 'REGEN', tp.regen, GO);
-        col(x + 376, 'NET', tp.out - tp.regen, t.text);
-        const clim = Math.min(tp.climate || 0, tp.out), drive = Math.max(0, tp.out - clim);
-        const cp2 = tp.out > 0.005 ? clim / tp.out : 0, dp = tp.out > 0.005 ? 1 - cp2 : 0;
-        const pct = (f) => (tp.out > 0.005 ? Math.round(f * 100) + ' %' : '--');
-        const sx = x + 580, sw = r - sx;
-        cv.text('DRIVING  ' + G.fmt(drive, 2) + ' kWh  ' + pct(dp), sx, y0 + 72, 18, t.text, { font: 'bold', spacing: 1 });
-        cv.text('CLIMATE  ' + G.fmt(clim, 2) + ' kWh  ' + pct(cp2), r, y0 + 98, 18, t.warn, { font: 'bold', spacing: 1, align: 'right' });
-        cv.roundRect(sx, y0 + 110, sw, 14, 5, withAlpha(t.track, 0.9));
-        if (tp.out > 0.005) {
-            if (dp > 0.005) cv.roundRect(sx, y0 + 110, Math.max(4, sw * dp), 14, 5, withAlpha(t.text, 0.8));
-            if (cp2 > 0.005) cv.roundRect(sx + sw * dp, y0 + 110, Math.max(4, sw * cp2), 14, 5, t.warn);
-        }
-        const mins = Math.round((Date.now() - tp.since) / 60000);
-        cv.text('peak ' + G.fmt(tp.peakOut, 0) + ' kW out  ·  ' + G.fmt(tp.peakIn, 0) + ' kW regen  ·  ' + (tp.charged > 0.05 ? 'charged ' + G.fmt(tp.charged, 2) + ' kWh  ·  ' : '')
-            + 'since ' + (mins < 1 ? 'just now' : mins + ' min ago') , x + 24, y0 + 168, 18, t.dim);
+        const ex = G.panel(cv, t, x, y0, w, h, 'This drive').h - Math.round(h);
+        renderTripTall(cv, t, d, x, y0, w, h, foot, inBattery, ex);
     }
     const tripNow = (d) => (d.demo ? { out: 2.84, regen: 0.61, charged: 0, climate: 0.48, peakOut: 61, peakIn: 24, since: Date.now() - 23 * 60000 } : trip);
-    function renderTripTall(cv, t, d, x, y0, w, h, foot, inBattery) {
-        const tp = tripNow(d), r = x + w - 24;
+    function renderTripTall(cv, t, d, x, y0, w, h, foot, inBattery, ex) {
+        // room below the page (ex): the parts spread down, the foot at the bottom
+        const tp = tripNow(d), r = x + w - 24, e1 = Math.round(ex / 3), e2 = Math.round(ex * 2 / 3);
         const row = (y, label, v, c) => {
             cv.text(label, x + 24, y, 20, t.dim, { font: 'bold', spacing: 1.5 });
             const kw = cv.text('kWh', r, y + 44, 22, t.dim, { align: 'right' });
@@ -726,22 +705,23 @@ module.exports = function live(ctx, sh) {
             cv.text('kWh', cx, y0 + 166, 18, t.dim, { align });
         });
         if (inBattery) {
-            cv.text('IN BATTERY', x + 24, y0 + 222, 20, t.dim, { font: 'bold', spacing: 1.5 });
-            const kw2 = cv.text('kWh', r, y0 + 278, 22, t.dim, { align: 'right' });
-            const tw = cv.text(' / ' + inBattery[1], r - kw2 - 8, y0 + 278, 30, t.dim, { font: 'bold', align: 'right' });
-            cv.text(inBattery[0], r - kw2 - 8 - tw, y0 + 278, 48, t.text, { font: 'num', align: 'right' });
+            cv.text('IN BATTERY', x + 24, y0 + 222 + e1, 20, t.dim, { font: 'bold', spacing: 1.5 });
+            const kw2 = cv.text('kWh', r, y0 + 278 + e1, 22, t.dim, { align: 'right' });
+            const tw = cv.text(' / ' + inBattery[1], r - kw2 - 8, y0 + 278 + e1, 30, t.dim, { font: 'bold', align: 'right' });
+            cv.text(inBattery[0], r - kw2 - 8 - tw, y0 + 278 + e1, 48, t.text, { font: 'num', align: 'right' });
         }
         const clim = Math.min(tp.climate || 0, tp.out), drive = Math.max(0, tp.out - clim);
         const cp2 = tp.out > 0.005 ? clim / tp.out : 0, dp = tp.out > 0.005 ? 1 - cp2 : 0;
-        const pct = (f) => (tp.out > 0.005 ? Math.round(f * 100) + ' %' : '--'), yb = y0 + 340, sw = w - 48;
+        const pct = (f) => (tp.out > 0.005 ? Math.round(f * 100) + ' %' : '--'), yb = y0 + 340 + e2, sw = w - 48;
         cv.text('DRIVING ' + pct(dp), x + 24, yb, 18, t.text, { font: 'bold', spacing: 1 });
         cv.text('CLIMATE ' + pct(cp2), r, yb, 18, t.warn, { font: 'bold', spacing: 1, align: 'right' });
-        cv.roundRect(x + 24, yb + 12, sw, 14, 5, withAlpha(t.track, 0.9));
-        if (tp.out > 0.005) {
-            if (dp > 0.005) cv.roundRect(x + 24, yb + 12, Math.max(4, sw * dp), 14, 5, withAlpha(t.text, 0.8));
-            if (cp2 > 0.005) cv.roundRect(x + 24 + sw * dp, yb + 12, Math.max(4, sw * cp2), 14, 5, t.warn);
-        }
-        (foot || []).forEach(([txt, col], i) => cv.text(txt, x + 24, y0 + 412 + i * 30, 20, col || t.dim, { font: 'bold', spacing: 1 }));
+        // the split as a kit bar (G.bar, as Full and Holds): driving from the left, the climate's share the
+        // rest of the track
+        const has = tp.out > 0.005;
+        G.bar(cv, t, x + 24, yb + 12, sw, 26, {
+            head: false, value: has ? dp * 100 : null, max: 100, color: G.mix(t.text, t.bg, 0.25), track: has && cp2 > 0.005 ? 'warn' : null, ticks: [], smooth: false,
+        });
+        (foot || []).forEach(([txt, col], i) => cv.text(txt, x + 24, y0 + 412 + ex + i * 30, 20, col || t.dim, { font: 'bold', spacing: 1 }));
     }
 
     function renderUnit(cv, t, d) {
@@ -911,18 +891,11 @@ module.exports = function live(ctx, sh) {
         drawTrip(cv, t, x, y, w, h, foot, inBattery) { lastDrawT = Date.now(); renderTrip(cv, t, data(), x, y, w, h, foot, inBattery); },
         /** The Battery page's power panel (kW, bar, the last two minutes) at x, y, w, h. */
         drawPower(cv, t, x, y, w, h) { lastDrawT = Date.now(); renderPowerPanel(cv, t, data(), x, y, w, h); },
-        /** A one-line "battery power now": label, kW and the bar (regen left, use right), no history. */
+        /** "Battery power now" as the Range page's Full bar: label and kW, the bar (regen left, use right), 92 high from y. */
         drawPowerBar(cv, t, x, y, w) {
             lastDrawT = Date.now();
             const d = data(), pw = power(d, t);
-            const lim = limitsKw(d);
-            cv.text('LIVE BATTERY USAGE', x, y - 34, 20, t.dim, { font: 'bold', spacing: 1.5 });
-            // the kW above the bar, over the end of its fill (kept inside the bar's width)
-            const outMax = settings.get('gaugeKw');
-            const inMax = Math.max(10, lim && G.isNum(lim.in) && lim.in >= 15 ? lim.in : settings.get('gaugeKw') * 0.5);
-            const kx = x + w * (inMax + G.clamp(G.isNum(pw.kw) ? pw.kw : 0, -inMax, outMax)) / (outMax + inMax);
-            cv.text(pw.text + ' kW', G.clamp(kx, x + 50, x + w - 50), y + 4, 28, pw.col, { font: 'bold', align: 'center' });
-            powerBar(cv, t, x, y + 18, w, pw.kw, lim);
+            powerBar(cv, t, x, y, w, pw.kw, limitsKw(d), { label: 'Live battery usage', pw });
         },
         /** The battery's power now as the pages show it: { kw, text, col, what } (kw null: no reading). */
         powerNow(t) { return power(data(), t); },

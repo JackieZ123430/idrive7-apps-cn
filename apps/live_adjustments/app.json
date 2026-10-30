@@ -2,7 +2,7 @@
   "id": "live_adjustments",
   "title": "Engine Menu",
   "description": "Engine Menu for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link, with per-DME adapters. On a tuned DME (read-only unlock check): Map slot 1-4 (MHD, BM3), Max cooling (MHD), Burbles and Active Sound Design (BM3)",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",

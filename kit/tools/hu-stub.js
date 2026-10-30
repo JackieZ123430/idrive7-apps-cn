@@ -88,6 +88,7 @@ function headUnit(stage, o) {
         sheet: (sh) => display.openSheet(sh),
         hideButton(id) { display.hideButton(id); },
         onScroll(fn) { display.onScroll = fn; },
+        onLayout(fn) { display.onLayout(fn); },
         controller: { grab(on) { display.grab(on); }, onInput(fn) { display.onCcu = fn; } },
         signals: live ? liveSignals(hu) : { watch: async (iface) => ({ iface, error: 'preview' }), proxy: async () => { throw new Error('preview'); } },
         theme: themeFn,

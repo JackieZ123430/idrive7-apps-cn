@@ -285,10 +285,11 @@ mgu.run({
 
         /* ---------- drawing ---------- */
         let page = 0;
+        let perPage = PER_PAGE;          // faults on a page: one more where the screen has room below the page (render)
         let only = null;                 // a control unit tapped on the Control units page: the Faults page lists its faults alone
         const faults = () => (scan ? [].concat(...scan.ecus.map((e) => e.dtcs.map((d) => Object.assign({ addr: e.addr }, d)))) : []);
         const listed = () => (only === null ? faults() : faults().filter((d) => d.addr === only));
-        const pageCount = () => Math.max(1, Math.ceil(listed().length / PER_PAGE)) + 2;
+        const pageCount = () => Math.max(1, Math.ceil(listed().length / perPage)) + 2;
         const when = (ms) => { const d = new Date(ms); const p = (n) => String(n).padStart(2, '0'); return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
         const ccList = () => (scan && scan.demo ? DEMO.cc : Array.from(cc.entries()).map(([id, m]) => Object.assign({ id }, m, ccNames.get(id) || {})));
 
@@ -297,10 +298,12 @@ mgu.run({
             return fitText(cv, txt, size, max, opt);
         }
 
-        function tile(cv, t, x, label, value, sub, col) {
-            G.panel(cv, t, x, 44, 374, 115, label);
+        /** Tile i of the four across the top: 16 apart, the last one ending where the list's panel does (1576). */
+        function tile(cv, t, i, label, value, sub, col) {
+            const w = (1552 - 3 * 16) / 4, x = 24 + i * (w + 16);
+            G.panel(cv, t, x, 44, w, 115, label);
             cv.text(value, x + 18, 142, 64, col, { font: 'num' });
-            if (sub) cv.text(sub, x + 356, 142, 22, t.dim, { align: 'right' });
+            if (sub) cv.text(sub, x + w - 18, 142, 22, t.dim, { align: 'right' });
         }
 
         /** G20-style frame: tab bar with the page names along the top (fault pages share one tab). */
@@ -313,18 +316,18 @@ mgu.run({
         function tiles(cv, t) {
             const f = faults(), active = f.filter((d) => d.status & 1).length, n = scan ? scan.ecus.length : null;
             const fm = f.filter((d) => d.mem === 'fault').length, im = f.length - fm;
-            tile(cv, t, 24, 'Control units', phase === 'scanning' ? String(replies) : n === null ? '--' : String(n), phase === 'scanning' ? 'answering...' : 'answered', t.text);
-            tile(cv, t, 414, 'Faults', scan ? String(fm) : '--', im ? '+ ' + im + ' info' : 'stored', !scan ? t.dim : fm ? t.warn : GO);
-            tile(cv, t, 804, 'Active now', scan ? String(active) : '--', 'present right now', !scan ? t.dim : active ? t.crit : GO);
+            tile(cv, t, 0, 'Control units', phase === 'scanning' ? String(replies) : n === null ? '--' : String(n), phase === 'scanning' ? 'answering...' : 'answered', t.text);
+            tile(cv, t, 1, 'Faults', scan ? String(fm) : '--', im ? '+ ' + im + ' info' : 'stored', !scan ? t.dim : fm ? t.warn : GO);
+            tile(cv, t, 2, 'Active now', scan ? String(active) : '--', 'present right now', !scan ? t.dim : active ? t.crit : GO);
             const c = ccList().length;
-            tile(cv, t, 1194, 'Check Control', String(c), 'messages', c ? t.warn : GO);
+            tile(cv, t, 3, 'Check Control', String(c), 'messages', c ? t.warn : GO);
         }
 
         function listPanel(cv, t, title, buttons) {
-            G.panel(cv, t, 24, 176, 1552, 336, title);
-            // the page's buttons right after its title (where the kit runs the screen; else the bar's)
+            const p = G.panel(cv, t, 24, 176, 1552, 336, title);
+            // the page's buttons right after its title, centred on it (where the kit runs the screen; else the bar's)
             let bx = 42 + cv.textWidth(String(title), 26, { font: 'bold' }) + 28;
-            (buttons || []).forEach((b) => { bx += G.button(cv, t, bx, 188, 0, 40, b.label, b.run, b) + 12; });
+            (buttons || []).forEach((b) => { bx += G.button(cv, t, bx, 189, 0, 40, b.label, b.run, b) + 12; });
             let right = msg;
             if (!right && scan) right = 'Last scan ' + when(scan.at);
             if (phase === 'scanning' || phase === 'clearing') {
@@ -337,28 +340,30 @@ mgu.run({
                 // (cut to the room the title and its buttons leave; the log has it whole)
                 cv.text(fit(cv, right, 22, Math.max(240, 1552 - bx - 24)), 1552, 212, 22, phase === 'error' || /^Not cleared/.test(right) ? t.crit : t.dim, { align: 'right' });
             }
+            return p;
         }
 
         function drawFaults(cv, t) {
-            const f = listed(), pages = Math.max(1, Math.ceil(f.length / PER_PAGE));
+            const f = listed(), pages = Math.max(1, Math.ceil(f.length / perPage));
             const busy = phase === 'scanning' || phase === 'clearing';
-            listPanel(cv, t, (only === null ? 'Faults' : 'Faults  ' + ecuName(only)) + (pages > 1 ? '  ' + (page + 1) + '/' + pages : ''), [
+            const p = listPanel(cv, t, (only === null ? 'Faults' : 'Faults  ' + ecuName(only)) + (pages > 1 ? '  ' + (page + 1) + '/' + pages : ''), [
                 { label: phase === 'scanning' ? 'Scanning...' : scan ? 'Scan again' : 'Scan now', run: () => doScan(), key: 'scan', busy },
                 { label: clearArmed ? 'Yes, clear' : 'Clear all', run: () => doClear(), key: 'clear', busy: busy || !faults().length, color: clearArmed ? t.crit : null },
                 only !== null && { label: 'All units', run: () => { only = null; page = 0; changed(); }, key: 'all' },
             ].filter(Boolean));
+            const mid = Math.round((p.y + p.h - G.BOTTOM) / 2);     // the messages stay centred in a taller panel
             if (!scan) {
-                cv.text(phase === 'scanning' ? 'Scanning...' : 'Press "Scan now" (ignition on)', 800, 369, 32, t.dim, { align: 'center' });
+                cv.text(phase === 'scanning' ? 'Scanning...' : 'Press "Scan now" (ignition on)', 800, 369 + mid, 32, t.dim, { align: 'center' });
                 return;
             }
             if (!f.length && phase !== 'scanning') {
-                cv.circle(800, 327, 40, withAlpha(GO, 0.2));
-                cv.polyline([[782, 327], [796, 342], [820, 312]], 7, GO);     // check mark ('✓' isn't in the baked fonts)
-                cv.text(scan.ecus.length ? 'No faults stored' : 'No answer', 800, 433, 32, t.text, { align: 'center', font: 'bold' });
+                cv.circle(800, 327 + mid, 40, withAlpha(GO, 0.2));
+                cv.polyline([[782, 327 + mid], [796, 342 + mid], [820, 312 + mid]], 7, GO);     // check mark ('✓' isn't in the baked fonts)
+                cv.text(scan.ecus.length ? 'No faults stored' : 'No answer', 800, 433 + mid, 32, t.text, { align: 'center', font: 'bold' });
                 return;
             }
-            f.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE).forEach((d, i) => {
-                const y = 231 + i * 47;
+            f.slice(page * perPage, page * perPage + perPage).forEach((d, i) => {
+                const y = 239 + i * 46;         // (room under the title's buttons: 10 px, as over them)
                 const s = statusInfo(d.status), col = t[s.sev] || t.dim;
                 cv.roundRect(48, y, 170, 34, 6, withAlpha(col, 0.22));
                 cv.text(s.label, 133, y + 25, 20, col, { align: 'center', font: 'bold', spacing: 0.5 });
@@ -370,31 +375,33 @@ mgu.run({
                 // Resolve diagnosis before layout; never reapply UI word substitution.
                 const diagnosticOptions = { literal: true };
                 if (txt) cv.text(fit(cv, txt, 22, 1552 - 680, diagnosticOptions), 680, y + 27, 22, t.dim, diagnosticOptions);
-                if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
+                if (i < perPage - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
         }
 
         function drawCC(cv, t) {
-            listPanel(cv, t, 'Check Control messages');
+            const p = listPanel(cv, t, 'Check Control messages'), dy = p.y + p.h - G.BOTTOM;
             const l = ccList();
-            if (!l.length) { cv.text('No active Check Control messages', 800, 369, 30, t.dim, { align: 'center' }); return; }
+            if (!l.length) { cv.text('No active Check Control messages', 800, 369 + Math.round(dy / 2), 30, t.dim, { align: 'center' }); return; }
             const COL = { RED: t.crit, YELLOW: t.warn, ORANGE: t.warn, GREEN: GO, WHITE: t.text };
-            l.slice(0, PER_PAGE).forEach((m, i) => {
+            l.slice(0, perPage).forEach((m, i) => {
                 const y = 231 + i * 47;
                 cv.circle(66, y + 18, 9, COL[m.color] || t.dim);
                 cv.text(m.name ? diagnosticText(m.name) : translateUI('Message ') + m.id, 92, y + 27, 28, t.text, { font: 'bold', literal: true });
                 if (m.ecu !== undefined) cv.text(fit(cv, ecuName(m.ecu), 22, 420), 1552, y + 27, 22, t.dim, { align: 'right' });
-                if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
+                if (i < perPage - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
-            if (l.length > PER_PAGE) cv.text('+ ' + (l.length - PER_PAGE) + ' more', 1552, 506, 22, t.dim, { align: 'right' });
+            if (l.length > perPage) cv.text('+ ' + (l.length - perPage) + ' more', 1552, 506 + dy, 22, t.dim, { align: 'right' });
         }
 
         function drawEcus(cv, t) {
-            listPanel(cv, t, 'Control units that answered');
+            const p = listPanel(cv, t, 'Control units that answered'), dy = p.y + p.h - G.BOTTOM;
             const l = scan ? scan.ecus.slice().sort((a, b) => a.addr - b.addr) : [];
-            if (!l.length) { cv.text(scan ? 'No control unit answered' : 'Scan first', 800, 369, 30, t.dim, { align: 'center' }); return; }
+            if (!l.length) { cv.text(scan ? 'No control unit answered' : 'Scan first', 800, 369 + Math.round(dy / 2), 30, t.dim, { align: 'center' }); return; }
             const cols = 5, cw = 296, ch = 55;
-            l.slice(0, cols * 5).forEach((e, i) => {
+            // a taller panel: another row of units where one fits whole; the grid stays compact
+            const rows = 5 + Math.floor(dy / ch);
+            l.slice(0, cols * rows).forEach((e, i) => {
                 const x = 48 + (i % cols) * (cw + 8), y = 233 + Math.floor(i / cols) * ch;
                 const act = e.dtcs.some((d) => d.status & 1), n = e.dtcs.length;
                 const col = act ? t.crit : n ? t.warn : GO;
@@ -414,7 +421,12 @@ mgu.run({
             drawn = version;
             const t = ctx.theme();
             const cv = ctx.canvas(W, H).clear(t.bg);
+            const fp0 = pageCount() - 2;
+            perPage = PER_PAGE + Math.floor((G.pageBottom(cv) - G.BOTTOM) / 47);     // rows of 47 px (drawCC; drawFaults' are 46)
             const fp = pageCount() - 2;
+            // fewer or more fault pages now (the room below the page came or went): Check Control and Control
+            // units stay the pages shown
+            if (fp !== fp0) page = page >= fp0 ? fp + page - fp0 : Math.min(page, fp - 1);
             page = Math.min(page, pageCount() - 1);
             tiles(cv, t);
             if (page < fp) drawFaults(cv, t); else if (page === fp) drawCC(cv, t); else drawEcus(cv, t);
@@ -427,6 +439,7 @@ mgu.run({
         // on the Faults page where the kit runs the screen
         ctx.hideButton('BTN_SCAN');
         ctx.hideButton('BTN_CLEAR');
+        ctx.onLayout(changed);           // (it draws only on changes: a new layout is one)
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % pageCount(); changed(); });
         // tabs: Faults (opened again: its next page of faults), Check Control, Control units
         ctx.onTab((i) => {

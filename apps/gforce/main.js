@@ -125,8 +125,9 @@ mgu.run({
 
         function drawLive(cv, t) {
             const R = car.data().demo ? demoRec : rec;
-            G.panel(cv, t, 24, 44, 600, 468, null);
-            circle(cv, t, 324, 282, 182);
+            // ex: how much lower the panels reach where the screen has room below the page (else 0)
+            const sh = G.panel(cv, t, 24, 44, 600, 468, null), ex = sh.y + sh.h - G.BOTTOM, mid = Math.floor(G.toMargin(ex, 11) / 2);
+            circle(cv, t, 324, 282 + mid, 182 + mid);       // a larger circle: it stays round, BRAKE ends G.MARGIN over the bottom
             // live readout
             G.panel(cv, t, 648, 44, 420, 468, 'Now');
             // numbers at the G-force display rate (default 10 a second); the dot and trail stay at full rate
@@ -138,34 +139,37 @@ mgu.run({
             const bars = [['LATERAL', G.isNum(hl) ? Math.abs(hl) : null, G.isNum(hl) ? (hl >= 0 ? 'L' : 'R') : ''],
                 ['LONGITUDINAL', G.isNum(hg) ? Math.abs(hg) : null, G.isNum(hg) ? (hg >= 0 ? 'ACC' : 'BRK') : '']];
             // OEM-style bars; the hang is this session's peak on the side it is pulling to now
+            // (the room spread over the gaps, the speed line at the panel's bottom)
             const pk = [hl >= 0 ? S.peak.left : S.peak.right, hg >= 0 ? S.peak.acc : S.peak.brk];
             bars.forEach(([l, v, side], i) => {
-                G.bar(cv, t, 672, 233 + i * 108, 372, 92, { label: l + '  ' + side, value: v, decimals: 2, max: settings.get('scale'), ramp: 'hot', peak: pk[i] });
+                G.bar(cv, t, 672, 233 + i * 108 + Math.round((i + 1) * ex / 3), 372, 92, { label: l + '  ' + side, value: v, decimals: 2, max: settings.get('scale'), ramp: 'hot', peak: pk[i] });
             });
             const d = car.data();
-            cv.text(G.fmt(V(G.hold('speed', d.speed, gms)), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491, 22, t.dim, { font: 'bold', spacing: 1 });
+            cv.text(G.fmt(V(G.hold('speed', d.speed, gms)), 0) + (mph() ? ' mph' : ' km/h') + '   ·   ' + G.fmt(d.rpm, 0) + ' rpm', 672, 491 + G.toMargin(ex, 17), 22, t.dim, { font: 'bold', spacing: 1 });
 
             // session peaks
             G.panel(cv, t, 1092, 44, 484, 468, 'Session peaks');
             G.button(cv, t, 1576 - 20 - 180, 56, 180, 40, 'Reset max', act, { key: 'reset', confirm: true });
             peakBox(cv, t, 1116, 116, 'ACCEL', S.peak.acc, R.acc);
             peakBox(cv, t, 1346, 116, 'BRAKE', S.peak.brk, R.brk);
-            peakBox(cv, t, 1116, 255, 'LEFT', S.peak.left, R.left);
-            peakBox(cv, t, 1346, 255, 'RIGHT', S.peak.right, R.right);
-            cv.fillRect(1116, 382, 436, 1, withAlpha(t.tick, 0.4));
-            cv.text('COMBINED  ' + (S.peak.comb ? S.peak.comb.toFixed(2) + ' g' : '--'), 1116, 421, 22, t.accent2, { font: 'bold', spacing: 1 });
-            cv.text('> 0.5 g  ' + S.over05.toFixed(0) + ' s', 1552, 421, 22, t.text, { align: 'right', font: 'bold' });
+            // (the room spread over the gaps, the last line at the panel's bottom)
+            const e1 = Math.round(ex / 3), e2 = Math.round(ex * 2 / 3);
+            peakBox(cv, t, 1116, 255 + e1, 'LEFT', S.peak.left, R.left);
+            peakBox(cv, t, 1346, 255 + e1, 'RIGHT', S.peak.right, R.right);
+            cv.fillRect(1116, 382 + e2, 436, 1, withAlpha(t.tick, 0.4));
+            cv.text('COMBINED  ' + (S.peak.comb ? S.peak.comb.toFixed(2) + ' g' : '--'), 1116, 421 + e2, 22, t.accent2, { font: 'bold', spacing: 1 });
+            cv.text('> 0.5 g  ' + S.over05.toFixed(0) + ' s', 1552, 421 + e2, 22, t.text, { align: 'right', font: 'bold' });
             const mins = Math.floor((Date.now() - S.start) / 60000);
-            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 474, 22, t.dim, { font: 'bold', spacing: 0.5 });
+            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 474 + G.toMargin(ex, 34), 22, t.dim, { font: 'bold', spacing: 0.5 });
         }
 
         function drawRecords(cv, t) {
             const R = car.data().demo ? demoRec : rec;
-            G.panel(cv, t, 24, 44, 1552, 468, 'All-time records');
+            const sh = G.panel(cv, t, 24, 44, 1552, 468, 'All-time records'), ex = sh.y + sh.h - G.BOTTOM;
             G.button(cv, t, 1576 - 20 - 200, 56, 200, 40, clearArmed ? 'Yes, clear' : 'Delete all', act, { key: 'clear', color: clearArmed ? t.crit : null });
             const rows = [['acc', 'Hardest launch', 'g'], ['brk', 'Hardest stop', 'g'], ['left', 'Left-hander', 'g'], ['right', 'Right-hander', 'g'], ['comb', 'Combined', 'g'], ['vmax', 'Top speed', mph() ? 'mph' : 'km/h']];
             rows.forEach(([k, label, u], i) => {
-                const col = i % 2, row = Math.floor(i / 2), x = 48 + col * 760, y = 135 + row * 123;
+                const col = i % 2, row = Math.floor(i / 2), x = 48 + col * 760, y = Math.round(135 + row * (123 + G.toMargin(ex, 60) / 2));     // the room spread over the gaps
                 const r = R[k], v = r ? (k === 'vmax' ? V(r.v) : r.v) : null;
                 cv.text(label.toUpperCase(), x, y, 22, t.dim, { font: 'bold', spacing: 2 });
                 const w = cv.text(v === null ? '--' : v.toFixed(k === 'vmax' ? 0 : 2), x, y + 66, 64, v === null ? t.dim : t.text, { font: 'num' });

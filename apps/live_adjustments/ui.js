@@ -37,26 +37,32 @@ function draw(cv, G, t, v, act) {
     // by cv.extra to fill the screen's bottom, so there is no dark band under it — that's
     // the "faixa" the other apps hide and we weren't drawing. ---
     G.panel(cv, t, 24, G.TOP, W - 48, G.BOTTOM - G.TOP, null);
+    // the panel's real bottom: the word and buttons sit on it, the figure grows into the room above them;
+    // the buttons (where the kit runs the screen) end G.MARGIN over it, as the other apps' last lines
+    const bottom = pageBottom(cv, G);
 
     // --- valve figure: twin tailpipes side by side seen end-on, butterfly opening/closing ---
-    drawExhaust(cv, G, t, W / 2 - 360, G.TOP + 18, 720, 250, v);
+    drawExhaust(cv, G, t, W / 2 - 360, G.TOP + 18, 720, 250 + bottom - G.BOTTOM, v);
 
     // --- state word (big), centered below the figure (no DME/version clutter) ---
     const word = v.confirmed !== 'UNKNOWN' ? v.confirmed : v.requested;
     const col = word === 'OPEN' ? (t.accent2 || '#81c4ff') : word === 'CLOSED' ? (t.crit || '#ef2b2d') : t.text;
-    cv.text(word, W / 2, G.BOTTOM - 96, 48, col, { align: 'center', font: 'bold', spacing: 2 });
+    cv.text(word, W / 2, bottom - 96, 48, col, { align: 'center', font: 'bold', spacing: 2 });
 
     // only a genuine safety block speaks up; a timeout / no-answer (car asleep) shows
     // NOTHING, and no "sending…" clutter either.
     if (v.error) {
-        cv.text('! ' + v.error, W / 2, G.BOTTOM - 64, 14, t.crit, { align: 'center', font: 'label' });
+        cv.text('! ' + v.error, W / 2, bottom - 64, 14, t.crit, { align: 'center', font: 'label' });
     }
 
     // --- the three mode buttons on the canvas, the selected one red — like the other
     // apps (G.button draws when the app owns the screen; the HMI bar is hidden). ---
-    drawButtons(cv, G, t, v, act);
+    drawButtons(cv, G, t, v, act, bottom);
     return cv;
 }
+
+/** The panel's real bottom (the room below the page); the kit's buttons end G.MARGIN over it. */
+function pageBottom(cv, G) { return G.pageBottom(cv) - (cv.own ? G.MARGIN : 0); }
 
 /**
  * Whether the page's controls reach the DME. need: 'map' (MHD, or a BM3 ROM with a known layout),
@@ -100,7 +106,7 @@ function drawMap(cv, G, t, v, act) {
     const tune = v.tune || {};
     const map = tune.mapAccepted === false ? null : tune.map;          // a refused one is not shown as set
     tunePage(cv, G, t, v, map ? 'MAP ' + map : 'MAP –', t.text, tune.mapAccepted, 'map');
-    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
     let bx = (W - (4 * bw + 3 * gap)) / 2;
     for (let n = 1; n <= 4; n++) {
         const on = map === n;
@@ -117,7 +123,7 @@ function drawCooling(cv, G, t, v, act) {
     const cooling = tune.coolingAccepted === false ? null : tune.cooling;
     const word = cooling == null ? 'MAX COOLING –' : cooling ? 'MAX COOLING ON' : 'MAX COOLING OFF';
     tunePage(cv, G, t, v, word, cooling ? (t.accent2 || '#81c4ff') : t.text, tune.coolingAccepted, 'cooling');
-    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
     let bx = (W - (2 * bw + gap)) / 2;
     [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {
         const sel = cooling === on;
@@ -136,7 +142,7 @@ function drawBurbles(cv, G, t, v, act) {
     tunePage(cv, G, t, v, 'AGGRESSION ' + pick, t.text, tune.burblesAccepted, 'burbles');
     const now = set === undefined ? 'Set: –' : set === null ? 'Set: off' : 'Set: ' + set;
     cv.text(now, W / 2, G.TOP + 290, 26, t.dim, { align: 'center', font: 'bold' });
-    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
     let bx = (W - (4 * bw + 3 * gap)) / 2;
     [['–', () => act.burbleStep && act.burbleStep(-0.5), {}],
         ['+', () => act.burbleStep && act.burbleStep(0.5), {}],
@@ -155,7 +161,7 @@ function drawAsd(cv, G, t, v, act) {
     const asd = tune.asdAccepted === false ? null : tune.asd;
     const word = asd == null ? 'SOUND DESIGN –' : asd ? 'SOUND DESIGN ON' : 'SOUND DESIGN OFF';
     tunePage(cv, G, t, v, word, t.text, tune.asdAccepted, 'asd');
-    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    const bw = 236, bh = 56, gap = 30, by = pageBottom(cv, G) - 56;
     let bx = (W - (2 * bw + gap)) / 2;
     [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {
         const sel = asd === on;
@@ -167,14 +173,14 @@ function drawAsd(cv, G, t, v, act) {
 }
 
 /** OPEN · CLOSE · OEM across the bottom; the selected (requested) mode is filled red. */
-function drawButtons(cv, G, t, v, act) {
+function drawButtons(cv, G, t, v, act, bottom) {
     act = act || {};
     const modes = [
         { k: 'OPEN', label: 'Open', run: act.open },
         { k: 'CLOSED', label: 'Close', run: act.close },
         { k: 'OEM', label: 'OEM', run: act.oem },
     ];
-    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    const bw = 236, bh = 56, gap = 30, by = bottom - 56;
     let bx = (W - (modes.length * bw + (modes.length - 1) * gap)) / 2;
     for (const m of modes) {
         const on = m.k === v.requested;

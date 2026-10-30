@@ -254,9 +254,10 @@ mgu.run({
         }
 
         function drawLog(cv, t) {
-            G.panel(cv, t, 24, 44, 760, 468, 'Recent upshifts');
+            const lp = G.panel(cv, t, 24, 44, 760, 468, 'Recent upshifts');
             G.button(cv, t, 784 - 20 - 180, 56, 180, 40, 'Reset max', resetMax, { key: 'reset', confirm: true });
-            const up = shifts.slice(0, 9);
+            // room below the page (where the kit gives it): another row where one fits whole
+            const up = shifts.slice(0, 9 + Math.floor((lp.y + lp.h - G.BOTTOM) / 41));
             if (!up.length) cv.text('No shifts yet - go and use the rev range.', 48, 189, 26, t.dim);
             up.forEach((s, i) => {
                 const y = 135 + i * 41;
@@ -269,14 +270,15 @@ mgu.run({
                 cv.text(s.verdict, 675, y - 1, 22, VCOL[s.verdict], { align: 'center', font: 'bold', spacing: 0.5 });
             });
 
-            G.panel(cv, t, 808, 44, 768, 468, 'Shift accuracy');
+            const ap = G.panel(cv, t, 808, 44, 768, 468, 'Shift accuracy');
+            const pitch = 46 + (ap.y + ap.h - G.BOTTOM) / 4;          // the bars spread over a taller panel
             const n = shifts.length;
             const cnt = (v) => shifts.filter((s) => s.verdict === v).length;
             const spot = cnt('SPOT ON');
             cv.text(n ? Math.round(spot / n * 100) + '%' : '--', 832, 199, 96, n ? GREEN : t.dim, { font: 'num' });
             cv.text('SPOT ON  (' + n + ' shifts)', 836, 235, 22, t.dim, { font: 'bold', spacing: 1 });
             ['EARLY', 'SPOT ON', 'LATE', 'COLD REV', 'LIMITER'].forEach((v, i) => {
-                const y = 276 + i * 46, c = cnt(v), f = n ? c / n : 0;
+                const y = 276 + Math.round(i * pitch), c = cnt(v), f = n ? c / n : 0;
                 cv.text(v, 836, y + 22, 22, VCOL[v], { font: 'bold', spacing: 1 });
                 cv.roundRect(990, y + 2, 460, 26, 6, t.track);
                 if (f > 0) cv.roundRect(990, y + 2, Math.max(12, 460 * f), 26, 6, VCOL[v]);
