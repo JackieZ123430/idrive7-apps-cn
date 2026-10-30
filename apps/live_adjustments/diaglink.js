@@ -28,6 +28,10 @@ const DID_SW = [0xF1, 0x95];
 const DID_ASW_EL_AGK = [0x62, 0xFD];
 const DID_ASG_EL_AGK = [0x64, 0xFD];
 const DID_ISAGK = [0x4A, 0x65];
+// MHD (the tuning flasher) leaves a tag in DME memory; MHD's own app reads it when it connects
+// (ReadMemoryByAddress 0x23, format 0x24 = 2-byte size / 4-byte address, 0x807FF750, 16 bytes) and
+// the DME answers "MHD2..." when it runs an MHD flash (capture from a1-mapping, idrive7-apps PR #23).
+const MHD_TAG = [0x24, 0x80, 0x7F, 0xF7, 0x50, 0x00, 0x10];
 
 function bytesToHex(b) { return (b || []).map((x) => hex(x)).join(' '); }
 
@@ -85,8 +89,25 @@ class DiagLink {
             commandedPct: asw.ok && asw.data.length >= 2 ? ((asw.data[0] << 8) | asw.data[1]) / 100 : null,
             positionRaw: asg.ok ? bytesToHex(asg.data) : null,
         };
+        ident.mhd = await this.readMhd();
         this.log.info('DME ident: ' + JSON.stringify(ident));
         return ident;
+    }
+
+    /** The unlock check (read-only): is the DME MHD-flashed? Returns {flashed, tag, reason}. */
+    async readMhd() {
+        if (!this.available) return { flashed: false, tag: null, reason: 'no diagnostic link' };
+        try {
+            const reply = await this.diag.physical(this.dme, 0x23, MHD_TAG, 2000);
+            if (!reply || !reply.length) return { flashed: false, tag: null, reason: 'timeout' };
+            if (reply[0] === 0x7F) return { flashed: false, tag: null, reason: NRC[reply[2]] || ('NRC ' + hex(reply[2])) };
+            if (reply[0] !== 0x63) return { flashed: false, tag: null, reason: 'unexpected ' + hex(reply[0]) };
+            const text = String.fromCharCode.apply(null, reply.slice(1));
+            const tag = (/^[\x20-\x7e]*/.exec(text) || [''])[0];
+            return { flashed: /^MHD/.test(tag), tag: tag || null, reason: /^MHD/.test(tag) ? 'MHD flash' : 'no MHD tag' };
+        } catch (e) {
+            return { flashed: false, tag: null, reason: String(e && e.message || e) };
+        }
     }
 
     /** Read the electric-flap state back (read-only). Returns {supported, commandedPct, positionRaw}. */

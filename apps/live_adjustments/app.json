@@ -1,16 +1,20 @@
 {
   "id": "live_adjustments",
   "title": "Live Adjustments",
-  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM (hand back to the DME), OPEN and CLOSE the flap over the car's own diagnostic link, with per-DME adapters",
-  "version": "0.0.1",
+  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link, with per-DME adapters. On an MHD-flashed DME (read-only unlock check): Map slot 1-4 and Max cooling",
+  "version": "0.1.0",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
-      "_methods": ["sendTasuRequest"],
-      "_broadcasts": ["sendTasuResponse"]
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
     },
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs"
@@ -44,7 +48,7 @@
   "settings": [
     {
       "key": "arm",
-      "label": "Exhaust Flap",
+      "label": "Car control",
       "type": "choice",
       "default": "off",
       "options": [
@@ -54,7 +58,7 @@
         ],
         [
           "on",
-          "Armed · actuates the real valve"
+          "Armed · sends to the DME"
         ]
       ]
     },

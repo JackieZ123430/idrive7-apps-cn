@@ -14,6 +14,7 @@
  */
 const { DiagLink } = require('./diaglink');
 const adapters = require('./adapters');
+const { MHD, mhdSend } = require('./real_adapters');
 
 const MODES = ['OEM', 'OPEN', 'CLOSED'];
 
@@ -34,10 +35,12 @@ class Controller {
             busy: false,
             error: null,
         };
+        // the MHD tune's own controls (Map, Max cooling): what was asked and whether the DME took it
+        this.tune = { map: null, mapAccepted: null, cooling: null, coolingAccepted: null, busy: false, error: null };
         this._busyToken = 0;
     }
 
-    /** The "Exhaust Flap" setting is the arm switch: Armed = talk to the car DME;
+    /** The "Car control" setting is the arm switch: Armed = talk to the car DME;
      * Disarmed (default) = simulated only, nothing is sent to the car. */
     get armedSetting() { return this.ctx.settings.get('arm') === 'on'; }
     get source() { return this.armedSetting ? 'car' : 'sim'; }
@@ -60,10 +63,15 @@ class Controller {
         await this.refresh();
     }
 
-    /** Re-detect the DME, re-pick the adapter and read the current state (read-only). */
+    /** The DME runs an MHD flash (the read-only unlock check answered "MHD..."). */
+    get mhd() { return !!(this.ident && this.ident.mhd && this.ident.mhd.flashed); }
+
+    /** Re-detect the DME, re-pick the adapter and read the current state (read-only). The
+     * identity and unlock check are reads, so they run disarmed too: the pages can say what the
+     * DME is before anything is armed. */
     async refresh() {
         adapters.armReal(this.armedSetting);        // arm/disarm from the setting before picking
-        if (this.link && this.link.available && this.source === 'car') {
+        if (this.link && this.link.available) {
             try { this.ident = await this.link.identifyDme(); } catch (e) { this.ident = { present: false }; }
         } else {
             this.ident = { present: false };
@@ -123,6 +131,40 @@ class Controller {
         return this.state;
     }
 
+    /** Map slot 1..4 or Max cooling on/off on an MHD-flashed DME. Disarmed: simulated, nothing
+     * is sent. Armed: only with the MHD flash detected; the DME's echo is the acceptance. */
+    async setTune(kind, value) {
+        const fn = kind === 'map' ? MHD.MAP : MHD.COOLING;
+        const raw = kind === 'map' ? value - 1 : (value ? 1 : 0);
+        if (kind === 'map' && !(value >= 1 && value <= 4)) return this.tune;
+        this.tune[kind] = value;
+        this.tune[kind + 'Accepted'] = null;
+        this.tune.error = null;
+        if (!this.armedSetting) {
+            this.tune[kind + 'Accepted'] = true;
+            this.log.info(kind + ' ' + value + ' (simulated)');
+            return this.tune;
+        }
+        if (!this.mhd) {
+            this.tune[kind + 'Accepted'] = false;
+            this.tune.error = 'not sent: no MHD flash';
+            return this.tune;
+        }
+        this.tune.busy = true;
+        try {
+            const r = await mhdSend(this.link, fn, raw);
+            this.tune[kind + 'Accepted'] = r.accepted;
+            if (!r.accepted) this.tune.error = r.detail;
+            this.log.info(kind + ' ' + value + ' -> accepted=' + r.accepted + ' (' + r.detail + ')');
+        } catch (e) {
+            this.tune[kind + 'Accepted'] = false;
+            this.log.warn(kind + ' ' + value + ': ' + String(e && e.message || e));
+        } finally {
+            this.tune.busy = false;
+        }
+        return this.tune;
+    }
+
     view() {
         return {
             requested: this.state.requested,
@@ -138,6 +180,8 @@ class Controller {
             pickReason: this.pickReason,
             dme: this.ident && this.ident.present ? (this.ident.sgbdIndex || this.ident.vin || 'detected') : null,
             modes: this.availableModes(),
+            mhd: this.ident && this.ident.mhd ? this.ident.mhd : null,
+            tune: Object.assign({}, this.tune),
         };
     }
 }
