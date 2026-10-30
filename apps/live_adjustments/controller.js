@@ -74,12 +74,11 @@ class Controller {
     /** The BM3 marker names a ROM with a known layout: map and burbles need it (memory addresses). */
     get bm3Rom() { return !!(this.ident && this.ident.bm3 && this.ident.bm3.flashed); }
 
-    /** Re-detect the DME, re-pick the adapter and read the current state (read-only). The
-     * identity and unlock check are reads, so they run disarmed too: the pages can say what the
-     * DME is before anything is armed. */
+    /** Re-detect the DME, re-pick the adapter and read the current state (read-only). Disarmed
+     * sends nothing to the car, not even the identity reads. */
     async refresh() {
         adapters.armReal(this.armedSetting);        // arm/disarm from the setting before picking
-        if (this.link && this.link.available) {
+        if (this.link && this.link.available && this.source === 'car') {
             try { this.ident = await this.link.identifyDme(this.platform); } catch (e) { this.ident = { present: false, platform: this.platform }; }
         } else {
             this.ident = { present: false, platform: this.platform };
