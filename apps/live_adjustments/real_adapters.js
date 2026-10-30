@@ -138,4 +138,37 @@ const MhdFlap = {
     async read() { return { accepted: true, confirmed: 'UNKNOWN', detail: 'no read-back on MHD' }; },
 };
 
-module.exports = { Mg1ElAgk, MhdFlap, MHD, mhdSend, PCT_OPEN, PCT_CLOSE, tvBytes, drive, release };
+/*
+ * BM3 CustomROM: the flap through the same DID 0x60FD with BM3's own values (BM3 Live, idrive7-apps
+ * PR #29): open 2F 60FD 03 14FE, close 2F 60FD 03 2328, auto 2F 60FD 00 (hands it back to the DME).
+ */
+const Bm3Flap = {
+    id: 'bm3-flap',
+    name: 'BM3 · exhaust flap',
+    simulated: false,
+    armed: false,                            // armed at runtime from the app's arm setting
+    match(ident) { return !!(ident && ident.bm3 && ident.bm3.flashed); },
+    _guard() {
+        if (!this.armed) {
+            const err = new Error('BM3 flap control is not armed');
+            err.blocked = true;
+            throw err;
+        }
+    },
+    async _set(link, mode) {
+        this._guard();
+        try {
+            await link.bm3.setFlap(mode);
+            return { accepted: true, confirmed: 'UNKNOWN', detail: 'DME took it' };
+        } catch (e) {
+            return { accepted: false, confirmed: 'UNKNOWN', detail: String(e && e.message || e) };
+        }
+    },
+    async open(link) { return this._set(link, 'open'); },
+    async closed(link) { return this._set(link, 'close'); },
+    async oem(link) { return this._set(link, 'auto'); },
+    // the replies don't measure the valve: the state stays as requested
+    async read() { return { accepted: true, confirmed: 'UNKNOWN', detail: 'no read-back on BM3' }; },
+};
+
+module.exports = { Mg1ElAgk, MhdFlap, Bm3Flap, MHD, mhdSend, PCT_OPEN, PCT_CLOSE, tvBytes, drive, release };

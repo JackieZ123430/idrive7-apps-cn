@@ -12,6 +12,8 @@
  * Nothing here actuates the flap. Actuation lives in adapters.js and is gated there.
  */
 const { Diag, hex, NRC } = require('./kit/diag');
+const { Bm3Protocol } = require('./bm3_protocol');
+const BM3_PROFILES = require('./bm3_profiles');
 
 const DME = 0x12;                 // DME engine (BMW diagnostic address)
 const DME2 = 0x13;                // second DME on some engines, kept for future use
@@ -36,10 +38,12 @@ const MHD_TAG = [0x24, 0x80, 0x7F, 0xF7, 0x50, 0x00, 0x10];
 function bytesToHex(b) { return (b || []).map((x) => hex(x)).join(' '); }
 
 class DiagLink {
-    constructor(signals, log) {
+    constructor(signals, log, config) {
         this.signals = signals;
         this.log = log;
+        this.config = config || {};
         this.diag = null;
+        this.bm3 = null;
         this.available = false;
         this.dme = DME;
     }
@@ -47,6 +51,7 @@ class DiagLink {
     async init() {
         this.diag = await new Diag(this.signals, this.log).init();
         this.available = !!this.diag.available;
+        this.bm3 = new Bm3Protocol(this.diag, BM3_PROFILES, { bm3MarkerAddress: this.config.bm3MarkerAddress || '807FFE50' });
         return this;
     }
 
@@ -90,6 +95,7 @@ class DiagLink {
             positionRaw: asg.ok ? bytesToHex(asg.data) : null,
         };
         ident.mhd = await this.readMhd();
+        ident.bm3 = ident.mhd.flashed ? { flashed: false, rom: null, reason: 'MHD flash' } : await this.readBm3();
         this.log.info('DME ident: ' + JSON.stringify(ident));
         return ident;
     }
@@ -107,6 +113,21 @@ class DiagLink {
             return { flashed: /^MHD/.test(tag), tag: tag || null, reason: /^MHD/.test(tag) ? 'MHD flash' : 'no MHD tag' };
         } catch (e) {
             return { flashed: false, tag: null, reason: String(e && e.message || e) };
+        }
+    }
+
+    /**
+     * The BM3 unlock check: the CustomROM marker names a ROM whose layout is known (bm3_profiles.js).
+     * Defines a temporary identifier over the marker (0x2C) and reads it (0x22 F301); changes nothing
+     * on the car. Returns {flashed, rom, reason}.
+     */
+    async readBm3() {
+        if (!this.available) return { flashed: false, rom: null, reason: 'no diagnostic link' };
+        try {
+            const r = await this.bm3.identify();
+            return { flashed: true, rom: r.rom, reason: 'BM3 ROM ' + r.rom };
+        } catch (e) {
+            return { flashed: false, rom: null, reason: String(e && e.message || e) };
         }
     }
 

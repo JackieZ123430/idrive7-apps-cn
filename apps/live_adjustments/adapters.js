@@ -107,13 +107,13 @@ const Unavailable = {
 
 // Registry. Real adapters first (most specific), then the template. All are
 // DISARMED until validated + authorised; Simulated is the safe fallback in sim mode.
-const { Mg1ElAgk, MhdFlap } = require('./real_adapters');
-// an MHD-flashed DME first: its tune answers the flap control itself
-const REAL_ADAPTERS = [MhdFlap, Mg1ElAgk, RealTemplate];
+const { Mg1ElAgk, MhdFlap, Bm3Flap } = require('./real_adapters');
+// a tuned DME first (MHD, BM3): its own flap values
+const REAL_ADAPTERS = [MhdFlap, Bm3Flap, Mg1ElAgk, RealTemplate];
 
 /** Arm/disarm the validated real adapters from the app's "Car control" setting.
  * Disarmed (default) = the app runs simulated and sends nothing to the car. */
-function armReal(on) { Mg1ElAgk.armed = !!on; MhdFlap.armed = !!on; }
+function armReal(on) { Mg1ElAgk.armed = !!on; MhdFlap.armed = !!on; Bm3Flap.armed = !!on; }
 
 /**
  * Pick the adapter for this car. Returns { adapter, real, blocked, reason }.

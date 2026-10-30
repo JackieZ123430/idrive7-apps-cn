@@ -35,8 +35,10 @@ class Controller {
             busy: false,
             error: null,
         };
-        // the MHD tune's own controls (Map, Max cooling): what was asked and whether the DME took it
-        this.tune = { map: null, mapAccepted: null, cooling: null, coolingAccepted: null, busy: false, error: null };
+        // the tune's own controls (Map, Max cooling, Burbles, ASD): what was asked and whether the DME
+        // took it ('read' = read back from the DME at the unlock check)
+        this.tune = { map: null, mapAccepted: null, cooling: null, coolingAccepted: null, burbles: null, burblesAccepted: null,
+            asd: null, asdAccepted: null, busy: false, error: null };
         this._busyToken = 0;
     }
 
@@ -53,7 +55,7 @@ class Controller {
      * the flap state if the adapter can; it never actuates. */
     async start() {
         try {
-            this.link = await new DiagLink(this.ctx.signals, this.log).init();
+            this.link = await new DiagLink(this.ctx.signals, this.log, (this.ctx.spec && this.ctx.spec.config) || {}).init();
             this.state.comm = this.link.available ? 'OK' : 'NONE';
         } catch (e) {
             this.state.comm = 'ERROR';
@@ -65,6 +67,8 @@ class Controller {
 
     /** The DME runs an MHD flash (the read-only unlock check answered "MHD..."). */
     get mhd() { return !!(this.ident && this.ident.mhd && this.ident.mhd.flashed); }
+    /** The DME runs a BM3 CustomROM with a known layout. */
+    get bm3() { return !!(this.ident && this.ident.bm3 && this.ident.bm3.flashed); }
 
     /** Re-detect the DME, re-pick the adapter and read the current state (read-only). The
      * identity and unlock check are reads, so they run disarmed too: the pages can say what the
@@ -76,10 +80,20 @@ class Controller {
         } else {
             this.ident = { present: false };
         }
+        if (this.bm3) await this._readBm3();
         const p = adapters.pick(this.source, this.ident);
         this.adapter = p.adapter; this.real = p.real; this.blocked = !!p.blocked; this.pickReason = p.reason;
         await this._readBack();
         return this.state;
+    }
+
+    /** BM3's map slot and burbles as the DME has them (memory reads). */
+    async _readBm3() {
+        try { this.tune.map = (await this.link.bm3.currentMap()) + 1; this.tune.mapAccepted = 'read'; } catch (e) { this.log.warn('BM3 map read: ' + e.message); }
+        try {
+            const b = await this.link.bm3.readBurbles();
+            if (!b.enabled || b.aggression !== null) { this.tune.burbles = b.enabled ? b.aggression : null; this.tune.burblesAccepted = 'read'; }
+        } catch (e) { this.log.warn('BM3 burbles read: ' + e.message); }
     }
 
     async _readBack() {
@@ -131,11 +145,12 @@ class Controller {
         return this.state;
     }
 
-    /** Map slot 1..4 or Max cooling on/off on an MHD-flashed DME. Disarmed: simulated, nothing
-     * is sent. Armed: only with the MHD flash detected; the DME's echo is the acceptance. */
+    /**
+     * map: slot 1..4 (MHD or BM3), cooling: on/off (MHD), burbles: aggression 0..12 or null = off (BM3),
+     * asd: Active Sound Design on/off (BM3). Disarmed: simulated, nothing is sent. Armed: only with
+     * the flash it needs detected; MHD's echo or BM3's memory read-back is the acceptance.
+     */
     async setTune(kind, value) {
-        const fn = kind === 'map' ? MHD.MAP : MHD.COOLING;
-        const raw = kind === 'map' ? value - 1 : (value ? 1 : 0);
         if (kind === 'map' && !(value >= 1 && value <= 4)) return this.tune;
         this.tune[kind] = value;
         this.tune[kind + 'Accepted'] = null;
@@ -145,14 +160,16 @@ class Controller {
             this.log.info(kind + ' ' + value + ' (simulated)');
             return this.tune;
         }
-        if (!this.mhd) {
+        const tuner = this.mhd && (kind === 'map' || kind === 'cooling') ? 'mhd' : this.bm3 && kind !== 'cooling' ? 'bm3' : null;
+        if (!tuner) {
             this.tune[kind + 'Accepted'] = false;
-            this.tune.error = 'not sent: no MHD flash';
+            this.tune.error = 'not sent: ' + (kind === 'map' ? 'no MHD or BM3 flash' : kind === 'cooling' ? 'no MHD flash' : 'no BM3 flash');
             return this.tune;
         }
         this.tune.busy = true;
         try {
-            const r = await mhdSend(this.link, fn, raw);
+            const r = tuner === 'mhd' ? await mhdSend(this.link, kind === 'map' ? MHD.MAP : MHD.COOLING, kind === 'map' ? value - 1 : (value ? 1 : 0))
+                : await this._bm3(kind, value);
             this.tune[kind + 'Accepted'] = r.accepted;
             if (!r.accepted) this.tune.error = r.detail;
             this.log.info(kind + ' ' + value + ' -> accepted=' + r.accepted + ' (' + r.detail + ')');
@@ -163,6 +180,17 @@ class Controller {
             this.tune.busy = false;
         }
         return this.tune;
+    }
+
+    async _bm3(kind, value) {
+        try {
+            if (kind === 'map') await this.link.bm3.setMap(value - 1);
+            else if (kind === 'burbles') await this.link.bm3.setBurbles(value);
+            else await this.link.bm3.setAsd(!!value);
+            return { accepted: true, detail: kind === 'asd' ? 'DME took it' : 'DME took it (read back)' };
+        } catch (e) {
+            return { accepted: false, detail: String(e && e.message || e) };
+        }
     }
 
     view() {
@@ -181,6 +209,7 @@ class Controller {
             dme: this.ident && this.ident.present ? (this.ident.sgbdIndex || this.ident.vin || 'detected') : null,
             modes: this.availableModes(),
             mhd: this.ident && this.ident.mhd ? this.ident.mhd : null,
+            bm3: this.ident && this.ident.bm3 ? this.ident.bm3 : null,
             tune: Object.assign({}, this.tune),
         };
     }

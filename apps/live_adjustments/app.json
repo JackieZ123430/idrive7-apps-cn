@@ -1,8 +1,8 @@
 {
   "id": "live_adjustments",
   "title": "Live Adjustments",
-  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link, with per-DME adapters. On an MHD-flashed DME (read-only unlock check): Map slot 1-4 and Max cooling",
-  "version": "0.1.0",
+  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link, with per-DME adapters. On a tuned DME (read-only unlock check): Map slot 1-4 (MHD, BM3), Max cooling (MHD), Burbles and Active Sound Design (BM3)",
+  "version": "0.2.0",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",
@@ -122,5 +122,9 @@
         ]
       ]
     }
-  ]
+  ],
+  "config": {
+    "comment": "bm3MarkerAddress: where the BM3 CustomROM marker sits in DME memory (BM3 unlock check), firmware dependent; the default is BM3 Live's (idrive7-apps PR #29).",
+    "bm3MarkerAddress": "807FFE50"
+  }
 }

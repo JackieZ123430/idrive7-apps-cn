@@ -1,7 +1,8 @@
 'use strict';
 /**
- * Live Adjustments - native live tweaks for the BMW MGU (iDrive 7). Pages: Exhaust Flap, and on
- * an MHD-flashed DME (found by a read-only unlock check) Map (map slot 1..4) and Max cooling.
+ * Live Adjustments - native live tweaks for the BMW MGU (iDrive 7). Pages: Exhaust Flap, and on a
+ * tuned DME (found by a read-only unlock check) Map (slot 1..4, MHD or BM3), Max cooling (MHD),
+ * Burbles and Sound (Active Sound Design) (BM3).
  *
  * Exhaust Flap modes: OEM (hand the flap back to the DME), OPEN (request it open) and
  * CLOSE (request it shut) — the bottom action buttons. The command leaves the app only
@@ -33,6 +34,7 @@ mgu.run({
         const controller = new Controller(ctx);
         let angle = 0.18;
         let page = 0;
+        let burble = 4;                       // the aggression picked on the Burbles page, sent on Apply
 
         // the three mode presses, each kicks a repaint (used by both the HMI bar and
         // the on-canvas buttons the kit draws when the app owns the screen)
@@ -40,7 +42,9 @@ mgu.run({
             Promise.resolve(controller.setMode(mode)).then(() => loop && (loop.kick ? loop.kick() : render())).catch((e) => log.error('action', e));
         const tune = (kind) => (value) =>
             Promise.resolve(controller.setTune(kind, value)).then(() => loop && (loop.kick ? loop.kick() : render())).catch((e) => log.error('action', e));
-        const acts = { oem: press('OEM'), open: press('OPEN'), close: press('CLOSED'), map: tune('map'), cooling: tune('cooling') };
+        const acts = { oem: press('OEM'), open: press('OPEN'), close: press('CLOSED'), map: tune('map'), cooling: tune('cooling'),
+            burbles: tune('burbles'), asd: tune('asd'),
+            burbleStep: (d) => { burble = Math.min(12, Math.max(0, burble + d)); if (loop.kick) loop.kick(); } };
 
         const render = async () => {
             const v = controller.view();
@@ -49,6 +53,7 @@ mgu.run({
             if (Math.abs(tgt - angle) < 0.003) angle = tgt;
             v.angle = angle;
             v.page = page;
+            v.burble = burble;
             const t = ctx.theme();
             const cv = ctx.canvas(UI.W, UI.H) || new Canvas(UI.W, UI.H);
             UI.draw(cv, G, t, v, acts);           // acts → the kit draws OEM/OPEN/CLOSE, active one red

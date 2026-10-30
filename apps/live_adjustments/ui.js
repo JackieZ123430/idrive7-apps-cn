@@ -9,15 +9,16 @@
  * bottom — the selected one filled red, like the other apps (drawn with G.button; the
  * HMI bar is hidden in main.js). A fifth arg `act` carries the press callbacks.
  *
- * Pages (tabs): Exhaust Flap, Map (MHD map slot 1..4) and Max cooling (on/off). The last two
- * exist only on an MHD-flashed DME; their pages say what the read-only unlock check found.
+ * Pages (tabs): Exhaust Flap, Map (map slot 1..4, MHD or BM3), Max cooling (on/off, MHD), Burbles
+ * (aggression 0..12, BM3) and Sound (Active Sound Design on/off, BM3). The tune pages work only on
+ * a DME with that flash; they say what the read-only unlock check found.
  *
  * GPU-safe: only circle / arc / roundRect / strokeRoundRect / line / text / gradientRect
  * (the car's Recorder has no cv.convex / N-point polygon fill).
  */
 
 const W = 1600, H = 520;
-const PAGES = ['Exhaust Flap', 'Map', 'Max cooling'];
+const PAGES = ['Exhaust Flap', 'Map', 'Max cooling', 'Burbles', 'Sound'];
 
 function draw(cv, G, t, v, act) {
     cv.clear(t.bg);
@@ -28,6 +29,8 @@ function draw(cv, G, t, v, act) {
     G.frame(cv, t, PAGES, page, [v.source === 'sim' ? { text: 'SIM', color: t.warn || '#d29922' } : null]);
     if (page === 1) return drawMap(cv, G, t, v, act || {});
     if (page === 2) return drawCooling(cv, G, t, v, act || {});
+    if (page === 3) return drawBurbles(cv, G, t, v, act || {});
+    if (page === 4) return drawAsd(cv, G, t, v, act || {});
 
     // --- the house content panel (grey card) over the whole content area, EXACTLY like
     // the other apps (e.g. car_vitals). A panel that reaches the page bottom extends down
@@ -55,23 +58,31 @@ function draw(cv, G, t, v, act) {
     return cv;
 }
 
+/** Whether the page's tune is on the DME: need = 'mhd', 'bm3' or 'any'. */
+function unlocked(v, need) {
+    return !!((need !== 'bm3' && v.mhd && v.mhd.flashed) || (need !== 'mhd' && v.bm3 && v.bm3.flashed));
+}
+
 /** What the unlock check found, and whether presses reach the car. */
-function unlockLine(v) {
-    const m = v.mhd;
-    const found = !m ? 'Unlock check: not read (no diagnostic link)'
-        : m.flashed ? 'MHD flash detected' + (m.tag ? ' (' + m.tag + ')' : '')
-            : 'No MHD flash on this DME (' + (m.reason || 'no answer') + '): needs an MHD-flashed DME';
+function unlockLine(v, need) {
+    const m = v.mhd, b = v.bm3;
+    const wants = need === 'mhd' ? 'an MHD' : need === 'bm3' ? 'a BM3' : 'an MHD or BM3';
+    let found;
+    if (!m && !b) found = 'Unlock check: not read (no diagnostic link)';
+    else if (m && m.flashed) found = 'MHD flash detected' + (m.tag ? ' (' + m.tag + ')' : '');
+    else if (b && b.flashed) found = 'BM3 ROM ' + b.rom + ' detected';
+    else found = 'No MHD or BM3 flash on this DME (' + ((b && b.reason) || (m && m.reason) || 'no answer') + ')';
+    if ((m || b) && !unlocked(v, need)) found += ': needs ' + wants + '-flashed DME';
     return found + (v.source === 'sim' ? '  ·  Disarmed: simulated, nothing is sent' : '');
 }
 
 /** A tune page: the panel, the big state word, the unlock line and whether the DME took it. */
-function tunePage(cv, G, t, v, word, color, accepted) {
+function tunePage(cv, G, t, v, word, color, accepted, need) {
     G.panel(cv, t, 24, G.TOP, W - 48, G.BOTTOM - G.TOP, null);
     cv.text(word, W / 2, G.TOP + 150, 80, color, { align: 'center', font: 'bold', spacing: 2 });
-    const ok = v.mhd && v.mhd.flashed;
-    cv.text(unlockLine(v), W / 2, G.TOP + 210, 20, ok ? t.text : (t.warn || '#d29922'), { align: 'center', font: 'label' });
+    cv.text(unlockLine(v, need), W / 2, G.TOP + 210, 20, unlocked(v, need) ? t.text : (t.warn || '#d29922'), { align: 'center', font: 'label' });
     const err = v.tune && v.tune.error;
-    const note = err ? '! ' + err : accepted === true ? (v.source === 'sim' ? 'Simulated' : 'DME took it') : accepted === false ? 'Not taken' : '';
+    const note = err ? '! ' + err : accepted === 'read' ? 'Read from the DME' : accepted === true ? (v.source === 'sim' ? 'Simulated' : 'DME took it') : accepted === false ? 'Not taken' : '';
     if (note) cv.text(note, W / 2, G.TOP + 246, 18, err || accepted === false ? (t.crit || '#ef2b2d') : t.dim, { align: 'center', font: 'label' });
 }
 
@@ -79,7 +90,7 @@ function tunePage(cv, G, t, v, word, color, accepted) {
 function drawMap(cv, G, t, v, act) {
     const tune = v.tune || {};
     const map = tune.mapAccepted === false ? null : tune.map;          // a refused one is not shown as set
-    tunePage(cv, G, t, v, map ? 'MAP ' + map : 'MAP –', t.text, tune.mapAccepted);
+    tunePage(cv, G, t, v, map ? 'MAP ' + map : 'MAP –', t.text, tune.mapAccepted, 'any');
     const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
     let bx = (W - (4 * bw + 3 * gap)) / 2;
     for (let n = 1; n <= 4; n++) {
@@ -96,13 +107,51 @@ function drawCooling(cv, G, t, v, act) {
     const tune = v.tune || {};
     const cooling = tune.coolingAccepted === false ? null : tune.cooling;
     const word = cooling == null ? 'MAX COOLING –' : cooling ? 'MAX COOLING ON' : 'MAX COOLING OFF';
-    tunePage(cv, G, t, v, word, cooling ? (t.accent2 || '#81c4ff') : t.text, tune.coolingAccepted);
+    tunePage(cv, G, t, v, word, cooling ? (t.accent2 || '#81c4ff') : t.text, tune.coolingAccepted, 'mhd');
     const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
     let bx = (W - (2 * bw + gap)) / 2;
     [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {
         const sel = cooling === on;
         G.button(cv, t, bx, by, bw, bh, label, () => act.cooling && act.cooling(on),
             Object.assign({ key: 'la_cool' + label }, sel ? { color: t.crit || '#ef2b2d', primary: true } : {}));
+        bx += bw + gap;
+    });
+    return cv;
+}
+
+/** Burbles: the aggression picked with - / + (v.burble, nothing sent), Apply sends it, Off turns them off. */
+function drawBurbles(cv, G, t, v, act) {
+    const tune = v.tune || {};
+    const set = tune.burblesAccepted === false ? undefined : tune.burbles;      // undefined = not known
+    const pick = v.burble == null ? 4 : v.burble;
+    tunePage(cv, G, t, v, 'AGGRESSION ' + pick, t.text, tune.burblesAccepted, 'bm3');
+    const now = set === undefined ? 'Set: –' : set === null ? 'Set: off' : 'Set: ' + set;
+    cv.text(now, W / 2, G.TOP + 290, 26, t.dim, { align: 'center', font: 'bold' });
+    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    let bx = (W - (4 * bw + 3 * gap)) / 2;
+    [['–', () => act.burbleStep && act.burbleStep(-0.5), {}],
+        ['+', () => act.burbleStep && act.burbleStep(0.5), {}],
+        ['Apply', () => act.burbles && act.burbles(pick), Object.assign({ confirm: true }, set === pick ? { color: t.crit || '#ef2b2d', primary: true } : {})],
+        ['Off', () => act.burbles && act.burbles(null), Object.assign({ confirm: set !== null }, set === null ? { color: t.crit || '#ef2b2d', primary: true } : {})],
+    ].forEach(([label, run, opts], i) => {
+        G.button(cv, t, bx, by, bw, bh, label, run, Object.assign({ key: 'la_burble' + i }, opts));
+        bx += bw + gap;
+    });
+    return cv;
+}
+
+/** Sound: Active Sound Design on / off. */
+function drawAsd(cv, G, t, v, act) {
+    const tune = v.tune || {};
+    const asd = tune.asdAccepted === false ? null : tune.asd;
+    const word = asd == null ? 'SOUND DESIGN –' : asd ? 'SOUND DESIGN ON' : 'SOUND DESIGN OFF';
+    tunePage(cv, G, t, v, word, t.text, tune.asdAccepted, 'bm3');
+    const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
+    let bx = (W - (2 * bw + gap)) / 2;
+    [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {
+        const sel = asd === on;
+        G.button(cv, t, bx, by, bw, bh, label, () => act.asd && act.asd(on),
+            Object.assign({ key: 'la_asd' + label }, sel ? { color: t.crit || '#ef2b2d', primary: true } : {}));
         bx += bw + gap;
     });
     return cv;
