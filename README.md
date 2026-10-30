@@ -711,7 +711,7 @@ mgu.run({
 |---|---|
 | `ctx.ui` | `image(name, canvas)`, `text(name, str)`, `visible(name, on)`, `checked(name, on)`, `rows(name, n)`, `onClick(name, fn)` |
 | `ctx.settings` | `get(key)`, `onChange(fn)` |
-| `ctx.canvas(w, h)` | the surface to draw one frame on (reused; pass it to `ui.image`). Use 1600 x 520: page tabs via `G.frame`, page content between `G.TOP` (44) and `G.BOTTOM` (512) |
+| `ctx.canvas(w, h)` | the surface to draw one frame on (reused; pass it to `ui.image`). Use 1600 x 520: page tabs via `G.frame`, page content between `G.TOP` (44) and `G.BOTTOM` (512). Where the kit runs the screen with no bar under the page, the screen has room below the page: `G.pageBottom(cv)` is `G.BOTTOM` plus that room (`cv.extra`, else 0), and `G.panel` stretches a panel that ends at the page's bottom down to it and returns the rect it drew (`G.stat` and `G.segBar` follow it), so a chart or list can use the real height. A page that reads `cv.extra` (or `G.pageBottom`, or has such a panel) starts where it does over the slim bar; any other page is centred in the room |
 | `ctx.loop(screen, fps, fn)` | render loop that runs only while that screen is shown: once per display refresh with the GPU renderer, `fps` times a second without; returns `{stop()}` |
 | `ctx.theme()` | current colour theme (`bg`, `text`, `dim`, `accent`, `warn`, `crit`, `cold`, ...) |
 | `ctx.signals` | raw SOME/IP access: `watch(iface, instance, handlers)`, `proxy`, `call`, `set(proxy, field, value)` (needs `w`) |

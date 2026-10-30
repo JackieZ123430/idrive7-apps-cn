@@ -108,9 +108,9 @@ mgu.run({
          * (blue -> purple -> red at 120 deg C, solid red above); cold / warn / crit zones tint the
          * track, green mark where it counts as warm.
          */
-        function gauge(cv, t, y, val, label, warm) {
+        function gauge(cv, t, y, h, val, label, warm) {
             const st = F() ? 18 : 10;
-            G.segBar(cv, t, 24, y, 880, 225, {
+            G.segBar(cv, t, 24, y, 880, h, {
                 label, value: T(val), unit: tU(), decimals: 0, min: T(0), max: T(150), step: st, scale: { every: st * 2.5 },
                 zones: [{ from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(160), color: 'crit' }],
                 ramp: 'hot', limit: T(120), marks: [{ value: T(warm), color: GO }],
@@ -137,11 +137,14 @@ mgu.run({
             const t = ctx.theme(), d = car.data(), now = Date.now();
             const cv = ctx.canvas(W, H).clear(t.bg);
             const warm = settings.get('warmOil'), warmC = settings.get('warmCoolant');
-            gauge(cv, t, G.TOP, d.oil, 'Oil', warm);
-            gauge(cv, t, G.TOP + 242, d.coolant, 'Coolant', warmC);
+            // the room below the page (on the car, with no bar under it): half to each gauge; the coolant
+            // panel ends at the page's bottom, and G.panel adds the room back to it
+            const room = G.pageBottom(cv) - G.BOTTOM, half = Math.round(room / 2);
+            gauge(cv, t, G.TOP, 225 + half, d.oil, 'Oil', warm);
+            gauge(cv, t, G.TOP + 242 + half, 225 - half, d.coolant, 'Coolant', warmC);
 
             // ---- status panel
-            G.panel(cv, t, 928, 44, 648, 468, null);
+            const sp = G.panel(cv, t, 928, 44, 648, 468, null);
             const lim = limit(d.oil);
             const ready = G.isNum(d.oil) && d.oil >= warm;
             const hot = G.isNum(d.oil) && d.oil > 125;
@@ -186,7 +189,8 @@ mgu.run({
             if (fl > 0) cv.roundRect(1160, 340, 230 * fl, 8, 4, ready ? GO : col);
 
             // trend: last minutes (steady clock, see mono) + up to 5 min projected; nothing is drawn outside the graph
-            const gx = 952, gy = 398, gw = 600, gh = 90, nowX = gx + gw - 90;
+            // (it grows with the status panel where that goes on down to the screen's bottom)
+            const gx = 952, gy = 398, gw = 600, gh = 90 + sp.h - 468, nowX = gx + gw - 90;
             const now0 = hist.length ? hist[hist.length - 1][0] : mono();
             const span = G.clamp(hist.length ? now0 - hist[0][0] : 0, 300000, 1200000);
             const ahead = 300000;                                  // projection: up to 5 min ahead

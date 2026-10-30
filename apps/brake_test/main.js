@@ -118,7 +118,11 @@ mgu.run({
         function drawLive(cv, t, now) {
             const d = car.data(), low = mainTest();
             // ---- result / live panel
-            G.panel(cv, t, 24, 44, 470, 468, run ? 'Stopping' : last ? 'Last stop' : 'Ready');
+            const pr = G.panel(cv, t, 24, 44, 470, 468, run ? 'Stopping' : last ? 'Last stop' : 'Ready');
+            // room below the page (where the kit gives it; all three panels reach it): the status lines move
+            // down with the panels' bottom, the charts get taller
+            // (each panel's last line then ends ~22 over its bottom: dl status, dc chart, df fade)
+            const dy = pr.y + pr.h - G.BOTTOM, dl = dy - Math.min(dy, 9), dc = dy + Math.min(dy, 41), df = dy + Math.min(dy, 8);
             // the panel's own button (where the kit runs the screen; else the bar's Cancel run)
             G.button(cv, t, 494 - 20 - 170, 56, 170, 40, 'Cancel run', act, { key: 'cancel', busy: !run && !last });
             const showKey = last ? (last.result[low.key] ? low.key : Object.keys(last.result)[0]) : low.key;
@@ -141,14 +145,14 @@ mgu.run({
             }
             const st = state === 'arm' ? STATE.arm + Math.round(V(low.v) + 3) + (mph() ? ' MPH' : ' KM/H') : STATE[state];
             const col = state === 'ready' ? GO : state === 'braking' ? t.crit : t.dim;
-            cv.roundRect(48, 412, 422, 44, 8, withAlpha(col, state === 'ready' ? 0.25 + 0.2 * Math.sin(now / 160) : 0.18));
-            cv.text(msg && now < msgUntil ? msg.toUpperCase() : st, 259, 445, msg && now < msgUntil ? 18 : 24, col, { align: 'center', font: 'bold', spacing: 2 });
-            cv.text('SPEED ' + G.fmt(V(G.hold('speed', d.speed, SPEED_MS)), 0) + '   ·   ' + G.fmt(d.gLong, 2) + ' g', 48, 495, 22, t.dim, { font: 'bold', spacing: 0.5 });
+            cv.roundRect(48, 412 + dl, 422, 44, 8, withAlpha(col, state === 'ready' ? 0.25 + 0.2 * Math.sin(now / 160) : 0.18));
+            cv.text(msg && now < msgUntil ? msg.toUpperCase() : st, 259, 445 + dl, msg && now < msgUntil ? 18 : 24, col, { align: 'center', font: 'bold', spacing: 2 });
+            cv.text('SPEED ' + G.fmt(V(G.hold('speed', d.speed, SPEED_MS)), 0) + '   ·   ' + G.fmt(d.gLong, 2) + ' g', 48, 495 + dl, 22, t.dim, { font: 'bold', spacing: 0.5 });
 
             // ---- decel trace (g over distance)
             G.panel(cv, t, 518, 44, 620, 468, 'Deceleration');
             const tr = run ? run.trace : last ? last.trace : [];
-            const px = 584, py = 104, pw = 520, ph = 319;
+            const px = 584, py = 104, pw = 520, ph = 319 + dc;
             const dMax = Math.max(40, Math.ceil(((tr.length ? tr[tr.length - 1][0] : 0) + 5) / 20) * 20);
             const gMax = 1.5;
             const X = (m) => px + (m / dMax) * pw, Y = (g) => py + ph - (G.clamp(g, 0, gMax) / gMax) * ph;
@@ -175,31 +179,32 @@ mgu.run({
             cv.text(low.label.toUpperCase() + ', LAST ' + runs.length, 1186, 114, 22, t.dim, { font: 'bold', spacing: 0.5 });
             if (runs.length) {
                 const ms = runs.map((x) => x.result[low.key].m), lo = Math.min.apply(null, ms), hi = Math.max.apply(null, ms);
-                const bw = 40, gap = 8, base = 327;
+                const bw = 40, gap = 8, base = 327 + df;
                 runs.forEach((x, i) => {
                     const m = x.result[low.key].m, f = hi > lo ? (m - lo) / (hi - lo) : 0.5;
-                    const h = 60 + f * 120, col = m - lo > lo * 0.08 ? t.crit : m - lo > lo * 0.04 ? t.warn : GO;
+                    const h = 60 + f * (120 + df), col = m - lo > lo * 0.08 ? t.crit : m - lo > lo * 0.04 ? t.warn : GO;
                     cv.roundRect(1186 + i * (bw + gap), base - h, bw, h, 5, col);
                     cv.text(D(m).toFixed(0), 1186 + i * (bw + gap) + bw / 2, base + 26, 20, t.dim, { align: 'center' });
                 });
                 const n = ms.length, fade = n >= 3 ? (ms[n - 1] - Math.min.apply(null, ms.slice(0, n - 1))) / Math.min.apply(null, ms.slice(0, n - 1)) : 0;
                 const fc = fade > 0.08 ? t.crit : fade > 0.04 ? t.warn : GO;
-                cv.text(n < 3 ? 'need 3 stops' : fade > 0.08 ? 'FADING  +' + (fade * 100).toFixed(0) + '%' : fade > 0.04 ? 'WARM  +' + (fade * 100).toFixed(0) + '%' : 'CONSISTENT', 1186, 393, 26, n < 3 ? t.dim : fc, { font: 'bold', spacing: 1 });
+                cv.text(n < 3 ? 'need 3 stops' : fade > 0.08 ? 'FADING  +' + (fade * 100).toFixed(0) + '%' : fade > 0.04 ? 'WARM  +' + (fade * 100).toFixed(0) + '%' : 'CONSISTENT', 1186, 393 + df, 26, n < 3 ? t.dim : fc, { font: 'bold', spacing: 1 });
             } else cv.text('no stops yet', 1186, 242, 24, t.dim);
             tests().forEach((x, i) => {
                 const b = store.best[x.key];
-                cv.text('BEST ' + x.label, 1186, 444 + i * 34, 22, t.dim, { font: 'bold' });
-                cv.text(b ? D(b.m).toFixed(1) + ' ' + dU() : '--', 1552, 444 + i * 34, 24, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
+                cv.text('BEST ' + x.label, 1186, 444 + df + i * 34, 22, t.dim, { font: 'bold' });
+                cv.text(b ? D(b.m).toFixed(1) + ' ' + dU() : '--', 1552, 444 + df + i * 34, 24, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
             });
         }
 
         function drawHistory(cv, t) {
-            G.panel(cv, t, 24, 44, 1552, 468, 'All stops');
+            const p = G.panel(cv, t, 24, 44, 1552, 468, 'All stops');
             G.button(cv, t, 1576 - 20 - 200, 56, 200, 40, clearArmed ? 'Yes, clear' : 'Clear log', act, { key: 'clear', color: clearArmed ? t.crit : null, busy: !store.runs.length });
             const ts = tests();
             const cols = [48, 330, 640, 950, 1180, 1400];
             ['WHEN', ts[1].label.toUpperCase(), ts[0].label.toUpperCase(), 'PEAK DECEL', 'FROM', ''].forEach((h, i) => cv.text(h, cols[i], 127, 22, t.dim, { font: 'bold', spacing: 1 }));
-            const runs = store.runs.filter((x) => x.unit === settings.get('speedUnit')).slice(0, 8);
+            // another row where the panel reaches further down (room below the page) and one fits whole
+            const runs = store.runs.filter((x) => x.unit === settings.get('speedUnit')).slice(0, 8 + Math.floor((p.y + p.h - G.BOTTOM) / 41));
             if (!runs.length) cv.text('No stops yet.', 48, 210, 26, t.dim);
             runs.forEach((r, i) => {
                 const y = 174 + i * 41;

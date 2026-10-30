@@ -531,12 +531,12 @@ mgu.run({
         /** Speed + gear card; tall = the full-height card of the Engine page without boost. */
         function speedCard(cv, t, d, x, y, w, h) {
             const tall = h > 300, sz = tall ? 150 : 96, gz = tall ? 230 : 120;
-            G.panel(cv, t, x, y, w, h, 'Speed');
+            const p = G.panel(cv, t, x, y, w, h, 'Speed');
             const sp = V(G.hold('speed', d.speed, 1000 / settings.get('speedRate'))), sy = tall ? y + 220 : y + 160;
             const sw = cv.text(G.fmt(sp, 0), x + 22, sy, sz, sp == null ? t.dim : t.text, { font: 'num' });
             cv.text(settings.get('speedUnit') === 'mph' ? 'mph' : 'km/h', x + 30 + sw, sy, tall ? 34 : 26, t.dim);
             // gear: D / S / M + number (R, N, P alone)
-            const gr = gearText(d), gy = tall ? y + h - 30 : y + 162;
+            const gr = gearText(d), gy = tall ? p.y + p.h - 30 : y + 162;
             if (gr) {
                 const nw = gr.num ? cv.text(gr.num, x + w - 24, gy, gz, t.text, { align: 'right', font: 'gear' }) : 0;
                 cv.text(gr.letter, x + w - 28 - nw, gy, gz, gr.letter === 'M' ? t.crit : gr.letter === 'S' ? t.accent : t.dim, { align: 'right', font: 'gear' });
@@ -556,8 +556,11 @@ mgu.run({
             const pw = power(d), powMax = PW(settings.get('maxPower'));
             ['rpm', 'boost', 'torque'].forEach((k) => raise(pk, k, d[k]));
             raise(pk, 'power', pw.kw);
-            // rpm + boost as tach bars (Redline style): theme colour -> red at the redline / warning zone
-            G.segBar(cv, t, 24, G.TOP, 1062, 226, {
+            // rpm + boost as tach bars (Redline style): theme colour -> red at the redline / warning zone.
+            // The room below the page (on the car, with no bar under it): half to the rpm bar, half to the
+            // panel under it, which ends at the page's bottom: G.panel adds the room back to it
+            const room = G.pageBottom(cv) - G.BOTTOM, half = Math.round(room / 2);
+            G.segBar(cv, t, 24, G.TOP, 1062, 226 + half, {
                 label: 'Engine speed', value: d.rpm, unit: 'rpm', decimals: 0, min: 0, max, step: 500,
                 scale: { every: 1000, div: 1000 }, ramp: 'hot', limit: red, marks: [{ value: red, color: 'crit' }],
                 peak: showPk ? pk.rpm : null,
@@ -573,18 +576,18 @@ mgu.run({
             };
             if (shown('boost')) {
                 const psi = settings.get('pressUnit') === 'psi', pmax = psi ? 36 : 2.5;
-                G.segBar(cv, t, 24, G.TOP + 242, 1062, 226, {
+                G.segBar(cv, t, 24, G.TOP + 242 + half, 1062, 226 - half, {
                     label: 'Boost', value: P(d.boost), unit: settings.get('pressUnit'), decimals: psi ? 1 : 2, min: 0, max: pmax,
                     step: psi ? 2 : 0.125, scale: { every: psi ? 6 : 0.5, decimals: psi ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
                     marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(pk.boost) : null,
                 });
-                if (!G.isNum(d.boost) && !usingDemo()) cv.text(boostWhy(), 48, G.TOP + 242 + 212, 22, t.dim);
+                if (!G.isNum(d.boost) && !usingDemo()) cv.text(boostWhy(), 48, G.pageBottom(cv) - 14, 22, t.dim);
                 speedCard(cv, t, d, 1110, G.TOP, 466, 190);
-                bars(1110, 272, 466, 132);
+                bars(1110, 272 + half, 466, 132 + room - half);
             } else {
                 // no boost: power + torque take its place, speed + gear the whole right column
-                G.panel(cv, t, 24, G.TOP + 242, 1062, 226, null);
-                bars(48, G.TOP + 256, 1014, 108);
+                const p = G.panel(cv, t, 24, G.TOP + 242 + half, 1062, 226 - half, null);
+                bars(48, p.y + 14, 1014, p.h - 118);       // torque stays 12 over the panel's bottom
                 speedCard(cv, t, d, 1110, G.TOP, 466, G.BOTTOM - G.TOP);
             }
         }
@@ -618,9 +621,9 @@ mgu.run({
         /** Draw the tiles of a page; a page with nothing to show says so. */
         function drawTiles(cv, t, tiles) {
             if (!tiles.length) {
-                G.panel(cv, t, 24, G.TOP, 1552, G.BOTTOM - G.TOP, null);
-                cv.text('No data from the engine unit yet', 800, 260, 32, t.dim, { align: 'center', font: 'bold' });
-                cv.text('Values show up here once the car answers. Settings: set one to Show to keep it on screen.', 800, 304, 24, t.dim, { align: 'center' });
+                const p = G.panel(cv, t, 24, G.TOP, 1552, G.BOTTOM - G.TOP, null), dy = Math.round((p.h - (G.BOTTOM - G.TOP)) / 2);
+                cv.text('No data from the engine unit yet', 800, 260 + dy, 32, t.dim, { align: 'center', font: 'bold' });
+                cv.text('Values show up here once the car answers. Settings: set one to Show to keep it on screen.', 800, 304 + dy, 24, t.dim, { align: 'center' });
                 return;
             }
             grid(tiles.length).forEach((b, i) => {
@@ -647,15 +650,16 @@ mgu.run({
 
         /** Misfires this driving cycle: the total big, each cylinder below (from OBD service 06). */
         function misfireTile(cv, t, x, y, w, h, counts) {
-            G.panel(cv, t, x, y, w, h, 'Misfires');
+            const p = G.panel(cv, t, x, y, w, h, 'Misfires'), yb = p.y + p.h;       // (a bottom tile's panel goes on down)
             const ok = Array.isArray(counts) && counts.length, big = h > 200 ? 100 : 64;
             const total = ok ? counts.reduce((a, c) => a + (c || 0), 0) : null;
             const col = !ok ? t.dim : total === 0 ? GO : total < 20 ? t.warn : t.crit;
             const tw = cv.text(ok ? String(total) : '--', x + 18, y + 52 + big * 0.78, big, col, { font: 'num' });
             cv.text(ok ? 'this drive' : '', x + 28 + tw, y + 52 + big * 0.78, 24, t.dim);
-            if (!ok) { cv.text(usingDemo() ? 'no data' : fuelWhy('misfire'), x + 18, y + h - 16, 22, t.dim); return; }
-            // per cylinder: a cell each along the bottom, "Cyl n" over its count
-            const n = counts.length, gap = 8, cw = (w - 36 - gap * (n - 1)) / n, ch = 74, cy = y + h - 12 - ch;
+            if (!ok) { cv.text(usingDemo() ? 'no data' : fuelWhy('misfire'), x + 18, yb - 16, 22, t.dim); return; }
+            // per cylinder: a cell each along the bottom, "Cyl n" over its count; with room below the page (the
+            // panel stretched) up to 16 higher, nearer the other tiles' graphs and lines
+            const n = counts.length, gap = 8, cw = (w - 36 - gap * (n - 1)) / n, ch = 74, cy = yb - 12 - ch - G.clamp(yb - Math.round(y + h), 0, 16);
             counts.forEach((c, i) => {
                 const cx = x + 18 + i * (cw + gap), hit = G.isNum(c) && c > 0;
                 cv.roundRect(cx, cy, cw, ch, 8, withAlpha(hit ? t.warn : t.track, hit ? 0.18 : 0.9));
@@ -670,7 +674,7 @@ mgu.run({
          * the target asks for something (above 'idle'): at idle a gap means nothing.
          */
         function pairTile(cv, t, x, y, w, h, g) {
-            G.panel(cv, t, x, y, w, h, g.label);
+            const p = G.panel(cv, t, x, y, w, h, g.label), yb = p.y + p.h;          // (a bottom tile's panel goes on down)
             const a = g.actual, tg = g.target, has = G.isNum(a), big = h > 200 ? 84 : 56;
             const gap = has && G.isNum(tg) ? a - tg : null, judged = G.isNum(gap) && tg > g.idle;
             const col = !has ? t.dim : !judged || Math.abs(gap) < g.tol ? t.text : gap > 0 ? t.crit : t.warn;
@@ -685,7 +689,7 @@ mgu.run({
                 // both over the last 5 minutes, on one scale
                 const ha = g.histA || [], ht = g.histT || [], all = ha.concat(ht).filter(G.isNum);
                 if (all.length > 2) {
-                    const hx = x + 18, hw = w - 36, hy = y + h - 44, hh = Math.min(56, h * 0.24);
+                    const hx = x + 18, hw = w - 36, hy = yb - 44, hh = Math.min(56, h * 0.24);
                     let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
                     if (hi - lo < 1e-6) { lo -= 1; hi += 1; }
                     const pts = (hs) => hs.map((p, i) => [hx + (i / Math.max(1, hs.length - 1)) * hw, G.isNum(p) ? hy - ((p - lo) / (hi - lo)) * hh : hy]);
@@ -697,7 +701,7 @@ mgu.run({
                 : !judged ? 'on target' + (G.isNum(gap) ? ' (idle)' : '')
                     : Math.abs(gap) < g.tol ? 'on target  ·  ' + (gap >= 0 ? '+' : '') + G.fmt(gap, g.decimals) + ' ' + g.unit
                         : (gap > 0 ? '+' : '') + G.fmt(gap, g.decimals) + ' ' + g.unit + (gap > 0 ? ' over target' : ' under target');
-            cv.text(sub, x + 18, y + h - 16, 22, judged && Math.abs(gap) >= g.tol ? col : t.dim, { spacing: 0.5 });
+            cv.text(sub, x + 18, yb - 16, 22, judged && Math.abs(gap) >= g.tol ? col : t.dim, { spacing: 0.5 });
         }
 
         function drawFuel(cv, t, d) {
@@ -747,8 +751,11 @@ mgu.run({
             const showAwd = xd === 'on' || (xd !== 'off' && (awdSeen || usingDemo()));
             const showTyres = shown('tyres'), right = showAwd ? 1196 : 1576;
             const gw = showTyres ? 480 : right - 24;
+            // the room below the page (on the car, with no bar under it): the g-g diagram grows into it until its
+            // g line ends ~22 over the panel's bottom, as the tyres' and xDrive's last lines; the xDrive bars spread over it
+            const room = G.pageBottom(cv) - G.BOTTOM, half = Math.floor(room / 2), grow = Math.round(room * 2 / 3);
             G.panel(cv, t, 24, G.TOP, gw, G.BOTTOM - G.TOP, 'G-force');
-            G.gmeter(cv, t, 24 + gw / 2, 258, 164, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
+            G.gmeter(cv, t, 24 + gw / 2, 258 + grow, 164 + grow, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
             if (showTyres) drawTyres(cv, t, 528, G.TOP, right - 528, G.BOTTOM - G.TOP, d);
             if (showAwd) {
                 const ax = 1220, aw = 356;
@@ -759,8 +766,8 @@ mgu.run({
                 cv.text(mode, ax + 24, 160, 52, hot ? t.crit : t.text, { font: 'bold' });
                 if (hot) cv.text('DERATED / OFF', ax + 24, 196, 22, t.crit, { font: 'bold', spacing: 1.5 });
                 const sp = xdriveSplit(d), rear = sp.rear;
-                G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
-                G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
+                G.bar(cv, t, ax + 24, 262 + half, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
+                G.bar(cv, t, ax + 24, 392 + 2 * half, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
                 // where the split came from when it isn't the car's own torque split
                 // under the mode: front axle torque and where the split came from, when it isn't the car's own
                 const note = G.isNum(sp.nm) ? 'front ' + G.fmt(TQ(sp.nm), 0) + ' ' + tqU() + ' (transfer case)'
@@ -772,9 +779,9 @@ mgu.run({
         /** Top-down car with each tyre's pressure (against the car's target) and temperature (when shown). */
         function drawTyres(cv, t, x, y, w, h, d) {
             const temps = shown('tyreTemp');
-            G.panel(cv, t, x, y, w, h, 'Tyres');
+            const p = G.panel(cv, t, x, y, w, h, 'Tyres');
             const unitP = settings.get('pressUnit'), dec = unitP === 'psi' ? 0 : 1;
-            const cx = x + w / 2, top = y + 70, bh = h - 100, bw = 150;
+            const cx = x + w / 2, top = y + 70, bh = p.h - 100, bw = 150;     // rear tyres: at the panel's real bottom
             // body: rounded shell, windscreen + rear window, FRONT marker
             cv.roundRect(cx - bw / 2, top, bw, bh, 52, withAlpha(t.track, 0.9));
             cv.strokeRoundRect(cx - bw / 2, top, bw, bh, 52, 3, t.tick);

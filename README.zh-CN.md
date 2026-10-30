@@ -535,7 +535,7 @@ mgu.run({
 |---|---|
 | `ctx.ui` | `image(name, canvas)`、`text(name, str)`、`visible(name, on)`、`checked(name, on)`、`rows(name, n)`、`onClick(name, fn)`。 |
 | `ctx.settings` | `get(key)`、`onChange(fn)`。 |
-| `ctx.canvas(w, h)` | 可复用的单帧画布，交给 `ui.image`。使用 1600 × 520，页签由 `G.frame` 绘制，内容位于 `G.TOP`（44）与 `G.BOTTOM`（512）之间。 |
+| `ctx.canvas(w, h)` | 可复用的单帧画布，交给 `ui.image`。使用 1600 × 520，页签由 `G.frame` 绘制，内容位于 `G.TOP`（44）与 `G.BOTTOM`（512）之间。套件接管屏幕且页面下方没有按钮栏时，页面下方还有空间：`G.pageBottom(cv)` 为 `G.BOTTOM` 加上该空间（`cv.extra`，否则为 0）；`G.panel` 会把延伸到页面底部的面板拉伸到该处，并返回实际绘制的矩形（`G.stat` 与 `G.segBar` 随之调整），图表或列表可据此使用实际高度。读取 `cv.extra`（或 `G.pageBottom`，或含有此类面板）的页面与有窄按钮栏时的起始位置相同；其他页面在该空间内垂直居中。 |
 | `ctx.loop(screen, fps, fn)` | 仅在页面显示时运行；GPU 模式每次刷新一帧，否则每秒 fps 次，返回 `{stop()}`。 |
 | `ctx.theme()` | 当前主题，含 `bg`、`text`、`dim`、`accent`、`warn`、`crit`、`cold` 等。 |
 | `ctx.signals` | 原始 SOME/IP 访问：`watch(iface, instance, handlers)`、`proxy`、`call`、`set(proxy, field, value)`，写入需 `w`。 |

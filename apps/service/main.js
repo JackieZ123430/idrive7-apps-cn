@@ -270,22 +270,26 @@ mgu.run({
             tile(cv, t, 24, 760, 'Next service', s ? s.way || s.date || '--' : '--', s ? fit(cv, s.text, 22, 380) : 'waiting for the car', s ? COL(t, s.colour) : t.dim);
             tile(cv, t, 804, 374, 'Due soon', String(soon), 'items', soon ? t.warn : GO);
             tile(cv, t, 1198, 378, 'Due now', String(red), 'items', red ? t.crit : GO);
-            G.panel(cv, t, 24, 176, 1552, 336, 'Service requirements' + (its.length > PER_PAGE ? '  ' + (Math.floor(sel / PER_PAGE) + 1) + '/' + Math.ceil(its.length / PER_PAGE) : ''));
+            // room below the page (where the kit gives it): another row where one fits whole, the rest
+            // spreads the rows; the bottom line moves down with the panel's bottom
+            const ex = G.pageBottom(cv) - G.BOTTOM;
+            const rows = PER_PAGE + Math.floor(ex / 55), pitch = 55 + (ex % 55) / (rows - 1);
             // the bottom line: an item's details, or what the last button did (reset)
             // (where the kit runs the screen the item's card shows its hint and the reset's progress)
             const line = cv.own ? '' : hint ? hint.name + ':  ' + hint.text : msg;
+            const per = line ? rows - 1 : rows;                  // the bottom line takes the last row
+            G.panel(cv, t, 24, 176, 1552, 336, 'Service requirements' + (its.length > per ? '  ' + (Math.floor(sel / per) + 1) + '/' + Math.ceil(its.length / per) : ''));
             if (line) {
-                cv.roundRect(40, 470, 1520, 38, 8, withAlpha(t.accent, 0.12));
-                cv.text(fit(cv, line, 22, 1490), 56, 496, 22, t.text);
+                cv.roundRect(40, 470 + ex, 1520, 38, 8, withAlpha(t.accent, 0.12));
+                cv.text(fit(cv, line, 22, 1490), 56, 496 + ex, 22, t.text);
             }
             if (!its.length) {
-                cv.text('Waiting for the service data from the instrument cluster (ignition on)...', 800, 369, 28, t.dim, { align: 'center' });
+                cv.text('Waiting for the service data from the instrument cluster (ignition on)...', 800, 369 + Math.round(ex / 2), 28, t.dim, { align: 'center' });
                 return;
             }
-            const per = line ? PER_PAGE - 1 : PER_PAGE;          // the bottom line takes the last row
             const first = Math.floor(sel / per) * per;
             its.slice(first, first + per).forEach((it, i) => {
-                const y = 232 + i * 55, col = COL(t, it.colour);
+                const y = 232 + Math.round(i * pitch), col = COL(t, it.colour);
                 // a row tapped, or pressed with the controller: its card
                 if (cv.own) cv.target(40, y - 4, 1520, 50, () => openCard(first + i), 'item' + it.id, 8);
                 if (!cv.own && first + i === sel) cv.roundRect(40, y - 4, 1520, 50, 8, withAlpha(t.accent, 0.18));   // (the kit rings the row the controller is on)
@@ -301,7 +305,7 @@ mgu.run({
         }
 
         function drawDiag(cv, t) {
-            G.panel(cv, t, 24, 44, 1552, 468, 'Diagnostics - what the instrument cluster sends');
+            const p = G.panel(cv, t, 24, 44, 1552, 468, 'Diagnostics - what the instrument cluster sends');
             const lines = [
                 'KombiInterface_2: ' + (kombi ? (kombi.error ? 'error ' + kombi.error : kombi.available ? 'available' : 'not available yet') : 'connecting...'),
                 'cbsDataSBA: ' + (rawSba || 'nothing received'),
@@ -310,7 +314,7 @@ mgu.run({
             let y = 96;
             lines.forEach((l) => { cv.text(fit(cv, l, 20, 1500), 48, y, 20, t.text); y += 32; });
             const chunk = 120;
-            for (let i = 0; i < rawList.length && y < 500; i += chunk) { cv.text(rawList.slice(i, i + chunk), 48, y, 18, t.dim, { font: 'label' }); y += 26; }
+            for (let i = 0; i < rawList.length && y < p.y + p.h - 12; i += chunk) { cv.text(rawList.slice(i, i + chunk), 48, y, 18, t.dim, { font: 'label' }); y += 26; }
         }
 
         let drawn = -1;
@@ -343,6 +347,7 @@ mgu.run({
         ui.onClick('BTN_RESET', () => { resetPress(); });
         // where the kit runs the screen the rows open their cards (with Reset): none of these in its bar
         ['BTN_SELECT', 'BTN_DETAILS', 'BTN_RESET'].forEach((b) => ctx.hideButton(b));
+        ctx.onLayout(changed);           // (it draws only on changes: a new layout is one)
         ctx.onTab((i) => { if (i !== page) { page = i; sel = 0; msg = ''; changed(); } });
 
         ctx.loop('MAIN', 2, () => render(false));

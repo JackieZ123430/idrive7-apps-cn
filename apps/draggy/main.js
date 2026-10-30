@@ -148,24 +148,28 @@ mgu.run({
             const [stTxt, stCol] = STATE[timer.state];
             const col = stCol === 'go' ? GO : t[stCol];
             // --- speed + clock ---
-            G.panel(cv, t, 24, 44, 520, 468, 'Speed');
+            // ex: how much lower the panels reach where the screen has room below the page (else 0)
+            const sh = G.panel(cv, t, 24, 44, 520, 468, 'Speed'), ex = sh.y + sh.h - G.BOTTOM, mid = Math.round(ex / 2);
             const sp = V(G.hold('speed', live.speed, 1000 / settings.get('speedRate')));   // setting: 10/s by default, 5 like the cluster .. 60
             cv.text(G.fmt(sp, 0), 460, 227, 150, G.isNum(sp) ? t.text : t.dim, { align: 'right', font: 'num' });
             cv.text(vU(), 476, 227, 28, t.dim);
             cv.fillRect(44, 255, 480, 2, t.panelEdge);
             const el = timer.elapsed(now);
-            cv.text(secs(el), 400, 384, 96, timer.state === 'run' ? t.text : timer.endAt !== undefined ? t.accent2 : t.dim, { align: 'right', font: 'num' });
-            cv.text('s', 412, 384, 32, t.dim);
-            cv.roundRect(44, 412, 480, 44, 8, withAlpha(col, 0.18));
-            if (timer.state === 'ready') cv.roundRect(44, 412, 480, 44, 8, withAlpha(GO, 0.35 + 0.25 * Math.sin(now / 160)));
-            cv.text(stTxt, 284, 446, 26, col, { align: 'center', font: 'bold', spacing: 3 });
-            cv.text('PEAK ' + (peakG > 0 ? peakG.toFixed(2) : '-.--') + ' g', 44, 493, 22, t.dim, { font: 'bold', spacing: 1 });
-            if (G.isNum(live.rpm)) cv.text(Math.round(live.rpm) + ' rpm', 524, 493, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
-            G.button(cv, t, 214, 466, 140, 38, 'Reset run', act, { key: 'reset', confirm: true });
+            // the clock and state halfway down the room, the bottom line lower too: it ends ~22 over the panel's
+            // bottom, as the other panels' last lines (eb)
+            const eb = ex - Math.min(ex, 14);
+            cv.text(secs(el), 400, 384 + mid, 96, timer.state === 'run' ? t.text : timer.endAt !== undefined ? t.accent2 : t.dim, { align: 'right', font: 'num' });
+            cv.text('s', 412, 384 + mid, 32, t.dim);
+            cv.roundRect(44, 412 + mid, 480, 44, 8, withAlpha(col, 0.18));
+            if (timer.state === 'ready') cv.roundRect(44, 412 + mid, 480, 44, 8, withAlpha(GO, 0.35 + 0.25 * Math.sin(now / 160)));
+            cv.text(stTxt, 284, 446 + mid, 26, col, { align: 'center', font: 'bold', spacing: 3 });
+            cv.text('PEAK ' + (peakG > 0 ? peakG.toFixed(2) : '-.--') + ' g', 44, 493 + eb, 22, t.dim, { font: 'bold', spacing: 1 });
+            if (G.isNum(live.rpm)) cv.text(Math.round(live.rpm) + ' rpm', 524, 493 + eb, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
+            G.button(cv, t, 214, 466 + eb, 140, 38, 'Reset run', act, { key: 'reset', confirm: true });
 
             // --- speed trace ---
             G.panel(cv, t, 568, 44, 520, 468, 'Speed trace');
-            const px = 640, py = 104, pw = 424, ph = 351;
+            const px = 640, py = 104, pw = 424, ph = 351 + ex;      // the trace takes all the room
             const tr = timer.trace;
             const tMax = Math.max(6, Math.ceil(tr.length ? tr[tr.length - 1][0] / 2 + 0.5 : 0) * 2);
             const vMax = Math.max(mph() ? 80 : 120, Math.ceil(((V(timer.vmax) || 0) + 5) / 40) * 40);
@@ -194,7 +198,7 @@ mgu.run({
             // --- splits ---
             G.panel(cv, t, 1112, 44, 464, 468, 'Splits');
             splits().forEach((s, i) => {
-                const y = 101 + i * 82;
+                const y = Math.round(101 + i * (82 + ex / 4));     // the room spread over the gaps
                 const r = timer.result[s.key], b = store.best[bestKey(s.key)];
                 cv.text(s.label, 1136, y + 22, 24, t.dim, { font: 'bold', spacing: 0.5 });
                 cv.text(secs(r), 1520, y + 46, 44, G.isNum(r) ? t.text : withAlpha(t.dim, 0.6), { align: 'right', font: 'num' });
@@ -211,11 +215,11 @@ mgu.run({
 
         function drawBest(cv, t) {
             const sp = splits();
-            G.panel(cv, t, 24, 44, 640, 468, 'Best times' + (settings.get('rollout') ? ' (rollout)' : ''));
+            const sh = G.panel(cv, t, 24, 44, 640, 468, 'Best times' + (settings.get('rollout') ? ' (rollout)' : '')), ex = sh.y + sh.h - G.BOTTOM;
             G.button(cv, t, 664 - 20 - 200, 56, 200, 40, clearArmed ? 'Yes, clear' : 'Reset best', act, { key: 'clear', color: clearArmed ? t.crit : null });
             sp.forEach((s, i) => {
-                // (the page reaching lower on screen: the rows clear of Reset best)
-                const y = 95 + (cv.extra ? 25 : 0) + i * 83, b = store.best[bestKey(s.key)];
+                // (the page reaching lower on screen: the rows clear of Reset best, the rest of the room spread over the gaps)
+                const y = Math.round(95 + (cv.extra ? 25 : 0) + i * (83 + Math.max(0, ex - 25) / 4)), b = store.best[bestKey(s.key)];
                 cv.text(s.label, 48, y + 34, 28, t.text, { font: 'bold' });
                 cv.text(b ? secs(b.s) : '--.--', 560, y + 40, 52, b ? t.accent2 : t.dim, { align: 'right', font: 'num' });
                 cv.text('s', 568, y + 40, 24, t.dim);
@@ -228,7 +232,8 @@ mgu.run({
             const cx = [920, 1140, 1360];
             cv.text('WHEN', 712, 127, 22, t.dim, { font: 'bold', spacing: 1 });
             cols.forEach((c, i) => cv.text(c.label.toUpperCase(), cx[i] + 150, 127, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 }));
-            const runs = store.runs.filter((r) => (r.unit || 'kmh') === settings.get('speedUnit')).slice(0, 8);
+            // another row where the panel reaches lower on screen and it fits whole
+            const runs = store.runs.filter((r) => (r.unit || 'kmh') === settings.get('speedUnit')).slice(0, 8 + Math.floor(ex / 41));
             if (!runs.length) cv.text('No runs yet - stop, launch, and they show up here.', 712, 221, 26, t.dim);
             runs.forEach((r, i) => {
                 const y = 176 + i * 41;

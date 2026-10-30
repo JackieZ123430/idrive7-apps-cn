@@ -87,6 +87,7 @@ class Display {
         this.labels = {};                            // bar labels the app changed (ui.text)
         this.barOff = 0;                             // how far the HMI has scrolled its bar left
         this.tickHandlers = [];
+        this.layoutHandlers = [];                    // ctx.onLayout: where the frame goes changed
         this.bgShown = null;
         this.place = null;
         this.frames = 0; this.jsMs = 0; this.statT = Date.now();
@@ -281,7 +282,7 @@ class Display {
         this.app = {
             name: L.name, softImage: L.softImage, w: r.w, h: r.h, textScale: sc, words: new Uint32Array(r.words()),
             atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), images: new Set(r.images || []),
-            tabs: this.tabInfo || { tabs: [], sel: -1, badges: [] },
+            tabs: this.tabInfo || { tabs: [], sel: -1, badges: [] }, reaches: r.extraUsed,
         };
         this._send(L.name, this._compose(), L.softImage, false);
         this._claimTabs(this.chromeRec.tabRects, null);
@@ -487,6 +488,7 @@ class Display {
         }
         this._hmiBar();
         this.tickHandlers.forEach((fn) => fn());
+        this._layoutChanged();
     }
 
     /** The HMI's own bar buttons: hidden where the kit runs the screen (its bar, tabs and page buttons
@@ -522,12 +524,22 @@ class Display {
                 ox: HMI.left + Math.round((w - src.w * s) / 2 - src.x * s),
                 oy: Math.round(this.headH() + (ah - src.h * s) / 2 - src.y * s),
             };
-            // no bar under the page (the kit's, emptied): the page starts under the header and its panels
-            // reach down to the screen's bottom (extra: logical px below the app's 520, G.panel)
+            // no bar under the page (the kit's, emptied): a page that reaches down (its panels, a sheet: it reads
+            // extra, logical px below the app's 520, G.panel) starts where it does over the slim bar, and its
+            // panels go on down to the screen's bottom; any other stays centred (_reach picks one for each frame)
             const spare = ah - 2 * PAGE_GAP - src.h * s;
             if (!this.barH() && spare > 0) {
-                pl.oy = Math.round(this.headH() + PAGE_GAP - src.y * s);
-                pl.extra = Math.floor(spare / s);
+                const top = Math.round(this.headH() + PAGE_GAP - src.y * s);
+                if (this.screen && this.screen.chrome === false) {
+                    // a screen the app draws whole (a game, in screen pixels): its page right at the top
+                    pl.oy = top;
+                    pl.extra = Math.floor(spare / s);
+                } else {
+                    pl.oyMid = pl.oy;
+                    pl.oyTop = Math.max(top, Math.round(this.headH() + (ah - FULL.barH - src.h * s) / 2 - src.y * s));
+                    pl.extra = Math.floor((h - PAGE_GAP - pl.oyTop) / s - PAGE.h);
+                    if (this.reaches) pl.oy = pl.oyTop;     // as the last frame was (it may draw in screen pixels, r.place)
+                }
             }
         }
         this.place = pl;
@@ -537,6 +549,20 @@ class Display {
         this.recorders.clear();             // text sizes depend on the scale
         this.app = null; this.outRec = null;
         this.log.info('display: renderer placement ' + JSON.stringify(pl) + ' (layout ' + v + ')');
+        this._layoutChanged();
+    }
+    /** Apps that draw only on changes draw again: the last frame has the old layout (bar, header, place). */
+    _layoutChanged() { this.layoutHandlers.forEach((fn) => { try { fn(); } catch (e) { this.log.error('layout', e); } }); }
+
+    /** No bar under the page: one that reaches down (it read the recorder's extra) starts as over the slim bar, any other is centred. */
+    _reach(reaches) {
+        const pl = this.place;
+        if (!pl || pl.oyTop == null) return;
+        this.reaches = !!reaches;
+        const oy = reaches ? pl.oyTop : pl.oyMid;
+        if (pl.oy === oy) return;
+        pl.oy = oy;
+        this.gpu.place(pl);                 // (the same scale: the renderer keeps our resources)
     }
 
     /** the screen is up and not covered by an HMI popup */
@@ -590,6 +616,7 @@ class Display {
             if (r.chrome) this.saved = Object.assign({}, this.saved || {}, {
                 name, softImage, w: r.w, h: r.h, textScale: r.textScale, words: new Uint32Array(r.words()),
                 atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), images: new Set(r.images || []), tabs: r.chrome.tabs,
+                reaches: r.extraUsed,
             });
             return Promise.resolve();
         }
@@ -607,9 +634,10 @@ class Display {
                 this.app = {
                     name, softImage, w: r.w, h: r.h, textScale: r.textScale, words: new Uint32Array(r.words()),
                     atlases: new Set(r.atlases), ramps: new Set(r.ramps), layersUsed: new Set(r.layersUsed || []), images: new Set(r.images || []), tabs: r.chrome.tabs,
+                    reaches: r.extraUsed,
                 };
                 out = this._compose();
-            } else this.app = null;
+            } else { this.app = null; this._reach(r.extraUsed); }
             this._send(name, out, softImage, false);
             if (this.place.full && r.chrome) this._claimTabs(this.chromeRec.tabRects, null);
             else if (this.own()) this._claimTabs(null, null);
@@ -655,6 +683,7 @@ class Display {
         if (a.images) a.images.forEach((x) => o.images.add(x));
         if (a.layersUsed.size) { o.layersUsed = o.layersUsed || new Set(); a.layersUsed.forEach((x) => o.layersUsed.add(x)); }
         o.chrome = { tabs: a.tabs };
+        this._reach(a.reaches);             // (before _drawChrome: its focus marks follow the page)
         this._drawChrome(o);
         return o;
     }
@@ -663,7 +692,10 @@ class Display {
     _repaint() {
         this.lastWords = null;
         if (!this.app || !this.active() || !this.place.full) return;
+        const oy = this.place.oy;
         try { this._send(this.app.name, this._compose(), this.app.softImage, true); } catch (e) { this.log.warn('display: repaint ' + e); }
+        // the page moved (a sheet closed over a centred page): its claims and tabs follow it
+        if (this.place.oy !== oy && this.chromeRec) this._claimTabs(this.chromeRec.tabRects, null);
     }
 
     /** Remember the last frame: resent as keepalive, or drawn in software when the GPU goes. */
@@ -819,6 +851,7 @@ class Display {
     }
 
     onTick(fn) { this.tickHandlers.push(fn); }
+    onLayout(fn) { this.layoutHandlers.push(fn); }
 }
 
 module.exports = { Display, HMI, FULL };
