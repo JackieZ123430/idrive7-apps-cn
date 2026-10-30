@@ -1,0 +1,1269 @@
+# Context-specific diagnostic terms for full-library translation.
+quantity control valve	流量调节阀
+secure feature activation	安全功能激活
+secure token	安全令牌
+check of secure token failed	安全令牌检查失败
+fault on	故障位于
+fault present	存在故障
+fault in	故障位于
+fault at	故障位于
+not in	未包含在
+linear actuator	直线执行器
+reducing-agent	还原剂
+reducing agent	还原剂
+pressure line	压力管路
+valvetronic bank	Valvetronic 气缸列
+bank	气缸列
+servomotor	伺服电机
+throttle-valve potentiometer	节气门电位计
+throttle valve potentiometer	节气门电位计
+throttle-valve	节气门
+potentiometer	电位计
+door switch cluster	车门开关组
+switch cluster	开关组
+transmission control	变速器控制
+rotor position sensor	转子位置传感器
+rotor position	转子位置
+exhaust gas restriction flap	排气节流阀
+current implausible	电流不可信
+current plausibility	电流可信度
+current in phase	相电流
+phase	相位
+phase current	相电流
+phase voltage	相电压
+sporadically	偶发
+intermittently	间歇性
+central locking drive	中控锁驱动装置
+central locking	中控锁
+motor driver	电机驱动器
+loudspeaker exciter combination	扬声器激励器总成
+loudspeaker exciter	扬声器激励器
+loudspeaker	扬声器
+wheel torque	车轮扭矩
+mixture overly lean	混合气过稀
+mixture overly rich	混合气过浓
+mixture too lean	混合气过稀
+mixture too rich	混合气过浓
+mixture control	混合气调节
+mixture	混合气
+lean	稀
+rich	浓
+driver's door	驾驶员车门
+passenger's door	乘客车门
+driver's seat	驾驶员座椅
+passenger's seat	乘客座椅
+scr delivery module	SCR 输送模块
+delivery module	输送模块
+delivery pump	输送泵
+status-independent	与状态无关的
+excess pressure	超压
+seat-heating electronics	座椅加热电子装置
+seat heating electronics	座椅加热电子装置
+seat ventilation	座椅通风
+sent by	发送方
+transmitted by	发送方
+received by	接收方
+receiver is	接收方为
+transmitter is	发送方为
+sender is	发送方为
+as receiver	作为接收方
+as transmitter	作为发送方
+as sender	作为发送方
+is receiver	为接收方
+is transmitter	为发送方
+receives	接收
+sends	发送
+transmits	发送
+recipient	接收方
+not current	不是最新状态
+not up to date	不是最新状态
+not defined	未定义
+faulty checksum	校验和错误
+lane change warning	变道警告
+lane departure warning	车道偏离警告
+coach-door	对开式车门
+roadspeed	车速
+road speed	车速
+potential vector	潜在矢量
+trailer tow hitch	挂车牵引装置
+trailer hitch	挂车牵引装置
+tow hitch	牵引装置
+valet parking assistant	代客泊车辅助
+telematics aerial	远程通信天线
+short with ground	对地短路
+short to ground or positive	对地或正极短路
+short circuit to positive battery voltage	对蓄电池正极短路
+short circuit to positive voltage	对正极电压短路
+short circuit to negative battery voltage	对蓄电池负极短路
+short circuit to battery voltage	对蓄电池电压短路
+short to battery	对蓄电池短路
+short circuit to	短路至
+short to	短路至
+short with	短路至
+line fault	线路故障
+wiring fault	线路故障
+voltage supply	供电电压
+coolant changeover valve	冷却液切换阀
+changeover valve	切换阀
+data transmission	数据传输
+power transmission	动力传递
+transmission	变速器
+air mass flow	空气质量流量
+air mass	空气质量
+mass air flow	空气质量流量
+volume flow	体积流量
+fuel injection	燃油喷射
+fuel injector	喷油器
+injection quantity	喷油量
+valve lift	气门升程
+intake manifold	进气歧管
+exhaust manifold	排气歧管
+intake camshaft	进气凸轮轴
+exhaust camshaft	排气凸轮轴
+camshaft	凸轮轴
+crankshaft	曲轴
+charging pressure	增压压力
+boost pressure	增压压力
+charge pressure	增压压力
+charging current	充电电流
+discharge current	放电电流
+leakage current	漏电电流
+quiescent current	静态电流
+closed-circuit current	休眠电流
+idle current	怠速电流
+idle speed	怠速转速
+nominal current	额定电流
+nominal voltage	额定电压
+nominal value	标称值
+nominal	标称
+target value	目标值
+actual value	实际值
+reference value	参考值
+reference voltage	参考电压
+reference current	参考电流
+thermal overload	热过载
+thermal protection	热保护
+thermal fuse	热熔断器
+fuse	熔断器
+electronic fuse	电子熔断器
+headlight	前照灯
+headlamp	前照灯
+tail light	尾灯
+tail lamp	尾灯
+brake light	制动灯
+brake lamp	制动灯
+turn indicator	转向灯
+direction indicator	转向灯
+side marker	侧标志灯
+high beam	远光灯
+low beam	近光灯
+daytime running light	日间行车灯
+rear window	后窗
+windscreen	前风挡玻璃
+windshield	前风挡玻璃
+rear-view mirror	后视镜
+rear view mirror	后视镜
+outside mirror	车外后视镜
+inside mirror	车内后视镜
+exterior mirror	车外后视镜
+interior mirror	车内后视镜
+hall sensor	霍尔传感器
+hall effect sensor	霍尔效应传感器
+hall effect	霍尔效应
+ignition coil	点火线圈
+glow plug	预热塞
+spark plug	火花塞
+spark ignition	火花点火
+misfiring	失火
+misfire	失火
+starter motor generator	起动发电机
+starter generator	起动发电机
+starter motor	起动机
+alternator	发电机
+generator	发电机
+actuator	执行器
+activation	驱动
+actuation	驱动
+rotor	转子
+stator	定子
+upstream	上游
+downstream	下游
+upshift	升挡
+downshift	降挡
+gear shift	换挡
+gearshift	换挡
+clutch	离合器
+brake booster	制动助力器
+brake pressure	制动压力
+steering angle	转向角
+steering torque	转向扭矩
+steering assistance	转向助力
+steering assist	转向助力
+steering rack	转向齿条
+wheel bearing	车轮轴承
+wheel-speed sensor	轮速传感器
+wheel speed	轮速
+wheel rotation	车轮转动
+wheel slip	车轮滑移
+yaw rate	横摆角速度
+roll rate	侧倾角速度
+lateral acceleration	横向加速度
+longitudinal acceleration	纵向加速度
+centre of gravity	重心
+center of gravity	重心
+cell supervision circuit	电芯监控电路
+cell module	电芯模块
+cell voltage	电芯电压
+battery cell	蓄电池电芯
+battery unit	蓄电池单元
+battery pack	蓄电池组
+battery module	蓄电池模块
+powertrain	动力传动系统
+driveline	传动系统
+instrument cluster	组合仪表
+instrument panel	仪表板
+operating facility	操作装置
+touch detection	触摸检测
+display status	显示状态
+checksum error in message	报文校验和错误
+checksum fault	校验和故障
+alive monitoring	存活计数监测
+alive counter	存活计数器
+rolling counter	循环计数器
+message counter	报文计数器
+counter error	计数器错误
+timeout	超时
+bus off	总线关闭
+bus-off	总线关闭
+data bus	数据总线
+bus line	总线线路
+bus connection	总线连接
+protocol	协议
+telegram	报文
+message from	报文来自
+telegram from	报文来自
+signal from	信号来自
+data from	数据来自
+not received	未接收到
+not transmitted	未发送
+not sent	未发送
+not available	不可用
+unavailable	不可用
+not possible	无法执行
+cannot be performed	无法执行
+not performed	未执行
+not completed	未完成
+not started	未启动
+not activated	未启用
+not deactivated	未停用
+deactivation	停用
+deactivated	已停用
+failure	故障
+defective	损坏
+malfunction	故障
+improper	不正确
+incorrect	错误
+wrong	错误
+failed	失败
+failure to	未能
+lock unsuccessful	锁止失败
+lower limit value surpassed	低于下限值
+upper limit value surpassed	超过上限值
+threshold value fallen below	低于阈值
+limit value fallen below	低于限值
+limit value exceeded	超过限值
+upper limit exceeded	超过上限
+lower limit undershot	低于下限
+too high	过高
+too low	过低
+too small	过小
+too large	过大
+excessively high	过高
+excessively low	过低
+excessively small	过小
+excessively large	过大
+too long	过长
+too short	过短
+permanently	持续
+temporary	暂时
+temporarily	暂时
+intermittent	间歇性
+sporadic	偶发
+plausibility check	可信度检查
+not plausible	不可信
+implausible	不可信
+plausible	可信
+plausibility	可信度
+as	作为
+of	的
+by	通过
+via	通过
+from	来自
+with	带有
+without	无
+between	之间
+after	之后
+before	之前
+above	高于
+below	低于
+not	未
+systems	系统
+system	系统
+components	部件
+component	部件
+information	信息
+info	信息
+requirement	要求
+requirements	要求
+coupling	耦合
+couplings	耦合
+parking assistant	泊车辅助
+parking	泊车
+local	本地
+installation	安装
+seat cushion	座椅坐垫
+cushion	坐垫
+self-test	自检
+self test	自检
+matches	一致
+delivery status	出厂状态
+data status	数据状态
+operating mode	工作模式
+hybrid	混合动力
+automatic	自动
+blind spot	盲区
+blind	盲区
+solenoid	电磁阀
+solenoid valve	电磁阀
+reading	读数
+gear	挡位
+emergency	紧急
+chassis	底盘
+attained	已达到
+secure	安全
+secured	已保障
+tank	储液罐
+fuel tank	燃油箱
+combustion	燃烧
+pedal	踏板
+surpassed	越限
+backrest	靠背
+warning	警告
+distribution	分配
+locking	锁止
+lock	锁
+encoding	编码
+stabilisation	稳定控制
+insufficient	不足
+measurement	测量
+ventilation	通风
+digital	数字
+massage	按摩
+assistant	辅助装置
+element	元件
+equipment	设备
+wastegate	废气旁通阀
+body	车身
+defect	缺陷
+longitudinal	纵向
+lateral	横向
+sum	总和
+braking	制动
+accelerator	加速踏板
+excess	超出
+management	管理
+cold	冷态
+unsuccessful	失败
+common rail	共轨
+rail pressure	油轨压力
+offset	偏移
+behind	后方
+outer	外部
+quantity	数量
+aerial	天线
+within	范围内
+crash	碰撞
+energy	能量
+feedback	反馈
+cooler	冷却器
+terminal	端子
+terminals	端子
+compartment	舱室
+relative	相对
+main	主
+area	区域
+specification	规定值
+recirculation	循环回流
+receiving	接收
+convertible	敞篷
+permissible	允许的
+manager	管理器
+remote	远程
+sending	发送
+intake	进气
+broken	断裂
+wiper	刮水器
+restricted	受限
+injection	喷射
+limited	受限
+coil	线圈
+shutoff	关断
+recognized	已识别
+turbine	涡轮
+disconnection	断开
+water	水
+lambda	λ
+measured	实测
+setpoint	设定值
+lid	盖板
+group	组
+nitrogen oxide	氮氧化物
+nitrogen	氮
+oxide	氧化物
+period	周期
+duration	持续时间
+tolerance	公差
+correction	修正
+lights	灯
+diagnostic	诊断
+measuring	测量
+lane	车道
+footwell	脚部空间
+heat	热量
+movement	运动
+model	型号
+pneumatics	气动系统
+permitted	允许的
+intelligent	智能
+variable	可变
+buckle	锁扣
+differential	差速器
+pedestrian	行人
+lines	线路
+shutter	百叶窗
+functions	功能
+throttle	节气门
+multiple	多个
+row	排
+limitation	限制
+inclination	倾斜度
+undefined	未定义
+verification	验证
+reduced	降低
+vacuum	真空
+seats	座椅
+path	路径
+bypass	旁通
+functional	功能性的
+standstill	静止
+availability	可用性
+metering	计量
+stored	已存储
+physical	物理
+opening	开启
+tilt	倾斜
+pillar	立柱
+integrated	集成
+ratio	比值
+infrastructure	基础设施
+armrest	扶手
+sliding	滑动
+evaluation	评估
+knock	爆震
+key	钥匙
+oxygen	氧
+geometry	几何形状
+pipe	管路
+installed	已安装
+closing	关闭
+global	全局
+satellite	卫星单元
+restraint	约束
+comparison	比较
+immobiliser	防盗锁止装置
+vertical	垂直
+locked	已锁止
+flashing	闪烁
+object	目标
+denox	脱硝
+exceeds	超过
+response	响应
+difference	差值
+assist	辅助
+date	日期
+effect	作用
+gateway	网关
+switching	切换
+performance	性能
+roadway	道路
+source	来源
+road	道路
+left-hand	左侧
+right-hand	右侧
+front	前部
+rear	后部
+left	左侧
+right	右侧
+upward	向上
+downward	向下
+positive	正极
+negative	负极
+upper	上部
+lower	下部
+top	顶部
+bottom	底部
+steering wheel	方向盘
+driver seat	驾驶员座椅
+driver side	驾驶员侧
+driver door	驾驶员车门
+driver airbag	驾驶员安全气囊
+driver belt	驾驶员安全带
+driver's	驾驶员的
+gate driver	栅极驱动器
+output driver	输出驱动器
+driver stage	驱动级
+driver module	驱动模块
+driver circuit	驱动电路
+driver assistance system	驾驶辅助系统
+brake pad	制动摩擦片
+power consumption	功耗
+power loss	功率损失
+power reduction	功率降低
+power limitation	功率限制
+power limit	功率限值
+power reserve	功率储备
+power requirement	功率要求
+current acceleration	当前加速度
+current speed	当前速度
+current position	当前位置
+current operating mode	当前工作模式
+current vehicle	当前车辆
+current driving	当前行驶
+current torque	当前扭矩
+current value	电流值
+current	电流
+drive	驱动
+on-board	车载
+on board	车载
+on-time	接通时间
+on time	接通时间
+on demand	按需
+on load	负载下
+switched-off	已关闭
+switched-on	已接通
+cut-off	切断
+switch-off	关闭
+switch-on	接通
+off	关闭
+driver	驾驶员
+power	功率
+load	负载
+open	开路
+short	短路
+head	头部
+block	单元块
+on	接通
+bracket	支架
+pin	针脚
+rail	导轨
+one	一
+because	因为
+while	期间
+be	为
+closed	已关闭
+found	已发现
+provision	提供
+been	已
+change	变化
+caused	导致
+end	末端
+under	低于
+cannot	无法
+travel	行程
+shift	换挡
+close	关闭
+back	后部
+does	执行
+view	视图
+charge	充电
+out	外部
+identified	已识别
+board	电路板
+service	服务
+reached	已达到
+break	断开
+roller	滚轮
+dynamics	动态
+support	支撑
+rate	速率
+firing	点火
+indicator	指示器
+up	上升
+are	为
+park	驻车
+occurred	已发生
+release	释放
+meter	计量器
+total	总计
+pull	拉动
+train	传动链
+longer	更长
+hold	保持
+effective	有效
+when	当
+large	大
+small	小
+drift	漂移
+drops	下降
+drier	干燥器
+dryer	干燥器
+dummy load	模拟负载
+dummy	模拟件
+eFuse	电子熔断器
+periphery	外围
+bit	位
+fog	雾
+hub	轮毂
+cap	盖帽
+cat	催化器
+cam	凸轮
+ash	灰分
+gap	间隙
+jam	卡滞
+lag	滞后
+fob	遥控钥匙
+max	最大值
+min	最小值
+mux	多路复用器
+raw	原始
+pad	垫片
+mat	垫
+log	日志
+ram	RAM
+bow	弓形件
+gas	气体
+bay	舱
+arm	支臂
+bad	不良
+cut	切断
+map	特性图
+yaw	横摆
+head unit	主机
+cylinder head	气缸盖
+engine block	发动机缸体
+cylinder block	气缸体
+battery bank	蓄电池组
+short-term	短期
+long-term	长期
+none	无
+not used	未使用
+unused	未使用
+stop and go	走停
+stop&go	走停
+driving	行驶
+beyond	超出
+ox	氧
+too	过于
+target	目标
+SecOC	SecOC
+running	运行
+run	运行
+box	箱体
+ahead	前方
+excessively	过度
+controlled	受控
+faults	故障
+link	链路
+hot	热态
+general	一般
+preheating	预热
+vision	视觉
+field	场
+classification	分类
+more	更多
+selector	选择器
+contactors	接触器
+contactor	接触器
+application	应用
+cruise	巡航
+gradient	梯度
+additional	附加
+dynamic	动态
+extended	扩展
+monitor	监控器
+sunroof	天窗
+kilometre	千米
+cycle	循环
+stepper	步进
+cover	盖板
+timer	定时器
+encoded	已编码
+overrun	倒拖
+force	力
+electromechanical	机电
+convenience	便捷
+glow	预热
+resistor	电阻器
+soft	软
+manoeuvring	机动操作
+requested	已请求
+least	最少
+intermediate	中间
+reduction	减小
+set	设置
+user	用户
+fast	快速
+reverse	倒车
+sunblind	遮阳帘
+layering	分层
+issue	问题
+this	此
+super-knocking	超级爆震
+daytime	日间
+sticking	卡滞
+turbocharger	涡轮增压器
+traction	牵引力
+automated	自动化
+correspond	对应
+critical	临界
+discharge	放电
+potential	电势
+hose	软管
+vibration	振动
+coasting	滑行
+acoustic	声学
+moment	力矩
+processing	处理
+successful	成功
+synchronisation	同步
+synchronization	同步
+loss	损失
+combined	组合
+shut	关闭
+access	访问
+quality	质量
+curtain	帘
+graph	图
+beam	光束
+stratification	分层
+printed	印制
+infotainment	信息娱乐
+temp	温度
+list	列表
+calculated	计算所得
+code	代码
+slow	缓慢
+circuited	短路
+guidance	引导
+film	薄膜
+mass	质量
+continuous	连续
+switches	开关
+against	相对于
+selection	选择
+lumbar	腰部
+down	下降
+incorrectly	错误地
+possible	可能
+match	匹配
+video	视频
+problem	问题
+brightness	亮度
+allowed	允许
+consistent	一致
+interlock	联锁
+compensation	补偿
+saved	已保存
+regulator	调节器
+experience	体验
+panel	面板
+specified	规定的
+could	可能
+washer	清洗装置
+several	多个
+probe	探头
+plug	插头
+weight	重量
+seating	座椅
+belt	安全带
+extender	延长装置
+concept	方案
+odometer	里程表
+lever	操纵杆
+height	高度
+climate	气候
+injectors	喷油器
+positioning	定位
+extension	伸出
+unlocking	解锁
+heated	已加热
+feature	功能
+over	超过
+laser	激光
+internally	内部
+lost	丢失
+mixing	混合
+readiness	就绪状态
+chamber	腔室
+efficiency	效率
+turn	转向
+base	基准
+recognition	识别
+refuelling	加注燃油
+ageing	老化
+oxidation	氧化
+direct	直接
+marking	标记
+selective	选择性
+trim	饰板
+pinion	小齿轮
+doors	车门
+watchdog	看门狗
+tandem	串联
+event	事件
+than	比
+following	跟随
+section	部分
+crankcase	曲轴箱
+triggered	已触发
+environment	环境
+engaged	已接合
+signature	签名
+progress	进度
+coordination	协调
+units	单元
+alarm	报警
+secondary	次级
+capacity	容量
+needle	针阀
+balloon	气囊
+program	程序
+unchecked	未检查
+basic	基本
+column	柱
+second	第二
+profile	曲线
+implausibly	不可信地
+mixed	混合
+drum	鼓
+self-levelling	自动调平
+width	宽度
+all-round	全方位
+restriction	限制
+consumer	用电器
+implausibility	不可信
+fitted	已装配
+blockage	堵塞
+reference	参考
+compared	比较
+leaks	泄漏
+regulation	调节
+accumulator	蓄能器
+vector	矢量
+storage	存储
+customer	用户
+fully	完全
+qualifier	限定符
+expansion	膨胀
+return	回位
+ready	就绪
+mechanism	机构
+bridge	桥路
+overheated	过热
+middle	中间
+vent	通风口
+process	过程
+outlet	出口
+content	内容
+calculation	计算
+universal	通用
+excitation	励磁
+clutches	离合器
+other	其他
+stationary	静止
+personal	个人
+pulse	脉冲
+minus	负
+ambient	环境
+microswitch	微动开关
+rocker	摇臂
+lift	升程
+command	指令
+private	专用
+virtual	虚拟
+underbody	车身底部
+logic	逻辑
+integrity	完整性
+alternating	交变
+autonomous	自主
+multifunction	多功能
+transverse	横向
+trigger	触发
+lithium	锂
+enable	启用
+only	仅
+passive	被动
+cornering	转弯
+static	静态
+concentration	浓度
+valves	阀
+desired	期望
+jamming	卡滞
+read	读取
+dimming	调光
+filtered	经过滤
+knee	膝部
+cosine	余弦
+sine	正弦
+characteristic	特性
+degradation	性能下降
+zero	零
+inner	内部
+cyl	气缸
+inlet	入口
+optional	可选
+limiter	限位器
+filler	加注口
+particulate	颗粒物
+query	查询
+synchronised	已同步
+separation	分离
+filling	加注
+incompatible	不兼容
+tensioner	张紧器
+upgrade	升级
+slip	滑移
+file	文件
+radio	无线电
+absolute	绝对
+adaptive	自适应
+sleep	休眠
+cutout	切断
+machine	电机
+required	所需
+unknown	未知
+plus	正
+spoiler	扰流板
+fails	失败
+binary	二进制
+services	服务
+tweeter	高音扬声器
+point	点
+performed	已执行
+intervention	干预
+detector	检测器
+odometry	里程测量
+winding	绕组
+cluster	组
+location	位置
+sluggish	反应迟缓
+opened	已开启
+still	仍然
+security	安全性
+servotronic	随速转向助力
+slide	滑动
+illumination	照明
+idle	怠速
+recovery	恢复
+station	站
+frozen	冻结
+regeneration	再生
+damage	损坏
+cells	电芯
+loop	回路
+reported	已报告
+partial	部分
+linear	线性
+released	已释放
+independent	独立
+reaction	反应
+rotational	旋转
+additive	加法修正
+multiplicative	乘法修正
+fuses	熔断器
+backpressure	背压
+cryptographic	加密
+fallen	下降
+car	车辆
+neck-warmer	颈部暖风装置
+sill	门槛
+fluid	液体
+delivery	输送
+individual	单独
+console	控制台
+detent	卡位
+knurl	滚轮
+stress	应力
+initial	初始
+irregular	不稳定
+knocking noise	敲击噪声
+misalignment	未对准
+mounting	安装
+occupant	乘员
+occupants	乘员
+far	远
+into	进入
+if	如果
+but	但是
+all	全部
+own	本机的
+new	新的
+per	每
+use	使用
+used	已使用
+using	使用
+maximum	最大
+minimum	最小
+increased	升高
+decreased	降低
+increase	升高
+decrease	降低
+falling	下降
+rising	上升
+normal	正常
+abnormal	异常
+exceeded	超过
+timeout error	超时错误
+a	
+an	
+paddle	换挡拨片
+paddles	换挡拨片
+shunt	分流器
+load-shedding	负载切除
+shedding	切除
+occupancy	占用
+occupation	占用
+next	下一个
+jams	卡滞
+reports	报告
+diaphragm	膜片
+swirl flaps	涡流翻板
+swirl flap	涡流翻板
+eccentric shaft	偏心轴
+eccentric-shaft	偏心轴
+snap	卡扣
+solar	日照
+fogging	结雾
+oddments tray	储物托盘
+shows	显示
+damping bearing	减振支承
+damping	阻尼
+bearing	轴承
+aux	辅助
+seatbelt-catch	安全带锁扣
+seatbelt	安全带
+vs.	与
+handbrake	驻车制动器
+horizontal swivel	水平旋转
+shells	轴瓦
+spark plugs	火花塞
+pushbutton	按钮
+kidney iconic	双肾格栅灯光标识
+iconic	标志性
+mounted	已安装
+redundant design	冗余设计
+redundant	冗余
+diff.	差速器
+reporting	报告
+nearly	接近
+pads	垫片
+fct.	功能
+inter frame space	帧间间隔
+minidisc player	迷你光盘播放器
++ve	正极
+-ve	负极
+connecting rod bearing shells	连杆轴瓦
+connecting rod	连杆
+deadlocking	双重锁止
+child	儿童
+auto init	自动初始化
+returning	返回
+return	返回
+delayed dew	延迟结露
+dew	露水
+rotary knob	旋钮
+rotary push	旋转按压
+strut adjuster	减振支柱调节器
+hardtop erected	硬顶已升起
+hardtop	硬顶
+package	总成
+conv.	转换器
+banks	气缸列
+suction-jet	抽吸喷射
+twistgrip	旋转握把
+runtime	运行时
+come loose	松脱
+deadlock	双重锁止
+fallback-life	故障回退运行时间
+fallback	故障回退
+kickdown	强制降挡
+idling	怠速
+acknowledging	确认
+folding	折叠
+swivel	旋转
+sinus-/cosinus-amplitude	正弦/余弦幅值
+safe posix platform	安全 POSIX 平台
+luminance	亮度
+have	具有
+has	具有
+diagnosing	诊断
+switchable piston	可切换活塞
+piston	活塞
+until	直到
+debug messages	调试消息
+debug	调试
+bench	长座椅
+wash	清洗
+wipe	刮水
+journey	行程
+hubs	轮毂
+indicate	指示
+super ultra	超高
+parcel shelf	后窗搁板
+flame	火焰
+went	已消失
+covered	覆盖
+android boot	安卓启动
+slack removal	消除松弛
+loading	加载
+route	路线
+despite	尽管
+calf rest	腿托
+forward	向前
+choose	选择
+welding seam	焊缝
+evaporative emission	蒸发排放
+stack usage	堆栈使用
+stack overflow	堆栈溢出
+shiftlock	换挡锁止
+sulphur contamination	硫污染
+routine	例程
+carried	已执行
+delta	差值
+downloading	下载
+selectable postbuild	可选择的编译后配置
+engaging	接合
+hillholder	坡道驻车辅助
+tasks	任务
+inertia	惯性
+show	显示
+cutoff	切断
+dry	干燥
+toll collection	道路收费
+gong tone	提示音
+blocks	阻止
+mirrors	后视镜
+writing	写入
+viscosity	黏度
+ensure	确保
+previous	前一个
+toggle	切换
+knurled	滚花
+track rod	转向横拉杆
+strap	带
+homogenization	均质化
+changeover	切换
+betw.	之间
+ripcord	拉索
+pulled	已拉动
+phasing	相位调整
+triggering	触发
+roll	侧倾
+transversal	横向
+many	多个
+prompters	提示器
+echo	回波
+indirect	间接
+anti-dazzle	防眩目
+dazzle-free	防眩目
+dimmer	调光器
+setting	设置
+thumbwheel	滚轮
+conflict	冲突
+exceedance	超限
+token	令牌
+currently	当前
+causes	导致
+inferior urea	尿素品质不合格
+urea	尿素
+yelp tone-sequence	短促警报音序列
+wail tone-sequence	长鸣警报音序列
+automotive pixel	车用像素
+identifies	识别
+deactivate	停用
+heartbeat server	心跳服务器
+flash download	闪存下载
+flash modules	闪存模块
+fore/aft	前后
+latent	潜在
+knob	旋钮
+replacement	更换
+kinematics	运动机构
+worn	磨损
+wi-fi device	Wi-Fi 设备
+jump	跳变
+thrust recuperation	倒拖能量回收
+shelf life	存放期限
+through	通过
+flaps	翻板
+stiffly	卡涩
+either	任一
+gen	发电机
+library	库
+messages	报文
+flap	翻板
+noise	噪声
+initial detent	初始卡位
+non-compatible	不兼容
+non-reversible	不可逆
+interval	间隔
+e-	电动
+condensation	结露
+pc-board	电路板
+pc board	电路板
+f.l.	左前
+f.r.	右前
+r.l.	左后
+r.r.	右后
+pro-active driving assistant	主动驾驶辅助
+push	按压
+btn	按钮
+tbd	待定义
+aborted	已中止
+abort	中止
+visor	遮阳板
+bass	低音
+sec.	秒
+sec	秒
+charger	充电器
+mild hybrid	轻度混合动力
+mild	轻度
+cell	电芯
+starter unit	起动单元
+software level	软件级别
+I level	I-Level 集成等级
+anti-theft	防盗
+anti-theft protection	防盗保护
+by means of	通过
+means	方式
+violation	违反
+output speed	输出转速
+higher	更高
+lower range	下限范围
+upper range	上限范围
+presupply	预供油
+fuel presupply pressure	燃油预供压力
+negative control deviation	负向调节偏差
+positive control deviation	正向调节偏差
+positive acceleration	正加速度
+negative acceleration	负加速度
+positive torque	正扭矩
+negative torque	负扭矩
+actuators	执行器
+isolation	绝缘
+cable interruption	线缆断路
+lines are shorted together	线路相互短路
+lines shorted together	线路相互短路
+shorted together	相互短路
+increased resistance	电阻增大
+c.wheel	c.wheel

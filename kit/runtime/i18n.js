@@ -1,6 +1,4 @@
 'use strict';
-// 中文汉化：抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430.
-// https://github.com/JackieZ123430/idrive7-apps-cn — retain attribution when redistributing.
 // Local display translation only. Never use this on signal names, IDs or stored settings.
 const locale = require('./locale.json');
 const dict = locale.strings || {};

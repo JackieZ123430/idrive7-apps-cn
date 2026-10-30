@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bilibili 小白151 / GitHub JackieZ123430: sync the editable TSV to runtime JSON."""
+"""Sync the editable TSV to runtime JSON. Translation by: BiliBili 小白151 / GitHub JackieZ123430."""
 import json
 from pathlib import Path
 

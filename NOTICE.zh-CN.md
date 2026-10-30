@@ -1,12 +1,12 @@
-# 汉化署名与来源
+# 翻译署名与来源
 
-本仓库的简体中文汉化由 **抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430** 维护。
+简体中文翻译 Translation by：**抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430**。
 
-- 汉化仓库：https://github.com/JackieZ123430/idrive7-apps-cn
+- 翻译仓库：https://github.com/JackieZ123430/idrive7-apps-cn
 - 上游项目：https://github.com/cauliflowermossgrape/idrive7-apps
-- 汉化部分 Copyright (c) 2026 小白151 (GitHub: JackieZ123430)，按仓库 MIT 许可证提供。
+- 中文翻译部分 Copyright (c) 2026 小白151 (GitHub: JackieZ123430)，按仓库 MIT 许可证提供。
 
-请在转载、分发或修改版本时保留上游许可证、版权声明及汉化署名，并清楚标明修改来源。
+请在转载、分发或修改版本时保留上游许可证、版权声明及翻译署名，并清楚标明修改来源。
 本仓库没有设置付费激活、联网授权或收费下载。若有人收费提供安装服务，该收费并非本仓库的下载费或授权费，请自行核对服务内容。
 
 这份来源说明不更改上游开源许可证，也不额外限制其已授予的权利。Doom/Freedoom 相关组件继续适用各自原有许可证。

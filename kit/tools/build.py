@@ -13,11 +13,11 @@ The RHMI layout (application.xml + uiDescription.json) is GENERATED from the
 "screens" + "settings" in app.json, using only widget templates that BMW's own
 apps use on this firmware (see reference/rhmi-widget-cells.md).
 """
-import json, os, re, shutil, sys, tarfile, uuid
+import json, os, re, shutil, sys, tarfile, tempfile, uuid
 from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pack_data  # noqa: E402
-from localize import unicode_resources, localize_spec, load_locale, languages
+from localize import unicode_resources, localize_spec, load_locale, languages, zh_credit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -212,8 +212,7 @@ def build_ui(spec, language='en'):
         # Chinese builds only: credit for the Chinese translation (localize.py sets the Chinese title)
         if language == 'zh-CN':
             credit_title, credit_link = sid(app, 'CN_CREDITS_TITLE'), sid(app, 'CN_CREDITS_LINK')
-            strings[credit_title] = 'Translation by Douyin 小白科技杂物社 / BiliBili 小白151'
-            strings[credit_link] = 'GitHub JackieZ123430 · github.com/JackieZ123430/idrive7-apps-cn'
+            strings[credit_title], strings[credit_link] = zh_credit()['settingsTitle'], zh_credit()['settingsLink']
             items.append(comp('tworow', 'CN_CREDITS', rows=[{
                 'Text1stRow': {'value': credit_title, 'type': 'StringId'},
                 'Text2ndRow': {'value': credit_link, 'type': 'StringId'},
@@ -422,6 +421,13 @@ def build(app_id, language='en'):
             shutil.copy(os.path.join(adir, f), os.path.join(src, 'javascript', f))
             print('  %s (committed)' % f)
     # kit runtime
+    if app_id == 'dtc_scanner' and language == 'zh-CN':
+        from build_diagnostic_zh import catalog
+        with tempfile.TemporaryDirectory(prefix='mgu-diagnostic-') as temporary:
+            data = os.path.join(temporary, 'zh-CN.json')
+            with open(data, 'w', encoding='utf-8', newline='\n') as file:
+                json.dump(catalog(), file, ensure_ascii=False, separators=(',', ':'))
+            pack_data.pack(temporary, os.path.join(src, 'javascript', 'diagnostic_i18n.pack'))
     kr = os.path.join(KIT, 'runtime')
     for f in os.listdir(kr):
         p = os.path.join(kr, f)
@@ -430,10 +436,13 @@ def build(app_id, language='en'):
         else:
             shutil.copy(p, os.path.join(src, 'javascript', 'kit', f))
     if language == 'zh-CN':
-        # Retain localization authorship in the installed Chinese entry code as plain comments.
+        # Diagnostic glyphs are Chinese-only; keep the English runtime atlas intact.
+        if app_id == 'dtc_scanner':
+            shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'diagnostic-zh-CN.json'),
+                        os.path.join(src, 'javascript', 'kit', 'fonts', 'cjk.json'))
+        # The translation credit in the installed Chinese entry code, as plain comments.
         entry = os.path.join(src, 'javascript', 'app.js')
-        credit = ('// 中文汉化署名：抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430\n'
-                  '// 汉化仓库：https://github.com/JackieZ123430/idrive7-apps-cn\n')
+        credit = ''.join('// %s\n' % line for line in zh_credit()['comment'])
         with open(entry, 'rb') as file:
             body = file.read()
         with open(entry, 'wb') as file:
@@ -441,7 +450,10 @@ def build(app_id, language='en'):
     rt_spec = {k: spec.get(k) for k in ('id', 'title', 'version', 'screens', 'settings', 'config', 'startWidget')}
     rt_spec['stateIds'] = state_ids
     json.dump(rt_spec, open(os.path.join(src, 'javascript', 'kit', 'app-spec.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
-    json.dump({'language': language, 'strings': load_locale(language)}, open(os.path.join(src, 'javascript', 'kit', 'locale.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
+    locale = {'language': language, 'strings': load_locale(language)}
+    if language == 'zh-CN':
+        locale['credit'] = zh_credit()['corner']
+    json.dump(locale, open(os.path.join(src, 'javascript', 'kit', 'locale.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(os.path.join(SDK, 'index.js'), os.path.join(src, 'node_modules', 'oap-sdk', 'index.js'))
     shutil.copy(os.path.join(SDK, 'package.json'), os.path.join(src, 'node_modules', 'oap-sdk', 'package.json'))
 

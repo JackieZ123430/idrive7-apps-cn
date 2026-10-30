@@ -1,5 +1,5 @@
 'use strict';
-// Chinese contribution: 小白科技杂物社 / Bilibili 小白151 / GitHub JackieZ123430.
+// Translation by: 抖音 小白科技杂物社 / BiliBili 小白151 / GitHub JackieZ123430.
 const assert=require('assert'),fs=require('fs'),path=require('path'),os=require('os');
 const kit=process.argv[2]?path.resolve(process.argv[2]):path.resolve(__dirname,'../runtime');
 const {t,getLanguage}=require(path.join(kit,'i18n'));

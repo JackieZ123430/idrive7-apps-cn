@@ -20,6 +20,8 @@ const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { fitText } = require('./kit/text-layout');
+const { diagnosticText } = require('./diagnostic-text');
+const { t: translateUI } = require('./kit/i18n');
 const { Diag, parseDtcReply, statusInfo, hex, NRC } = require('./kit/diag');
 const DEMO = require('./demo');
 
@@ -364,8 +366,10 @@ mgu.run({
                 cv.text(fit(cv, ecuName(d.addr), 26, 680 - 420 - 16), 420, y + 27, 26, t.text);
                 // the fault's text when known (cut to fit)
                 const desc = describe(d.addr, d.code);
-                const txt = desc ? (d.mem === 'info' ? 'INFO: ' : '') + desc : d.mem === 'info' ? 'INFO MEMORY' : '';
-                if (txt) cv.text(fit(cv, txt, 22, 1552 - 680), 680, y + 27, 22, t.dim);
+                const txt = desc ? (d.mem === 'info' ? translateUI('INFO: ') : '') + diagnosticText(desc) : d.mem === 'info' ? translateUI('INFO MEMORY') : '';
+                // Resolve diagnosis before layout; never reapply UI word substitution.
+                const diagnosticOptions = { literal: true };
+                if (txt) cv.text(fit(cv, txt, 22, 1552 - 680, diagnosticOptions), 680, y + 27, 22, t.dim, diagnosticOptions);
                 if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
         }
@@ -378,7 +382,7 @@ mgu.run({
             l.slice(0, PER_PAGE).forEach((m, i) => {
                 const y = 231 + i * 47;
                 cv.circle(66, y + 18, 9, COL[m.color] || t.dim);
-                cv.text(m.name || 'Message ' + m.id, 92, y + 27, 28, t.text, { font: 'bold' });
+                cv.text(m.name ? diagnosticText(m.name) : translateUI('Message ') + m.id, 92, y + 27, 28, t.text, { font: 'bold', literal: true });
                 if (m.ecu !== undefined) cv.text(fit(cv, ecuName(m.ecu), 22, 420), 1552, y + 27, 22, t.dim, { align: 'right' });
                 if (i < PER_PAGE - 1) cv.fillRect(48, y + 40, 1504, 1, withAlpha(t.tick, 0.25));
             });
