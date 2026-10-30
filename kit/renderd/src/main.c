@@ -326,6 +326,28 @@ static void origin(const client *c, float *x, float *y) {
 }
 
 static struct ivi_controller_screen *centre_screen(void);
+
+/* The compositor reports the layer's screen: none means the screen's layers were set without it (the HMI's scene, an
+ * app manager's in-place update of another app). While the app is shown it goes straight back on, on top - it would
+ * stay visible but on no screen, a blank page until the app is shown again. */
+static void l_screen(void *d, struct ivi_controller_layer *l, struct wl_output *o) {
+    client *c = d;
+    if (o || !c->cl || c->cl != l || !c->layer_on) return;
+    struct ivi_controller_screen *scr = centre_screen();
+    if (!scr) return;
+    log_info("%s: layer taken off the screen while shown - put back", c->app);
+    ivi_controller_screen_add_layer(scr, c->cl);
+    ivi_controller_commit_changes(ictl);
+}
+static void l_int(void *d, struct ivi_controller_layer *l, int32_t v) { (void)d, (void)l, (void)v; }
+static void l_fixed(void *d, struct ivi_controller_layer *l, wl_fixed_t v) { (void)d, (void)l, (void)v; }
+static void l_rect(void *d, struct ivi_controller_layer *l, int32_t x, int32_t y, int32_t w, int32_t h) { (void)d, (void)l, (void)x, (void)y, (void)w, (void)h; }
+static void l_config(void *d, struct ivi_controller_layer *l, int32_t w, int32_t h) { (void)d, (void)l, (void)w, (void)h; }
+static void l_destroyed(void *d, struct ivi_controller_layer *l) { (void)d, (void)l; }
+static const struct ivi_controller_layer_listener layer_listener = {
+    l_int, l_fixed, l_rect, l_rect, l_config, l_int, l_screen, l_destroyed,
+};
+
 static void apply_visibility(client *c) {
     if (!c->cl) return;
     int on = shown(c);                                     /* never show an empty or dead surface */
@@ -461,6 +483,7 @@ static int surface_create(client *c) {
     ivi_controller_surface_set_destination_rectangle(c->cs, 0, 0, c->w, c->h);
     ivi_controller_surface_set_visibility(c->cs, 0);
     c->cl = ivi_controller_layer_create(ictl, lid, screen_w, screen_h);
+    ivi_controller_layer_add_listener(c->cl, &layer_listener, c);
     ivi_controller_layer_set_source_rectangle(c->cl, 0, 0, c->w, c->h);
     ivi_controller_layer_set_destination_rectangle(c->cl, c->x, c->y, c->w, c->h);
     ivi_controller_layer_set_opacity(c->cl, wl_fixed_from_int(1));
