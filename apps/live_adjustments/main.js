@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Live Adjustments - native live tweaks for the BMW MGU (iDrive 7). Pages: Exhaust Flap, and on a
+ * Engine Menu - native live tweaks for the BMW MGU (iDrive 7). Pages: Exhaust Flap, and on a
  * tuned DME (found by a read-only unlock check) Map (slot 1..4, MHD or BM3), Max cooling (MHD),
  * Burbles and Sound (Active Sound Design) (BM3).
  *

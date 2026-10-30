@@ -10,7 +10,8 @@
  *             config.dme), intake air above outside temperature
  *   (thermal also: gearbox temperature from the EGS when config.dme.egs has a source)
  *   chassis - friction circle (g-g diagram), tyre pressures + temperatures, xDrive split
- *   transmission - ZF 8HP gear, converter clutch, shaft speeds from the gearbox unit (config.gearbox)
+ *   transmission - ZF 8HP gear, converter clutch, shaft speeds from the gearbox unit (config.gearbox);
+ *             setting Auto shows it once a listed gearbox unit has answered
  *
  * Signals come straight from the car over SOME/IP (see app.json "signals").
  * With no car attached (the VM, or the unit on the bench) demo data can drive
@@ -475,12 +476,14 @@ mgu.run({
                 && !(G.isNum(live.splitRear) && now - splitAt < SPLIT_STALE);
             const onTrans = now - transSeen < 1500 && (zfId === null || zfOk());
             const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : onChassis ? ['lmv'] : onTrans ? ['zf'] : null;
+            // the gearbox unit is identified in the background, so Auto knows whether to show the Transmission page
+            const zfFind = zfId === null && settings.get('transmission') !== 'off';
             // misfire counts change slowly: every 4th fast round on its page (~2 s), every slow round otherwise
             pollFuel.n = (pollFuel.n || 0) + 1;
             const misNow = want('misfire') && (!fast || (onFuelPage && pollFuel.n % 4 === 0));
             try {
                 if (link.available) {
-                    const keys = (fast || FUEL.filter(want).concat(needBoost ? ['boost'] : [], needOil ? ['oil'] : [], want('egs') ? ['egs'] : [])).concat(misNow ? ['misfire'] : []);
+                    const keys = (fast || FUEL.filter(want).concat(needBoost ? ['boost'] : [], needOil ? ['oil'] : [], want('egs') ? ['egs'] : [], zfFind ? ['zf'] : [])).concat(misNow ? ['misfire'] : []);
                     for (const k of keys) {
                         if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
                         fuelTry[k] = Date.now();
@@ -541,13 +544,22 @@ mgu.run({
         /* ---------- drawing ---------- */
         let page = PAGES.indexOf(settings.get('page'));
         if (page < 0) page = 0;
+        const NAMES = { engine: 'Engine', thermal: 'Thermals', fuel: 'Fuel & ignition', chassis: 'Chassis', transmission: 'Transmission' };
+        /** The pages with tabs: Transmission only with a listed gearbox unit (Auto), or set to Show. */
+        const shownPages = () => PAGES.filter((p) => p !== 'transmission' || settings.get('transmission') === 'on'
+            || (settings.get('transmission') !== 'off' && (zfOk() || usingDemo())));
+        /** The page on screen: the chosen one, or Chassis while the chosen one is hidden. */
+        const curPage = () => (shownPages().indexOf(PAGES[page]) >= 0 ? PAGES[page] : 'chassis');
+        /** Next / previous shown page. */
+        const step = (d) => { const vis = shownPages(), i = vis.indexOf(curPage()); page = PAGES.indexOf(vis[(i + d + vis.length) % vis.length]); };
         const trail = [];
 
         const GO = '#2fd27a';
 
         /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t) {
-            G.frame(cv, t, ['Engine', 'Thermals', 'Fuel & ignition', 'Chassis', 'Transmission'], page, [usingDemo() && { text: 'DEMO' }]);
+            const vis = shownPages();
+            G.frame(cv, t, vis.map((p) => NAMES[p]), vis.indexOf(curPage()), [usingDemo() && { text: 'DEMO' }]);
         }
 
         /** Power in kW: { kw, calc } (calc = estimated from torque x rpm, no sport-display data). */
@@ -880,15 +892,15 @@ mgu.run({
         async function render() {
             const t = ctx.theme(), d = data();
             const cv = ctx.canvas(W, H).clear(t.bg);
-            [drawEngine, drawThermal, drawFuel, drawChassis, drawTransmission][page](cv, t, d);
+            ({ engine: drawEngine, thermal: drawThermal, fuel: drawFuel, chassis: drawChassis, transmission: drawTransmission })[curPage()](cv, t, d);
             header(cv, t);
             if (!render.n) { render.n = 1; log.info('first frame drawn'); }
             await ui.image('MAIN_GFX', cv);
         }
 
-        ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
-        ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
-        ctx.onTab((i) => { page = i; return render(); });
+        ui.onClick('BTN_PAGE', () => { step(1); return render(); });
+        ui.onClick('BTN_PREV', () => { step(-1); return render(); });
+        ctx.onTab((i) => { const p = shownPages()[i]; if (p) page = PAGES.indexOf(p); return render(); });
         // every screen refresh (60 fps) with the GPU renderer; 10 fps in software (PNG frames)
         ctx.loop('MAIN', 10, render);
         settings.onChange((k) => {

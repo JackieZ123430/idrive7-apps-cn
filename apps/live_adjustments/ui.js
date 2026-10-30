@@ -1,10 +1,10 @@
 'use strict';
 /**
- * ui.js - the Live Adjustments / Exhaust Flap screen, a PURE draw(cv, G, t, v) so it
+ * ui.js - the Engine Menu screens, a PURE draw(cv, G, t, v) so it
  * renders both on the car (main.js) and in the PC preview harness.
  *
  * House style of the other apps: an "Exhaust Flap" title with the M→white underline up
- * top, the twin tailpipes seen end-on with the butterfly valves opening/closing in the
+ * top, the twin tailpipes side by side seen end-on with the butterfly valves opening/closing in the
  * middle, the big state word, and the three mode buttons (OEM / Open / Close) across the
  * bottom — the selected one filled red, like the other apps (drawn with G.button; the
  * HMI bar is hidden in main.js). A fifth arg `act` carries the press callbacks.
@@ -38,8 +38,8 @@ function draw(cv, G, t, v, act) {
     // the "faixa" the other apps hide and we weren't drawing. ---
     G.panel(cv, t, 24, G.TOP, W - 48, G.BOTTOM - G.TOP, null);
 
-    // --- valve figure: twin tailpipes seen end-on, butterfly opening/closing ---
-    drawExhaust(cv, G, t, W / 2 - 310, G.TOP + 18, 620, 250, v);
+    // --- valve figure: twin tailpipes side by side seen end-on, butterfly opening/closing ---
+    drawExhaust(cv, G, t, W / 2 - 360, G.TOP + 18, 720, 250, v);
 
     // --- state word (big), centered below the figure (no DME/version clutter) ---
     const word = v.confirmed !== 'UNKNOWN' ? v.confirmed : v.requested;
@@ -187,46 +187,52 @@ function drawButtons(cv, G, t, v, act) {
 }
 
 /**
- * One tailpipe tip seen end-on: a chromed round bezel with a dark bore and the butterfly
- * valve inside. open 0 = shut (plate covers the bore), 1 = open (plate edge-on, bore
- * reveals). Built from concentric discs for a metallic look.
+ * One tailpipe tip seen end-on: a rolled chrome rim (lit from the top left), the inner pipe with
+ * depth, and the butterfly valve inside it. open 0 = shut (the plate fills the pipe), 1 = open
+ * (the plate edge-on).
  */
 function drawTip(cv, G, t, cx, cy, r, open, accent) {
     const wa = G.withAlpha;
-    cv.circle(cx, cy + 4, r + 6, wa('#000000', 0.32));      // soft drop shadow
-    cv.circle(cx, cy, r + 2, '#0b0e12');                     // outer edge
-    cv.circle(cx, cy, r, '#9aa1ac');                         // chrome base
-    cv.circle(cx, cy, r * 0.93, '#565d68');                  // shade ring
-    cv.circle(cx, cy, r * 0.87, '#cdd2da');                  // bright lip
-    cv.circle(cx, cy, r * 0.79, '#272c34');                  // groove
-    cv.circle(cx, cy, r * 0.71, '#9ea5af');                  // inner lip
-    const rb = r * 0.65;
-    cv.circle(cx, cy, rb, '#0a0c10');                        // dark bore
-    cv.circle(cx, cy - rb * 0.1, rb * 0.9, '#050608');       // bore depth
-    if (open > 0.4) {                                        // flow glow when open
+    cv.circle(cx, cy, r * 1.13, '#040506');                                   // cut-out in the valance
+    cv.arc(cx, cy, r * 1.13, r * 1.16, 230, 490, wa('#ffffff', 0.10));       // its lit edge
+    cv.circle(cx, cy + r * 0.06, r * 1.02, wa('#000000', 0.55));              // shadow under the tip
+    // chrome rim: colour by angle, bright top left, dark bottom right
+    cv.arc(cx, cy, r * 0.78, r, 0, 360, null, { ramp: ['#c9ced5', '#8b939d', '#4a5059', '#2f343b', '#3d434b', '#7d858f', '#e9edf1', '#fbfcfd', '#c9ced5'] });
+    cv.arc(cx, cy, r * 0.97, r, 0, 360, wa('#000000', 0.35));                 // outer edge
+    cv.arc(cx, cy, r * 0.86, r * 0.92, 285, 355, wa('#ffffff', 0.55), { round: true });   // specular on the roll
+    cv.arc(cx, cy, r * 0.86, r * 0.9, 105, 165, wa('#ffffff', 0.12), { round: true });    // bounce light
+    cv.arc(cx, cy, r * 0.76, r * 0.8, 0, 360, '#15181c');                     // lip into the pipe
+    // the pipe going in: darker toward the back
+    const rb = r * 0.74;
+    cv.circle(cx, cy, rb, '#0e1013');
+    cv.arc(cx, cy, rb * 0.86, rb, 0, 360, null, { ramp: ['#23272d', '#16191d', '#0b0d10', '#16191d', '#23272d'] });
+    cv.circle(cx, cy, rb * 0.62, '#07080a');
+    if (open > 0.4) {                                                         // light through the open valve
         const g = (open - 0.4) / 0.6;
-        cv.circle(cx, cy, rb * 0.72, wa(accent, 0.13 * g));
-        cv.circle(cx, cy, rb * 0.4, wa(accent, 0.20 * g));
+        cv.circle(cx, cy, rb * 0.62, wa(accent, 0.10 * g));
+        cv.circle(cx, cy, rb * 0.34, wa(accent, 0.18 * g));
     }
-    // butterfly plate: a vertical pill whose width shrinks as it opens
-    const ws = Math.max(0.10, Math.cos(open * Math.PI / 2 * 0.95));
-    const pw = 2 * rb * ws;
-    cv.roundRect(cx - pw / 2, cy - rb, pw, 2 * rb, Math.min(pw / 2, rb), '#c7cdd5');
-    if (pw > 12) cv.roundRect(cx - pw * 0.28, cy - rb * 0.92, pw * 0.3, rb * 1.84, Math.min(pw * 0.15, rb), wa('#ffffff', 0.28));
-    cv.line(cx, cy - rb, cx, cy + rb, 2, wa('#20242b', 0.8));
-    cv.circle(cx, cy, 5.5, '#1a1e24'); cv.circle(cx, cy, 2.5, '#434a53');   // hub
-    cv.circle(cx - r * 0.4, cy - r * 0.48, r * 0.1, wa('#ffffff', 0.5));    // specular dot
+    // butterfly plate on a vertical shaft: narrower as it opens
+    const pr = rb * 0.84, ws = Math.max(0.08, Math.cos(open * Math.PI / 2 * 0.95));
+    const pw = 2 * pr * ws;
+    cv.roundRect(cx - pw / 2, cy - pr, pw, 2 * pr, Math.min(pw / 2, pr), '#4f565f');
+    if (pw > 14) cv.roundRect(cx - pw / 2 + pw * 0.08, cy - pr * 0.94, pw * 0.34, pr * 1.88, Math.min(pw * 0.17, pr), wa('#ffffff', 0.16));
+    cv.line(cx, cy - rb, cx, cy + rb, 3, '#1c2026');                          // shaft
+    cv.circle(cx, cy, 6, '#2a2f36'); cv.circle(cx, cy, 2.5, '#6a727c');       // hub
 }
 
-/** Twin tailpipes seen end-on, with the butterfly valves opening/closing. */
+/** The rear valance with twin tips side by side (oo), the valves opening and closing. */
 function drawExhaust(cv, G, t, x, y, w, h, v) {
+    const wa = G.withAlpha;
     const a = (v.angle == null ? (v.confirmed === 'OPEN' ? 1 : v.confirmed === 'UNKNOWN' ? 0.5 : 0) : v.angle);
     const accent = (v.confirmed === 'OPEN' || v.requested === 'OPEN') ? (t.accent2 || '#81c4ff') : (t.crit || '#ef2b2d');
-    const cx = x + w * 0.5, cy = y + h * 0.5;
-    const r = Math.min(h * 0.40, w * 0.19);
-    const ox = r * 0.8, oy = r * 0.32;        // diagonal offset between the twin tips
-    drawTip(cv, G, t, cx - ox, cy + oy, r, a, accent);   // left/lower
-    drawTip(cv, G, t, cx + ox, cy - oy, r, a, accent);   // right/upper
+    const cx = x + w / 2, cy = y + h / 2;
+    const r = Math.min(h * 0.38, w * 0.14);
+    // valance: dark body colour, lit along its top edge
+    cv.card(x, y + h * 0.1, w, h * 0.8, 36, [[0, '#2b3038'], [0.35, '#181b20'], [1, '#0b0d10']]);
+    cv.strokeRoundRect(x, y + h * 0.1, w, h * 0.8, 36, 2, wa('#ffffff', 0.08));
+    cv.line(x + 40, y + h * 0.1 + 10, x + w - 40, y + h * 0.1 + 10, 2, wa('#ffffff', 0.06));
+    for (const side of [-1, 1]) drawTip(cv, G, t, cx + side * r * 1.32, cy, r, a, accent);
 }
 
 module.exports = { draw, W, H, PAGES };
