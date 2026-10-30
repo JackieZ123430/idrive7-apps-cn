@@ -65,10 +65,14 @@ class Controller {
         await this.refresh();
     }
 
-    /** The DME runs an MHD flash (the read-only unlock check answered "MHD..."). */
-    get mhd() { return !!(this.ident && this.ident.mhd && this.ident.mhd.flashed); }
-    /** The DME runs a BM3 CustomROM with a known layout. */
-    get bm3() { return !!(this.ident && this.ident.bm3 && this.ident.bm3.flashed); }
+    /** Platform setting: 'auto' (the unlock check decides), 'bm3' or 'mhd'. */
+    get platform() { return this.ctx.settings.get('platform') || 'auto'; }
+    /** MHD controls: the unlock check answered "MHD...", or the platform is set to MHD. */
+    get mhd() { return !!(this.ident && this.ident.mhd && this.ident.mhd.flashed) || this.platform === 'mhd'; }
+    /** BM3 controls without a ROM layout (flap, ASD): the marker was found, or the platform is set to Bootmod3. */
+    get bm3() { return this.bm3Rom || this.platform === 'bm3'; }
+    /** The BM3 marker names a ROM with a known layout: map and burbles need it (memory addresses). */
+    get bm3Rom() { return !!(this.ident && this.ident.bm3 && this.ident.bm3.flashed); }
 
     /** Re-detect the DME, re-pick the adapter and read the current state (read-only). The
      * identity and unlock check are reads, so they run disarmed too: the pages can say what the
@@ -76,11 +80,11 @@ class Controller {
     async refresh() {
         adapters.armReal(this.armedSetting);        // arm/disarm from the setting before picking
         if (this.link && this.link.available) {
-            try { this.ident = await this.link.identifyDme(); } catch (e) { this.ident = { present: false }; }
+            try { this.ident = await this.link.identifyDme(this.platform); } catch (e) { this.ident = { present: false, platform: this.platform }; }
         } else {
-            this.ident = { present: false };
+            this.ident = { present: false, platform: this.platform };
         }
-        if (this.bm3) await this._readBm3();
+        if (this.bm3Rom) await this._readBm3();
         const p = adapters.pick(this.source, this.ident);
         this.adapter = p.adapter; this.real = p.real; this.blocked = !!p.blocked; this.pickReason = p.reason;
         await this._readBack();
@@ -160,10 +164,13 @@ class Controller {
             this.log.info(kind + ' ' + value + ' (simulated)');
             return this.tune;
         }
-        const tuner = this.mhd && (kind === 'map' || kind === 'cooling') ? 'mhd' : this.bm3 && kind !== 'cooling' ? 'bm3' : null;
+        // map / burbles on BM3 write memory, so they need the ROM's layout; flap and ASD don't
+        const tuner = this.mhd && (kind === 'map' || kind === 'cooling') ? 'mhd'
+            : (kind === 'map' || kind === 'burbles') && this.bm3Rom ? 'bm3' : kind === 'asd' && this.bm3 ? 'bm3' : null;
         if (!tuner) {
             this.tune[kind + 'Accepted'] = false;
-            this.tune.error = 'not sent: ' + (kind === 'map' ? 'no MHD or BM3 flash' : kind === 'cooling' ? 'no MHD flash' : 'no BM3 flash');
+            this.tune.error = 'not sent: ' + (kind === 'cooling' ? 'no MHD flash' : kind !== 'asd' && this.bm3 ? 'BM3 ROM not identified'
+                : kind === 'map' ? 'no MHD or BM3 flash' : 'no BM3 flash');
             return this.tune;
         }
         this.tune.busy = true;
@@ -210,6 +217,7 @@ class Controller {
             modes: this.availableModes(),
             mhd: this.ident && this.ident.mhd ? this.ident.mhd : null,
             bm3: this.ident && this.ident.bm3 ? this.ident.bm3 : null,
+            platform: this.platform,
             tune: Object.assign({}, this.tune),
         };
     }

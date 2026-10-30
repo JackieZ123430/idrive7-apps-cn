@@ -118,7 +118,8 @@ const MhdFlap = {
     name: 'MHD · exhaust flap',
     simulated: false,
     armed: false,                            // armed at runtime from the app's arm setting
-    match(ident) { return !!(ident && ident.mhd && ident.mhd.flashed); },
+    // the unlock check found the MHD tag, or the Platform setting says MHD
+    match(ident) { return !!(ident && ((ident.mhd && ident.mhd.flashed) || ident.platform === 'mhd')); },
     _guard() {
         if (!this.armed) {
             const err = new Error('MHD flap control is not armed');
@@ -147,7 +148,8 @@ const Bm3Flap = {
     name: 'BM3 · exhaust flap',
     simulated: false,
     armed: false,                            // armed at runtime from the app's arm setting
-    match(ident) { return !!(ident && ident.bm3 && ident.bm3.flashed); },
+    // the flap needs no ROM layout: the marker was found, or the Platform setting says Bootmod3
+    match(ident) { return !!(ident && ((ident.bm3 && ident.bm3.flashed) || ident.platform === 'bm3')); },
     _guard() {
         if (!this.armed) {
             const err = new Error('BM3 flap control is not armed');

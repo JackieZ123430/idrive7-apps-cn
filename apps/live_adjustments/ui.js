@@ -58,21 +58,30 @@ function draw(cv, G, t, v, act) {
     return cv;
 }
 
-/** Whether the page's tune is on the DME: need = 'mhd', 'bm3' or 'any'. */
+/**
+ * Whether the page's controls reach the DME. need: 'map' (MHD, or a BM3 ROM with a known layout),
+ * 'cooling' (MHD), 'burbles' (a BM3 ROM with a known layout), 'asd' (Bootmod3). The Platform
+ * setting stands in for the unlock check, except where BM3 needs the ROM's memory layout.
+ */
 function unlocked(v, need) {
-    return !!((need !== 'bm3' && v.mhd && v.mhd.flashed) || (need !== 'mhd' && v.bm3 && v.bm3.flashed));
+    const mhd = !!(v.mhd && v.mhd.flashed) || v.platform === 'mhd', rom = !!(v.bm3 && v.bm3.flashed);
+    const bm3 = rom || v.platform === 'bm3';
+    return need === 'map' ? mhd || rom : need === 'cooling' ? mhd : need === 'burbles' ? rom : bm3;
 }
+
+const NEEDS = { map: 'an MHD flash or an identified BM3 ROM', cooling: 'an MHD flash', burbles: 'an identified BM3 ROM', asd: 'Bootmod3' };
 
 /** What the unlock check found, and whether presses reach the car. */
 function unlockLine(v, need) {
     const m = v.mhd, b = v.bm3;
-    const wants = need === 'mhd' ? 'an MHD' : need === 'bm3' ? 'a BM3' : 'an MHD or BM3';
     let found;
-    if (!m && !b) found = 'Unlock check: not read (no diagnostic link)';
+    if (!m && !b) found = v.platform === 'mhd' ? 'Platform: MHD' : v.platform === 'bm3' ? 'Platform: Bootmod3' : 'Unlock check: not read (no diagnostic link)';
     else if (m && m.flashed) found = 'MHD flash detected' + (m.tag ? ' (' + m.tag + ')' : '');
     else if (b && b.flashed) found = 'BM3 ROM ' + b.rom + ' detected';
+    else if (v.platform === 'mhd') found = 'Platform: MHD (no MHD tag found: ' + (m.reason || 'no answer') + ')';
+    else if (v.platform === 'bm3') found = 'Platform: Bootmod3 (ROM not identified: ' + (b.reason || 'no answer') + ')';
     else found = 'No MHD or BM3 flash on this DME (' + ((b && b.reason) || (m && m.reason) || 'no answer') + ')';
-    if ((m || b) && !unlocked(v, need)) found += ': needs ' + wants + '-flashed DME';
+    if (!unlocked(v, need)) found += ': needs ' + NEEDS[v.platform === 'bm3' && need === 'map' ? 'burbles' : need];
     return found + (v.source === 'sim' ? '  ·  Disarmed: simulated, nothing is sent' : '');
 }
 
@@ -90,7 +99,7 @@ function tunePage(cv, G, t, v, word, color, accepted, need) {
 function drawMap(cv, G, t, v, act) {
     const tune = v.tune || {};
     const map = tune.mapAccepted === false ? null : tune.map;          // a refused one is not shown as set
-    tunePage(cv, G, t, v, map ? 'MAP ' + map : 'MAP –', t.text, tune.mapAccepted, 'any');
+    tunePage(cv, G, t, v, map ? 'MAP ' + map : 'MAP –', t.text, tune.mapAccepted, 'map');
     const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
     let bx = (W - (4 * bw + 3 * gap)) / 2;
     for (let n = 1; n <= 4; n++) {
@@ -107,7 +116,7 @@ function drawCooling(cv, G, t, v, act) {
     const tune = v.tune || {};
     const cooling = tune.coolingAccepted === false ? null : tune.cooling;
     const word = cooling == null ? 'MAX COOLING –' : cooling ? 'MAX COOLING ON' : 'MAX COOLING OFF';
-    tunePage(cv, G, t, v, word, cooling ? (t.accent2 || '#81c4ff') : t.text, tune.coolingAccepted, 'mhd');
+    tunePage(cv, G, t, v, word, cooling ? (t.accent2 || '#81c4ff') : t.text, tune.coolingAccepted, 'cooling');
     const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
     let bx = (W - (2 * bw + gap)) / 2;
     [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {
@@ -124,7 +133,7 @@ function drawBurbles(cv, G, t, v, act) {
     const tune = v.tune || {};
     const set = tune.burblesAccepted === false ? undefined : tune.burbles;      // undefined = not known
     const pick = v.burble == null ? 4 : v.burble;
-    tunePage(cv, G, t, v, 'AGGRESSION ' + pick, t.text, tune.burblesAccepted, 'bm3');
+    tunePage(cv, G, t, v, 'AGGRESSION ' + pick, t.text, tune.burblesAccepted, 'burbles');
     const now = set === undefined ? 'Set: –' : set === null ? 'Set: off' : 'Set: ' + set;
     cv.text(now, W / 2, G.TOP + 290, 26, t.dim, { align: 'center', font: 'bold' });
     const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
@@ -145,7 +154,7 @@ function drawAsd(cv, G, t, v, act) {
     const tune = v.tune || {};
     const asd = tune.asdAccepted === false ? null : tune.asd;
     const word = asd == null ? 'SOUND DESIGN –' : asd ? 'SOUND DESIGN ON' : 'SOUND DESIGN OFF';
-    tunePage(cv, G, t, v, word, t.text, tune.asdAccepted, 'bm3');
+    tunePage(cv, G, t, v, word, t.text, tune.asdAccepted, 'asd');
     const bw = 236, bh = 56, gap = 30, by = G.BOTTOM - 56;
     let bx = (W - (2 * bw + gap)) / 2;
     [[true, 'On'], [false, 'Off']].forEach(([on, label]) => {

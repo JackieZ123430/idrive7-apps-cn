@@ -2,7 +2,7 @@
   "id": "live_adjustments",
   "title": "Live Adjustments",
   "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link, with per-DME adapters. On a tuned DME (read-only unlock check): Map slot 1-4 (MHD, BM3), Max cooling (MHD), Burbles and Active Sound Design (BM3)",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",
@@ -59,6 +59,26 @@
         [
           "on",
           "Armed · sends to the DME"
+        ]
+      ]
+    },
+    {
+      "key": "platform",
+      "label": "Platform",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto detect"
+        ],
+        [
+          "bm3",
+          "Bootmod3"
+        ],
+        [
+          "mhd",
+          "MHD"
         ]
       ]
     },

@@ -72,10 +72,10 @@ class DiagLink {
 
     /**
      * Identify the DME (read-only). Returns an ident object the adapters match on:
-     *   { present, sgbdIndex(hex string), vin, hw, sw }.
+     *   { present, sgbdIndex(hex string), vin, hw, sw, elAgk, platform, mhd, bm3 }.
      * `present` is true only when the DME answered at least one identity read.
      */
-    async identifyDme() {
+    async identifyDme(platform) {
         const ident = { present: false, address: this.dme, sgbdIndex: null, vin: null, hw: null, sw: null };
         if (!this.available) return ident;
         const sg = await this.readDid(DID_SGBD_INDEX);
@@ -94,8 +94,10 @@ class DiagLink {
             commandedPct: asw.ok && asw.data.length >= 2 ? ((asw.data[0] << 8) | asw.data[1]) / 100 : null,
             positionRaw: asg.ok ? bytesToHex(asg.data) : null,
         };
-        ident.mhd = await this.readMhd();
-        ident.bm3 = ident.mhd.flashed ? { flashed: false, rom: null, reason: 'MHD flash' } : await this.readBm3();
+        // platform 'mhd' / 'bm3' (the Platform setting) checks only that flash; 'auto' checks MHD, then BM3
+        ident.platform = platform || 'auto';
+        ident.mhd = ident.platform !== 'bm3' ? await this.readMhd() : { flashed: false, tag: null, reason: 'not checked' };
+        ident.bm3 = ident.platform !== 'mhd' && !ident.mhd.flashed ? await this.readBm3() : { flashed: false, rom: null, reason: 'not checked' };
         this.log.info('DME ident: ' + JSON.stringify(ident));
         return ident;
     }
