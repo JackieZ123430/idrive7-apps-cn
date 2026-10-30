@@ -18,6 +18,8 @@
  *     2026-10-30 - the engine note changed), DME 0x12:
  *     map switch : 2F 01 <map - 1>   -> 6F 01 <map - 1>   map 1..4 = 00..03
  *     max cooling: 2F 03 01 | 00     -> 6F 03 01 | 00     on | off
+ *       ON is sent only with the engine running: live engine speed over MIN_COOLING_RPM
+ *       (CDS statusEngineSpeed2; demo data never counts). OFF is always allowed.
  *     MHD's marker sits at a ROM-dependent address, so it is not read: a press counts only
  *     when the DME echoes the request back. No read-back of the active map is known.
  */
@@ -25,6 +27,7 @@ const { Bm3Protocol } = require('./bm3_protocol');
 const bm3Profiles = require('./bm3_profiles');
 
 const TUNERS = ['off', 'bm3', 'mhd'];
+const MIN_COOLING_RPM = 500;     // Max Cooling: the engine must be running
 const FEATURES = {
     off: { map: false, cooling: false, burbles: false, asd: false },
     bm3: { map: true, cooling: false, burbles: true, asd: true },
@@ -32,8 +35,10 @@ const FEATURES = {
 };
 
 class TuneControl {
-    constructor(ctx) {
+    /** engine (optional): { rpm() -> live engine speed, or null when unknown / not live } */
+    constructor(ctx, engine) {
         this.ctx = ctx;
+        this.engine = engine || { rpm: () => null };
         this.log = ctx.log;
         this.link = null;
         this.bm3 = null;
@@ -147,7 +152,19 @@ class TuneControl {
         });
     }
 
+    /** Live engine speed, or null (no live value: unknown, or demo data). */
+    rpm() {
+        const r = this.engine.rpm();
+        return typeof r === 'number' && isFinite(r) ? r : null;
+    }
+    engineRunning() { const r = this.rpm(); return r !== null && r > MIN_COOLING_RPM; }
+
     setCooling(on) {
+        if (on && this.armed && FEATURES[this.tuner].cooling && !this.busy && !this.engineRunning()) {
+            this.note = 'Start the engine first · Max Cooling needs over ' + MIN_COOLING_RPM + ' rpm';
+            this.noteType = 'warn';
+            return Promise.resolve();
+        }
         return this._run('cooling', 'cooling ' + (on ? 'on' : 'off'), async () => {
             const req = [0x03, on ? 0x01 : 0x00];
             this._expectEcho(await this.link.sendToDme(0x2F, req), req);
@@ -204,6 +221,8 @@ class TuneControl {
             cooling: this.cooling,
             burbles: this.burbles,
             asd: this.asd,
+            rpm: this.rpm(),
+            minCoolingRpm: MIN_COOLING_RPM,
             targetAgg: this.targetAgg,
             busy: this.busy,
             note: this.note,
@@ -212,4 +231,4 @@ class TuneControl {
     }
 }
 
-module.exports = { TuneControl, TUNERS, FEATURES };
+module.exports = { TuneControl, TUNERS, FEATURES, MIN_COOLING_RPM };

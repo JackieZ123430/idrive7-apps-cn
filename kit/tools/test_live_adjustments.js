@@ -40,14 +40,15 @@ function dme(kind) {
     return { calls, memory, link };
 }
 
-async function setup(kind, tuner, available) {
+async function setup(kind, tuner, available, rpm) {
     const d = dme(kind);
     if (available === false) d.link.available = false;
     const ctx = { settings: { get: (k) => (k === 'tuner' ? tuner : undefined) },
         log: { info() {}, warn() {}, error() {} }, spec: { config: { bm3MarkerAddress: '807FFE50' } } };
-    const tune = new TuneControl(ctx);
+    const engine = { value: rpm === undefined ? 800 : rpm, rpm() { return this.value; } };   // engine running by default
+    const tune = new TuneControl(ctx, engine);
     await tune.start(d.link);
-    return { tune, d, ctx };
+    return { tune, d, ctx, engine };
 }
 const NONE = { map: false, cooling: false, burbles: false, asd: false };
 
@@ -76,6 +77,26 @@ const NONE = { map: false, cooling: false, burbles: false, asd: false };
     assert.strictEqual(s.d.calls.length, sent);
     assert.strictEqual(s.tune.noteType, 'warn');
     assert(!s.d.calls.some((c) => /^(2c|3d|3e|2e)/.test(c)), 'MHD never gets a BM3 request');
+
+    // Max Cooling ON needs the engine running (live rpm over 500); OFF is always allowed.
+    for (const r of [null, 0, 450, 500]) {
+        s = await setup('mhd', 'mhd', true, r);
+        await s.tune.setCooling(true);
+        assert.deepStrictEqual(s.d.calls, [], 'cooling on sent at rpm ' + r);
+        assert.strictEqual(s.tune.cooling, null);
+        assert.strictEqual(s.tune.noteType, 'warn');
+        assert(/Start the engine/.test(s.tune.note));
+        await s.tune.setCooling(false);
+        assert.strictEqual(s.d.calls.at(-1), '2f 03 00', 'cooling off must always be sendable');
+    }
+    s = await setup('mhd', 'mhd', true, 501);
+    await s.tune.setCooling(true);
+    assert.strictEqual(s.d.calls.at(-1), '2f 03 01');
+    s.engine.value = 300; s.d.calls.length = 0;                    // engine stopped since
+    await s.tune.setCooling(true);
+    assert.deepStrictEqual(s.d.calls, []);
+    await s.tune.setMap(3);                                         // the map is not rpm-gated
+    assert.strictEqual(s.d.calls.at(-1), '2f 01 02');
 
     // BM3: map and burbles written to memory and confirmed by read-back; ASD; no cooling.
     s = await setup('bm3', 'bm3');
@@ -122,5 +143,5 @@ const NONE = { map: false, cooling: false, burbles: false, asd: false };
     await s.tune.refresh();
     assert.strictEqual(s.tune.map, 2);
 
-    console.log('Live Adjustments tune checks passed (off / MHD echo / BM3 read-back + ASD / wrong tune / untuned / late link).');
+    console.log('Live Adjustments tune checks passed (off / MHD echo / cooling rpm gate / BM3 read-back + ASD / wrong tune / untuned / late link).');
 })().catch((e) => { console.error(e); process.exit(1); });

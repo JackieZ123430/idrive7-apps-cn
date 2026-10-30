@@ -20,6 +20,7 @@ const { Canvas } = require('./kit/canvas');
 const UI = require('./ui');
 const { Controller } = require('./controller');
 const { TuneControl } = require('./tune');
+const Car = require('./kit/car');
 
 /** The tabs this car gets: Exhaust Flap always, then the picked tune's pages. */
 function pagesFor(f) {
@@ -40,7 +41,9 @@ mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
         const controller = new Controller(ctx);
-        const tune = new TuneControl(ctx);
+        // engine speed for Max Cooling's rpm threshold: live values only, never the demo drive
+        const car = new Car(ctx, ['rpm']);
+        const tune = new TuneControl(ctx, { rpm: () => { const d = car.data(); return d.demo ? null : d.rpm; } });
         let angle = 0.18;
         let page = 'Exhaust Flap';          // by name: the tune's tabs come and go with the setting
 

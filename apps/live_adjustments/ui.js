@@ -132,6 +132,10 @@ function drawCooling(cv, G, t, m, act, bottom) {
     const r = Math.min(104, (bottom - G.TOP - 200) / 2);
     drawFan(cv, G, t, W / 2, G.TOP + 24 + r + 10, r, on ? ice : G.withAlpha('#ffffff', 0.35));
     cv.text(m.cooling || 'OFF', W / 2, bottom - 112, 48, on ? ice : t.text, { align: 'center', font: 'bold', spacing: 2 });
+    // ON needs the engine running (tune.js MIN_COOLING_RPM); shown under the fan
+    const rpmText = m.rpm == null ? 'Engine speed unknown' : m.rpm > (m.minCoolingRpm || 500)
+        ? 'Engine running · ' + Math.round(m.rpm) + ' rpm' : 'Engine off · needs over ' + (m.minCoolingRpm || 500) + ' rpm';
+    cv.text(rpmText, W / 2, bottom - 152, 16, t.dim, { align: 'center', font: 'label' });
     noteLine(cv, G, t, m, bottom);
     buttonRow(cv, G, t, [['On', act.cooling && act.cooling(true), on],
         ['Off', act.cooling && act.cooling(false), m.cooling === 'OFF']], bottom, 236, m.busy, 'la_cool');

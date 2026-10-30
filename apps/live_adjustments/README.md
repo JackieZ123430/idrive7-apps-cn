@@ -22,7 +22,7 @@ command — and no extra tab appears. Code: `tune.js`.
 | Engine Map | maps 1–4, memory write, confirmed by read-back | `2F 01 <map-1>`, accepted on the DME's echo |
 | Burbles | aggression 0–12 in 0.5 steps, read-back, Off | — |
 | Active Sound | ASD on / off (`2E 5FFD 00` / `01`), accepted, not read back | — |
-| Max Cooling | — | `2F 03 01` / `2F 03 00`, accepted on the echo |
+| Max Cooling | — | `2F 03 01` / `2F 03 00`, accepted on the echo; **On only with the engine running** (live engine speed over 500 rpm, demo data never counts); Off always |
 
 **BM3** (this replaces the separate BM3 Live app; `bm3_protocol.js`, `bm3_profiles.js`): when
 BM3 is picked, the app reads the CustomROM marker and it must match a known ROM profile in
