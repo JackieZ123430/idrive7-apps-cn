@@ -76,8 +76,39 @@ for (const r of readings) {
     reader.save();
     const loaded = new Reader(ctx);
     assert.strictEqual(loaded.records['6000'].cached, true);
-    loaded.diag = { available: true }; loaded.supported = true; loaded.checked = true;
+    loaded.diag = { available: true }; loaded.sgbd = '0F25D0'; loaded.checked = true;
     assert.strictEqual(loaded.status(), 'LINK STALE', 'A saved snapshot must not be presented as live');
+    // another variant: read only with the setting EGS variant: Try any, and marked unverified
+    let variants = 'verified';
+    const other = new Reader(Object.assign({}, ctx, { settings: { get: (k) => (k === 'variants' ? variants : 2) } })), seen = [];
+    other.diag = { available: true, p: {}, physical: async (target, sid, args) => {
+        seen.push(args);
+        return args[0] === 0xF1 ? [0x62, 0xF1, 0x50, 0x0F, 0x2F, 0xF0] : [0x62, 0x60, 0x00, 100];
+    } };
+    await other.read('F150');
+    await other.read('6000');
+    assert(other.sgbd === '0F2FF0' && !other.supported && seen.length === 1 && other.status() === 'OTHER EGS', 'Another variant is not read by default');
+    variants = 'any';
+    await other.read('6000');
+    assert(other.supported && other.records['6000'].values[0] === 60 && other.status() === 'LIVE · UNVERIFIED', 'Try any reads it, marked unverified');
+    // the G20 330e's hybrid 8HP (0F21E0): read by default; records it refuses are not asked; its own lengths
+    const hybrid = new Reader(ctx), asked = [];
+    hybrid.diag = { available: true, p: {}, physical: async (target, sid, args) => {
+        asked.push(args.map((x) => x.toString(16).padStart(2, '0')).join('').toUpperCase());
+        if (args[0] === 0xF1) return [0x62, 0xF1, 0x50, 0x0F, 0x21, 0xE0];
+        if (args[0] === 0x41 && args[1] === 0x37) return [0x62, 0x41, 0x37].concat(new Array(36).fill(0));
+        if (args[0] === 0x41 && args[1] === 0x43) return [0x62, 0x41, 0x43].concat(new Array(62).fill(0));
+        return [0x62, 0x60, 0x00, 100];
+    } };
+    await hybrid.read('F150');
+    await hybrid.read('6000');
+    await hybrid.read('41A0');
+    await hybrid.read('4137');
+    await hybrid.read('4143');
+    assert(hybrid.supported && hybrid.verified && hybrid.records['6000'].values[0] === 60, 'The hybrid 8HP is read by default');
+    assert(asked.indexOf('41A0') < 0 && hybrid.records['41A0'].absent, 'A record the hybrid 8HP refuses is not asked');
+    assert(hybrid.records['4137'].ok && hybrid.records['4137'].values.length === 18, 'Its KF2 return-shift counters: 18 values');
+    assert(hybrid.records['4143'].ok && !hybrid.records['4143'].decoded && hybrid.records['4143'].bytes === 62, 'A differing layout shows raw');
     const hiddenReader = new Reader(ctx);
     hiddenReader.diag = reader.diag; hiddenReader.setWanted(['6000']); hiddenReader.running = true;
     let running = hiddenReader.pump(), count = calls.length;

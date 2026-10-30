@@ -4,7 +4,7 @@
  *
  * ==========================  SAFETY  ==========================================
  * This adapter ships DISARMED (`armed: false`). Actuation is gated behind the app's
- * own "Exhaust Flap" setting (Settings → Armed): disarmed = simulated only (touches
+ * own "Car control" setting (Settings → Armed): disarmed = simulated only (touches
  * nothing); armed = the app sets `armed: true` at runtime and sends the real command.
  * Each owner validates on their OWN car before arming. Even when armed it only
  * actuates with a matching DME, and OEM always hands control back (the DME also
@@ -55,7 +55,7 @@ const Mg1ElAgk = {
     name: 'Bosch MG1 · electric flap',
     simulated: false,
     armed: false,                            // DISARMED by default; the controller sets this true at
-                                             // runtime when the "Exhaust Flap" setting is Armed. Even
+                                             // runtime when the "Car control" setting is Armed. Even
                                              // then it needs a matching DME; OEM always hands back.
     OPEN_REQUEST: drive(PCT_OPEN),
     CLOSE_REQUEST: drive(PCT_CLOSE),
@@ -97,4 +97,80 @@ const Mg1ElAgk = {
     },
 };
 
-module.exports = { Mg1ElAgk, PCT_OPEN, PCT_CLOSE, tvBytes, drive, release };
+/*
+ * MHD-flashed DME: the tune itself answers short 0x2F controls. Captured from MHD's own app on an
+ * MHD+ S58 (a1-mapping, idrive7-apps PR #23):
+ *   2F 01 nn  map slot      (00 = map 1 .. 03 = map 4)
+ *   2F 02 nn  exhaust flap  (00 = OEM, 01 = open, 02 = closed)
+ *   2F 03 nn  max cooling   (00 = off, 01 = on; the "on" capture was damaged, 01 by analogy)
+ * The DME takes one by echoing 6F <fn> <nn>. A DME without the MHD flash rejects them.
+ */
+const MHD = { MAP: 0x01, FLAP: 0x02, COOLING: 0x03 };
+
+async function mhdSend(link, fn, value) {
+    const r = await link.sendToDme(0x2F, [fn, value]);
+    const ok = !!r.ok && r.sid === 0x6F && r.data[0] === fn && r.data[1] === value;
+    return { accepted: ok, detail: ok ? 'DME took it' : (r.reason || 'unexpected reply') };
+}
+
+const MhdFlap = {
+    id: 'mhd-flap',
+    name: 'MHD · exhaust flap',
+    simulated: false,
+    armed: false,                            // armed at runtime from the app's arm setting
+    // the unlock check found the MHD tag, or the Platform setting says MHD
+    match(ident) { return !!(ident && ((ident.mhd && ident.mhd.flashed) || ident.platform === 'mhd')); },
+    _guard() {
+        if (!this.armed) {
+            const err = new Error('MHD flap control is not armed');
+            err.blocked = true;
+            throw err;
+        }
+    },
+    async _set(link, value) {
+        this._guard();
+        const r = await mhdSend(link, MHD.FLAP, value);
+        return { accepted: r.accepted, confirmed: 'UNKNOWN', detail: r.detail };
+    },
+    async open(link) { return this._set(link, 0x01); },
+    async closed(link) { return this._set(link, 0x02); },
+    async oem(link) { return this._set(link, 0x00); },
+    // the tune has no read-back of the flap that we know of: the state stays as requested
+    async read() { return { accepted: true, confirmed: 'UNKNOWN', detail: 'no read-back on MHD' }; },
+};
+
+/*
+ * BM3 CustomROM: the flap through the same DID 0x60FD with BM3's own values (BM3 Live, idrive7-apps
+ * PR #29): open 2F 60FD 03 14FE, close 2F 60FD 03 2328, auto 2F 60FD 00 (hands it back to the DME).
+ */
+const Bm3Flap = {
+    id: 'bm3-flap',
+    name: 'BM3 · exhaust flap',
+    simulated: false,
+    armed: false,                            // armed at runtime from the app's arm setting
+    // the flap needs no ROM layout: the marker was found, or the Platform setting says Bootmod3
+    match(ident) { return !!(ident && ((ident.bm3 && ident.bm3.flashed) || ident.platform === 'bm3')); },
+    _guard() {
+        if (!this.armed) {
+            const err = new Error('BM3 flap control is not armed');
+            err.blocked = true;
+            throw err;
+        }
+    },
+    async _set(link, mode) {
+        this._guard();
+        try {
+            await link.bm3.setFlap(mode);
+            return { accepted: true, confirmed: 'UNKNOWN', detail: 'DME took it' };
+        } catch (e) {
+            return { accepted: false, confirmed: 'UNKNOWN', detail: String(e && e.message || e) };
+        }
+    },
+    async open(link) { return this._set(link, 'open'); },
+    async closed(link) { return this._set(link, 'close'); },
+    async oem(link) { return this._set(link, 'auto'); },
+    // the replies don't measure the valve: the state stays as requested
+    async read() { return { accepted: true, confirmed: 'UNKNOWN', detail: 'no read-back on BM3' }; },
+};
+
+module.exports = { Mg1ElAgk, MhdFlap, Bm3Flap, MHD, mhdSend, PCT_OPEN, PCT_CLOSE, tvBytes, drive, release };

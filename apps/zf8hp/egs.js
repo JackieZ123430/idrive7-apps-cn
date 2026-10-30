@@ -10,9 +10,14 @@ function payload(did, uds) {
     return b.slice(3);
 }
 
-function decode(did, uds) {
+/** layout (optional): this EGS variant's own length for the record - { count } fields shaped like the catalog's
+ * first, or { raw: true } for a record whose layout differs and is shown as raw bytes. */
+function decode(did, uds, layout) {
     did = String(did).toUpperCase();
-    const meta = C.records[did], b = payload(did, uds);
+    const base = C.records[did], b = payload(did, uds);
+    const meta = !base || !layout ? base : layout.raw ? { length: null, fields: [] }
+        : { length: layout.count * base.fields[0].bytes, fields: Array.from({ length: layout.count }, (_, i) =>
+            Object.assign({}, base.fields[0], { at: i * base.fields[0].bytes })) };
     if (!meta || !b) return { ok: false, error: 'No matching positive response', values: [] };
     if (meta.length !== null && b.length !== meta.length) {
         return { ok: false, error: 'Unexpected length: ' + b.length + ', expected ' + meta.length, values: [] };

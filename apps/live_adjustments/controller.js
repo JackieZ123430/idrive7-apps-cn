@@ -14,6 +14,7 @@
  */
 const { DiagLink } = require('./diaglink');
 const adapters = require('./adapters');
+const { MHD, mhdSend } = require('./real_adapters');
 
 const MODES = ['OEM', 'OPEN', 'CLOSED'];
 
@@ -34,10 +35,14 @@ class Controller {
             busy: false,
             error: null,
         };
+        // the tune's own controls (Map, Max cooling, Burbles, ASD): what was asked and whether the DME
+        // took it ('read' = read back from the DME at the unlock check)
+        this.tune = { map: null, mapAccepted: null, cooling: null, coolingAccepted: null, burbles: null, burblesAccepted: null,
+            asd: null, asdAccepted: null, busy: false, error: null };
         this._busyToken = 0;
     }
 
-    /** The "Exhaust Flap" setting is the arm switch: Armed = talk to the car DME;
+    /** The "Car control" setting is the arm switch: Armed = talk to the car DME;
      * Disarmed (default) = simulated only, nothing is sent to the car. */
     get armedSetting() { return this.ctx.settings.get('arm') === 'on'; }
     get source() { return this.armedSetting ? 'car' : 'sim'; }
@@ -50,7 +55,7 @@ class Controller {
      * the flap state if the adapter can; it never actuates. */
     async start() {
         try {
-            this.link = await new DiagLink(this.ctx.signals, this.log).init();
+            this.link = await new DiagLink(this.ctx.signals, this.log, (this.ctx.spec && this.ctx.spec.config) || {}).init();
             this.state.comm = this.link.available ? 'OK' : 'NONE';
         } catch (e) {
             this.state.comm = 'ERROR';
@@ -60,18 +65,39 @@ class Controller {
         await this.refresh();
     }
 
-    /** Re-detect the DME, re-pick the adapter and read the current state (read-only). */
+    /** Platform setting: 'auto' (the unlock check decides), 'bm3' or 'mhd'. */
+    get platform() { return this.ctx.settings.get('platform') || 'auto'; }
+    /** MHD controls: the unlock check answered "MHD...", or the platform is set to MHD. */
+    get mhd() { return !!(this.ident && this.ident.mhd && this.ident.mhd.flashed) || this.platform === 'mhd'; }
+    /** BM3 controls without a ROM layout (flap, ASD): the marker was found, or the platform is set to Bootmod3. */
+    get bm3() { return this.bm3Rom || this.platform === 'bm3'; }
+    /** The BM3 marker names a ROM with a known layout: map and burbles need it (memory addresses). */
+    get bm3Rom() { return !!(this.ident && this.ident.bm3 && this.ident.bm3.flashed); }
+
+    /** Re-detect the DME, re-pick the adapter and read the current state (read-only). The
+     * identity and unlock check are reads, so they run disarmed too: the pages can say what the
+     * DME is before anything is armed. */
     async refresh() {
         adapters.armReal(this.armedSetting);        // arm/disarm from the setting before picking
-        if (this.link && this.link.available && this.source === 'car') {
-            try { this.ident = await this.link.identifyDme(); } catch (e) { this.ident = { present: false }; }
+        if (this.link && this.link.available) {
+            try { this.ident = await this.link.identifyDme(this.platform); } catch (e) { this.ident = { present: false, platform: this.platform }; }
         } else {
-            this.ident = { present: false };
+            this.ident = { present: false, platform: this.platform };
         }
+        if (this.bm3Rom) await this._readBm3();
         const p = adapters.pick(this.source, this.ident);
         this.adapter = p.adapter; this.real = p.real; this.blocked = !!p.blocked; this.pickReason = p.reason;
         await this._readBack();
         return this.state;
+    }
+
+    /** BM3's map slot and burbles as the DME has them (memory reads). */
+    async _readBm3() {
+        try { this.tune.map = (await this.link.bm3.currentMap()) + 1; this.tune.mapAccepted = 'read'; } catch (e) { this.log.warn('BM3 map read: ' + e.message); }
+        try {
+            const b = await this.link.bm3.readBurbles();
+            if (!b.enabled || b.aggression !== null) { this.tune.burbles = b.enabled ? b.aggression : null; this.tune.burblesAccepted = 'read'; }
+        } catch (e) { this.log.warn('BM3 burbles read: ' + e.message); }
     }
 
     async _readBack() {
@@ -123,6 +149,57 @@ class Controller {
         return this.state;
     }
 
+    /**
+     * map: slot 1..4 (MHD or BM3), cooling: on/off (MHD), burbles: aggression 0..12 or null = off (BM3),
+     * asd: Active Sound Design on/off (BM3). Disarmed: simulated, nothing is sent. Armed: only with
+     * the flash it needs detected; MHD's echo or BM3's memory read-back is the acceptance.
+     */
+    async setTune(kind, value) {
+        if (kind === 'map' && !(value >= 1 && value <= 4)) return this.tune;
+        this.tune[kind] = value;
+        this.tune[kind + 'Accepted'] = null;
+        this.tune.error = null;
+        if (!this.armedSetting) {
+            this.tune[kind + 'Accepted'] = true;
+            this.log.info(kind + ' ' + value + ' (simulated)');
+            return this.tune;
+        }
+        // map / burbles on BM3 write memory, so they need the ROM's layout; flap and ASD don't
+        const tuner = this.mhd && (kind === 'map' || kind === 'cooling') ? 'mhd'
+            : (kind === 'map' || kind === 'burbles') && this.bm3Rom ? 'bm3' : kind === 'asd' && this.bm3 ? 'bm3' : null;
+        if (!tuner) {
+            this.tune[kind + 'Accepted'] = false;
+            this.tune.error = 'not sent: ' + (kind === 'cooling' ? 'no MHD flash' : kind !== 'asd' && this.bm3 ? 'BM3 ROM not identified'
+                : kind === 'map' ? 'no MHD or BM3 flash' : 'no BM3 flash');
+            return this.tune;
+        }
+        this.tune.busy = true;
+        try {
+            const r = tuner === 'mhd' ? await mhdSend(this.link, kind === 'map' ? MHD.MAP : MHD.COOLING, kind === 'map' ? value - 1 : (value ? 1 : 0))
+                : await this._bm3(kind, value);
+            this.tune[kind + 'Accepted'] = r.accepted;
+            if (!r.accepted) this.tune.error = r.detail;
+            this.log.info(kind + ' ' + value + ' -> accepted=' + r.accepted + ' (' + r.detail + ')');
+        } catch (e) {
+            this.tune[kind + 'Accepted'] = false;
+            this.log.warn(kind + ' ' + value + ': ' + String(e && e.message || e));
+        } finally {
+            this.tune.busy = false;
+        }
+        return this.tune;
+    }
+
+    async _bm3(kind, value) {
+        try {
+            if (kind === 'map') await this.link.bm3.setMap(value - 1);
+            else if (kind === 'burbles') await this.link.bm3.setBurbles(value);
+            else await this.link.bm3.setAsd(!!value);
+            return { accepted: true, detail: kind === 'asd' ? 'DME took it' : 'DME took it (read back)' };
+        } catch (e) {
+            return { accepted: false, detail: String(e && e.message || e) };
+        }
+    }
+
     view() {
         return {
             requested: this.state.requested,
@@ -138,6 +215,10 @@ class Controller {
             pickReason: this.pickReason,
             dme: this.ident && this.ident.present ? (this.ident.sgbdIndex || this.ident.vin || 'detected') : null,
             modes: this.availableModes(),
+            mhd: this.ident && this.ident.mhd ? this.ident.mhd : null,
+            bm3: this.ident && this.ident.bm3 ? this.ident.bm3 : null,
+            platform: this.platform,
+            tune: Object.assign({}, this.tune),
         };
     }
 }

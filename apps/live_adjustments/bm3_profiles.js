@@ -1,4 +1,5 @@
 'use strict';
+// BM3 ROM layouts, from BM3 Live by ezl0l (idrive7-apps PR #29).
 
 // Protocol address metadata only. A listed ROM is not a compatibility certification.
 // No tune contents, vehicle data or account material is included.

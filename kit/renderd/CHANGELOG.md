@@ -1,5 +1,9 @@
 # mgu-render changelog
 
+## idrive7-apps mgu-renderd 2.1.5
+
+- An app's layer taken off the centre screen while its app is shown (the compositor reports it: the layer's `screen` event with no output) goes straight back on, on top. The HMI's scene or the app manager's in-place update of another app could set the screen's layers without it while it stayed visible: a blank page until the app was shown again (seen on the car: the Store blank after it updated an app).
+
 ## idrive7-apps mgu-renderd 2.1.4
 
 - An app's layer goes back on the centre screen, on top, each time it is shown: another renderer (the MGU Store's beside idrive7-apps') or the HMI could set the screen's layers without it, and the app then showed a black page (seen on the car after opening the Store, then an app).

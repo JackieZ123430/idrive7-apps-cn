@@ -1,4 +1,5 @@
 'use strict';
+// BM3 CustomROM controls on the DME, from BM3 Live by ezl0l (idrive7-apps PR #29).
 
 const DME = 0x12;
 const MARKER_SIZE = 0xFF;

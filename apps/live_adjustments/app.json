@@ -1,8 +1,8 @@
 {
   "id": "live_adjustments",
-  "title": "Live Adjustments",
-  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. With BM3 or MHD picked in Settings: engine map switching, burbles, ASD and Max Cooling",
-  "version": "0.1.1",
+  "title": "Engine Config",
+  "description": "Engine Config for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. With BM3 or MHD picked in Settings: engine map switching, burbles, ASD and Max Cooling",
+  "version": "0.6.0",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",
@@ -24,7 +24,7 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "Live Adjustments",
+      "title": "Engine Config",
       "buttons": [
         [
           "BTN_OPEN",
