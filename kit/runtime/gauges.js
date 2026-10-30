@@ -133,6 +133,13 @@ function box(cv, t, x, y, w, h, title) {
  * runs the screen with no bar under the page, else 0). Reading it places the page as one that reaches down.
  */
 function pageBottom(cv) { return BOTTOM + (cv.extra || 0); }
+/** px between a panel's bottom and its last line (the lowest drawn pixel): the same in every panel. */
+const MARGIN = 22;
+/**
+ * How far down to move a panel's bottom part, laid out m px over the bottom of the unstretched panel (y + h),
+ * so it ends MARGIN over the panel's real bottom, room px lower (G.panel's stretch: cv.extra, else 0).
+ */
+function toMargin(room, m) { return room + m - MARGIN; }
 function drawPanel(cv, t, x, y, w, h, title) {
     // flat light grey overlay; top: a short bold bar in the theme's stripe colours (M tricolour:
     // light blue, dark blue, red; the last part with an angled end), then a thin white line;
@@ -411,21 +418,21 @@ function stat(cv, t, x, y, w, h, g) {
     box(cv, t, x, y, w, hb, g.label);
     const v = g.value, c = zoneColor(t, g, v, g.color ? t[g.color] || g.color : t.accent);
     const vcol = zoneColor(t, g, v, g.valueColor ? t[g.valueColor] || g.valueColor : t.text);
-    const hist = (g.history || []).filter(isNum);
+    const hist = (g.history || []).filter(isNum), size = g.size || Math.min(96, h * 0.42), vy = y + 52 + size * 0.78;
     if (hist.length > 2 && h > 150) {
-        const hx = x + 18, hw = w - 36, hy = y + hb - (g.sub ? 44 : 18), hh = Math.min(60, h * 0.25);
+        // (the trace stays under the value: at most up to 8 px under its baseline)
+        const hx = x + 18, hw = w - 36, hy = y + hb - (g.sub ? MARGIN + 28 : MARGIN), hh = Math.min(60, h * 0.25, hy - vy - 8);
         let lo = Math.min.apply(null, hist), hi = Math.max.apply(null, hist);
         if (hi - lo < 1e-6) { lo -= 1; hi += 1; }
         const pts = g.history.map((p, i) => [hx + (i / Math.max(1, g.history.length - 1)) * hw, isNum(p) ? hy - ((p - lo) / (hi - lo)) * hh : hy]);
         cv.fillUnder(pts, hy, withAlpha(c, 0.16));
         cv.polyline(pts, 2.5, withAlpha(c, 0.85));
     }
-    const size = g.size || Math.min(96, h * 0.42);
     const vs = fmt(v, g.decimals);
     const vw = cv.textWidth(vs, size, { font: 'num' });
-    cv.text(vs, x + 18, y + 52 + size * 0.78, size, isNum(v) ? vcol : t.dim, { font: 'num' });
-    if (g.unit) cv.text(g.unit, x + 26 + vw, y + 52 + size * 0.78, 28, t.dim);
-    if (g.sub) cv.text(g.sub, x + 18, y + hb - 16, 22, t.dim, { spacing: 0.5 });
+    cv.text(vs, x + 18, vy, size, isNum(v) ? vcol : t.dim, { font: 'num' });
+    if (g.unit) cv.text(g.unit, x + 26 + vw, vy, 28, t.dim);
+    if (g.sub) cv.text(g.sub, x + 18, y + hb - MARGIN, 22, t.dim, { spacing: 0.5 });
 }
 
 /**
@@ -848,7 +855,7 @@ function stripes(cv, t, x, y, w) {
 }
 
 module.exports = {
-    BAR_H, TOP, BOTTOM, pageBottom, frame, header, layer, onLayerDrop, panel, segBar, radial, needle, ring, bar, stat, readout,
+    BAR_H, TOP, BOTTOM, pageBottom, MARGIN, toMargin, frame, header, layer, onLayerDrop, panel, segBar, radial, needle, ring, bar, stat, readout,
     shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, button, onConfirm, smooth, hold, niceStep,
     fmt, isNum, clamp, mix, zoneColor, withAlpha, ramp,
 };

@@ -175,7 +175,7 @@ mgu.run({
             const base = st.baseline;
             // ex: how much lower the panels reach where the screen has room below the page (else 0); the plot takes all of it
             const sh = G.panel(cv, t, 24, 44, 1120, 468, 'Dyno sheet'), ex = sh.y + sh.h - G.BOTTOM;
-            plot(cv, t, 104, 135, 960, 294 + ex, [cur, base]);
+            plot(cv, t, 104, 135, 960, 294 + G.toMargin(ex, 31), [cur, base]);     // (its axis labels G.MARGIN over the bottom)
             if (base) {
                 cv.fillRect(600, 74, 26, 4, withAlpha(t.dim, 0.7));
                 cv.text('BASELINE ' + Math.round(pw(base.peakP)) + ' ' + pU(), 634, 84, 22, t.dim, { font: 'bold', spacing: 0.5 });

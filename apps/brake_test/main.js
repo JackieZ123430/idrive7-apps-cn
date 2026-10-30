@@ -121,8 +121,8 @@ mgu.run({
             const pr = G.panel(cv, t, 24, 44, 470, 468, run ? 'Stopping' : last ? 'Last stop' : 'Ready');
             // room below the page (where the kit gives it; all three panels reach it): the status lines move
             // down with the panels' bottom, the charts get taller
-            // (each panel's last line then ends ~22 over its bottom: dl status, dc chart, df fade)
-            const dy = pr.y + pr.h - G.BOTTOM, dl = dy - Math.min(dy, 9), dc = dy + Math.min(dy, 41), df = dy + Math.min(dy, 8);
+            // (each panel's last line then ends G.MARGIN over its bottom: dl status, dc chart, df fade)
+            const dy = pr.y + pr.h - G.BOTTOM, dl = G.toMargin(dy, 13), dc = G.toMargin(dy, 63), df = G.toMargin(dy, 30);
             // the panel's own button (where the kit runs the screen; else the bar's Cancel run)
             G.button(cv, t, 494 - 20 - 170, 56, 170, 40, 'Cancel run', act, { key: 'cancel', busy: !run && !last });
             const showKey = last ? (last.result[low.key] ? low.key : Object.keys(last.result)[0]) : low.key;

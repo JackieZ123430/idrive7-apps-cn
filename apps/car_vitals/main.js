@@ -656,7 +656,7 @@ mgu.run({
             const col = !ok ? t.dim : total === 0 ? GO : total < 20 ? t.warn : t.crit;
             const tw = cv.text(ok ? String(total) : '--', x + 18, y + 52 + big * 0.78, big, col, { font: 'num' });
             cv.text(ok ? 'this drive' : '', x + 28 + tw, y + 52 + big * 0.78, 24, t.dim);
-            if (!ok) { cv.text(usingDemo() ? 'no data' : fuelWhy('misfire'), x + 18, yb - 16, 22, t.dim); return; }
+            if (!ok) { cv.text(usingDemo() ? 'no data' : fuelWhy('misfire'), x + 18, yb - G.MARGIN, 22, t.dim); return; }
             // per cylinder: a cell each along the bottom, "Cyl n" over its count; with room below the page (the
             // panel stretched) up to 16 higher, nearer the other tiles' graphs and lines
             const n = counts.length, gap = 8, cw = (w - 36 - gap * (n - 1)) / n, ch = 74, cy = yb - 12 - ch - G.clamp(yb - Math.round(y + h), 0, 16);
@@ -689,7 +689,7 @@ mgu.run({
                 // both over the last 5 minutes, on one scale
                 const ha = g.histA || [], ht = g.histT || [], all = ha.concat(ht).filter(G.isNum);
                 if (all.length > 2) {
-                    const hx = x + 18, hw = w - 36, hy = yb - 44, hh = Math.min(56, h * 0.24);
+                    const hx = x + 18, hw = w - 36, hy = yb - G.MARGIN - 28, hh = Math.min(56, h * 0.24, hy - (y + 122) - 8);   // (under the target's value)
                     let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
                     if (hi - lo < 1e-6) { lo -= 1; hi += 1; }
                     const pts = (hs) => hs.map((p, i) => [hx + (i / Math.max(1, hs.length - 1)) * hw, G.isNum(p) ? hy - ((p - lo) / (hi - lo)) * hh : hy]);
@@ -701,7 +701,7 @@ mgu.run({
                 : !judged ? 'on target' + (G.isNum(gap) ? ' (idle)' : '')
                     : Math.abs(gap) < g.tol ? 'on target  ·  ' + (gap >= 0 ? '+' : '') + G.fmt(gap, g.decimals) + ' ' + g.unit
                         : (gap > 0 ? '+' : '') + G.fmt(gap, g.decimals) + ' ' + g.unit + (gap > 0 ? ' over target' : ' under target');
-            cv.text(sub, x + 18, yb - 16, 22, judged && Math.abs(gap) >= g.tol ? col : t.dim, { spacing: 0.5 });
+            cv.text(sub, x + 18, yb - G.MARGIN, 22, judged && Math.abs(gap) >= g.tol ? col : t.dim, { spacing: 0.5 });
         }
 
         function drawFuel(cv, t, d) {
@@ -752,8 +752,8 @@ mgu.run({
             const showTyres = shown('tyres'), right = showAwd ? 1196 : 1576;
             const gw = showTyres ? 480 : right - 24;
             // the room below the page (on the car, with no bar under it): the g-g diagram grows into it until its
-            // g line ends ~22 over the panel's bottom, as the tyres' and xDrive's last lines; the xDrive bars spread over it
-            const room = G.pageBottom(cv) - G.BOTTOM, half = Math.floor(room / 2), grow = Math.round(room * 2 / 3);
+            // g line ends G.MARGIN over the panel's bottom, as the tyres' and xDrive's last lines; the xDrive bars spread over it
+            const room = G.pageBottom(cv) - G.BOTTOM, grow = Math.round(G.toMargin(room, 38) / 2), dx = G.toMargin(room, 28);
             G.panel(cv, t, 24, G.TOP, gw, G.BOTTOM - G.TOP, 'G-force');
             G.gmeter(cv, t, 24 + gw / 2, 258 + grow, 164 + grow, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
             if (showTyres) drawTyres(cv, t, 528, G.TOP, right - 528, G.BOTTOM - G.TOP, d);
@@ -766,8 +766,8 @@ mgu.run({
                 cv.text(mode, ax + 24, 160, 52, hot ? t.crit : t.text, { font: 'bold' });
                 if (hot) cv.text('DERATED / OFF', ax + 24, 196, 22, t.crit, { font: 'bold', spacing: 1.5 });
                 const sp = xdriveSplit(d), rear = sp.rear;
-                G.bar(cv, t, ax + 24, 262 + half, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
-                G.bar(cv, t, ax + 24, 392 + 2 * half, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
+                G.bar(cv, t, ax + 24, 262 + Math.round(dx / 2), aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
+                G.bar(cv, t, ax + 24, 392 + dx, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
                 // where the split came from when it isn't the car's own torque split
                 // under the mode: front axle torque and where the split came from, when it isn't the car's own
                 const note = G.isNum(sp.nm) ? 'front ' + G.fmt(TQ(sp.nm), 0) + ' ' + tqU() + ' (transfer case)'
@@ -781,7 +781,7 @@ mgu.run({
             const temps = shown('tyreTemp');
             const p = G.panel(cv, t, x, y, w, h, 'Tyres');
             const unitP = settings.get('pressUnit'), dec = unitP === 'psi' ? 0 : 1;
-            const cx = x + w / 2, top = y + 70, bh = p.h - 100, bw = 150;     // rear tyres: at the panel's real bottom
+            const cx = x + w / 2, top = y + 70, bh = h - 100 + G.toMargin(p.h - h, 26), bw = 150;     // rear tyres: G.MARGIN over the panel's real bottom
             // body: rounded shell, windscreen + rear window, FRONT marker
             cv.roundRect(cx - bw / 2, top, bw, bh, 52, withAlpha(t.track, 0.9));
             cv.strokeRoundRect(cx - bw / 2, top, bw, bh, 52, 3, t.tick);

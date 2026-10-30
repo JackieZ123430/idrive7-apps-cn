@@ -29,8 +29,8 @@ function draw(cv, G, t, v, act) {
     // the "faixa" the other apps hide and we weren't drawing. ---
     G.panel(cv, t, 24, G.TOP, W - 48, G.BOTTOM - G.TOP, null);
     // the panel's real bottom: the word and buttons sit on it, the figure grows into the room above them;
-    // the buttons (where the kit runs the screen) end 22 over it, as the other apps' last lines
-    const bottom = G.pageBottom(cv) - (cv.own ? 22 : 0);
+    // the buttons (where the kit runs the screen) end G.MARGIN over it, as the other apps' last lines
+    const bottom = G.pageBottom(cv) - (cv.own ? G.MARGIN : 0);
 
     // --- valve figure: twin tailpipes seen end-on, butterfly opening/closing ---
     drawExhaust(cv, G, t, W / 2 - 310, G.TOP + 18, 620, 250 + bottom - G.BOTTOM, v);

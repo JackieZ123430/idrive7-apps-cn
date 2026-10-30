@@ -488,6 +488,7 @@ class Display {
         }
         this._hmiBar();
         this.tickHandlers.forEach((fn) => fn());
+        this.layoutKey = null;
         this._layoutChanged();
     }
 
@@ -549,7 +550,9 @@ class Display {
         this.recorders.clear();             // text sizes depend on the scale
         this.app = null; this.outRec = null;
         this.log.info('display: renderer placement ' + JSON.stringify(pl) + ' (layout ' + v + ')');
-        this._layoutChanged();
+        // (only a real change: hideButton places again for every button it hides)
+        const key = JSON.stringify([pl, this.own(), this.screen ? this.buttons().map((b) => b.id) : []]);
+        if (key !== this.layoutKey) { this.layoutKey = key; this._layoutChanged(); }
     }
     /** Apps that draw only on changes draw again: the last frame has the old layout (bar, header, place). */
     _layoutChanged() { this.layoutHandlers.forEach((fn) => { try { fn(); } catch (e) { this.log.error('layout', e); } }); }
@@ -558,7 +561,6 @@ class Display {
     _reach(reaches) {
         const pl = this.place;
         if (!pl || pl.oyTop == null) return;
-        this.reaches = !!reaches;
         const oy = reaches ? pl.oyTop : pl.oyMid;
         if (pl.oy === oy) return;
         pl.oy = oy;
@@ -627,6 +629,8 @@ class Display {
             drawCredit(r, r.w - 96, 25);
             r._cnStamped = true;
         }
+        // the app's page reaches down or not (never a sheet's frame): _place starts from it
+        this.reaches = !!r.extraUsed;
         if (this.active()) {
             let out = r;
             if (this.place.full && r.chrome) {

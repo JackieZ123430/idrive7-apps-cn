@@ -270,10 +270,10 @@ mgu.run({
             tile(cv, t, 24, 760, 'Next service', s ? s.way || s.date || '--' : '--', s ? fit(cv, s.text, 22, 380) : 'waiting for the car', s ? COL(t, s.colour) : t.dim);
             tile(cv, t, 804, 374, 'Due soon', String(soon), 'items', soon ? t.warn : GO);
             tile(cv, t, 1198, 378, 'Due now', String(red), 'items', red ? t.crit : GO);
-            // room below the page (where the kit gives it): another row where one fits whole, the rest
-            // spreads the rows; the bottom line moves down with the panel's bottom
+            // room below the page (where the kit gives it): another row where one fits whole (the rows stay
+            // compact, as Fault Scanner's); the bottom line moves down with the panel's bottom
             const ex = G.pageBottom(cv) - G.BOTTOM;
-            const rows = PER_PAGE + Math.floor(ex / 55), pitch = 55 + (ex % 55) / (rows - 1);
+            const rows = PER_PAGE + Math.floor(ex / 55);
             // the bottom line: an item's details, or what the last button did (reset)
             // (where the kit runs the screen the item's card shows its hint and the reset's progress)
             const line = cv.own ? '' : hint ? hint.name + ':  ' + hint.text : msg;
@@ -289,7 +289,7 @@ mgu.run({
             }
             const first = Math.floor(sel / per) * per;
             its.slice(first, first + per).forEach((it, i) => {
-                const y = 232 + Math.round(i * pitch), col = COL(t, it.colour);
+                const y = 232 + i * 55, col = COL(t, it.colour);
                 // a row tapped, or pressed with the controller: its card
                 if (cv.own) cv.target(40, y - 4, 1520, 50, () => openCard(first + i), 'item' + it.id, 8);
                 if (!cv.own && first + i === sel) cv.roundRect(40, y - 4, 1520, 50, 8, withAlpha(t.accent, 0.18));   // (the kit rings the row the controller is on)

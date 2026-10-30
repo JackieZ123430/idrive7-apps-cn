@@ -628,8 +628,8 @@ module.exports = function live(ctx, sh) {
         if (d.engine) cv.text('ENGINE RUNNING', r, y + 138, 20, t.warn, { font: 'bold', spacing: 1.5, align: 'right' });
         const by = ky + 30;
         powerBar(cv, t, x + 24, by, w - 48, pw.kw, lim);
-        // (with room: its time labels end 22 over the panel's bottom, as the other panels' last lines)
-        const ty = by + 58, th = y + h - 34 - Math.min(h - h0, 13) - ty;
+        // (with room: its time labels end G.MARGIN over the panel's bottom, as the other panels' last lines)
+        const ty = by + 58, th = y + h0 - 34 + G.toMargin(h - h0, 9) - ty;
         if (th >= 40) {
             const top = Math.max(20, ...trace.map((p) => p[1]), 0) * 1.1, bottom = Math.max(10, ...trace.map((p) => -p[1]), 0) * 1.1;
             const tr = d.demo ? demoHistory(TRACE_S, 1, (q) => q.kw) : trace;
@@ -664,7 +664,7 @@ module.exports = function live(ctx, sh) {
         if (G.isNum(d.soc)) cv.text('~' + G.fmt(d.soc / 100 * settings.get('designKwh'), 1) + ' kWh', r, 172, 16, t.dim, { align: 'right' });
         if (cells) {
             // bars: from a floor below the lowest cell, so the differences show
-            const x0 = x + 80, bw0 = r - x0, btop = 210, base = 420 + ex + Math.min(ex, 48), n = cells.length, bw = bw0 / n;
+            const x0 = x + 80, bw0 = r - x0, btop = 210, base = 420 + G.toMargin(ex, 70), n = cells.length, bw = bw0 / n;
             const pad = Math.max(0.005, (cvv.max - cvv.min) * 0.6), vlo = cvv.min - pad, vhi = cvv.max + pad * 0.4;
             const Y = (v) => base - (v - vlo) / (vhi - vlo) * (base - btop);
             [vlo, vhi].forEach((v) => {

@@ -691,8 +691,8 @@ mgu.run({
                 label: 'Full: ' + Math.round(D(e.full)) + ' ' + dU(), value: has ? D(e.mid) : null, unit: dU(), max: D(e.full), niceMax: true, ramp: 'hot',
             });
             // the battery's power now: regen to the left, use to the right (live.js), as the Full bar above it
-            // (its scale ends 22 over the panel's bottom)
-            lv.drawPowerBar(cv, t, 48, 398 + ex, 672);
+            // (its scale ends G.MARGIN over the panel's bottom)
+            lv.drawPowerBar(cv, t, 48, G.BOTTOM - G.MARGIN - 92 + ex, 672);
             // climate control + on-board electrics: costs range by the hour (off: the on-board draw only)
             const ac = ec.climate !== false && ec.auxKw >= 1.5 ? t.warn : t.dim;
             const what = ec.climate === false ? 'CLIMATE OFF  ·  ON-BOARD  ' : ec.climate ? 'CLIMATE ON' + (d.ac ? ' (A/C)' : '') + '  ' : 'CLIMATE & ON-BOARD  ';
@@ -715,19 +715,20 @@ mgu.run({
             cv.text('12 V', 792, 340 + ey, 22, t.dim, { font: 'bold', spacing: 1.5 });
             void vw;
             cv.fillRect(792, 357 + ey, 332, 1, t.tick);
-            const c = d.charge;
-            cv.text(c && c.open ? 'CHARGING' : 'LAST CHARGE', 792, 393 + ex, 22, c && c.open ? GO : t.dim, { font: 'bold', spacing: 1.5 });
+            // (the last charge's lines end G.MARGIN over the panel's bottom)
+            const c = d.charge, lc = G.toMargin(ex, 18);
+            cv.text(c && c.open ? 'CHARGING' : 'LAST CHARGE', 792, 393 + lc, 22, c && c.open ? GO : t.dim, { font: 'bold', spacing: 1.5 });
             if (c) {
                 const add = c.to - c.from;
-                const aw = cv.text('+' + add.toFixed(0) + ' %', 792, 446 + ex, 44, GO, { font: 'bold' });
-                cv.text('+' + Math.round(D(kmOf(add))) + ' ' + dU(), 806 + aw, 444 + ex, 28, t.text, { font: 'bold' });
+                const aw = cv.text('+' + add.toFixed(0) + ' %', 792, 446 + lc, 44, GO, { font: 'bold' });
+                cv.text('+' + Math.round(D(kmOf(add))) + ' ' + dU(), 806 + aw, 444 + lc, 28, t.text, { font: 'bold' });
                 // from -> to: the arrow drawn ('→' isn't in the baked fonts), as the text's colour and weight
-                const ly = 489 + ex, fw = cv.text(String(Math.round(c.from)), 792, ly, 24, t.dim), ax = 792 + fw + 9, ay = ly - 8;
+                const ly = 489 + lc, fw = cv.text(String(Math.round(c.from)), 792, ly, 24, t.dim), ax = 792 + fw + 9, ay = ly - 8;
                 cv.line(ax, ay, ax + 18, ay, 2, t.dim);
                 cv.polyline([[ax + 12, ay - 5], [ax + 18, ay], [ax + 12, ay + 5]], 2, t.dim);
                 cv.text(Math.round(c.to) + ' %  ·  ' + (c.open ? 'now' : ago(Date.now() - c.toT)), ax + 27, ly, 24, t.dim);
             } else {
-                cv.text('none yet', 792, 446 + ex, 28, t.dim);
+                cv.text('none yet', 792, 446 + lc, 28, t.dim);
             }
 
             // ---- this drive (from the battery's own power readings, live.js)
@@ -777,9 +778,9 @@ mgu.run({
             const soh = d.soh, kwh = settings.get('designKwh');
             const cap = G.isNum(soh) ? kwh * soh / 100 : null;                     // what a full charge holds today
             const now = G.isNum(cap) && G.isNum(d.soc) ? cap * d.soc / 100 : null;  // energy in the pack right now
-            // room below the page (ex): the energy now goes down until it ends 22 over the panel's bottom, as the
+            // room below the page (ex): the energy now goes down until it ends G.MARGIN over the panel's bottom, as the
             // Cells panel's chart; the Holds bar half as far
-            const ex = G.panel(cv, t, x, y, w, h, 'Battery health').h - h, dy = ex + Math.min(ex, 27), dh = Math.round(dy / 2);
+            const ex = G.panel(cv, t, x, y, w, h, 'Battery health').h - h, dy = G.toMargin(ex, 49), dh = Math.round(dy / 2);
             const hc = !G.isNum(soh) ? t.dim : soh < 70 ? t.crit : soh < 80 ? t.warn : t.text;
             // HV battery temperature (the car's own value): cold packs give less range and charge slower
             const bt = d.batt && d.batt.avg, btc = !G.isNum(bt) ? t.dim : bt < 5 || bt > 45 ? t.warn : t.text;
@@ -868,8 +869,8 @@ mgu.run({
             const days = [];
             for (let i = 13; i >= 0; i--) days.push(sum(all.filter((c) => c.toT >= today0 - i * day && c.toT < today0 - (i - 1) * day)));
             const top = Math.max(4, Math.max.apply(null, days));
-            // (taller into the room below the page; its label then ends 22 over the panel's bottom, as the list's rows)
-            const lift = Math.min(ex, 13), gx = 1112, gy = 470 + ex - lift, gh = 132 + ex - lift, bw = 440 / 14;
+            // (taller into the room below the page; its label then ends G.MARGIN over the panel's bottom, as the list's rows)
+            const dg = G.toMargin(ex, 9), gx = 1112, gy = 470 + dg, gh = 132 + dg, bw = 440 / 14;
             cv.text('KWH PER DAY, 14 DAYS', gx, 318, 22, t.dim, { font: 'bold', spacing: 1 });
             days.forEach((v, i) => {
                 const h = v > 0 ? Math.max(6, v / top * gh) : 0;

@@ -155,21 +155,21 @@ mgu.run({
             cv.text(vU(), 476, 227, 28, t.dim);
             cv.fillRect(44, 255, 480, 2, t.panelEdge);
             const el = timer.elapsed(now);
-            // the clock and state halfway down the room, the bottom line lower too: it ends ~22 over the panel's
-            // bottom, as the other panels' last lines (eb)
-            const eb = ex - Math.min(ex, 14);
-            cv.text(secs(el), 400, 384 + mid, 96, timer.state === 'run' ? t.text : timer.endAt !== undefined ? t.accent2 : t.dim, { align: 'right', font: 'num' });
-            cv.text('s', 412, 384 + mid, 32, t.dim);
-            cv.roundRect(44, 412 + mid, 480, 44, 8, withAlpha(col, 0.18));
-            if (timer.state === 'ready') cv.roundRect(44, 412 + mid, 480, 44, 8, withAlpha(GO, 0.35 + 0.25 * Math.sin(now / 160)));
-            cv.text(stTxt, 284, 446 + mid, 26, col, { align: 'center', font: 'bold', spacing: 3 });
+            // the bottom line ends G.MARGIN over the panel's bottom, as the other panels' last lines (eb); the clock
+            // and state go halfway down the room and up as far as the bottom line (es)
+            const eb = G.toMargin(ex, 8), es = mid + eb - ex;
+            cv.text(secs(el), 400, 384 + es, 96, timer.state === 'run' ? t.text : timer.endAt !== undefined ? t.accent2 : t.dim, { align: 'right', font: 'num' });
+            cv.text('s', 412, 384 + es, 32, t.dim);
+            cv.roundRect(44, 412 + es, 480, 44, 8, withAlpha(col, 0.18));
+            if (timer.state === 'ready') cv.roundRect(44, 412 + es, 480, 44, 8, withAlpha(GO, 0.35 + 0.25 * Math.sin(now / 160)));
+            cv.text(stTxt, 284, 446 + es, 26, col, { align: 'center', font: 'bold', spacing: 3 });
             cv.text('PEAK ' + (peakG > 0 ? peakG.toFixed(2) : '-.--') + ' g', 44, 493 + eb, 22, t.dim, { font: 'bold', spacing: 1 });
             if (G.isNum(live.rpm)) cv.text(Math.round(live.rpm) + ' rpm', 524, 493 + eb, 22, t.dim, { align: 'right', font: 'bold', spacing: 1 });
             G.button(cv, t, 214, 466 + eb, 140, 38, 'Reset run', act, { key: 'reset', confirm: true });
 
             // --- speed trace ---
             G.panel(cv, t, 568, 44, 520, 468, 'Speed trace');
-            const px = 640, py = 104, pw = 424, ph = 351 + ex;      // the trace takes all the room
+            const px = 640, py = 104, pw = 424, ph = 351 + G.toMargin(ex, 31);      // the trace takes the room (its labels G.MARGIN over the bottom)
             const tr = timer.trace;
             const tMax = Math.max(6, Math.ceil(tr.length ? tr[tr.length - 1][0] / 2 + 0.5 : 0) * 2);
             const vMax = Math.max(mph() ? 80 : 120, Math.ceil(((V(timer.vmax) || 0) + 5) / 40) * 40);
@@ -198,7 +198,7 @@ mgu.run({
             // --- splits ---
             G.panel(cv, t, 1112, 44, 464, 468, 'Splits');
             splits().forEach((s, i) => {
-                const y = Math.round(101 + i * (82 + ex / 4));     // the room spread over the gaps
+                const y = Math.round(101 + i * (82 + G.toMargin(ex, 26) / 4));     // the room spread over the gaps (the last G.MARGIN over the bottom)
                 const r = timer.result[s.key], b = store.best[bestKey(s.key)];
                 cv.text(s.label, 1136, y + 22, 24, t.dim, { font: 'bold', spacing: 0.5 });
                 cv.text(secs(r), 1520, y + 46, 44, G.isNum(r) ? t.text : withAlpha(t.dim, 0.6), { align: 'right', font: 'num' });
