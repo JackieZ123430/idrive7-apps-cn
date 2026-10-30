@@ -769,6 +769,11 @@ kit/tools/make_gif.sh docs/media/redline.gif redline 6 6 --set coldGuard=false  
 
 ### 6.4 Live emulator
 
+<p align="center">
+  <img src="docs/media/emulator-redline.png" alt="The live emulator: Redline drawn by the car's own draw engine in the browser, the panel at the bottom" width="100%"><br>
+  <sub>Redline in the emulator. The full guide, with more screenshots: <a href="docs/emulator.md">docs/emulator.md</a>.</sub>
+</p>
+
 ```sh
 node kit/tools/emu.js redline                  # -> http://localhost:8077
 node kit/tools/emu.js doom --port 8080 --bg hmi-screenshot.png
@@ -888,12 +893,16 @@ kit/renderd/          mgu-renderd: the GPU renderer service (mgu-render: C, GLES
                       GPL-3.0-or-later; prebuilt/ = the ready binary + the source fingerprint it
                       was built from; inputgate/ = the controller gate
 kit/platform/         permissions template used by build.py
-kit/tools/            build.py, make_kit.py, preview.js, make_gif.sh, make_icon.js, render_icons.py,
-                      bake_fonts.py, extract_sdk.js, check_signals.py, sigdoc.py, oapgen/gen.js
+kit/tools/            build.py, make_kit.py, preview.js, emu.js + hu-stub.js (the live emulator),
+                      make_gif.sh, make_icon.js, render_icons.py, bake_fonts.py, extract_sdk.js,
+                      check_signals.py, sigdoc.py, oapgen/gen.js
+kit/emu/              the emulator's page (web/) and the draw engine as WebAssembly (web/gfx/, built
+                      from wasm/ with build.sh), GPL-3.0-or-later for the engine's build
 kit/icons/            the apps' tile icons as SVG (render_icons.py -> apps/<app>/icon.png)
 deploy/               make-car-kit.sh/.cmd, push-to-car.sh/.ps1, mgu-app-install.sh, mainapp-patch.js
 deploy/car/           deploy-car.sh (runs on the unit) + its README
-docs/                 RHMI widget reference, screenshots (docs/screens), animations (docs/media)
+docs/                 RHMI widget reference, the emulator guide (emulator.md), screenshots
+                      (docs/screens), animations and emulator screenshots (docs/media)
 third_party/doomgeneric/  Doom's engine source (GPL-2.0) with the changes for the app (mgu.patch,
                       MGU.md) and build.sh, which builds apps/doom/doom.wasm
 ```
@@ -915,7 +924,9 @@ The repository is MIT-licensed, except two parts. The GPU renderer, `kit/renderd
 GPL-3.0-or-later (`kit/renderd/LICENSE`); the parts it took from this repository's first renderer
 stay MIT too (`kit/renderd/LICENSE.mgu-renderd`), and the controller gate in
 `kit/renderd/inputgate` is MIT. It runs as its own program, so the apps that talk to it over its
-socket stay MIT. The other is the Doom app: `apps/doom` contains `doom.wasm`, the
+socket stay MIT. The emulator's build of its draw engine, `kit/emu/wasm` and `kit/emu/web/gfx`
+(WebAssembly, section 6.4), contains its code, so it is GPL-3.0-or-later too; the rest of the
+emulator, which only feeds it the socket's bytes, stays MIT. The other is the Doom app: `apps/doom` contains `doom.wasm`, the
 [doomgeneric](https://github.com/ozkl/doomgeneric) engine (GPL-2.0) compiled to WebAssembly, so
 the app as a whole is distributed under the GPL-2.0 (`apps/doom/LICENSE`, `apps/doom/NOTICE`).
 Its complete source, with the changes made for the app, is in `third_party/doomgeneric`;

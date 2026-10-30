@@ -1,4 +1,5 @@
 // mgu-gfx.js - the head unit's GPU renderer (kit/renderd/src/gfx.c as WebAssembly, kit/emu/wasm) drawing into a canvas.
+// GPL-3.0-or-later, as kit/renderd (kit/renderd/LICENSE), like the module it loads.
 //
 //   import { createGfx } from './gfx/mgu-gfx.js';
 //   const gfx = await createGfx(canvas, { onLost });   // 1920 x 720; WebGL 2 context made here

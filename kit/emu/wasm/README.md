@@ -69,3 +69,11 @@ Against `mgu-renderd --replay` (llvmpipe), Chrome on an Apple M5 Pro (ANGLE Meta
 the kit's apps (redline, car_vitals, gforce) and IterioDev's recorded screens differ by at most
 3 of 255, mean 0.01-0.13; Doom and the pixmap / picture sessions are identical; nine mipmapped
 1024 px pictures drawn small differ by at most 11 (the GPU makes the mipmaps).
+
+## Licence
+
+GPL-3.0-or-later, as `kit/renderd` (`kit/renderd/LICENSE`): `emu_gfx.c` holds code from
+`kit/renderd/src/main.c`, and the build in `kit/emu/web/gfx` (`mgu-gfx-wasm.js`, `.wasm`, and the
+loader `mgu-gfx.js`) contains `gfx.c`, `dialect.c` and `log.c`. Their complete source is
+`kit/renderd/src` and this folder; `build.sh` rebuilds the module from it byte for byte. The parts
+from this repository's first renderer are also MIT (`kit/renderd/LICENSE.mgu-renderd`).

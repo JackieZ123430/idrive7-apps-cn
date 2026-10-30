@@ -10,6 +10,9 @@
  * idrive7-apps kit/renderd, MIT, Copyright (c) 2026 cauliflowermossgrape), without the compositor: no wayland, no
  * touch, controller, gate or video (their messages are checked as there and ignored), and embed mode is the HMI box
  * of the default config (embed_area) on the same screen.
+ *
+ * Licence: GPL-3.0-or-later, as kit/renderd, whose code this file and the build (kit/emu/web/gfx/mgu-gfx-wasm.*)
+ * contain (kit/renderd/LICENSE; the parts from the first renderer are also MIT, kit/renderd/LICENSE.mgu-renderd).
  */
 #include <GLES3/gl3.h>
 #include <emscripten.h>
