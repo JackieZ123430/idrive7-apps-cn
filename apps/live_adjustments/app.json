@@ -1,7 +1,7 @@
 {
   "id": "live_adjustments",
   "title": "Live Adjustments",
-  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. On a tuned DME (experimental): engine map switching, Max Cooling and burbles",
+  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. On a tuned DME: engine map switching, Max Cooling and burbles",
   "version": "0.1.0",
   "vendor": "custom",
   "loggingId": "OAA0",

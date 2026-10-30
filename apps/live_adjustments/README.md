@@ -10,7 +10,7 @@ BMW's own `0x2F` job on DID `0x60FD` (Bosch MG1 / DME8): `2F 60FD 03 03E8` open,
 setting is the arm switch and ships **Disarmed** (simulated, nothing is sent). Tested on one
 car with an MG1.
 
-## Tune functions — experimental
+## Tune functions
 
 Engine Map (maps 1–4), Max Cooling and Burbles are **not BMW jobs**: they are handled by
 the tuner's code inside the DME. They sit behind their own setting, *Tune functions*, which
@@ -35,11 +35,14 @@ Map and Max Cooling are offered and a press counts only when the DME echoes it b
 untuned DME refuses it and the tab says *Not available on this car*. No read-back of the
 active map is known, so the screen says *accepted*, never *confirmed*.
 
-What was checked on a car (one MG1 with MHD multi-map, over ENET from a PC, not yet from the
-app): `2F 01 01` was echoed and the engine note changed (map 2); `2F 01 02` made the check
-engine light flash (MHD's map-change indication) — the map page says that is normal. Max
-Cooling and the BM3 path have not been run on a car. None of the DIDs MHD reads
-(`22 3010/3020/3030/3031/3032/37FE/586A/4098`) changed between map 1 and map 2.
+**Validated on a car** (one MG1 with MHD multi-map): Engine Map and Max Cooling work from the
+app. Over ENET, `2F 01 01` was echoed and the engine note changed (map 2), and `2F 01 02` made
+the check engine light flash (MHD's map-change indication) — the map page says that is
+normal. None of the DIDs MHD reads (`22 3010/3020/3030/3031/3032/37FE/586A/4098`) changed
+between map 1 and map 2.
+
+**Not yet run on a car:** the BM3 path (Engine Map by read-back, Burbles). It is covered only
+by the synthetic test below.
 
 ## Build and test
 
