@@ -129,6 +129,7 @@ typedef struct client {
     uint32_t frames_shown, ticks;
     /* watchdog: an app on screen that stops talking (hung) is hidden until it talks again */
     uint64_t last_msg; int stale;
+    int layer_on;                /* the layer was last made visible (apply_visibility) */
     /* touch claims, logical px (CLAIM) */
     int nclaim; float claim[16][4];
     /* frame cap (MI_FPS): at least min_us between two frames drawn; 0 = none */
@@ -324,9 +325,18 @@ static void origin(const client *c, float *x, float *y) {
     else { *x = (float)c->x; *y = (float)c->y; }
 }
 
+static struct ivi_controller_screen *centre_screen(void);
 static void apply_visibility(client *c) {
     if (!c->cl) return;
     int on = shown(c);                                     /* never show an empty or dead surface */
+    /* shown again: the layer back on the centre screen, on top. Another renderer (the MGU Store's beside
+     * idrive7-apps') or the HMI may have set the screen's layers without it meanwhile: it was then visible
+     * but not on any screen, and the app showed a black page. */
+    if (on && !c->layer_on) {
+        struct ivi_controller_screen *scr = centre_screen();
+        if (scr) ivi_controller_screen_add_layer(scr, c->cl);
+    }
+    c->layer_on = on;
     ivi_controller_layer_set_visibility(c->cl, on);
     ivi_controller_surface_set_visibility(c->cs, on);
     ivi_controller_commit_changes(ictl);
