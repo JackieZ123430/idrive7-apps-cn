@@ -99,15 +99,51 @@ mgu.run({
             return raw * c.factor + (c.offset || 0);
         };
 
+        /*
+         * The car's display units (Vehicle.statusNewCurrentUnitsStatusExt, as BMW's x_call reads them):
+         * the TPMS sends tyre pressures as 0.1 x raw in the car's pressure unit and tyre temperatures
+         * as the car's degrees + 40. A car set to psi / deg F read 41 psi as 4.1 bar (59 psi) and
+         * 82 deg F as 82 deg C (180 deg F).
+         */
+        const carUnits = { press: null, temp: null, psiSeen: false };
+        const PRESS_UNITS = { 1: 'BAR', 2: 'KPA', 3: 'PSI' }, TEMP_UNITS = { 1: 'C', 2: 'F' };
+        const PRESS_TO_BAR = { BAR: 1, KPA: 0.01, PSI: 1 / 14.5038 };
+        const unitName = (map, v) => (map[v] || (Object.values(map).indexOf(v) >= 0 ? v : null));
         /**
-         * A tyre pressure in bar: app.json's scaling (0.1 bar per bit), else the kPa (raw 50-600) or 0.1 kPa
-         * (raw 600-6000) a car sends instead - each unit's plausible raw values lie apart, so only one fits.
+         * A tyre pressure in bar. Until the car's unit is known: each unit's plausible tyre pressures
+         * lie apart (bar 0.5-6, psi 7-60, kPa 60-600), so only one fits; psi also means deg F.
          */
         const tyreP = (raw) => {
             const v = sc('tyrePress', raw);
-            if (v === null || (v >= TYRE_P[0] && v <= TYRE_P[1])) return v;
-            const b = [0.01, 0.001].map((k) => raw * k).find((x) => x >= TYRE_P[0] && x <= TYRE_P[1]);
-            return b === undefined ? v : b;
+            if (v === null) return null;
+            const k = PRESS_TO_BAR[carUnits.press];
+            if (k) return v * k;
+            if (v >= TYRE_P[0] && v <= TYRE_P[1]) return v;
+            if (v >= 7 && v < 60) { carUnits.psiSeen = true; return v / 14.5038; }
+            if (v >= 60 && v <= 600) return v / 100;
+            return v;
+        };
+        /** A tyre temperature in deg C (the car sends deg F when it is set to Fahrenheit). */
+        const tyreT = (raw) => {
+            const v = sc('tyreTemp', raw), f = carUnits.temp ? carUnits.temp === 'F' : carUnits.psiSeen;
+            return v !== null && f ? (v - 32) * 5 / 9 : v;
+        };
+        /*
+         * g-force: an owner's car read 0.6-0.7 g idling (the sport display showed 0). At a
+         * standstill the car's acceleration is 0, so whatever an axis reads then is its offset:
+         * learned while the car stands (an average, so a door or a blip hardly counts) and taken
+         * off. Parked on a slope, the slope is zeroed too until the next stop.
+         */
+        const G0 = 9.80665, G_ZERO_MAX = 1;
+        const gZero = { gLong: { z: 0, n: 0 }, gLat: { z: 0, n: 0 } };
+        let stillSince = 0;
+        const standing = () => stillSince > 0 && Date.now() - stillSince > 2000;
+        const putG = (k, raw) => {
+            const a = sc('accel', raw);
+            if (a === null) return;
+            const g = a / G0, z = gZero[k];
+            if (standing() && Math.abs(g) <= G_ZERO_MAX) { z.n = Math.min(z.n + 1, 50); z.z += (g - z.z) / z.n; }
+            put(k, g - z.z);
         };
 
         /* ---------- live data ---------- */
@@ -199,6 +235,7 @@ mgu.run({
                 // fallback when the car sends no sport-display power: crankshaft torque x speed (engine only)
                 if (G.isNum(live.torque) && G.isNum(live.rpm)) live.powerCalc = Math.max(0, live.torque * live.rpm / 9549);
             }
+            if (k === 'speed') stillSince = v < 0.5 ? stillSince || Date.now() : 0;
             if ((k === 'rpm' || k === 'speed') && G.isNum(live.rpm) && G.isNum(live.speed)) {
                 const g = guess.feed(live.rpm, live.speed);
                 // nothing at a standstill: the guess can't tell P, N or D there (it showed "N" in park / in D)
@@ -216,12 +253,30 @@ mgu.run({
                 },
             }],
             ['de.bmw.infotainment.vehicle.CDS2', {
-                statusLongitudinalAccelerationMassCenter: (v) => put('gLong', sc('accel', v.longitudinalAccelerationCentreOfGravity) / 9.80665),
-                statusLateralAccelerationMassCenter: (v) => put('gLat', sc('accel', v.lateralAccelerationCentreOfGravity) / 9.80665),
+                statusLongitudinalAccelerationMassCenter: (v) => {
+                    logRaw('longitudinal acceleration' + (standing() ? ' (standing)' : ''), v.longitudinalAccelerationCentreOfGravity);
+                    putG('gLong', v.longitudinalAccelerationCentreOfGravity);
+                },
+                statusLateralAccelerationMassCenter: (v) => {
+                    logRaw('lateral acceleration' + (standing() ? ' (standing)' : ''), v.lateralAccelerationCentreOfGravity);
+                    putG('gLat', v.lateralAccelerationCentreOfGravity);
+                },
+            }],
+            ['de.bmw.infotainment.vehicle.Vehicle', {
+                statusNewCurrentUnitsStatusExt: (v) => {
+                    const press = unitName(PRESS_UNITS, v && v.unitOfMeasurementAirPressure), temp = unitName(TEMP_UNITS, v && v.unitOfMeasurementTemperature);
+                    if (press === carUnits.press && temp === carUnits.temp) return;
+                    carUnits.press = press; carUnits.temp = temp;
+                    log.info('car units: pressure ' + (press || '?') + ', temperature ' + (temp || '?'));
+                },
             }],
             ['de.bmw.infotainment.vehicle.Vehicle2', { statusCarSpeed2: (v) => put('speed', sc('speed', v.speedVehicleCentreOfGravity)) }],
             ['de.bmw.infotainment.drivingexcitement.FES', {
-                statusSwitchDriveDynamicSport2: (v) => { logRaw('FES boost', v.displayBoostPressure); put('boostFes', sc('boost', v.displayBoostPressure)); },
+                statusSwitchDriveDynamicSport2: (v) => {
+                    logRaw('FES boost', v.displayBoostPressure);
+                    logRaw('FES g [lat, long]', [v.displayLateralAcceleration, v.displayLongitudinalAcceleration]);
+                    put('boostFes', sc('boost', v.displayBoostPressure));
+                },
                 // the HMI's sport display: power / torque in % of the car's maximum
                 statusVehicleDynamicEngine: (v) => { put('powerPct', sc('sportPct', v.displaySportEnginePower)); put('torquePct', sc('sportPct', v.displaySportEngineTorque)); },
                 // negative = engine braking (falling rpm): shown as 0
@@ -265,10 +320,10 @@ mgu.run({
             ['de.bmw.infotainment.vehicle.TPMS', {
                 statusTyreTemperature: (v) => {
                     logRaw('tyre temperature', [v.actualValueTemperatureTyreFLH, v.actualValueTemperatureTyreFRH, v.actualValueTemperatureTyreRLH, v.actualValueTemperatureTyreRRH]);
-                    put('tFL', sc('tyreTemp', v.actualValueTemperatureTyreFLH)); put('tFR', sc('tyreTemp', v.actualValueTemperatureTyreFRH));
-                    put('tRL', sc('tyreTemp', v.actualValueTemperatureTyreRLH)); put('tRR', sc('tyreTemp', v.actualValueTemperatureTyreRRH));
+                    put('tFL', tyreT(v.actualValueTemperatureTyreFLH)); put('tFR', tyreT(v.actualValueTemperatureTyreFRH));
+                    put('tRL', tyreT(v.actualValueTemperatureTyreRLH)); put('tRR', tyreT(v.actualValueTemperatureTyreRRH));
                 },
-                // bar = 0.1 x raw, >= 65532 invalid (BMW x_call's converter); tyreP takes the other units some cars send
+                // 0.1 x raw in the car's pressure unit, >= 65532 invalid (BMW x_call's converter); tyreP makes it bar
                 statusTyrePressure: (v) => {
                     logRaw('tyre pressure', [v.actualValuePressureTyreFLH, v.actualValuePressureTyreFRH, v.actualValuePressureTyreRLH, v.actualValuePressureTyreRRH]);
                     if (v && v.actualValuePressureTyreFLH === undefined) logRaw('tyre pressure fields', Object.keys(v));
