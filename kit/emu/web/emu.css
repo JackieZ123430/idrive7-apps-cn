@@ -1,0 +1,164 @@
+:root {
+  --bg: #0b0d10; --panel: #14171c; --line: #262b33; --text: #d8dde4; --dim: #8a93a0; --accent: #3d9cff;
+  --ok: #3fbf6f; --warn: #e0a030; --err: #ff5a52;
+  --panel-w: clamp(280px, 24vw, 380px);   /* side panel width: emu-app.js PANEL_W must match */
+  --pad: 16px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body { height: 100vh; height: 100dvh; display: flex; overflow: hidden; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+@media (max-height: 520px) { :root { --pad: 8px; } }
+body.short[data-dock="bottom"] #legend { display: none; }      /* (under 420 px high: the screen gets the room) */
+
+/* where the panel docks (emu-app.js sets data-dock: the choice, or bottom where a side panel leaves the screen too small) */
+body[data-dock="right"] { flex-direction: row; }
+body[data-dock="left"] { flex-direction: row-reverse; }
+body[data-dock="bottom"] { flex-direction: column; }
+
+#main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--pad); gap: var(--pad); overflow: hidden; }
+body[data-dock="bottom"] #main { flex: none; }
+
+#panel { background: var(--panel); min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+body[data-dock="right"] #panel, body[data-dock="left"] #panel { width: var(--panel-w); flex: none; display: flex; flex-direction: column; }
+body[data-dock="right"] #panel { border-left: 1px solid var(--line); }
+body[data-dock="left"] #panel { border-right: 1px solid var(--line); }
+/* bottom: the rest of the height, scrolling on its own; sections side by side where there is room */
+body[data-dock="bottom"] #panel { flex: 1 1 auto; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); align-content: start; }
+body[data-dock="bottom"] #panel > section { border-right: 1px solid var(--line); }
+body[data-dock="bottom"] #dockbar { grid-column: 1 / -1; }
+/* auto, not 0: the panel is shorter than its rows, and the grid keeps each row at its minimum (0 would leave the log no room) */
+body[data-dock="bottom"] section.grow { min-height: auto; }
+/* the log fills its row (as tall as the tallest section beside it); its lines never make the row taller */
+body[data-dock="bottom"] #log { flex: 1 1 0px; min-height: 260px; max-height: none; }
+
+/* the centre display: 1920 x 720, scaled to fit (emu-app.js sets its width; the canvas keeps 1920 x 720 pixels) */
+#stage { position: relative; flex: none; width: 100%; aspect-ratio: 1920 / 720; background: #000; outline: none; box-shadow: 0 0 0 1px #222, 0 10px 40px #000a; border-radius: 6px; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; container-type: inline-size; }
+#stage.kbd-focus { box-shadow: 0 0 0 2px var(--accent); }
+#stage > * { position: absolute; }
+/* the HMI's own screen parts, in the screen's pixels: calc(var(--u) * n) is n px of the 1920 x 720 screen at any size */
+#stage { --u: calc(100cqw / 1920); --hmi-red: #ec5530; }
+#hmi { inset: 0; background: #000; }
+/* lines are 2 screen px drawn as gradients (a border of 2u rounds up to a whole CSS px on a small screen): the strip's at
+   y 78..80, where the app's own header line covers it in the full layout; the standard layout and the picker show it */
+#hmi-strip { left: 0; top: 0; width: 100%; height: calc(var(--u) * 80); background: linear-gradient(#ffffff30, #ffffff30) bottom / 100% calc(var(--u) * 2) no-repeat, #000; position: absolute; }
+/* everything in the strip is centred on y 39, as the app's own header text (display.js: 78 px over its line at 78) */
+.hmi-home { position: absolute; left: calc(var(--u) * 23); top: calc(var(--u) * 20); width: calc(var(--u) * 38); height: calc(var(--u) * 38); color: #fff; }
+/* over a running app (the car's Warm-Up photo): the home icon in a lighter cell with a light underline, a white
+   pull-down handle, a plain white back arrow at mid height in the app's black (display.js HMI.left 84, colEnd 530) */
+/* its underline continues the app's header line (display.js: FULL.headH 80, a 2 px line at 78..80) */
+.hmi-homecell { position: absolute; left: 0; top: 0; width: calc(var(--u) * 84); height: calc(var(--u) * 80); background: linear-gradient(#d6d6d6, #d6d6d6) bottom / 100% calc(var(--u) * 2) no-repeat, #1a1b1d; }
+#stage:not(.pk) .hmi-badge { display: none; }     /* (the car shows the profile number in its app list, not over an app) */
+.hmi-handle { position: absolute; left: calc(var(--u) * 1150); top: calc(var(--u) * 5); width: calc(var(--u) * 44); height: calc(var(--u) * 4); border-radius: calc(var(--u) * 2); background: #e8e8e8; }
+.hmi-back-app { position: absolute; left: calc(var(--u) * 30); top: calc(var(--u) * 386); width: calc(var(--u) * 19); height: calc(var(--u) * 38); color: #f2f2f2; }
+#stage.pk #screen, #stage.pk #soft { visibility: hidden; }    /* (the app is not on screen while the picker shows) */
+#stage:not(.pk) .hmi-up, #stage:not(.pk) #hmi-col, #stage.pk .hmi-homecell, #stage.pk .hmi-handle, #stage.pk .hmi-back-app { display: none; }
+.hmi-up { position: absolute; left: calc(var(--u) * 1126); top: calc(var(--u) * 30); width: calc(var(--u) * 26); height: calc(var(--u) * 15); color: var(--hmi-red); }
+.hmi-status { position: absolute; right: calc(var(--u) * 34); top: 0; height: calc(var(--u) * 78); display: flex; align-items: center; gap: calc(var(--u) * 22); color: #e4e4e4; font-size: calc(var(--u) * 24); letter-spacing: .03em; }
+.hmi-status svg { width: calc(var(--u) * 28); height: calc(var(--u) * 28); }
+.hmi-badge { border: calc(var(--u) * 2) solid #d0d0d0; border-radius: calc(var(--u) * 3); padding: 0 calc(var(--u) * 6); font-size: calc(var(--u) * 19); line-height: 1.15; font-weight: 600; }
+.hmi-name { font-weight: 500; margin-right: calc(var(--u) * 6); }
+/* text: the letters sit a little above the middle of their line box (set by eye at 2x: capitals in line with the icons) */
+.hmi-name, #hmi-clock { position: relative; top: calc(var(--u) * 0.6); }
+#hmi-clock { font-size: calc(var(--u) * 27); font-weight: 400; margin-left: calc(var(--u) * 4); }
+/* the back column: the online globe and the back arrow (display.js HMI.left 84; the app covers it below y 530) */
+#hmi-col { left: 0; top: calc(var(--u) * 80); width: calc(var(--u) * 84); bottom: 0; position: absolute; background: #1e1f22; }
+.hmi-globe { position: absolute; left: calc(var(--u) * 14); top: calc(var(--u) * 296); width: calc(var(--u) * 30); height: calc(var(--u) * 30); color: #9a9da2; }
+.hmi-back { position: absolute; left: calc(var(--u) * 56); top: calc(var(--u) * 292); width: calc(var(--u) * 19); height: calc(var(--u) * 38); color: var(--hmi-red); }
+/* the app picker: over the (hidden) app's surface; header and back column stay the HMI's (#hmi under it) */
+#picker { inset: 0; touch-action: none; }
+.pk-title { position: absolute; left: calc(var(--u) * 100); top: 0; height: calc(var(--u) * 76); line-height: calc(var(--u) * 78); font-size: calc(var(--u) * 33); color: var(--hmi-red); white-space: nowrap; pointer-events: none; }
+.pk-body { position: absolute; left: calc(var(--u) * 84); top: calc(var(--u) * 80); right: 0; bottom: 0; background: #000; overflow: hidden; }
+.pk-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: calc(var(--u) * 236); padding: calc(var(--u) * 18) calc(var(--u) * 50) calc(var(--u) * 30) calc(var(--u) * 150);   /* (columns as on the car: centres x 400 .. 1700) */ will-change: transform; }
+.pk-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--u) * 12); margin: calc(var(--u) * 8) calc(var(--u) * 16); border-radius: calc(var(--u) * 10); color: #fff; cursor: pointer; min-width: 0; }
+.pk-tile img { width: calc(var(--u) * 104); height: calc(var(--u) * 104); object-fit: contain; flex: none; -webkit-user-drag: none; }
+.pk-tile span { font-size: calc(var(--u) * 29); line-height: 1.15; text-align: center; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.pk-tile.focus { background: #ffffff12; box-shadow: inset 0 0 0 calc(var(--u) * 3) #f2f2f2; }
+.pk-tile.busy { opacity: .55; }
+.pk-bar { position: absolute; right: calc(var(--u) * 40); top: calc(var(--u) * 100); bottom: calc(var(--u) * 30); width: calc(var(--u) * 4); pointer-events: none; }
+.pk-thumb { position: absolute; left: 0; width: 100%; background: #d9d9d9; border-radius: calc(var(--u) * 2); }
+#bgimg { inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* the HMI's own image component of a canvas screen (124, 82, 1600 x 520): the software path draws there */
+#soft { left: 6.458%; top: 11.389%; width: 83.333%; height: 72.222%; }
+#screen { inset: 0; width: 100%; height: 100%; display: block; }
+#overlay { inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2cqw; padding: 4%; background: #000a; color: #fff; text-align: center; font-size: clamp(11px, 1.6cqw, 16px); pointer-events: none; overflow: hidden; }
+#overlay button { pointer-events: auto; font-size: inherit; padding: .5em 1.2em; }
+#overlay .mono { font-size: .8em; color: var(--dim); max-width: 100%; overflow-wrap: anywhere; }
+#toast.info { background: #13202e; border-color: var(--accent); color: #d6e8ff; }
+#toast { left: 50%; bottom: 4%; transform: translateX(-50%); background: #2a0e0e; border: 1px solid var(--err); color: #ffd7d4; padding: 6px 14px; border-radius: 6px; font-size: clamp(11px, 1.4cqw, 13px); max-width: 90%; }
+
+#legend { flex: none; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--dim); font-size: 12px; justify-content: center; max-width: 100%; }
+#legend span { white-space: nowrap; }
+kbd { display: inline-block; padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: #1b1f26; color: var(--text); font: 11px/16px ui-monospace, Menlo, monospace; }
+
+section { padding: 12px 14px; border-bottom: 1px solid var(--line); min-width: 0; }
+section.grow { flex: 1; display: flex; flex-direction: column; min-height: 200px; }
+h2 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); display: flex; align-items: center; justify-content: space-between; }
+.row { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; min-width: 0; }
+.dim { color: var(--dim); }
+.note { font-size: 11px; line-height: 1.35; margin: -2px 0 4px; }
+.mono { font: 12px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+button, select, input[type=number], input[type=text] { background: #1d222a; color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 4px 9px; font: inherit; max-width: 100%; }
+button { cursor: pointer; }
+button:hover { border-color: #3a414c; }
+button.small { padding: 0 6px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+button.focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+:is(button, select, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+select { text-overflow: ellipsis; }
+#app { flex: 1; min-width: 0; }
+.btns { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.btns:empty { display: none; }
+.pill { padding: 1px 8px; border-radius: 10px; background: #252a32; font-size: 12px; }
+.pill.running { background: #143322; color: #8fe0ad; }
+.pill.building, .pill.starting { background: #33290f; color: #f3cf7a; }
+.pill.build-error, .pill.exited, .pill.disconnected { background: #3a1513; color: #ffaaa4; }
+#stack { font: 12px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+#builderr { max-height: 180px; overflow: auto; background: #1f0d0d; color: #ffc9c4; border: 1px solid #5a2320; border-radius: 5px; padding: 6px 8px; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; }
+
+/* the panel's dock: a segmented radio group */
+#dockbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+#dock-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.segctl { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.segctl label { position: relative; display: flex; }
+.segctl input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.segctl .seg { display: flex; align-items: center; gap: 5px; padding: 3px 9px; color: var(--dim); font-size: 12px; border-left: 1px solid var(--line); white-space: nowrap; }
+.segctl label:first-child .seg { border-left: 0; }
+.segctl svg { width: 16px; height: 12px; flex: none; }
+.segctl input:checked + .seg { background: #1f3550; color: #fff; }
+.segctl input:focus-visible + .seg { outline: 2px solid var(--accent); outline-offset: -2px; }
+.segctl input:disabled { cursor: not-allowed; }
+.segctl input:disabled + .seg { opacity: .4; }
+#dock-hint { font-size: 11px; flex-basis: 100%; }
+
+/* one row per setting: the label takes the room its control leaves; a narrow panel wraps the control under it */
+#settings { display: flex; flex-direction: column; gap: 6px; }
+.set-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.set-row label { flex: 1 1 8em; min-width: 0; overflow-wrap: break-word; hyphens: auto; }
+.set-row select, .set-row input:not([type=checkbox]) { flex: none; margin-left: auto; max-width: 100%; min-width: 0; }
+.set-row input[type=checkbox] { flex: none; margin-left: auto; }
+
+.sigmode { gap: 14px; }
+.slider { display: grid; grid-template-columns: 64px minmax(0, 1fr) 62px; align-items: center; gap: 8px; margin: 4px 0; }
+.slider > span:last-child { text-align: right; font: 12px ui-monospace, Menlo, monospace; white-space: nowrap; }
+.slider input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); }
+.slider select { width: 100%; }
+#sliders.off { opacity: .45; }
+
+#log { flex: 1; margin: 0; overflow: auto; font: 11px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 160px; max-height: 50vh; }
+#log .warn { color: var(--warn); }
+#log .error { color: var(--err); }
+#log .debug { color: #6b7380; }
+
+/* touch screens: targets of at least 32 px */
+@media (pointer: coarse) {
+  button, select, input[type=number], input[type=text] { min-height: 36px; }
+  .segctl .seg { min-height: 36px; padding: 0 12px; }
+  .segctl svg { width: 20px; height: 15px; }
+  /* (native radios and checkboxes keep their size: their rows and labels are the 32 px targets) */
+  input[type=checkbox], input[type=radio]:not(.segctl input) { width: 20px; height: 20px; }
+  .set-row { min-height: 36px; }
+  .slider input[type=range] { height: 32px; }
+  .sigmode label, .row > label { min-height: 32px; display: inline-flex; align-items: center; gap: 6px; }
+  button.small { min-height: 32px; padding: 0 10px; }
+}

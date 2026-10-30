@@ -767,6 +767,53 @@ all and encodes a GIF (needs Docker and ffmpeg):
 kit/tools/make_gif.sh docs/media/redline.gif redline 6 6 --set coldGuard=false   # 6 s, after 6 s of demo drive
 ```
 
+### 6.4 Live emulator
+
+```sh
+node kit/tools/emu.js redline                  # -> http://localhost:8077
+node kit/tools/emu.js doom --port 8080 --bg hmi-screenshot.png
+node kit/tools/emu.js car_vitals --no-touch    # a renderer without touch routing
+```
+
+`emu.js` builds the app, runs it live with the real runtime on a stubbed head unit, and plays the
+part of the GPU renderer: the page draws every frame with the car's own draw engine
+(`kit/renderd/src/gfx.c` compiled to WebAssembly, `kit/emu/web/gfx/`) at up to 60 fps. The app
+gets its ticks, touch and controller as `mgu-render` gives them on the car, so the kit runs the
+screen itself: header tabs, slim bar, the settings sheet, scrolling. Save a file under
+`apps/<id>/` or `kit/runtime/` and the app is built and restarted while the page stays open; a
+build that fails is shown on the page, and the last good build keeps running. The server answers this
+computer only (127.0.0.1), and only pages it serves itself.
+
+| Input | Does |
+|---|---|
+| mouse on the screen | touch (a tap outside the app's claims goes to the "HMI": the home icon is HOME, the back arrow BACK) |
+| mouse wheel, `[` `]` | turn the iDrive knob |
+| `Enter` | press the knob |
+| arrow keys | push it up / right / down / left |
+| `Backspace`, `H`, `O` | BACK, HOME, open the app again |
+
+The side panel switches the app, shows the log and the renderer's numbers, changes the app's
+settings live (saved in `preview/emu/<id>/`), and feeds the vehicle signals: **Demo drive**
+(`sim.js`, setting `demo` on) or **Manual** sliders, sent as raw values (section 7) so that
+`car.js` scales them as in the car. Menu screens and the HMI's bar buttons (Doom's menu, the
+standard layout) are buttons in the panel. The panel docks left, right or at the bottom (its own control, or
+`?panel=left|right|bottom`); narrow windows put it at the bottom.
+
+BACK on the app's last screen, or HOME, leaves the app for the HMI's app list ("Installed Apps",
+drawn by the page as on the car): the app keeps running hidden, as on the car, and a rebuild keeps it
+there. Its tile opens it again; another app's tile starts that one. On the car HOME goes to the main
+menu; the app list stands in for it here.
+
+**Touch routing** (the panel's switch, or `--no-touch` at start) picks the renderer. On, as the
+Store's `mgu-render`: the kit runs the screen, with tabs and page buttons and no bar. Off, as a
+renderer without it: the kit draws the slim bar over the HMI's own buttons, as in
+[docs/screens](docs/screens); taps and the controller's focus go to those buttons, and tabs can't be tapped.
+
+Limits: of the BMW HMI only its frame around the app (home icon, back arrow, status corner) and the
+app list are drawn; its popups, main menu and own settings screen are not (the panel stands in). Frame times are your computer's GPU and CPU, not the car's. Signals come at
+20 Hz without the car's timing or gaps, and nothing answers diagnostics (UDS) or other SOME/IP
+calls. A large app such as Doom takes a few seconds to build.
+
 ---
 
 ## 7. Vehicle signals reference

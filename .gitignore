@@ -11,6 +11,10 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+.DS_Store
+/preview/
+# Claude Code's local files (launch configs, notes)
+.claude/
 kit/renderd/build/
 kit/renderd/protocol/*-protocol.c
 kit/renderd/protocol/*-client-protocol.h
