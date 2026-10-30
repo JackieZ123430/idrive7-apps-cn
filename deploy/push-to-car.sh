@@ -25,11 +25,15 @@ if [ -n "${KEY:-}" ]; then
     SSH+=(-i "$KEY" -o IdentitiesOnly=yes)
 fi
 SSH+=("$HU")
+# remote commands start with LC_ALL=C: ssh sends the Mac's LANG/LC_*, which the unit lacks ("Failed to set default locale")
 # tar over ssh: the unit's busybox has no scp/sftp server in some builds
 # apps/ is replaced, not merged: old .mgu files left there would be installed too (old, then new)
-tar czf - -C "$KIT" . | "${SSH[@]}" "mkdir -p '$DEST' && rm -rf '$DEST/apps' && tar xzf - -C '$DEST' && cd '$DEST' && md5sum -c KIT_SUMS >/dev/null && echo 'kit copied + verified'"
+# macOS tar (bsdtar) adds extended attributes (com.apple.provenance, ...) the unit's tar cannot restore
+TAR=(tar czf -)
+case $(tar --version 2>/dev/null) in *bsdtar*) TAR+=(--no-xattrs --no-mac-metadata --no-acls) ;; esac
+COPYFILE_DISABLE=1 "${TAR[@]}" -C "$KIT" . | "${SSH[@]}" "export LC_ALL=C; mkdir -p '$DEST' && rm -rf '$DEST/apps' && tar xzf - -C '$DEST' && cd '$DEST' && md5sum -c KIT_SUMS >/dev/null && echo 'kit copied + verified'"
 if [ "$CMD" = restore ]; then
-    "${SSH[@]}" -t "cd '$DEST' && sh deploy-car.sh restore"     # asks to type YES
+    "${SSH[@]}" -t "export LC_ALL=C; cd '$DEST' && sh deploy-car.sh restore"     # asks to type YES
 else
-    "${SSH[@]}" "cd '$DEST' && sh deploy-car.sh $CMD"
+    "${SSH[@]}" "export LC_ALL=C; cd '$DEST' && sh deploy-car.sh $CMD"
 fi

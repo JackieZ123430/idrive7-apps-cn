@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mgu-gfx test</title>
+<style>
+  :root { --bg: #15171a; --fg: #e8e8e8; --dim: #9aa0a6; --ok: #6c6; --bad: #e66; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; margin: 16px; }
+  .screen { width: 100%; max-width: 1920px; aspect-ratio: 1920 / 720; position: relative;
+    background: repeating-conic-gradient(#2a2d31 0 25%, #202326 0 50%) 0 0 / 32px 32px; }
+  .screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #diff { display: none; }
+  .screen.showdiff #diff { display: block; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+  label { color: var(--dim); }
+  pre { background: #0d0e10; padding: 10px; overflow: auto; white-space: pre-wrap; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+</style>
+</head>
+<body>
+<h1>mgu-gfx: gfx.c in WebGL 2</h1>
+<div class="row">
+  <label>stream <input type="file" id="fstream"></label>
+  <label>reference .pam <input type="file" id="fref"></label>
+  <button id="run">Feed all + compare</button>
+  <button id="play">Play</button>
+  <label><input type="checkbox" id="showdiff"> show difference</label>
+</div>
+<div class="screen" id="screen"><canvas id="cv" width="1920" height="720"></canvas><canvas id="diff" width="1920" height="720"></canvas></div>
+<pre id="out">loading...</pre>
+<script type="module">
+import { createGfx } from './mgu-gfx.js';
+
+const $ = (id) => document.getElementById(id);
+const out = $('out');
+const log = (s) => { out.textContent += s + '\n'; };
+const q = new URLSearchParams(location.search);
+let stream = null, ref = null;
+
+const gfx = await createGfx($('cv'));
+out.textContent = 'ready\n';
+
+// whole messages, grouped so each group ends with a FRAME (the last group may have none)
+function groups(u8) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), gs = [];
+    let start = 0, off = 0;
+    while (off + 8 <= u8.length) {
+        const type = dv.getUint32(off, true), len = dv.getUint32(off + 4, true);
+        if (off + 8 + len > u8.length) break;
+        off += 8 + len;
+        if (type === 7) { gs.push(u8.subarray(start, off)); start = off; }
+    }
+    if (off > start) gs.push(u8.subarray(start, off));
+    return gs;
+}
+
+function pam(buf) {
+    const u8 = new Uint8Array(buf), end = new TextDecoder().decode(u8.subarray(0, 200)).indexOf('ENDHDR\n') + 7;
+    const head = new TextDecoder().decode(u8.subarray(0, end)), num = (k) => +head.match(new RegExp(k + ' (\\d+)'))[1];
+    return { w: num('WIDTH'), h: num('HEIGHT'), px: u8.subarray(end) };
+}
+
+// the screen against the reference (pamdiff.py's numbers, plus the mean); a reference the size of the surface
+// (mgu-renderd --replay writes the PLACE size) is compared at the surface's place
+function compare(ref, draw = true) {
+    const s = gfx.stats(), px = gfx.readPixels(), W = 1920;
+    let ox = 0, oy = 0;
+    if (ref.w !== 1920 || ref.h !== 720) {
+        if (!s.place || s.place.w !== ref.w || s.place.h !== ref.h) return { error: `reference ${ref.w}x${ref.h}, surface ${JSON.stringify(s.place)}` };
+        ox = s.place.x; oy = s.place.y;
+    }
+    const dctx = $('diff').getContext('2d'), di = dctx.createImageData(1920, 720);
+    let n = 0, n8 = 0, big = 0, sum = 0, box = null;
+    for (let y = 0; y < ref.h; y++) for (let x = 0; x < ref.w; x++) {
+        const a = (y * ref.w + x) * 4, b = ((y + oy) * W + x + ox) * 4;
+        let d = 0;
+        for (let k = 0; k < 4; k++) { const e = Math.abs(ref.px[a + k] - px[b + k]); sum += e; if (e > d) d = e; }
+        if (!d) continue;
+        n++; if (d > 8) n8++; if (d > big) big = d;
+        box = box ? [Math.min(box[0], x), Math.min(box[1], y), Math.max(box[2], x), Math.max(box[3], y)] : [x, y, x, y];
+        const o = b; di.data[o] = 255; di.data[o + 1] = 0; di.data[o + 2] = 255; di.data[o + 3] = Math.min(255, 64 + d * 8);
+    }
+    if (draw) dctx.putImageData(di, 0, 0);
+    return { pixels: ref.w * ref.h, differ: n, differOver8: n8, maxDiff: big, meanDiff: +(sum / (ref.w * ref.h * 4)).toFixed(4), box };
+}
+
+// ?show: SHOW 1 first, for a stream recorded without one (mgu-renderd --replay draws the surface either way)
+const SHOW1 = new Uint8Array(new Uint32Array([3, 4, 1]).buffer);
+function restart() { gfx.reset(); if (q.has('show')) gfx.feed(SHOW1); }
+
+async function load(sel, url) {
+    if (!url) return null;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${sel} ${url}: HTTP ${r.status}`);
+    return new Uint8Array(await r.arrayBuffer());
+}
+
+async function run() {
+    if (!stream) return log('no stream');
+    restart();
+    const t0 = performance.now();
+    gfx.feed(stream);
+    const ms = performance.now() - t0;
+    log(`fed ${stream.length} bytes in ${ms.toFixed(1)} ms`);
+    log('stats ' + JSON.stringify(gfx.stats()));
+    if (ref) {
+        const r = compare(ref);
+        window.__result = r;
+        log('compare ' + JSON.stringify(r));
+        log(r.error ? r.error : r.maxDiff <= 8 ? 'within tolerance (max difference <= 8)' : 'differs (max difference > 8)');
+    }
+}
+
+// every frame against mgu-renderd --replay ... --raw (RGBA, the surface's size, rows top-down)
+async function compareRaw(raw) {
+    const s = gfx.stats(), w = s.place ? s.place.w : 1920, h = s.place ? s.place.h : 720, fsz = w * h * 4;
+    restart();
+    const gs = groups(stream);
+    let k = 0, worst = null;
+    for (const g of gs) {
+        gfx.feed(g);
+        if ((k + 1) * fsz > raw.length || gfx.stats().frames <= k) continue;
+        const r = compare({ w, h, px: raw.subarray(k * fsz, (k + 1) * fsz) }, false);
+        log(`frame ${k}: ${JSON.stringify(r)}`);
+        if (!worst || r.maxDiff > worst.maxDiff) worst = Object.assign({ frame: k }, r);
+        k++;
+    }
+    log(`${k} frames compared, worst: ${JSON.stringify(worst)}`);
+    window.__raw = { frames: k, worst };
+}
+
+// one FRAME a display frame, as the car would draw them
+async function play() {
+    if (!stream) return log('no stream');
+    restart();
+    const gs = groups(stream);
+    let i = 0, t = [];
+    await new Promise((done) => {
+        const step = () => {
+            if (i >= gs.length) return done();
+            const t0 = performance.now(); gfx.feed(gs[i++]); t.push(performance.now() - t0);
+            requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    });
+    t.sort((a, b) => a - b);
+    const st = gfx.stats();
+    log(`played ${gs.length} groups: feed() median ${t[t.length >> 1].toFixed(2)} ms, max ${t[t.length - 1].toFixed(2)} ms; gfx avg ${st.avgMs.toFixed(2)} ms`);
+    window.__play = { groups: gs.length, median: t[t.length >> 1], max: t[t.length - 1], stats: st };
+}
+
+$('fstream').onchange = async (e) => { stream = new Uint8Array(await e.target.files[0].arrayBuffer()); log('stream ' + stream.length + ' bytes'); };
+$('fref').onchange = async (e) => { ref = pam(await e.target.files[0].arrayBuffer()); log(`reference ${ref.w}x${ref.h}`); };
+$('run').onclick = run;
+$('play').onclick = play;
+$('showdiff').onchange = (e) => $('screen').classList.toggle('showdiff', e.target.checked);
+
+try {
+    stream = await load('stream', q.get('stream'));
+    const r = await load('ref', q.get('ref'));
+    if (r) ref = pam(r.buffer);
+    if (stream) await run();
+    const raw = await load('raw', q.get('raw'));
+    if (stream && raw) await compareRaw(raw);
+    if (stream && q.has('play')) await play();
+} catch (e) { log('error: ' + e); }
+window.__gfx = gfx;
+</script>
+</body>
+</html>
