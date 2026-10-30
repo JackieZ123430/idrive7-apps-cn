@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.16.5",
+  "version": "2.17.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -311,6 +311,22 @@
         [
           "off",
           "Hide (RWD)"
+        ]
+      ]
+    },
+    {
+      "key": "gearbox",
+      "label": "Gearbox card",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "off",
+          "Hide"
         ]
       ]
     },
@@ -703,6 +719,11 @@
       "gearRatios": [5.0, 3.2, 2.143, 1.72, 1.313, 1.0, 0.823, 0.64],
       "gearRatiosNote": "ZF 8HP, 1st..8th"
     },
+    "gearbox": {
+      "comment": "Gearbox card on the Chassis page: ZF 8HP live values from the gearbox unit (EGS, address 0x18) with UDS 0x22, read while the page is on screen, layouts from GSZFBCE revision 15.000 (idrive7-apps PR #29): DA2E actual gear and selector, DA22 converter clutch state, DA2A turbine and output shaft speed (rpm, 2 x 2 bytes signed). Read only from a unit whose SGBD identification (22 F150) is listed in sgbd; the identification goes to the log (\"gearbox unit\").",
+      "ecu": 24,
+      "sgbd": ["0F25D0"]
+    },
     "dme": {
       "comment": "Intake / fuel values from the engine unit (DME, ecu 18 = 0x12) with UDS 0x22. F4xx = the standard OBD PIDs (F40F = PID 0x0F); a candidate with \"obd\" instead of \"did\" asks for the same PID with OBD service 01 (some engine units refuse the F4xx identifiers with NRC 31). Candidates are tried in order; the first plausible one wins. value = raw * factor + offset (bar / deg C). If a tile says 'not available from this DME', add your engine's BMW-specific DID here. boost: tried in order when the sport display sends no boost (setting 'Boost from'); absolute pressure in kPa, the outside air pressure (baro) is subtracted. boostTarget / boostActual: boost pressure setpoint and actual (absolute kPa, baro subtracted), BMW DIDs first, then OBD PID 0x70; the tile only shows when the target answers. loadTarget / loadActual: requested and actual relative air charge in %. timing: OBD PID 0x0E, degrees before top dead centre. misfire: OBD service 06 monitor results (MID A2 = cylinder 1, A3 = cylinder 2 ...), tid 0C = misfires this driving cycle (0B = average of the last 10 cycles); engine units that only speak UDS are asked 0x22 F6A2... egs: gearbox temperature from the gearbox unit (EGS); give each candidate its \"ecu\".",
       "ecu": 18,
@@ -1011,6 +1032,17 @@
         "note": "set to {} to switch off; \"ecu\" to ask another unit"
       },
       "egs": [
+        {
+          "ecu": 24,
+          "did": "6000",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 160,
+          "note": "ZF 8HP (GSZFBCE) _GETRIEBEOELTEMPERATUR, deg C + 40 (idrive7-apps PR #29, read on a G22)"
+        },
         {
           "ecu": 24,
           "did": "DA12",
