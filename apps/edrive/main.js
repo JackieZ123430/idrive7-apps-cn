@@ -74,6 +74,7 @@ const RESERVE = 8;               // engine-start charge (%) until two engine sta
 // there come from speed / throttle, not from an empty battery, and the charge moves with regen: nothing
 // in this zone teaches the range, and the range counts down to its top.
 const HOLD_TOP = 11;
+const ASLEEP_MS = 10 * 60000;     // a gap this long between charge readings: the car was off meanwhile
 
 /**
  * Range of a full battery by outside temperature, for a car doing 50 km at 20 °C:
@@ -373,7 +374,9 @@ mgu.run({
         /* ---------- last charge ----------
          * A charge = the charge level rising by >= chargeMinPct while the car stands still
          * (regen while driving doesn't count). The last reading is saved, so a charge done
-         * while the head unit slept shows up as a jump at the next start. */
+         * while the head unit slept shows up as a jump at the next start: that jump counts even when
+         * the car is already moving by the first reading (the diagnostic link takes a while to come up),
+         * as readings come every few seconds while the car is on and regen never adds that much between them. */
         const chargeKwh = (from, to) => (G.isNum(live.soh) ? (to - from) / 100 * settings.get('designKwh') * live.soh / 100 : null);
         function closeSession() {
             const s = st.session;
@@ -402,7 +405,14 @@ mgu.run({
             seg.km = 0; seg.engine = G.isNum(live.rpm) && live.rpm > 400; seg.engineAll = seg.engine;
             seg.climate = live.climate; seg.climateMixed = false; seg.comfort = comfortKw();
             if (G.isNum(prev)) {
-                if (soc > prev + 0.3 && !moving) {
+                if (soc > prev + 0.3 && now - (st.lastSocT || now) > ASLEEP_MS
+                    && soc >= (st.session ? st.session.from : prev) + cfg.chargeMinPct) {
+                    // charged while the car was off (also one that began while the head unit was still awake):
+                    // the charge runs up to this reading and ended before it
+                    if (!st.session) st.session = { from: prev, fromT: st.lastSocT };
+                    st.session.to = soc; st.session.toT = now;
+                    closeSession();
+                } else if (soc > prev + 0.3 && !moving) {
                     if (!st.session) st.session = { from: prev, fromT: st.lastSocT || now };
                     st.session.to = soc; st.session.toT = now;
                     save();
