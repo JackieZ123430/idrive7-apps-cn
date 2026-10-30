@@ -5,7 +5,7 @@
  *
  *   Scan  : UDS 19 02 <mask> to all ECUs (0xDF), like BMW's own teleservice
  *           job READ_PRIMARY_DTCS; optional info memory 19 17 <mask> 01.
- *   Clear : UDS 14 FF FF FF to each control unit that reported faults
+ *   Clear : UDS 14 FF FF FF to all control units at once, then to each unit with faults that did not confirm
  *           (press twice to confirm), then scans again.
  *   Check Control: the active messages from CheckControlMaster, named via the
  *           cluster's KombiInterface_2 lists.
@@ -256,7 +256,17 @@ mgu.run({
             busy = true; phase = 'clearing'; changed();
             let ok = 0;
             const failed = [], cleared = [];
+            // first to every unit at once (functional, as the workshop tester clears): the engine, e-motor and brake
+            // units refuse the physical request (7F 14 22) with the engine off but take this one
+            let all = new Map();
+            if (!scan.demo) {
+                msg = 'Clearing all control units...'; changed();
+                try { all = await diag.functional(0x14, [0xFF, 0xFF, 0xFF], { idleMs: 5000 }); } catch (err) { log.warn('clear all: ' + err); }
+                log.info('clear all: ' + Array.from(all.values()).filter((u) => u[0] === 0x54).length + ' units cleared');
+            }
             for (const e of targets) {
+                const r = all.get(e.addr);
+                if (r && r[0] === 0x54) { ok++; cleared.push(e.addr); continue; }
                 msg = 'Clearing ' + ecuName(e.addr) + '...'; changed();
                 if (scan.demo) { await new Promise((r) => setTimeout(r, 400)); ok++; cleared.push(e.addr); continue; }
                 try {
