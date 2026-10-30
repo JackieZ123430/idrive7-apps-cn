@@ -59,7 +59,7 @@ mgu.run({
         ui.onClick('BTN_OPEN', acts.open);        // kept as a fallback if the bar button shows
         ui.onClick('BTN_CLOSE', acts.close);
         ui.onClick('BTN_OEM', acts.oem);
-        settings.on && settings.on(() => controller.refresh().then(() => loop.kick && loop.kick()));
+        settings.onChange(() => controller.refresh().then(() => loop.kick && loop.kick()));
 
         await controller.start();        // read-only: detect DME + read state, no actuation
         await render();
