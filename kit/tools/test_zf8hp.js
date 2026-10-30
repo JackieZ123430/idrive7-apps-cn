@@ -76,8 +76,21 @@ for (const r of readings) {
     reader.save();
     const loaded = new Reader(ctx);
     assert.strictEqual(loaded.records['6000'].cached, true);
-    loaded.diag = { available: true }; loaded.supported = true; loaded.checked = true;
+    loaded.diag = { available: true }; loaded.sgbd = '0F25D0'; loaded.checked = true;
     assert.strictEqual(loaded.status(), 'LINK STALE', 'A saved snapshot must not be presented as live');
+    // another variant: read only with the setting EGS variant: Try any, and marked unverified
+    let variants = 'verified';
+    const other = new Reader(Object.assign({}, ctx, { settings: { get: (k) => (k === 'variants' ? variants : 2) } })), seen = [];
+    other.diag = { available: true, p: {}, physical: async (target, sid, args) => {
+        seen.push(args);
+        return args[0] === 0xF1 ? [0x62, 0xF1, 0x50, 0x0F, 0x21, 0xE0] : [0x62, 0x60, 0x00, 100];
+    } };
+    await other.read('F150');
+    await other.read('6000');
+    assert(other.sgbd === '0F21E0' && !other.supported && seen.length === 1 && other.status() === 'OTHER EGS', 'Another variant is not read by default');
+    variants = 'any';
+    await other.read('6000');
+    assert(other.supported && other.records['6000'].values[0] === 60 && other.status() === 'LIVE · UNVERIFIED', 'Try any reads it, marked unverified');
     const hiddenReader = new Reader(ctx);
     hiddenReader.diag = reader.diag; hiddenReader.setWanted(['6000']); hiddenReader.running = true;
     let running = hiddenReader.pump(), count = calls.length;

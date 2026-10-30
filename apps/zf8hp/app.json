@@ -2,7 +2,7 @@
   "id": "zf8hp",
   "title": "Transmission Config",
   "description": "Transmission Config, experimental ZF 8HP monitor: live data, clutch fill adaptations, shift maps and temperature history",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "vendor": "custom",
   "loggingId": "OAA2",
   "iconGlyph": "8HP",
@@ -43,6 +43,22 @@
     }
   ],
   "settings": [
+    {
+      "key": "variants",
+      "label": "EGS variant",
+      "type": "choice",
+      "default": "verified",
+      "options": [
+        [
+          "verified",
+          "Verified only (0F25D0)"
+        ],
+        [
+          "any",
+          "Try any (unverified)"
+        ]
+      ]
+    },
     {
       "key": "autoRefresh",
       "label": "Refresh while visible",

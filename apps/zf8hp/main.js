@@ -264,7 +264,7 @@ mgu.run({
             }
         }
         function reference(cv, t) {
-            subtitle(cv, t, 'ZF 8HP / shift-element reference', 'Controller on this car: GSZFBCE / 0F25D0');
+            subtitle(cv, t, 'ZF 8HP / shift-element reference', 'Controller on this car: ' + (demo() ? '0F25D0' : reader.sgbd || 'not identified yet'));
             G.panel(cv, t, 24, 94, 795, 390, 'Expected applied elements / reference');
             const gs = ['R', '1', '2', '3', '4', '5', '6', '7', '8'];
             const rows = gs.map((g, i) => [{ text: g, color: i === matrixGear ? BLUE : t.text }].concat(PACKS.map((p) => C.clutchMatrix[g].indexOf(p) >= 0 ? { text: 'ON', color: BLUE } : '-')));
@@ -288,7 +288,8 @@ mgu.run({
             if (!demo() && reader.checked && !reader.supported) {
                 cv.fillRect(24, 94, 1552, 390, t.bg);
                 cv.text('This EGS variant is not supported by the verified decoder', 800, 260, 32, t.warn, { align: 'center' });
-                cv.text(reader.lastError, 800, 315, 25, t.dim, { align: 'center' });
+                cv.text('Unsupported EGS variant: ' + reader.sgbd, 800, 315, 25, t.dim, { align: 'center' });
+                cv.text('Settings: EGS variant, Try any (unverified) reads it anyway; values that don\'t fit show as errors', 800, 360, 22, t.dim, { align: 'center' });
             }
             if (message && Date.now() < messageUntil) {
                 cv.fillRect(24, 478, 1552, 37, t.bg);

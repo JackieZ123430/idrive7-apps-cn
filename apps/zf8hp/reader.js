@@ -6,6 +6,8 @@ const C = require('./catalog');
 const E = require('./egs');
 const { Diag, parseDtcReply } = require('./kit/diag');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// the EGS identification (22 F150) the decoders were checked on; others are read only with the setting EGS variant: Try any
+const VERIFIED = '0F25D0';
 
 // Every request made by this reader is fixed to EGS and to a read service.
 // No reset, diagnostic session change, DTC clear, adaptation write or actuator command.
@@ -13,7 +15,7 @@ class Reader {
     constructor(ctx) {
         this.ctx = ctx;
         this.records = {};
-        this.supported = false;
+        this.sgbd = null;
         this.checked = false;
         this.busy = false;
         this.current = '';
@@ -31,7 +33,7 @@ class Reader {
         this.snapshotFile = path.join(ctx.dataDir, 'egs-snapshot.json');
         try {
             const old = JSON.parse(fs.readFileSync(this.snapshotFile, 'utf8'));
-            if (old.sgbd === '0F25D0' && old.records) Object.keys(old.records).forEach((k) => {
+            if (old.sgbd && old.records) Object.keys(old.records).forEach((k) => {
                 const r = old.records[k];
                 if (C.records[k] && r && Array.isArray(r.values)) this.records[k] = Object.assign({}, r, { cached: true });
             });
@@ -67,9 +69,9 @@ class Reader {
             this.lastError = '';
             if (did === 'F150') {
                 this.checked = true;
-                this.supported = got.raw === '0F25D0';
+                this.sgbd = got.raw;
                 if (!this.supported) this.lastError = 'Unsupported EGS variant: ' + got.raw;
-                this.ctx.log.info('EGS identification ' + got.raw + ', supported=' + this.supported);
+                this.ctx.log.info('EGS identification ' + got.raw + ', verified=' + this.verified + ', read=' + this.supported);
             }
             if (!this.logged) this.logged = {};
             if (!this.logged[did]) {
@@ -103,7 +105,7 @@ class Reader {
     }
 
     save() {
-        const data = { format: 1, sgbd: '0F25D0', savedAt: Date.now(), records: this.records };
+        const data = { format: 1, sgbd: this.sgbd, savedAt: Date.now(), records: this.records };
         try {
             fs.writeFileSync(this.snapshotFile + '.tmp', JSON.stringify(data));
             fs.renameSync(this.snapshotFile + '.tmp', this.snapshotFile);
@@ -137,11 +139,17 @@ class Reader {
         }
     }
 
+    /** The identified EGS is the one the decoders were checked on. */
+    get verified() { return this.sgbd === VERIFIED; }
+    /** Read it: verified, or another identified variant with the setting EGS variant: Try any. Every record is still
+     * checked against its identifier and exact length, so a different layout shows as an error, not as numbers. */
+    get supported() { return this.verified || (!!this.sgbd && this.ctx.settings.get('variants') === 'any'); }
+
     status() {
         if (!this.diag || !this.diag.available) return 'NO LINK';
         if (!this.checked) return 'IDENTIFYING';
         if (!this.supported) return 'OTHER EGS';
-        return Date.now() - this.lastGood > 12000 ? 'LINK STALE' : 'LIVE';
+        return Date.now() - this.lastGood > 12000 ? 'LINK STALE' : this.verified ? 'LIVE' : 'LIVE · UNVERIFIED';
     }
 }
 
