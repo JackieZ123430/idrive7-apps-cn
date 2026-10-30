@@ -122,6 +122,14 @@ More in [How apps draw](#44-how-apps-draw-remote-hmi-rhmi) and [`kit/renderd`](k
 <td><img src="docs/screens/live_adjustments.png" alt="Live Adjustments, exhaust flap open"><br><b>Live Adjustments</b>: exhaust flap open, closed or handed back to the car (OEM), state read back from the DME</td>
 <td><img src="docs/screens/live_adjustments_closed.png" alt="Live Adjustments, exhaust flap closed"><br><b>Live Adjustments</b>: flap closed, the selected mode in red; more adjustments can be added as tabs</td>
 </tr>
+<tr>
+<td><img src="docs/screens/live_adjustments_map.png" alt="Live Adjustments, engine map"><br><b>Live Adjustments</b> (experimental, tuned DME): engine map 1–4 with one press; the DME echoes the request back</td>
+<td><img src="docs/screens/live_adjustments_cooling.png" alt="Live Adjustments, Max Cooling"><br><b>Live Adjustments</b> (experimental, tuned DME): Max Cooling on / off</td>
+</tr>
+<tr>
+<td><img src="docs/screens/live_adjustments_map_readback.png" alt="Live Adjustments, engine map read back"><br><b>Live Adjustments</b> (experimental, tuned DME): engine map confirmed by reading it back from the DME</td>
+<td><img src="docs/screens/live_adjustments_burbles.png" alt="Live Adjustments, burbles"><br><b>Live Adjustments</b> (experimental, tuned DME): burble aggression 0–12 picked with – / +, sent on Apply and read back; Off</td>
+</tr>
 </table>
 
 <sub>Every animation is recorded offline from the app's built-in demo drive through the engine's

@@ -1,7 +1,9 @@
 'use strict';
 /**
- * Live Adjustments - native live tweaks for the BMW MGU (iDrive 7). First adjustment:
- * Exhaust Flap (the app's single page/tab for now), room for more later.
+ * Live Adjustments - native live tweaks for the BMW MGU (iDrive 7), one tab each:
+ *   Exhaust Flap - BMW's own 0x60FD on the DME (controller.js + adapters), always there;
+ *   Engine Map / Max Cooling / Burbles - only on a tuned DME, detected while "Tune
+ *   functions" is Armed (tune.js). The screen never names the tune.
  *
  * Exhaust Flap modes: OEM (hand the flap back to the DME), OPEN (request it open) and
  * CLOSE (request it shut) — the bottom action buttons. The command leaves the app only
@@ -17,6 +19,13 @@ const G = require('./kit/gauges');
 const { Canvas } = require('./kit/canvas');
 const UI = require('./ui');
 const { Controller } = require('./controller');
+const { TuneControl } = require('./tune');
+
+/** The tabs this car gets: Exhaust Flap always, the tune's pages once it is detected. */
+function pagesFor(f) {
+    return ['Exhaust Flap'].concat(f.map ? ['Engine Map'] : [], f.cooling ? ['Max Cooling'] : [],
+        f.burbles ? ['Burbles'] : []);
+}
 
 // eased valve angle toward the current state (0 = shut, 1 = open)
 function targetAngle(v) {
@@ -31,13 +40,27 @@ mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
         const controller = new Controller(ctx);
+        const tune = new TuneControl(ctx);
         let angle = 0.18;
+        let page = 'Exhaust Flap';          // by name: the tune's tabs come and go with detection
 
         // the three mode presses, each kicks a repaint (used by both the HMI bar and
         // the on-canvas buttons the kit draws when the app owns the screen)
         const press = (mode) => () =>
             Promise.resolve(controller.setMode(mode)).then(() => loop && (loop.kick ? loop.kick() : render())).catch((e) => log.error('action', e));
-        const acts = { oem: press('OEM'), open: press('OPEN'), close: press('CLOSED') };
+        const repaint = () => (loop && loop.kick ? loop.kick() : render());
+        // a tune action: repaint at once (shows "Sending…"), then again with the DME's answer
+        const tuneAct = (fn) => () => { const p = fn(); repaint(); return p.then(repaint).catch((e) => log.error('tune', e)); };
+        const acts = {
+            oem: press('OEM'), open: press('OPEN'), close: press('CLOSED'),
+            map: (n) => tuneAct(() => tune.setMap(n)),
+            cooling: (on) => tuneAct(() => tune.setCooling(on)),
+            aggDown: () => { tune.stepAggression(-0.5); repaint(); },
+            aggUp: () => { tune.stepAggression(0.5); repaint(); },
+            burblesApply: tuneAct(() => tune.applyBurbles(false)),
+            burblesOff: tuneAct(() => tune.applyBurbles(true)),
+        };
+        const pages = () => pagesFor(tune.features());
 
         const render = async () => {
             const v = controller.view();
@@ -45,6 +68,11 @@ mgu.run({
             angle += (tgt - angle) * 0.25;            // simple ease per frame
             if (Math.abs(tgt - angle) < 0.003) angle = tgt;
             v.angle = angle;
+            const list = pages();
+            if (list.indexOf(page) < 0) page = list[0];   // a tab that went away (disarmed / not detected)
+            v.pages = list;
+            v.page = page;
+            v.tune = tune.view();
             const t = ctx.theme();
             const cv = ctx.canvas(UI.W, UI.H) || new Canvas(UI.W, UI.H);
             UI.draw(cv, G, t, v, acts);           // acts → the kit draws OEM/OPEN/CLOSE, active one red
@@ -59,9 +87,12 @@ mgu.run({
         ui.onClick('BTN_OPEN', acts.open);        // kept as a fallback if the bar button shows
         ui.onClick('BTN_CLOSE', acts.close);
         ui.onClick('BTN_OEM', acts.oem);
-        settings.onChange(() => controller.refresh().then(() => loop.kick && loop.kick()));
+        ui.onClick('BTN_PAGE', () => { const l = pages(); page = l[(l.indexOf(page) + 1) % l.length]; return render(); });
+        ctx.onTab((i) => { const l = pages(); if (l[i]) page = l[i]; return render(); });
+        settings.onChange(() => controller.refresh().then(() => tune.refresh()).then(() => loop.kick && loop.kick()));
 
         await controller.start();        // read-only: detect DME + read state, no actuation
+        await tune.start(controller.link);   // nothing at all unless "Tune functions" is Armed
         await render();
         log.info('exhaust_control ready (source=' + controller.source + ', adapter=' + controller.adapter.name + ')');
     },
