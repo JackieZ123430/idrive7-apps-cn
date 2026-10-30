@@ -1,6 +1,6 @@
 'use strict';
 /**
- * ui.js - the Engine Menu screens, a PURE draw(cv, G, t, v) so it
+ * ui.js - the Engine Config screens, a PURE draw(cv, G, t, v) so it
  * renders both on the car (main.js) and in the PC preview harness.
  *
  * House style of the other apps: an "Exhaust Flap" title with the M→white underline up

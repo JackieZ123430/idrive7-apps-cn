@@ -26,7 +26,6 @@ class Demo {
             tRL: 60 + 35 * warm + 8 * pull, tRR: 61 + 36 * warm + 8 * pull,
             pFL: 2.3 + 0.25 * warm, pFR: 2.3 + 0.24 * warm, pRL: 2.45 + 0.3 * warm, pRR: 2.1 + 0.28 * warm,
             ptFL: 2.5, ptFR: 2.5, ptRL: 2.7, ptRR: 2.7,
-            zf: { gear: String(gear + 2), sel: 'D', tcc: pull > 0.3 ? 'Locked' : 'Slipping', turbine: rpm, output: rpm / [3.2, 2.143, 1.72, 1.313][gear] },
             awd: pull > 0.9 ? '_4WD_ALTERNATIV' : '_4WD_STANDARD', awdQual: 'FUNKTION_VERFUEGBAR_AKTIV',
         };
     }

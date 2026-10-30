@@ -10,8 +10,6 @@
  *             config.dme), intake air above outside temperature
  *   (thermal also: gearbox temperature from the EGS when config.dme.egs has a source)
  *   chassis - friction circle (g-g diagram), tyre pressures + temperatures, xDrive split
- *   transmission - ZF 8HP gear, converter clutch, shaft speeds from the gearbox unit (config.gearbox);
- *             setting Auto shows it once a listed gearbox unit has answered
  *
  * Signals come straight from the car over SOME/IP (see app.json "signals").
  * With no car attached (the VM, or the unit on the bench) demo data can drive
@@ -28,7 +26,7 @@ const { Diag } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
 
 const W = 1600, H = 520;
-const PAGES = ['engine', 'thermal', 'fuel', 'chassis', 'transmission'];
+const PAGES = ['engine', 'thermal', 'fuel', 'chassis'];
 const FUEL = ['iat', 'hpfp', 'lpfp', 'timing', 'boostCtl', 'load'];   // engine unit values read fast on the Fuel & ignition page
 /** Target-vs-actual pairs on the Fuel & ignition page: read together, [target, actual] keys of config.dme. */
 const PAIR = { boostCtl: ['boostTarget', 'boostActual'], load: ['loadTarget', 'loadActual'] };
@@ -348,42 +346,7 @@ mgu.run({
         const rd = new DidReader(link, { ecu: dme.ecu });
         // xDrive front axle torque from the transfer case unit (config.xdrive), read while the Chassis page is on screen
         const xcfg = Object.assign({ front: [], gearRatios: [] }, (ctx.spec.config && ctx.spec.config.xdrive) || {});
-        let chassisSeen = 0, lmvAt = 0, transSeen = 0;
-        /*
-         * Transmission page: ZF 8HP live values from the gearbox unit (config.gearbox), read while the
-         * page is on screen and only from a unit whose identification is listed (layouts of that software).
-         * zfId: its SGBD identification (null = not asked yet, '' = the unit refused it).
-         */
-        const zcfg = Object.assign({ ecu: 24, sgbd: [] }, (ctx.spec.config && ctx.spec.config.gearbox) || {});
-        let zfId = null, zfAt = 0;
-        const zfOk = () => zfId !== null && zcfg.sgbd.indexOf(zfId) >= 0;
-        const ZF_GEAR = { 0: 'P', 1: 'R', 2: 'N', 3: '1', 4: '2', 5: '3', 6: '4', 7: '5', 8: '6', 9: '7', 16: '8' };
-        const ZF_SEL = { 0: 'P', 1: 'R', 2: 'N', 3: 'D', 4: 'M' };
-        const ZF_TCC = { 0: 'Open', 1: 'Slipping', 2: 'Slipping', 3: 'Locked', 4: 'Locked', 8: 'Opening', 9: 'Closing', 10: 'Closing', 11: 'Locking', 12: 'Locking' };
-        /** One 0x22 read from the gearbox unit: the data bytes of a reply of exactly n bytes, else null. */
-        async function zfRead(did, n) {
-            const id = parseInt(did, 16);
-            const u = await link.physical(zcfg.ecu, 0x22, [id >> 8, id & 0xFF], 1800,
-                (b) => (b[0] === 0x62 && b[1] === id >> 8 && b[2] === (id & 0xFF)) || (b[0] === 0x7F && b[1] === 0x22));
-            if (u && u[0] === 0x7F && did === 'F150') return [];
-            return u && u[0] === 0x62 && (n == null || u.length === 3 + n) ? u.slice(3) : null;
-        }
-        async function readZf() {
-            if (zfId === null) {
-                const b = await zfRead('F150');
-                if (!b) { fuelFail.zf = (fuelFail.zf || 0) + 1; return; }
-                zfId = b.map((x) => (x < 16 ? '0' : '') + x.toString(16)).join('').toUpperCase();
-                log.info('gearbox unit: ' + (zfId || 'no identification') + (zfOk() ? '' : ', not in config.gearbox.sgbd: no transmission values'));
-            }
-            if (!zfOk()) return;
-            const g = await zfRead('DA2E', 2), c = await zfRead('DA22', 2), sp = await zfRead('DA2A', 4);
-            if (!g && !c && !sp) { fuelFail.zf = (fuelFail.zf || 0) + 1; return; }
-            fuelFail.zf = 0;
-            const s16 = (b, i) => { const v = (b[i] << 8) | b[i + 1]; return v >= 32768 ? v - 65536 : v; };
-            live.zf = { gear: g ? ZF_GEAR[g[0]] || null : null, sel: g ? ZF_SEL[g[1]] || null : null,
-                tcc: c ? ZF_TCC[s16(c, 0)] || null : null, turbine: sp ? s16(sp, 0) : null, output: sp ? s16(sp, 2) : null };
-            zfAt = Date.now(); lastCar = zfAt;
-        }
+        let chassisSeen = 0, lmvAt = 0;
         const fuelT = {}, fuelFail = {}, fuelTry = {};
         let fuelSeen = 0, engineSeen = 0, fuelTimer = null, fuelBusy = false, fuelLast = 0;
         let baro = 101.3, baroT = 0;                                       // outside air pressure, kPa
@@ -474,21 +437,17 @@ mgu.run({
             // transfer case: only on the Chassis page with the xDrive card shown, and only while the car's own split is missing
             const onChassis = now - chassisSeen < 1500 && xcfg.front.length > 0 && settings.get('xdrive') !== 'off'
                 && !(G.isNum(live.splitRear) && now - splitAt < SPLIT_STALE);
-            const onTrans = now - transSeen < 1500 && (zfId === null || zfOk());
-            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : onChassis ? ['lmv'] : onTrans ? ['zf'] : null;
-            // the gearbox unit is identified in the background, so Auto knows whether to show the Transmission page
-            const zfFind = zfId === null && settings.get('transmission') !== 'off';
+            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : onChassis ? ['lmv'] : null;
             // misfire counts change slowly: every 4th fast round on its page (~2 s), every slow round otherwise
             pollFuel.n = (pollFuel.n || 0) + 1;
             const misNow = want('misfire') && (!fast || (onFuelPage && pollFuel.n % 4 === 0));
             try {
                 if (link.available) {
-                    const keys = (fast || FUEL.filter(want).concat(needBoost ? ['boost'] : [], needOil ? ['oil'] : [], want('egs') ? ['egs'] : [], zfFind ? ['zf'] : [])).concat(misNow ? ['misfire'] : []);
+                    const keys = (fast || FUEL.filter(want).concat(needBoost ? ['boost'] : [], needOil ? ['oil'] : [], want('egs') ? ['egs'] : [])).concat(misNow ? ['misfire'] : []);
                     for (const k of keys) {
                         if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
                         fuelTry[k] = Date.now();
                         if (k === 'lmv') { await readLmv(); continue; }
-                        if (k === 'zf') { await readZf(); continue; }
                         const v = k === 'boost' ? await readBoost() : k === 'misfire' ? await readMisfire() : PAIR[k] ? await readPair(k) : await rd.value(k, dme[k]);
                         if (k === 'egs' || k === 'timing') { const c = dme[k][rd.pick[k] || 0], r = c && rd.raws[rd.key(c)]; if (r) logRaw(k === 'egs' ? 'EGS' : 'timing', r.bytes || r.why); }
                         // the first replies of the target / actual identifiers go to the log, to check their scaling
@@ -544,22 +503,13 @@ mgu.run({
         /* ---------- drawing ---------- */
         let page = PAGES.indexOf(settings.get('page'));
         if (page < 0) page = 0;
-        const NAMES = { engine: 'Engine', thermal: 'Thermals', fuel: 'Fuel & ignition', chassis: 'Chassis', transmission: 'Transmission' };
-        /** The pages with tabs: Transmission only with a listed gearbox unit (Auto), or set to Show. */
-        const shownPages = () => PAGES.filter((p) => p !== 'transmission' || settings.get('transmission') === 'on'
-            || (settings.get('transmission') !== 'off' && (zfOk() || usingDemo())));
-        /** The page on screen: the chosen one, or Chassis while the chosen one is hidden. */
-        const curPage = () => (shownPages().indexOf(PAGES[page]) >= 0 ? PAGES[page] : 'chassis');
-        /** Next / previous shown page. */
-        const step = (d) => { const vis = shownPages(), i = vis.indexOf(curPage()); page = PAGES.indexOf(vis[(i + d + vis.length) % vis.length]); };
         const trail = [];
 
         const GO = '#2fd27a';
 
         /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t) {
-            const vis = shownPages();
-            G.frame(cv, t, vis.map((p) => NAMES[p]), vis.indexOf(curPage()), [usingDemo() && { text: 'DEMO' }]);
+            G.frame(cv, t, ['Engine', 'Thermals', 'Fuel & ignition', 'Chassis'], page, [usingDemo() && { text: 'DEMO' }]);
         }
 
         /** Power in kW: { kw, calc } (calc = estimated from torque x rpm, no sport-display data). */
@@ -839,30 +789,6 @@ mgu.run({
             }
         }
 
-        /** Transmission: ZF 8HP gear with the selector, converter clutch, turbine and output shaft speeds. */
-        function drawTransmission(cv, t) {
-            transSeen = Date.now();
-            kickFuel();
-            const z = (usingDemo() ? data().zf : Date.now() - zfAt < 5000 ? live.zf : null) || {};
-            const h = G.BOTTOM - G.TOP;
-            G.panel(cv, t, 24, G.TOP, 500, h, 'Gear');
-            const gear = /^[1-8]$/.test(z.gear || '') && /^[DM]$/.test(z.sel || '') ? z.sel + z.gear : z.gear || z.sel || '--';
-            cv.text(gear, 274, G.TOP + 300, 220, z.gear || z.sel ? t.text : t.dim, { align: 'center', font: 'bold' });
-            if (!usingDemo() && !zfOk()) cv.text(transWhy(), 274, G.TOP + h - 30, 22, t.dim, { align: 'center' });
-            G.panel(cv, t, 548, G.TOP, 500, h, 'Converter clutch');
-            cv.text(z.tcc || '--', 798, G.TOP + 250, 72, z.tcc ? t.text : t.dim, { align: 'center', font: 'bold' });
-            G.panel(cv, t, 1072, G.TOP, 504, h, 'Shaft speeds');
-            [['Turbine', z.turbine], ['Output', z.output]].forEach(([label, v], i) =>
-                G.readout(cv, t, 1096, G.TOP + 90 + i * 170, { label, value: v, decimals: 0, unit: 'rpm', size: 88 }));
-        }
-        /** Why the Transmission page has no values. */
-        function transWhy() {
-            if (!link.p) return 'no diagnostic link';
-            if (!link.available) return 'diagnostic link down';
-            if (zfId === null) return 'reading the gearbox unit...';
-            return 'gearbox unit ' + (zfId || 'without identification') + ': not a known ZF 8HP';
-        }
-
         /** Top-down car with each tyre's pressure (against the car's target) and temperature (when shown). */
         function drawTyres(cv, t, x, y, w, h, d) {
             const temps = shown('tyreTemp');
@@ -899,15 +825,15 @@ mgu.run({
         async function render() {
             const t = ctx.theme(), d = data();
             const cv = ctx.canvas(W, H).clear(t.bg);
-            ({ engine: drawEngine, thermal: drawThermal, fuel: drawFuel, chassis: drawChassis, transmission: drawTransmission })[curPage()](cv, t, d);
+            [drawEngine, drawThermal, drawFuel, drawChassis][page](cv, t, d);
             header(cv, t);
             if (!render.n) { render.n = 1; log.info('first frame drawn'); }
             await ui.image('MAIN_GFX', cv);
         }
 
-        ui.onClick('BTN_PAGE', () => { step(1); return render(); });
-        ui.onClick('BTN_PREV', () => { step(-1); return render(); });
-        ctx.onTab((i) => { const p = shownPages()[i]; if (p) page = PAGES.indexOf(p); return render(); });
+        ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; return render(); });
+        ui.onClick('BTN_PREV', () => { page = (page + PAGES.length - 1) % PAGES.length; return render(); });
+        ctx.onTab((i) => { page = i; return render(); });
         // every screen refresh (60 fps) with the GPU renderer; 10 fps in software (PNG frames)
         ctx.loop('MAIN', 10, render);
         settings.onChange((k) => {

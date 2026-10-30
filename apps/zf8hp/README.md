@@ -1,4 +1,4 @@
-# ZF 8HP — experimental
+# Transmission Config (ZF 8HP) — experimental
 
 **Experimental prototype for iDrive 7.** Manual smoke testing has been reported
 on one G22. Compatibility with other controllers or firmware has not been
