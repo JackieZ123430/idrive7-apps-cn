@@ -118,6 +118,10 @@ More in [How apps draw](#44-how-apps-draw-remote-hmi-rhmi) and [`kit/renderd`](k
 <td><img src="docs/screens/edrive2.png" alt="eDrive battery page"><br><b>eDrive</b>: HV battery power now, regen / drive against the battery's limits, drive totals</td>
 <td><img src="docs/screens/edrive2_battery.png" alt="eDrive battery page"><br><b>eDrive</b>: cell temperatures and voltages, coolant, power the battery allows</td>
 </tr>
+<tr>
+<td><img src="docs/screens/live_adjustments.png" alt="Live Adjustments, exhaust flap open"><br><b>Live Adjustments</b>: exhaust flap open, closed or handed back to the car (OEM), state read back from the DME</td>
+<td><img src="docs/screens/live_adjustments_closed.png" alt="Live Adjustments, exhaust flap closed"><br><b>Live Adjustments</b>: flap closed, the selected mode in red; more adjustments can be added as tabs</td>
+</tr>
 </table>
 
 <sub>Every animation is recorded offline from the app's built-in demo drive through the engine's
