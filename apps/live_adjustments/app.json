@@ -1,8 +1,8 @@
 {
   "id": "live_adjustments",
   "title": "Live Adjustments",
-  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM (hand back to the DME), OPEN and CLOSE the flap over the car's own diagnostic link, with per-DME adapters",
-  "version": "0.0.2",
+  "description": "Live Adjustments for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. On a tuned DME: engine map switching, Max Cooling and burbles",
+  "version": "0.1.0",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",
@@ -35,6 +35,10 @@
           "OEM"
         ],
         [
+          "BTN_PAGE",
+          "Next page"
+        ],
+        [
           "BTN_SETTINGS",
           "Settings"
         ]
@@ -55,6 +59,22 @@
         [
           "on",
           "Armed · actuates the real valve"
+        ]
+      ]
+    },
+    {
+      "key": "tune",
+      "label": "Tune functions",
+      "type": "choice",
+      "default": "off",
+      "options": [
+        [
+          "off",
+          "Disarmed · nothing is sent (safe)"
+        ],
+        [
+          "on",
+          "Armed · map, cooling and burbles on a tuned DME"
         ]
       ]
     },
@@ -118,5 +138,8 @@
         ]
       ]
     }
-  ]
+  ],
+  "config": {
+    "bm3MarkerAddress": "807FFE50"
+  }
 }
