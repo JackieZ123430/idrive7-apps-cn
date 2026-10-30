@@ -45,15 +45,14 @@ body[data-dock="bottom"] #log { flex: 1 1 0px; min-height: 260px; max-height: no
 #hmi-strip { left: 0; top: 0; width: 100%; height: calc(var(--u) * 80); background: linear-gradient(#ffffff30, #ffffff30) bottom / 100% calc(var(--u) * 2) no-repeat, #000; position: absolute; }
 /* everything in the strip is centred on y 39, as the app's own header text (display.js: 78 px over its line at 78) */
 .hmi-home { position: absolute; left: calc(var(--u) * 23); top: calc(var(--u) * 20); width: calc(var(--u) * 38); height: calc(var(--u) * 38); color: #fff; }
-/* over a running app (the car's Warm-Up photo): the home icon in a lighter cell with a light underline, a white
-   pull-down handle, a plain white back arrow at mid height in the app's black (display.js HMI.left 84, colEnd 530) */
+/* over a running app (the car's Warm-Up photo): the home icon in a lighter cell with a light underline, and a plain
+   white back arrow at mid height in the app's black (display.js HMI.left 84, colEnd 530) */
 /* its underline continues the app's header line (display.js: FULL.headH 80, a 2 px line at 78..80) */
 .hmi-homecell { position: absolute; left: 0; top: 0; width: calc(var(--u) * 84); height: calc(var(--u) * 80); background: linear-gradient(#d6d6d6, #d6d6d6) bottom / 100% calc(var(--u) * 2) no-repeat, #1a1b1d; }
 #stage:not(.pk) .hmi-badge { display: none; }     /* (the car shows the profile number in its app list, not over an app) */
-.hmi-handle { position: absolute; left: calc(var(--u) * 1150); top: calc(var(--u) * 5); width: calc(var(--u) * 44); height: calc(var(--u) * 4); border-radius: calc(var(--u) * 2); background: #e8e8e8; }
 .hmi-back-app { position: absolute; left: calc(var(--u) * 30); top: calc(var(--u) * 386); width: calc(var(--u) * 19); height: calc(var(--u) * 38); color: #f2f2f2; }
 #stage.pk #screen, #stage.pk #soft { visibility: hidden; }    /* (the app is not on screen while the picker shows) */
-#stage:not(.pk) .hmi-up, #stage:not(.pk) #hmi-col, #stage.pk .hmi-homecell, #stage.pk .hmi-handle, #stage.pk .hmi-back-app { display: none; }
+#stage:not(.pk) .hmi-up, #stage:not(.pk) #hmi-col, #stage.pk .hmi-homecell, #stage.pk .hmi-back-app { display: none; }
 .hmi-up { position: absolute; left: calc(var(--u) * 1126); top: calc(var(--u) * 30); width: calc(var(--u) * 26); height: calc(var(--u) * 15); color: var(--hmi-red); }
 .hmi-status { position: absolute; right: calc(var(--u) * 34); top: 0; height: calc(var(--u) * 78); display: flex; align-items: center; gap: calc(var(--u) * 22); color: #e4e4e4; font-size: calc(var(--u) * 24); letter-spacing: .03em; }
 .hmi-status svg { width: calc(var(--u) * 28); height: calc(var(--u) * 28); }

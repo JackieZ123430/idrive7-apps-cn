@@ -16,7 +16,7 @@ node kit/tools/emu.js redline          # then open http://localhost:8077
 | Option | Does |
 |---|---|
 | `--port 8080` | another port (default 8077); several emulators can run at the same time |
-| `--bg hmi.png` | a 1920 x 720 picture under the app, e.g. a photo of your HMI |
+| `--bg hmi.png` | a 1920 x 720 screenshot of your head unit's screen, shown instead of the HMI frame the page draws: it shows where the app leaves the screen see-through (the home and back column, the status corner). A photo of the screen does not line up |
 | `--no-touch` | start with touch routing off (see [Touch routing](#touch-routing)) |
 
 The server answers this computer only (127.0.0.1), and only pages it serves itself, because it
