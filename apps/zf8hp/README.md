@@ -7,7 +7,10 @@ established. The app displays an EXPERIMENTAL badge on every page.
 An independent iDrive 7 app for the verified GSZFBCE / SGBD `0F25D0` controller
 on the G22. It reads EGS `0x18` through the MGU's InternalTasu service, without
 an ENET cable after installation. A different EGS identification stops data
-polling before these decoders are applied.
+polling before these decoders are applied, unless the setting *EGS variant* is
+*Try any (unverified)*: it is then read with the same decoders and marked LIVE · UNVERIFIED.
+Each record must still match its identifier and exact length, so a layout that differs shows as
+an error.
 
 Pages: live oil and electronics temperatures, shaft and engine speeds, gear
 and converter-clutch state; A–E fill-pressure and fast-fill-time corrections
