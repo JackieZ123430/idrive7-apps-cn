@@ -29,3 +29,19 @@ dtc_scanner_*.json
 # Doom: Freedoom data is downloaded by the build (app.json "assets")
 apps/doom/*.wad
 kit/tools/.font-cache/
+
+# Local vehicle diagnostics and build packages (packages contain the owner's SDK)
+/work/
+/captures/
+/backups/
+*.mgu
+*.tgz
+*.pcap
+*.pcapng
+*.dlt
+*.log
+*.core
+/kit/renderd/core
+/apps/bm3_live/data/
+/apps/zf8hp/data/
+egs-snapshot*.json

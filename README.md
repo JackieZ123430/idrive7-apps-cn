@@ -171,7 +171,16 @@ the unit and kept across reboots.
 | **Doom** | Freedoom: Phase 1 (four episodes, free game data) running in the head unit as WebAssembly. The engine draws the 3D view in full resolution across the whole screen (1920 x 504, Doom's vertical field of view widened to the screen), with the status bar, menus and messages on top at 4:3; 35 fps on the VM. A main menu (Play / Continue, New game, all settings) comes first; the game then has the screen to itself with no header or button bar, and BACK returns to the menu. **Turn the controller to aim, push it to walk and sidestep, press to fire and open doors, press twice for the next weapon.** While you play, the game has the controller to itself: the HMI ignores the knob, press and tilt, so pushing forward no longer opens the HMI's pull-down menu and pushing left no longer leaves the game. BACK, MENU and the touchscreen always work. This uses the controller gate that `deploy-car.sh` loads into the HMI (see [5.1](#51-what-deploy-carsh-install-does)). Without the gate, the game reads the controller signal itself and the HMI reacts to it too. It pauses when you leave the screen or a popup / call covers it, and saves itself each time, so it carries on where you stopped. Settings, in the main menu: difficulty, episode, move speed (slow walk by default, walk, run), aim speed and direction, render resolution (full / medium / low). GPL-2.0, see [Doom licences](#doom-licences). **Parked only** by default: the game saves and waits while the car drives (setting *Parked only*, can be turned off). |
 | **Live Adjustments** | Live tweaks on one page, starting with **Exhaust Flap**: Open the flap, Close it, or hand control back to the car (OEM), shown as the twin tailpipes opening and closing with the big state word. **Safe by default** — the *Exhaust Flap* setting ships **Disarmed** (simulated, touches nothing); set it to **Armed** only after you have validated the command on your own car. When armed and a matching DME is detected, it drives the electric exhaust flap over the car's own diagnostic link (UDS `2F 60FD` "EL_AGK", Bosch MG1 / DME8 as used by B48 / B58 / S58 on MGU ID7; OPEN 10 %, CLOSE 90 %, OEM hands control back and the DME self-times the override in ~20 s). The command was confirmed on a real car; other DME variants are unverified, so each owner arms it themselves. Room for more adjustments as tabs later. |
 
-On the VM or a bench unit without vehicle data, every app switches to a built-in demo drive
+**Experimental apps:** [BM3 Live](apps/bm3_live/README.md) adds BM3 CustomROM map,
+exhaust-valve, ASD and burble controls; [ZF 8HP](apps/zf8hp/README.md) reads clutch
+adaptations, shift maps, temperature history and live transmission data. Both
+have only limited G22 smoke testing and display an EXPERIMENTAL badge. BM3 Live
+sends DME control/write requests; ZF 8HP is read-only and requires the verified
+EGS variant. Read each app's compatibility notes before use. BM3 Live's local
+preview never sends commands; ZF 8HP's synthetic demo is explicit and off by
+default.
+
+The driving dashboards switch to a built-in demo drive on the VM or a bench unit without vehicle data
 after 5 seconds (launch, pull through the gears, a hard stop, corners, an engine warming up from
 cold). A **DEMO** badge shows when the data isn't from the car.
 
