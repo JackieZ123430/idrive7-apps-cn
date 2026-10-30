@@ -2,7 +2,7 @@
   "id": "zf8hp",
   "title": "ZF 8HP",
   "description": "Experimental transmission monitor: live data, clutch fill adaptations, shift maps and temperature history",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "vendor": "custom",
   "loggingId": "OAA2",
   "iconGlyph": "8HP",
@@ -104,6 +104,22 @@
         [
           "skip",
           "Skip downshifts"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature",
+      "type": "choice",
+      "default": "C",
+      "options": [
+        [
+          "C",
+          "Celsius"
+        ],
+        [
+          "F",
+          "Fahrenheit"
         ]
       ]
     },
