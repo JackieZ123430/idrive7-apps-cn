@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.17.0",
+  "version": "2.18.0",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -97,6 +97,10 @@
         [
           "chassis",
           "Chassis"
+        ],
+        [
+          "transmission",
+          "Transmission"
         ]
       ]
     },
@@ -311,22 +315,6 @@
         [
           "off",
           "Hide (RWD)"
-        ]
-      ]
-    },
-    {
-      "key": "gearbox",
-      "label": "Gearbox card",
-      "type": "choice",
-      "default": "auto",
-      "options": [
-        [
-          "auto",
-          "Auto"
-        ],
-        [
-          "off",
-          "Hide"
         ]
       ]
     },
@@ -720,7 +708,7 @@
       "gearRatiosNote": "ZF 8HP, 1st..8th"
     },
     "gearbox": {
-      "comment": "Gearbox card on the Chassis page: ZF 8HP live values from the gearbox unit (EGS, address 0x18) with UDS 0x22, read while the page is on screen, layouts from GSZFBCE revision 15.000 (idrive7-apps PR #29): DA2E actual gear and selector, DA22 converter clutch state, DA2A turbine and output shaft speed (rpm, 2 x 2 bytes signed). Read only from a unit whose SGBD identification (22 F150) is listed in sgbd; the identification goes to the log (\"gearbox unit\").",
+      "comment": "Transmission page: ZF 8HP live values from the gearbox unit (EGS, address 0x18) with UDS 0x22, read while the page is on screen, layouts from GSZFBCE revision 15.000 (idrive7-apps PR #29): DA2E actual gear and selector, DA22 converter clutch state, DA2A turbine and output shaft speed (rpm, 2 x 2 bytes signed). Read only from a unit whose SGBD identification (22 F150) is listed in sgbd; the identification goes to the log (\"gearbox unit\").",
       "ecu": 24,
       "sgbd": ["0F25D0"]
     },

@@ -9,8 +9,8 @@
  *             timing, misfires per cylinder (read from the DME over UDS / OBD, see
  *             config.dme), intake air above outside temperature
  *   (thermal also: gearbox temperature from the EGS when config.dme.egs has a source)
- *   chassis - friction circle (g-g diagram), tyre pressures + temperatures, xDrive split,
- *             ZF 8HP gear / converter clutch / shaft speeds from the gearbox unit (config.gearbox)
+ *   chassis - friction circle (g-g diagram), tyre pressures + temperatures, xDrive split
+ *   transmission - ZF 8HP gear, converter clutch, shaft speeds from the gearbox unit (config.gearbox)
  *
  * Signals come straight from the car over SOME/IP (see app.json "signals").
  * With no car attached (the VM, or the unit on the bench) demo data can drive
@@ -27,7 +27,7 @@ const { Diag } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
 
 const W = 1600, H = 520;
-const PAGES = ['engine', 'thermal', 'fuel', 'chassis'];
+const PAGES = ['engine', 'thermal', 'fuel', 'chassis', 'transmission'];
 const FUEL = ['iat', 'hpfp', 'lpfp', 'timing', 'boostCtl', 'load'];   // engine unit values read fast on the Fuel & ignition page
 /** Target-vs-actual pairs on the Fuel & ignition page: read together, [target, actual] keys of config.dme. */
 const PAIR = { boostCtl: ['boostTarget', 'boostActual'], load: ['loadTarget', 'loadActual'] };
@@ -347,9 +347,9 @@ mgu.run({
         const rd = new DidReader(link, { ecu: dme.ecu });
         // xDrive front axle torque from the transfer case unit (config.xdrive), read while the Chassis page is on screen
         const xcfg = Object.assign({ front: [], gearRatios: [] }, (ctx.spec.config && ctx.spec.config.xdrive) || {});
-        let chassisSeen = 0, lmvAt = 0;
+        let chassisSeen = 0, lmvAt = 0, transSeen = 0;
         /*
-         * Gearbox card: ZF 8HP live values from the gearbox unit (config.gearbox), read while the Chassis
+         * Transmission page: ZF 8HP live values from the gearbox unit (config.gearbox), read while the
          * page is on screen and only from a unit whose identification is listed (layouts of that software).
          * zfId: its SGBD identification (null = not asked yet, '' = the unit refused it).
          */
@@ -372,7 +372,7 @@ mgu.run({
                 const b = await zfRead('F150');
                 if (!b) { fuelFail.zf = (fuelFail.zf || 0) + 1; return; }
                 zfId = b.map((x) => (x < 16 ? '0' : '') + x.toString(16)).join('').toUpperCase();
-                log.info('gearbox unit: ' + (zfId || 'no identification') + (zfOk() ? '' : ', not in config.gearbox.sgbd: no gearbox card'));
+                log.info('gearbox unit: ' + (zfId || 'no identification') + (zfOk() ? '' : ', not in config.gearbox.sgbd: no transmission values'));
             }
             if (!zfOk()) return;
             const g = await zfRead('DA2E', 2), c = await zfRead('DA22', 2), sp = await zfRead('DA2A', 4);
@@ -473,8 +473,8 @@ mgu.run({
             // transfer case: only on the Chassis page with the xDrive card shown, and only while the car's own split is missing
             const onChassis = now - chassisSeen < 1500 && xcfg.front.length > 0 && settings.get('xdrive') !== 'off'
                 && !(G.isNum(live.splitRear) && now - splitAt < SPLIT_STALE);
-            const chassis = (onChassis ? ['lmv'] : []).concat(now - chassisSeen < 1500 && settings.get('gearbox') !== 'off' && (zfId === null || zfOk()) ? ['zf'] : []);
-            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : chassis.length ? chassis : null;
+            const onTrans = now - transSeen < 1500 && (zfId === null || zfOk());
+            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : onChassis ? ['lmv'] : onTrans ? ['zf'] : null;
             // misfire counts change slowly: every 4th fast round on its page (~2 s), every slow round otherwise
             pollFuel.n = (pollFuel.n || 0) + 1;
             const misNow = want('misfire') && (!fast || (onFuelPage && pollFuel.n % 4 === 0));
@@ -547,7 +547,7 @@ mgu.run({
 
         /** G20-style frame: tab bar with the page names along the top. */
         function header(cv, t) {
-            G.frame(cv, t, ['Engine', 'Thermals', 'Fuel & ignition', 'Chassis'], page, [usingDemo() && { text: 'DEMO' }]);
+            G.frame(cv, t, ['Engine', 'Thermals', 'Fuel & ignition', 'Chassis', 'Transmission'], page, [usingDemo() && { text: 'DEMO' }]);
         }
 
         /** Power in kW: { kw, calc } (calc = estimated from torque x rpm, no sport-display data). */
@@ -796,53 +796,52 @@ mgu.run({
             // xDrive column and tyre card when shown; the g-force card takes the space of hidden ones
             const xd = settings.get('xdrive');
             const showAwd = xd === 'on' || (xd !== 'off' && (awdSeen || usingDemo()));
-            const showBox = settings.get('gearbox') !== 'off' && (zfOk() || usingDemo());
-            const showTyres = shown('tyres'), right = showAwd || showBox ? 1196 : 1576;
+            const showTyres = shown('tyres'), right = showAwd ? 1196 : 1576;
             const gw = showTyres ? 480 : right - 24;
             G.panel(cv, t, 24, G.TOP, gw, G.BOTTOM - G.TOP, 'G-force');
             G.gmeter(cv, t, 24 + gw / 2, 258, 164, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
             if (showTyres) drawTyres(cv, t, 528, G.TOP, right - 528, G.BOTTOM - G.TOP, d);
-            // right column: xDrive and the gearbox, one above the other when both are shown
-            const half = (G.BOTTOM - G.TOP - 16) / 2;
-            if (showAwd) drawAwd(cv, t, 1220, G.TOP, 356, showBox ? half : G.BOTTOM - G.TOP, d);
-            if (showBox) drawGearbox(cv, t, 1220, showAwd ? G.BOTTOM - half : G.TOP, 356, showAwd ? half : G.BOTTOM - G.TOP,
-                usingDemo() ? d.zf : Date.now() - zfAt < 5000 ? live.zf : null);
+            if (showAwd) {
+                const ax = 1220, aw = 356;
+                G.panel(cv, t, ax, G.TOP, aw, G.BOTTOM - G.TOP, 'xDrive');
+                const AWD = { _4WD_STANDARD: '4WD', _4WD_ALTERNATIV: '4WD Sport', _2WD: '2WD', AWDSAND: 'Sand' };
+                const mode = AWD[d.awd] || '--';
+                const hot = d.awdQual === 'FUNKTION_NICHT_VERFUEGBAR_FEHLER';
+                cv.text(mode, ax + 24, 160, 52, hot ? t.crit : t.text, { font: 'bold' });
+                if (hot) cv.text('DERATED / OFF', ax + 24, 196, 22, t.crit, { font: 'bold', spacing: 1.5 });
+                const sp = xdriveSplit(d), rear = sp.rear;
+                G.bar(cv, t, ax + 24, 262, aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
+                G.bar(cv, t, ax + 24, 392, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
+                // where the split came from when it isn't the car's own torque split
+                // under the mode: front axle torque and where the split came from, when it isn't the car's own
+                const note = G.isNum(sp.nm) ? 'front ' + G.fmt(TQ(sp.nm), 0) + ' ' + tqU() + ' (transfer case)'
+                    : sp.from ? 'from ' + sp.from : !G.isNum(rear) ? 'car sends no torque split' : '';
+                if (note) cv.text(note, ax + 24, 232, 20, t.dim);
+            }
         }
 
-        /** xDrive mode and torque split; a short card (beside the gearbox) has the rear share only. */
-        function drawAwd(cv, t, ax, ay, aw, ah, d) {
-            const short = ah < 300;
-            G.panel(cv, t, ax, ay, aw, ah, 'xDrive');
-            const AWD = { _4WD_STANDARD: '4WD', _4WD_ALTERNATIV: '4WD Sport', _2WD: '2WD', AWDSAND: 'Sand' };
-            const mode = AWD[d.awd] || '--';
-            const hot = d.awdQual === 'FUNKTION_NICHT_VERFUEGBAR_FEHLER';
-            cv.text(mode, ax + 24, ay + (short ? 100 : 116), short ? 40 : 52, hot ? t.crit : t.text, { font: 'bold' });
-            if (hot) cv.text('DERATED / OFF', ax + aw - 24, ay + (short ? 100 : 152), 22, t.crit, { font: 'bold', spacing: 1.5, align: short ? 'right' : 'left' });
-            const sp = xdriveSplit(d), rear = sp.rear;
-            G.bar(cv, t, ax + 24, ay + (short ? 118 : 218), aw - 48, 80, { label: 'Rear', value: rear, unit: '%', ramp: 'hot' });
-            if (!short) G.bar(cv, t, ax + 24, ay + 348, aw - 48, 80, { label: 'Front', value: G.isNum(rear) ? 100 - rear : null, unit: '%', ramp: 'hot' });
-            // front axle torque and where the split came from, when it isn't the car's own
-            const note = G.isNum(sp.nm) ? 'front ' + G.fmt(TQ(sp.nm), 0) + ' ' + tqU() + ' (transfer case)'
-                : sp.from ? 'from ' + sp.from : !G.isNum(rear) ? 'car sends no torque split' : '';
-            if (note) cv.text(note, ax + 24, short ? ay + ah - 14 : ay + 188, 20, t.dim);
-        }
-
-        /** ZF 8HP: gear with the selector, converter clutch, turbine and output shaft speeds. */
-        function drawGearbox(cv, t, x, y, w, h, z) {
-            const short = h < 300;
-            G.panel(cv, t, x, y, w, h, 'Gearbox');
-            z = z || {};
+        /** Transmission: ZF 8HP gear with the selector, converter clutch, turbine and output shaft speeds. */
+        function drawTransmission(cv, t) {
+            transSeen = Date.now();
+            kickFuel();
+            const z = (usingDemo() ? data().zf : Date.now() - zfAt < 5000 ? live.zf : null) || {};
+            const h = G.BOTTOM - G.TOP;
+            G.panel(cv, t, 24, G.TOP, 500, h, 'Gear');
             const gear = /^[1-8]$/.test(z.gear || '') && /^[DM]$/.test(z.sel || '') ? z.sel + z.gear : z.gear || z.sel || '--';
-            cv.text(gear, x + 24, y + (short ? 132 : 150), short ? 76 : 96, z.gear || z.sel ? t.text : t.dim, { font: 'bold' });
-            cv.text(z.tcc ? 'Converter ' + z.tcc.toLowerCase() : 'Converter --', x + w - 24, y + (short ? 82 : 100), 22, z.tcc ? t.text : t.dim, { align: 'right' });
-            const rows = [['Turbine', z.turbine], ['Output', z.output]];
-            rows.forEach(([label, v], i) => {
-                const ry = short ? y + 176 + i * 34 : y + 230 + i * 110;
-                if (short) {
-                    cv.text(label, x + 24, ry, 22, t.dim);
-                    cv.text((G.isNum(v) ? G.fmt(v, 0) : '--') + ' rpm', x + w - 24, ry, 26, G.isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
-                } else G.readout(cv, t, x + 24, ry, { label, value: v, decimals: 0, unit: 'rpm', size: 56 });
-            });
+            cv.text(gear, 274, G.TOP + 300, 220, z.gear || z.sel ? t.text : t.dim, { align: 'center', font: 'bold' });
+            if (!usingDemo() && !zfOk()) cv.text(transWhy(), 274, G.TOP + h - 30, 22, t.dim, { align: 'center' });
+            G.panel(cv, t, 548, G.TOP, 500, h, 'Converter clutch');
+            cv.text(z.tcc || '--', 798, G.TOP + 250, 72, z.tcc ? t.text : t.dim, { align: 'center', font: 'bold' });
+            G.panel(cv, t, 1072, G.TOP, 504, h, 'Shaft speeds');
+            [['Turbine', z.turbine], ['Output', z.output]].forEach(([label, v], i) =>
+                G.readout(cv, t, 1096, G.TOP + 90 + i * 170, { label, value: v, decimals: 0, unit: 'rpm', size: 88 }));
+        }
+        /** Why the Transmission page has no values. */
+        function transWhy() {
+            if (!link.p) return 'no diagnostic link';
+            if (!link.available) return 'diagnostic link down';
+            if (zfId === null) return 'reading the gearbox unit...';
+            return 'gearbox unit ' + (zfId || 'without identification') + ': not a known ZF 8HP';
         }
 
         /** Top-down car with each tyre's pressure (against the car's target) and temperature (when shown). */
@@ -881,7 +880,7 @@ mgu.run({
         async function render() {
             const t = ctx.theme(), d = data();
             const cv = ctx.canvas(W, H).clear(t.bg);
-            [drawEngine, drawThermal, drawFuel, drawChassis][page](cv, t, d);
+            [drawEngine, drawThermal, drawFuel, drawChassis, drawTransmission][page](cv, t, d);
             header(cv, t);
             if (!render.n) { render.n = 1; log.info('first frame drawn'); }
             await ui.image('MAIN_GFX', cv);
