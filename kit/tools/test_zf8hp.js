@@ -4,7 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, '..', '..');
 const E = require(path.join(root, 'apps/zf8hp/egs'));
 const C = require(path.join(root, 'apps/zf8hp/catalog'));
 // Stage only the three reader sources and the transport helper. No SDK or build is needed.

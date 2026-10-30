@@ -24,12 +24,16 @@ mgu.run({
         const protocol = new Bm3Protocol(diag, profiles, ctx.spec.config || {});
         let page = 0, map = null;
         let busy = false, lastValve = null, lastAsd = null, burbles = null, targetAgg = 1.5;
-        let note = preview ? 'Local preview. No car commands are sent.' : 'Checking DME and BM3 ROM';
+        // the "Car commands" setting is the arm switch: Disarmed (default) sends nothing to the car
+        const armed = () => ctx.settings.get('arm') === 'on';
+        const DISARMED = 'Disarmed: nothing is sent to the car. Arm it in Settings to use it on your car.';
+        let note = preview ? 'Local preview. No car commands are sent.' : !armed() ? DISARMED : 'Checking DME and BM3 ROM';
         let noteType = 'dim', version = 0, drawn = -1, loop;
         const changed = () => { version++; if (loop) loop.kick(); };
 
         async function connect() {
-            if (preview || busy || !diag.available) return;
+            if (preview || busy || !armed()) return;
+            if (!diag.available) { note = 'Waiting for the diagnostic link'; noteType = 'warn'; changed(); return; }
             busy = true; note = 'Verifying DME and BM3 CustomROM'; noteType = 'dim'; changed();
             try {
                 await protocol.identify();
@@ -48,8 +52,14 @@ mgu.run({
                 log.warn('BM3 identification: ' + note);
             } finally { busy = false; changed(); }
         }
-        diag.on('available', (on) => { if (on) connect(); else { protocol.profile = null; protocol.rom = null; burbles = null; note = 'Diagnostic link unavailable'; noteType = 'warn'; changed(); } });
+        diag.on('available', (on) => { if (on) connect(); else if (armed()) { protocol.profile = null; protocol.rom = null; burbles = null; note = 'Diagnostic link unavailable'; noteType = 'warn'; changed(); } });
         setTimeout(connect, 600);
+        ctx.settings.onChange((key) => {
+            if (key !== 'arm' || preview) return;
+            if (armed()) { note = 'Checking DME and BM3 ROM'; noteType = 'dim'; changed(); connect(); return; }
+            protocol.profile = null; protocol.rom = null; map = null; burbles = null;
+            note = DISARMED; noteType = 'dim'; changed();
+        });
 
         async function perform(index) {
             if (busy) return;
@@ -60,6 +70,7 @@ mgu.run({
                 noteType = 'dim'; changed(); return;
             }
             if (preview) { note = 'Preview only. No command sent.'; noteType = 'dim'; changed(); return; }
+            if (!armed()) { note = DISARMED; noteType = 'warn'; changed(); return; }
             busy = true;
             const label = ACTIONS[page][index];
             note = 'Sending ' + label + '...'; noteType = 'dim'; changed();
@@ -101,6 +112,8 @@ mgu.run({
         }
         ui.onClick('BTN_PAGE', () => select((page + 1) % MENU.length));
         ui.onClick('BTN_PREV', () => select((page + MENU.length - 1) % MENU.length));
+        // full-screen layout: the kit shows the pages as header tabs (and leaves out the page buttons)
+        ctx.onTab((i) => i !== page && select(i));
         ['BTN_A', 'BTN_B', 'BTN_C', 'BTN_D'].forEach((id, i) => ui.onClick(id, () => perform(i)));
 
         function card(cv, t, x, y, w, h, title, subtitle, active) {
@@ -146,11 +159,11 @@ mgu.run({
             const t = ctx.theme(), cv = ctx.canvas(W, H).clear(t.bg);
             content(cv, t);
             G.frame(cv, t, ['Maps', 'Valve', 'ASD', 'Burbles'], page,
-                [{ text: 'EXPERIMENTAL', color: t.warn }, preview && { text: 'PREVIEW' }]);
+                [{ text: 'EXPERIMENTAL', color: t.warn }, preview ? { text: 'PREVIEW' } : !armed() && { text: 'DISARMED' }]);
             await ui.image('MAIN_GFX', cv);
         }
         select(0);
-        loop = ctx.loop('MAIN', 5, () => render(false));
+        loop = ctx.loop('MAIN', 5, () => render(true));
         await render(true);
     },
 });

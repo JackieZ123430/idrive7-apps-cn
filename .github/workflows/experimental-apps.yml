@@ -6,18 +6,18 @@ on:
       - 'apps/bm3_live/**'
       - 'apps/zf8hp/**'
       - 'kit/runtime/diag.js'
-      - 'tools/test_bm3_live.js'
-      - 'tools/test_zf8hp.js'
-      - 'tools/test_diag_options.js'
+      - 'kit/tools/test_bm3_live.js'
+      - 'kit/tools/test_zf8hp.js'
+      - 'kit/tools/test_diag_options.js'
       - '.github/workflows/experimental-apps.yml'
   push:
     paths:
       - 'apps/bm3_live/**'
       - 'apps/zf8hp/**'
       - 'kit/runtime/diag.js'
-      - 'tools/test_bm3_live.js'
-      - 'tools/test_zf8hp.js'
-      - 'tools/test_diag_options.js'
+      - 'kit/tools/test_bm3_live.js'
+      - 'kit/tools/test_zf8hp.js'
+      - 'kit/tools/test_diag_options.js'
       - '.github/workflows/experimental-apps.yml'
 
 permissions:
@@ -31,6 +31,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node tools/test_bm3_live.js
-      - run: node tools/test_zf8hp.js
-      - run: node tools/test_diag_options.js
+      - run: node kit/tools/test_bm3_live.js
+      - run: node kit/tools/test_zf8hp.js
+      - run: node kit/tools/test_diag_options.js

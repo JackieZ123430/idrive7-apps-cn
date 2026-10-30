@@ -2,9 +2,9 @@
   "id": "zf8hp",
   "title": "ZF 8HP",
   "description": "Experimental transmission monitor: live data, clutch fill adaptations, shift maps and temperature history",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "vendor": "custom",
-  "loggingId": "OAZF",
+  "loggingId": "OAA2",
   "iconGlyph": "8HP",
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {

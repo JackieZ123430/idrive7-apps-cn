@@ -63,7 +63,7 @@ Build and checks:
 
 ```sh
 python3 kit/tools/build.py zf8hp
-node tools/test_zf8hp.js
+node kit/tools/test_zf8hp.js
 node kit/tools/preview.js dist/zf8hp work/zf8hp-preview render BTN_PAGE render
 ```
 

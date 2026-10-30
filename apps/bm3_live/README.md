@@ -22,7 +22,11 @@ vehicle identifiers or account credentials. Listed profiles are not a claim
 that every ROM has been tested. `config.bm3MarkerAddress` is a separate,
 firmware-dependent marker location; the default has only limited validation.
 
-This app **sends DME control/write requests** when an action button is pressed.
+This app **sends DME control/write requests** when an action button is pressed
+and it is armed. **Safe by default:** the *Car commands* setting ships
+**Disarmed**, and then nothing at all is sent to the car (no identification,
+no map, valve, ASD or burble command). Set it to **Armed** in Settings only
+after reading these notes.
 Map changes and burble overrides are verified by memory readback. Burble
 aggression uses a negative, scaled value repeated over a 24-byte timing table;
 the duration setting is not changed. Individual aggression steps and firmware
@@ -48,7 +52,7 @@ Protocol tests use a synthetic ROM and an in-memory mock DME; no SDK, vehicle
 connection, account or capture file is needed:
 
 ```sh
-node tools/test_bm3_live.js
+node kit/tools/test_bm3_live.js
 ```
 
 Vehicle captures, logs, installed app data and SDK-bearing packages are local

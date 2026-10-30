@@ -175,7 +175,7 @@ the unit and kept across reboots.
 exhaust-valve, ASD and burble controls; [ZF 8HP](apps/zf8hp/README.md) reads clutch
 adaptations, shift maps, temperature history and live transmission data. Both
 have only limited G22 smoke testing and display an EXPERIMENTAL badge. BM3 Live
-sends DME control/write requests; ZF 8HP is read-only and requires the verified
+sends DME control/write requests once armed (its *Car commands* setting ships Disarmed); ZF 8HP is read-only and requires the verified
 EGS variant. Read each app's compatibility notes before use. BM3 Live's local
 preview never sends commands; ZF 8HP's synthetic demo is explicit and off by
 default.

@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const { Diag } = require('../kit/runtime/diag');
+const { Diag } = require('../runtime/diag');
 const log = { info() {}, warn() {} };
 
 (async () => {

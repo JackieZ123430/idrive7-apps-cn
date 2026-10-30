@@ -2,9 +2,9 @@
   "id": "bm3_live",
   "title": "BM3 Live",
   "description": "Experimental BM3 CustomROM map, exhaust valve, Active Sound Design and burble controls",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "vendor": "custom",
-  "loggingId": "OA9F",
+  "loggingId": "OAA1",
   "iconGlyph": "BM3",
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
@@ -23,10 +23,12 @@
       ["BTN_A", "Map 1"],
       ["BTN_B", "Map 2"],
       ["BTN_C", "Map 3"],
-      ["BTN_D", "Map 4"]
+      ["BTN_D", "Map 4"],
+      ["BTN_SETTINGS", "Settings"]
     ]
   }],
   "settings": [
+    {"key":"arm","label":"Car commands","type":"choice","default":"off","options":[["off","Disarmed \u00b7 nothing is sent to the car (safe)"],["on","Armed \u00b7 sends commands to the DME"]]},
     {"key":"theme","label":"Colour theme","type":"choice","default":"m_tricolour","options":[["m_tricolour","M Tricolour"],["m_red","M Red"],["ice","Ice White"],["amber","Night Amber"]]},
     {"key":"layout","label":"Screen layout","type":"choice","default":"full","options":[["full","Full screen"],["standard","Standard"]]},
     {"key":"renderer","label":"Renderer","type":"choice","default":"auto","options":[["auto","GPU"],["software","Software"]]}

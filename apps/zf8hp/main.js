@@ -62,6 +62,8 @@ mgu.run({
         }
 
         ui.onClick('BTN_PAGE', () => { page = (page + 1) % PAGES.length; wanted(); });
+        // full-screen layout: the kit shows the pages as header tabs (and leaves out the page button)
+        ctx.onTab((i) => { if (i !== page) { page = i; wanted(); } });
         ui.onClick('BTN_SELECT', () => {
             if (page === 0) graphMetric = (graphMetric + 1) % 3;
             if (page === 1) pack = (pack + 1) % 5;
