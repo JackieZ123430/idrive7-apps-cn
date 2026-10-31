@@ -3,6 +3,7 @@
 const locale = require('./locale.json');
 const dict = locale.strings || {};
 const language = locale.language || 'en';
+const localizedValues = new Set(Object.values(dict));
 const cache = new Map();
 function getLanguage() { return language; }
 const folded = Object.create(null);
@@ -17,6 +18,7 @@ function t(value) {
     if (s.trim() === 'rpm') return s; // preserve the physical unit; uppercase RPM headings may translate
     if (cache.has(s)) return cache.get(s);
     const key = s.trim();
+    if (localizedValues.has(key)) return s;
     let out;
     if (Object.prototype.hasOwnProperty.call(dict, key)) {
         out = s.slice(0, s.indexOf(key)) + dict[key] + s.slice(s.indexOf(key) + key.length);

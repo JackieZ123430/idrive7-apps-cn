@@ -34,6 +34,13 @@ async function main(){
  for(const ch of CREDIT+Object.values(catalog).join(''))assert(f.glyphs[ch.codePointAt(0)],'missing Chinese glyph '+ch);
  const cv=new Canvas(800,120),r=new Recorder(800,120),opts={font:'bold'};
  if(chinese){
+  assert.strictEqual(t(t('eDrive')),t('eDrive'),'localized app titles must not be translated twice');
+  assert.strictEqual(t('RANGE AT THIS RATE'),'按当前能耗估算续航');
+  assert.strictEqual(t('Engine Config'),'发动机配置');
+  assert.strictEqual(t('Transmission Config'),'变速箱配置');
+  assert.strictEqual(t('Max Cooling ON'),'最大冷却 开启');
+  assert.strictEqual(t('64 cells'),'64 个单元格','map cells are not battery cells');
+  assert.strictEqual(t('up'),'升挡','translate stored shift groups only at display time');
   for(const bits of [0x01,0x80,0x04,0x08,0]){
    const label=statusInfo(bits).label;assert.notStrictEqual(t(label),label,'untranslated DTC status '+label);
   }

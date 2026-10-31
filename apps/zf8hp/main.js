@@ -3,6 +3,8 @@
 const mgu = require('./kit/mgu');
 const G = require('./kit/gauges');
 const { withAlpha, mix } = require('./kit/canvas');
+const { fitText } = require('./kit/text-layout');
+const { t: translate, getLanguage } = require('./kit/i18n');
 const C = require('./catalog');
 const E = require('./egs');
 const Reader = require('./reader');
@@ -18,9 +20,11 @@ const signed = (v, digits) => E.finite(v) ? (v > 0 ? '+' : '') + n(v, digits) : 
 function age(rec) {
     if (!rec || !rec.at) return 'not read';
     const seconds = Math.max(0, Math.round((Date.now() - rec.at) / 1000));
-    return (rec.cached ? 'saved ' : rec.error ? 'last good ' : '') + (seconds < 60 ? seconds + 's' : seconds < 3600 ? Math.floor(seconds / 60) + 'm' : Math.floor(seconds / 3600) + 'h') + ' ago';
+    return (rec.cached ? translate('saved') + ' ' : rec.error ? translate('last good') + ' ' : '')
+        + (seconds < 60 ? seconds + translate('s ago') : seconds < 3600 ? Math.floor(seconds / 60) + translate('m ago') : Math.floor(seconds / 3600) + translate('h ago'));
 }
 function fit(cv, s, max, size) {
+    if (getLanguage() === 'zh-CN') return fitText(cv, String(s || ''), size, max);
     s = String(s || '');
     while (s.length > 4 && cv.textWidth(s, size) > max) s = s.slice(0, -4) + '..';
     return s;
@@ -174,7 +178,7 @@ mgu.run({
         function shifts(cv, t) {
             const xs = maps(), familyLabel = /cold/.test(family()) ? 'Cold KF' + family().slice(-1) : 'KF' + family();
             const first = Math.floor(shift / 7) * 7;
-            subtitle(cv, t, 'Shift adaptation / ' + familyLabel + ' / ' + settings.get('shiftGroup'), 'View / refresh: open selected map');
+            subtitle(cv, t, 'Shift adaptation / ' + familyLabel + ' / ' + translate(settings.get('shiftGroup')), 'View / refresh: open selected map');
             G.panel(cv, t, 24, 94, 1552, 382, 'Per-shift map summary / ' + (first + 1) + '-' + Math.min(first + 7, xs.length) + ' of ' + xs.length);
             const rows = xs.slice(first, first + 7).map((s, i) => {
                 const m = E.mapValues(records(), s, family()), z = E.summary(m.values);
