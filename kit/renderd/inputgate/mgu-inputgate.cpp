@@ -12,6 +12,10 @@
 // it every ~200 ms while a connected app asks for the controller (M_GRAB). App closed, crashed or
 // renderer gone -> the file goes stale and the HMI has the controller back within GATE_MS.
 // Afterwards the knob position carries on from where the HMI last saw it (no focus jump).
+// What is held: the file's words "knob", "press", "tilt" name the parts the HMI doesn't get while
+// it is closed; the parts not named stay the HMI's (a tilt still leaves an app that holds only the
+// knob and the press). An empty file (every renderer before this) holds all three, as always.
+// The words are read with the file's age, at most every 50 ms (a few bytes on tmpfs).
 // While closed, the real event goes on to mgu-renderd (abstract unix datagram socket
 // "@mgu-renderd-ccu"), which hands it to the app holding the controller: the app gets exactly
 // what the HMI would have got, even where its own SOME/IP copy doesn't arrive (the VM).
@@ -21,6 +25,7 @@
 #include <vsomeip/vsomeip.hpp>   // compat (v2) API, as used by CommonAPI-SomeIP 3.1.12
 
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -40,6 +45,16 @@ namespace {
 const char *GATE_FILE = "/run/mgu-renderd/inputgate";
 const long GATE_MS = 700;           // file older than this: gate open (HMI has the controller)
 const uint16_t SVC_CCU = 0xb508, EVT_ROTARY = 0x8002;
+// the parts of the controller the gate can hold from the HMI
+const unsigned HOLD_KNOB = 1, HOLD_PRESS = 2, HOLD_TILT = 4, HOLD_ALL = 7;
+
+}  // namespace
+
+// For renderers to find in the loaded library (/proc/<HMI>/maps): this gate reads the hold words.
+extern "C" __attribute__((visibility("default"), used))
+const char mgu_inputgate_hold[] = "mgu-inputgate-hold: knob press tilt";
+
+namespace {
 
 typedef void (*handle_proxy_receive_t)(void *self, const std::shared_ptr<vsomeip::message> &);
 handle_proxy_receive_t g_real;
@@ -50,23 +65,41 @@ long mono_ms()
     return t.tv_sec * 1000L + t.tv_nsec / 1000000L;
 }
 
-// gate state, looked up at most every 50 ms
-bool gate_closed()
+// the parts the file names; an empty file, or one naming none of them: all three
+unsigned read_hold()
+{
+    char buf[64];
+    int fd = open(GATE_FILE, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return HOLD_ALL;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return HOLD_ALL;
+    buf[n] = 0;
+    unsigned h = 0;
+    if (strstr(buf, "knob")) h |= HOLD_KNOB;
+    if (strstr(buf, "press")) h |= HOLD_PRESS;
+    if (strstr(buf, "tilt")) h |= HOLD_TILT;
+    return h ? h : HOLD_ALL;
+}
+
+// gate state, looked up at most every 50 ms: the parts held from the HMI, 0 = open
+unsigned gate_held()
 {
     static std::atomic<long> checked{-1000};
-    static std::atomic<bool> closed{false};
+    static std::atomic<unsigned> held{0};
     long now = mono_ms();
-    if (now - checked.load() < 50) return closed.load();
+    if (now - checked.load() < 50) return held.load();
     checked.store(now);
     struct stat st;
-    bool c = false;
+    unsigned h = 0;
     if (stat(GATE_FILE, &st) == 0) {
         timespec rt; clock_gettime(CLOCK_REALTIME, &rt);
         long age = (rt.tv_sec - st.st_mtim.tv_sec) * 1000L + (rt.tv_nsec - st.st_mtim.tv_nsec) / 1000000L;
-        c = age >= 0 && age < GATE_MS;          // a clock jump backwards opens it (safe side)
+        if (age >= 0 && age < GATE_MS)          // a clock jump backwards opens it (safe side)
+            h = st.st_size == 0 ? HOLD_ALL : read_hold();   // (empty: what every renderer wrote before)
     }
-    closed.store(c);
-    return c;
+    held.store(h);
+    return h;
 }
 
 // the real event -> mgu-renderd (best effort, never blocks)
@@ -83,7 +116,7 @@ void forward(const uint8_t *d, uint32_t n)
            socklen_t(offsetof(sockaddr_un, sun_path) + sizeof name - 1));
 }
 
-// knob position as the HMI sees it: real position - offset; frozen while the gate is closed
+// knob position as the HMI sees it: real position - offset; frozen while the gate holds the knob
 std::mutex g_mu;
 uint16_t g_offset, g_hmi_pos;
 bool g_have_pos, g_was_closed;
@@ -98,26 +131,32 @@ void filter(const std::shared_ptr<vsomeip::message> &msg)
     if (n > sizeof d) return;
     memcpy(d, pl->get_data(), n);
     uint16_t pos = uint16_t(d[1] << 8 | d[2]);
-    bool closed = gate_closed();
+    unsigned held = gate_held();
+    bool knob_held = (held & HOLD_KNOB) != 0;
     std::lock_guard<std::mutex> lk(g_mu);
-    if (pos == 0xffff) {                        // "invalid": pass on as it is, unless closed
-        if (!closed) return;
-    } else if (!closed) {
+    // the knob the HMI's: it moves on from where the HMI last saw it ("invalid" passes as it is)
+    if (pos != 0xffff && !knob_held) {
         if (g_was_closed && g_have_pos) g_offset = uint16_t(pos - g_hmi_pos);   // carry on
         g_was_closed = false;
         g_hmi_pos = uint16_t(pos - g_offset);
         g_have_pos = true;
-        if (!g_offset) return;                  // nothing to change
+    }
+    if (!held) {
+        if (pos == 0xffff || !g_offset) return; // nothing to change
         d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos);
         pl->set_data(d, n);
         return;
     }
-    // closed: the app gets the real event; the HMI: knob still, not pressed, centred
+    // closed: the app gets the real event; the HMI: what is held stands still (knob), not pressed, centred
     forward(d, n);
-    g_was_closed = true;
-    if (g_have_pos) { d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos); }
-    d[3] = 0;                                   // not pressed
-    d[4] = 0;                                   // centre
+    if (knob_held) {
+        g_was_closed = true;
+        if (g_have_pos) { d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos); }
+    } else if (pos != 0xffff && g_offset) {
+        d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos);
+    }
+    if (held & HOLD_PRESS) d[3] = 0;            // not pressed
+    if (held & HOLD_TILT) d[4] = 0;             // centre
     pl->set_data(d, n);
 }
 
