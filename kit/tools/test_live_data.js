@@ -378,6 +378,10 @@ async function main() {
     assert.ok(sc.min === 0 && sc.max === 7000 && sc.red === 6500 && sc.zones.some((z) => z.color === 'crit' && z.from === 6500), 'rpm: 0-7000, red from 6500');
     sc = SCR.scale('18:useful:Engine oil (after filter)', 'Engine oil (after filter)', '°C', null);
     assert.ok(sc.min === 40 && sc.max === 150 && sc.zones.length === 2, 'oil: 40-150, warning and red');
+    sc = SCR.scale('18:useful:Engine oil (after filter)', 'Engine oil (after filter)', '°F', null);
+    assert.ok(sc.min === 100 && sc.max === 310 && sc.zones.length === 2 && sc.zones[1].from === 284 && sc.zones[1].to === 310, 'oil in °F: the °C scale converted, ends in tens ' + JSON.stringify(sc));
+    sc = SCR.scale('sig:coolant', null, '°F', { lo: 190, hi: 200 });
+    assert.ok(sc.min === 100 && sc.max === 270 && sc.red === 248, 'coolant in °F: red from 120 °C = 248 °F');
     assert.strictEqual(SCR.scale('sig:flow', null, 'l/h', { lo: 0, hi: 12 }).max, 40, 'l/h: 40 while below');
     assert.strictEqual(SCR.scale('sig:flow', null, 'l/h', { lo: 0, hi: 50.7 }).max, 60, 'l/h: grows to the next round number');
     assert.strictEqual(SCR.scale('x', null, 'bar', null).max, 3, 'by unit');
@@ -423,6 +427,7 @@ async function main() {
     const setting = (k) => aspec.settings.find((x) => x.key === k);
     assert.ok(setting('currency').default === 'EUR' && setting('currency').options.some((o) => o[0] === 'EUR'), 'currency: EUR');
     assert.strictEqual(setting('details').default, false, 'sources and unverified values: off');
+    assert.ok(setting('tempUnit').default === 'c' && setting('tempUnit').options.map((o) => o[0]).join() === 'c,f', 'temperature unit: Celsius by default, or Fahrenheit');
     assert.ok(setting('show').options.some((o) => o[0] === setting('show').default) && setting('show').reset >= 2, 'unit pages: a known default, reset from the old one');
     assert.ok(/^1\.\d+\.\d+$/.test(aspec.version), 'version 1.x');
     assert.ok(!aspec.settings.some((x) => /UAH/.test(String(x.default))), 'no local currency as a default');

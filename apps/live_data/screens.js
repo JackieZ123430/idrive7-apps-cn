@@ -74,6 +74,16 @@ function niceUp(v) {
  * useful = its Useful entry's name, seen = { lo, hi } of the values so far (ranges that grow, and values without one).
  */
 function scale(key, useful, unit, seen) {
+    // in °F: the °C scale, its ends rounded out to tens of °F (the zones where they are)
+    if (unit === '°F') {
+        const F = (c) => c * 1.8 + 32, C = (f) => (f - 32) / 1.8;
+        const c = scale(key, useful, '°C', seen ? { lo: C(seen.lo), hi: C(seen.hi) } : null);
+        return {
+            min: Math.floor(F(c.min) / 10) * 10, max: Math.ceil(F(c.max) / 10) * 10,
+            zones: c.zones.map((z) => ({ from: F(z.from), to: z.to === c.max ? Math.ceil(F(c.max) / 10) * 10 : F(z.to), color: z.color })),
+            div: c.div, red: c.red !== undefined ? F(c.red) : undefined,
+        };
+    }
     const sig = /^sig:/.test(key || '') ? key.slice(4) : null;
     const s = (sig && BY_SIGNAL[sig]) || (useful && BY_USEFUL[useful]) || BY_UNIT[unit] || null;
     let min, max;

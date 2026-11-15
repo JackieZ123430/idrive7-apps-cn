@@ -69,6 +69,7 @@ The standard identification and OBD-II values (`std.js`) are public standards an
 | Home-screen widget shows | Gauges 1 | and its picture size and redraws a second |
 | Trip computer | on | counts every drive in the background |
 | Currency | EUR | of the fuel price |
+| Temperature unit | Celsius | every temperature, its gauge scale included, in °C or °F |
 | Show sources and unverified values | off | the identifier or signal each value comes from, car signals whose scaling isn't known yet (raw numbers), the units' refusals |
 
 ## Build and test
