@@ -2,7 +2,7 @@
   "id": "dyno",
   "title": "Virtual Dyno",
   "description": "Power and torque curves from a full-throttle pull, saved and compared",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "vendor": "custom",
   "loggingId": "OA98",
   "iconGlyph": "dyno",
@@ -38,7 +38,7 @@
   ],
   "settings": [
     {"key": "weight", "label": "Weight with driver + fuel", "type": "number", "unit": "kg", "default": 1750,
-     "steps": [1300, 1400, 1500, 1550, 1600, 1650, 1700, 1750, 1800, 1850, 1900, 1950, 2000, 2100, 2200, 2300, 2400, 2500]},
+     "steps": [1300, 1400, 1500, 1550, 1600, 1650, 1700, 1750, 1800, 1850, 1900, 1950, 2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500]},
     {"key": "body", "label": "Body shape (air drag)", "type": "choice", "default": "coupe",
      "options": [["coupe", "Coupe / sedan"], ["wagon", "Touring / hatch"], ["suv", "SUV"]]},
     {"key": "loss", "label": "Drivetrain loss", "type": "number", "unit": "%", "default": 15, "steps": [0, 10, 12, 15, 18, 20, 25]},
