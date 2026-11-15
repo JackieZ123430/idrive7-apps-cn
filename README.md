@@ -181,6 +181,8 @@ same screens show live data.</sub>
 9. [Known limits](#9-known-limits)
 10. [Repository layout](#10-repository-layout)
 
+See also the [privacy audit of the stock head unit](https://github.com/cauliflowermossgrape/idrive7-privacy-audit): what it sends to BMW, what it stores, and how voice control works.
+
 ---
 
 ## 1. The apps
