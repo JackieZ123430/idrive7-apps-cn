@@ -739,9 +739,12 @@ async function runInner(impl) {
         },
     };
 
+    // a separate SETTINGS state exists only when no menu screen shows the settings itself
+    // ("settings": true, as in Doom: kit/tools/build.py builds no SETTINGS state then)
+    const settingsScreen = !!(SPEC.settings && SPEC.settings.length) && !(SPEC.screens || []).some((s) => s.settings === true);
     // visibility of our states (pauses rendering when the user leaves); the HMI's settings screen too (the
     // drawn screen gives way to it: display.js)
-    const tracked = (SPEC.screens || []).concat(SPEC.settings && SPEC.settings.length ? [{ name: 'SETTINGS' }] : []);
+    const tracked = (SPEC.screens || []).concat(settingsScreen ? [{ name: 'SETTINGS' }] : []);
     tracked.forEach((s) => {
         const st = ui.comp(s.name);
         if (st && st.on) st.on('visible', (ev) => ui._setVisible(s.name, !!(ev && ev.visible)));
@@ -819,7 +822,7 @@ async function runInner(impl) {
     // (menu screens only: doing it on a canvas screen before its first image
     // makes every later createResourceHandles fail with INVALID_VALUE)
     await step('screen resources', Promise.all((SPEC.screens || []).filter((s) => s.kind !== 'canvas')
-        .concat(SPEC.settings && SPEC.settings.length ? [{ name: 'SETTINGS' }] : [])
+        .concat(settingsScreen ? [{ name: 'SETTINGS' }] : [])
         .map((s) => ui.comp(s.name)).filter((st) => st && st.updateResources)
         .map((st) => st.updateResources())), 4000);
     await step('settings screen', wireSettings(ctx), 3000);
