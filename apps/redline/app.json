@@ -2,7 +2,7 @@
   "id": "redline",
   "title": "Redline",
   "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard; HUD by @biscotit",
-  "version": "2.0.41",
+  "version": "2.0.42",
   "vendor": "custom",
   "loggingId": "OA97",
   "iconGlyph": "rpm",
@@ -36,6 +36,10 @@
     "de.bmw.infrastructure.EnvironmentalInformation": {
       "_optional": "outside temperature on the HUD",
       "ExteriorTemperature": "s"
+    },
+    "de.bmw.infotainment.connectivity.telephony.ConnectivityAggregator": {
+      "_optional": "a call ringing: the HUD tach steps aside for BMW's call card",
+      "aggregatedCallState": "rs"
     },
     "de.bmw.infrastructure.VehicleCondition": {
       "_optional": "the car switched off: the HUD back to Cluster functions",

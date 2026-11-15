@@ -399,6 +399,13 @@ glass's edge. Checked for every size and position the settings allow.
   BMW's direction card is hidden while Redline is on the HUD: [Directions](#directions-experimental).
 - When BMW shows a pop-up on the HUD (media, lists), cluster-render moves the tach aside. It
   comes back about 1.5 s after the pop-up goes. Redline pauses drawing in the meantime.
+- **A call ringing (since 2.0.42, issue #181).** BMW's call card could outlast cluster-render's pop-up wait, so the
+  tach came back over it while the phone still rang. Redline now reads the head unit's call state
+  (`ConnectivityAggregator.aggregatedCallState`) and stays off the HUD while a call rings. It keeps the HUD
+  claim, so BMW's card shows, not Cluster functions' map. It comes back 2 s after the ringing stops (answered,
+  declined or missed). Only ringing counts: during the call and on an outgoing call the tach shows as before.
+  A ring lasting more than 90 s is let go, so a lost "call over" can't keep the tach off. The Learned page says
+  *HUD: giving way to the call*. A unit without the interface installs and runs Redline as before.
 - **The mapping guard (cluster-render's, not Redline's).**
   - Each time the cluster's display service goes away within 10 s of the HUD being mapped is a strike.
     That covers a cluster restart, and also, it seems, the cluster going off at switch-off. Two strikes turn the
@@ -744,6 +751,9 @@ Useful lines:
   *STRAIGHT_ON,NONE`), `dir: giving way to BMW (no turn data)`, `dir: event list <error>`.
 - `hud: route without readable turns, BMW's directions shown` / `hud: own directions`: Redline leaving the HUD
   to BMW's card and coming back.
+- `hud: phone ringing, the tach gives way to the call card` / `hud: phone active` / `hud: phone none`: the
+  call state as the head unit sends it (also `dialing`, `held`); `hud: call state not read: …` once if a car sends
+  a value Redline doesn't know.
 - `hud: rpm samples every N ms`: how often the car sends rpm.
 - `limiter: learned …`
 - `shiftmap: 3>4 at 5550`
@@ -763,6 +773,7 @@ Useful lines:
 | `nav.js` | Directions, the data: decodes the route events, `conclusiveDart` and the lanes into the next turn; freshness (3 s) and giving way to BMW's card |
 | `navlog.js` | The navigation probe: subscribes to the guidance sources, asks the event list, writes `redline-nav.log`, hands every value to `nav.js` |
 | `hud-nav.js` | Directions, the picture (200x76, bottom right corner): thick white arrows, distance, street or lanes |
+| `call.js` | The phone ringing: the head unit's call state, so the HUD tach gives way to BMW's call card |
 | `limiter.js` | Learned rev limit |
 | `shiftmap.js` | Learned torque curve, gear ratios, per-gear shift points |
 | `files.js` | `writeAtomic`: the learned files written whole or not at all (temp file, then rename) |

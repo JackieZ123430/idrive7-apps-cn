@@ -66,6 +66,7 @@ const Limiter = require('./limiter');
 const ShiftMap = require('./shiftmap');
 const { ShiftShare } = require('./shareshift');
 const LogView = require('./logview');
+const Call = require('./call');
 const Sheet = require('./kit/sheet');
 
 const W = 1600, H = 520;
@@ -189,8 +190,10 @@ mgu.run({
         });
         // one watch per interface: handler sets that share an interface are merged field by field (a plain
         // Object.assign would drop one: electrical.js and the power log both listen to Efficiencytainment2)
+        // the phone ringing: the HUD tach steps aside for BMW's call card (issue #181)
+        const call = Call.start({ log });
         const merged = {};
-        [{ [Engine.SIGNAL[0]]: engine.handlers() }, gearbox.handlers(), electrical.handlers(), tyres.handlers(), torqueWatch, powerLog.handlers()].forEach((set) => {
+        [{ [Engine.SIGNAL[0]]: engine.handlers() }, gearbox.handlers(), electrical.handlers(), tyres.handlers(), torqueWatch, powerLog.handlers(), call.handlers()].forEach((set) => {
             Object.keys(set).forEach((iface) => { merged[iface] = Object.assign(merged[iface] || {}, set[iface]); });
         });
         car = new Car(ctx, ['rpm', 'speed', 'temps', 'gear', 'condition'], merged);
@@ -1130,6 +1133,8 @@ mgu.run({
             // the next turn and lanes while a route runs (null: none here)
             nav: nav,
             data: () => car.data(), shiftPoint, redline, maxRpm, gearbox, knock, fuel, electrical, tyres, downshift,
+            // a call ringing: BMW's call card on the HUD, the tach out of its way
+            ringing: () => call.ringing(),
             // the tach's peak marker (drops back after "Peak hold"), the last upshift's grade for 1.5 s,
             // boost once it has moved and is under 2 s old (none from the demo drive)
             peak: () => peakRpm,

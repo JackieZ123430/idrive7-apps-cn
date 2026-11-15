@@ -1056,6 +1056,10 @@ function start(ctx, src) {
     // so the car's state can say first that it's switching off
     const BACK_WAIT_MS = isNum(ctx.backWaitMs) ? ctx.backWaitMs : 8000;
     let backAt = 0;
+    // a call ringing (src.ringing, issue #181): out of the way of BMW's call card until it stops ringing, then back
+    // after CALL_BACK_MS, so the card has gone (answered, declined or missed) before the tach is drawn again
+    const CALL_BACK_MS = isNum(ctx.callBackMs) ? ctx.callBackMs : 2000;
+    let callGiving = false, callBackAt = 0;
     const paused = () => !!target && (target.disabled || target.state === 'parked' || target.state === 'waiting' || target.state === 'unavailable');
     const tick = safe('tick', () => {
         // cluster-render not up (lost, or not yet back): nothing is drawn, so nothing is read from the car either
@@ -1070,8 +1074,11 @@ function start(ctx, src) {
             // (over with a turn to show: back at once, it's the route going on)
             if (navGiving && !nv.giveWay && !nv.show) backAt = Date.now() + BACK_WAIT_MS;
             navGiving = nv.giveWay;
+            const ring = !playing && !!(src.ringing && src.ringing());
+            if (callGiving && !ring) { callBackAt = Date.now() + CALL_BACK_MS; backAt = Math.max(backAt, callBackAt); }
+            callGiving = ring;
             const off = switchingOff();
-            if (calm(playing) === 'hide' || nv.giveWay || off) {
+            if (calm(playing) === 'hide' || nv.giveWay || ring || off) {
                 dropNav();
                 if (layer) {
                     cr.drop(layer); layer = 0;
@@ -1082,9 +1089,9 @@ function start(ctx, src) {
                 stopReads(true);
                 // nothing of Redline's on the HUD. Comfort's hide: the standing app (Cluster functions) may show. Giving
                 // way: keep the claim, so it's BMW's card that shows, not Cluster functions' map over it (2026-11-09 review)
-                claim.hold(!!nv.giveWay);
+                claim.hold(!!(nv.giveWay || ring));
                 if (off) { if (!offLogged) { offLogged = true; log.info('hud: dropped, the car is switching off (state ' + src.data().condition + ')'); } }
-                else if (!hiddenLogged && !nv.giveWay) { hiddenLogged = true; log.info('hud: hidden in ' + (src.driveMode ? src.driveMode() : '?') + ' mode'); }
+                else if (!hiddenLogged && !nv.giveWay && !ring) { hiddenLogged = true; log.info('hud: hidden in ' + (src.driveMode ? src.driveMode() : '?') + ' mode'); }
                 return;
             }
             if (!layer) {
@@ -1271,6 +1278,7 @@ function start(ctx, src) {
         if (!cr || !cr.ready) return NOT_RUNNING;
         if (target && target.disabled) return 'HUD: off after display errors';
         if (m === 'test') return 'HUD: test pattern';
+        if (shown === 'tach' && !layer && (callGiving || Date.now() < callBackAt)) return 'HUD: giving way to the call';
         if (shown === 'tach' && !layer && navGiving) return 'HUD: giving way to BMW\'s directions';
         if (shown === 'tach' && !layer && holdOff()) return 'HUD: waits for the car to be switched on';
         if (shown === 'tach' && !layer) return 'HUD: hidden in Comfort / Eco Pro';

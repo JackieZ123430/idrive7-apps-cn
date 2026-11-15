@@ -47,7 +47,7 @@ const log = { info() {}, warn() {}, error() {} };
         // a stand-in launch score: a run that finished `at`
         launch: (now, mph) => (launchRun && now - launchRun.at < 3000 ? Object.assign({ label: mph ? '0-60' : '0-100' }, launchRun) : null) };
     let launchRun = null;
-    const h = Hud.start({ settings: settings, log: log, dataDir: TMP, backWaitMs: 600 }, src);
+    const h = Hud.start({ settings: settings, log: log, dataDir: TMP, backWaitMs: 600, callBackMs: 400 }, src);
     await sleep(250);
 
     // every layout: one image layer, no shader
@@ -116,6 +116,17 @@ const log = { info() {}, warn() {}, error() {} };
     cond = undefined;
     drive = 'sport'; Hud.setComfortMode(settings, 'same'); await sleep(250);
     ok(cr.of('image').length === 1, 'back in Sport: shown again');
+    // a call ringing (issue #181): the tach out of the way of BMW's call card the whole time, back a moment after
+    let ring = true; src.ringing = () => ring;
+    await sleep(150);
+    ok(cr.of('image').length === 0 && h.status() === 'HUD: giving way to the call', 'a call ringing: no layer (' + h.status() + ')');
+    await sleep(600);
+    ok(cr.of('image').length === 0, 'still ringing after longer than a BMW pop-up: still no layer');
+    ring = false; await sleep(150);
+    ok(cr.of('image').length === 0 && h.status() === 'HUD: giving way to the call', 'the call answered: the tach not back at once (' + h.status() + ')');
+    await sleep(500);
+    ok(cr.of('image').length === 1, 'the call answered: the tach back after the wait');
+    delete src.ringing;
     // Comfort's own size and place: the tach moves there when the mode is Comfort, back when it's Sport
     Hud.setComfortMode(settings, 'own');
     const cv = Hud.profileView(settings, 'comfort');
