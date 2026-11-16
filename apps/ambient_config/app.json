@@ -2,7 +2,7 @@
   "id": "ambient_config",
   "title": "Ambient config",
   "description": "Any colour on the ambient light, animations, and a look for each driving mode",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -33,7 +33,8 @@
     },
     "de.bmw.infrastructure.VehicleCondition": {
       "_optional": "the car locked and left: the car's own light",
-      "VehicleCondition": "s"
+      "VehicleCondition": "s",
+      "vehicleConditionNoCrc": "s"
     },
     "de.bmw.body.Light": {
       "_optional": "the turn signals: that side's lights breathe green",

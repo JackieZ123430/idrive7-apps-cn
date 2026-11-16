@@ -89,13 +89,26 @@ async function background(bg) {
     // used for IDLE_MS counts as left
     let stateSeen = false, activeT = Date.now();
     const active = () => { activeT = Date.now(); if (!stateSeen && control._away) control.away(false); };
+    // the state from either of the car's two copies (some cars send only the one without a CRC); without one, the
+    // partial networks it keeps awake, numbered the same (KOM_PARKEN... = 1-3, no communication = parked)
+    const conditionFrom = (v) => {
+        const n = Car.conditionOf(v && v.statusConditionVehicle);
+        if (n !== undefined) return n;
+        const p = v && v.controlBasePartialNetworks;
+        if (p === 0 || p === 'KEINE_KOMMUNIKATION') return 1;
+        return Car.conditionOf(typeof p === 'string' ? p.replace(/^KOM_/, '') : p);
+    };
+    const sources = new Set();
+    const onCondition = (field) => (v) => {
+        const n = conditionFrom(v);
+        if (n === undefined) return;
+        if (!sources.has(field)) { sources.add(field); log.info('vehicle state: from ' + field + ' (' + n + ')'); }
+        stateSeen = true;
+        control.away(n <= 3);
+    };
     signals.watch('de.bmw.infrastructure.VehicleCondition', '1', {
-        VehicleCondition: (v) => {
-            const n = Car.conditionOf(v && v.statusConditionVehicle);
-            if (n === undefined) return;
-            stateSeen = true;
-            control.away(n <= 3);
-        },
+        VehicleCondition: onCondition('VehicleCondition'),
+        vehicleConditionNoCrc: onCondition('vehicleConditionNoCrc'),
     }, log).catch((e) => log.warn('vehicle state: ' + (e && e.message || e)));
     // the speed
     signals.watch('de.bmw.infotainment.vehicle.Vehicle2', '1', {
@@ -104,7 +117,11 @@ async function background(bg) {
             if (typeof k === 'number' && k !== 65535 && k * 0.015625 > 1 && k * 0.015625 < 400) active();
         },
     }, log).catch((e) => log.warn('speed: ' + (e && e.message || e)));
-    setInterval(() => { if (!stateSeen && !control._away && Date.now() - activeT > IDLE_MS) control.away(true); }, 30000);
+    setInterval(() => {
+        if (stateSeen || control._away || Date.now() - activeT <= IDLE_MS) return;
+        log.info('vehicle state: none from the car, not driven or used for ' + IDLE_MS / 60000 + ' min: parked');
+        control.away(true);
+    }, 30000);
     // the turn signals: that side's door lines blink green; an open door: its line red (settings turnGlow, doorRed, both off
     // until switched on)
     signals.watch('de.bmw.body.Light', '1', { StatusFunctionsIndicators: (v) => control.turn(turnOf(v)) }, log)
