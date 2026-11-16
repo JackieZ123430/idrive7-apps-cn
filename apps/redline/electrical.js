@@ -8,11 +8,13 @@
  *   every car
  *     12 V charge    CDS.statusBattery2.conditionBatteryChargingCondition (%), sent by the car
  *     12 V voltage   UDS 22 F442 (OBD "control module voltage") from the engine unit (0x12), OBD 01 42,
- *                    a second engine unit (0x13), the gearbox unit (0x18), the battery sensor (402B, 5853);
+ *                    a second engine unit (0x13), the gearbox unit (0x18), the battery sensor (402B, 5853),
+ *                    last the body controller (BDC 0x40) and the electric drive unit (EME 0x1A);
  *                    the one that answered keeps being asked, as battery12.js does
  *   plug-in hybrids only
- *     HV charge      UDS 22 DDBC from the battery unit (SME, 0x07), 0.1 %
- *     HV power       pack voltage (DDB4 / DD68 / DD66 / DDEF) x current (DD69) from the SME, in kW:
+ *     HV charge      UDS 22 DDBC from the battery unit (SME, 0x07), 0.1 % (from 0.5 %: a fully electric car's
+ *                    battery unit, e.g. the iX3's, answers zero bytes there, which is no charge and no hybrid)
+ *     HV power       pack voltage (DDB4 / DD68 / DD66 / DDEF / E54D) x current (DD69) from the SME, in kW:
  *                    + the battery drives, - it is charged (regen)
  *     HV temperature Efficiencytainment2.statusBatteryTemperature (raw - 50 °C, 255 = none)
  *     pack voltage   LSCDataSink.statusHighVoltageStorage (V, or 0.1 V above 1500)
@@ -52,17 +54,20 @@ const V12 = [
     Object.assign({ ecu: 0x18, obd: '42' }, VOLT),
     { ecu: 0x12, did: '402B', bytes: 2, at: 2, factor: 0.00025, offset: 6, min: 5, max: 18 },
     Object.assign({ ecu: 0x12, did: '5853' }, VOLT),
+    Object.assign({ ecu: 0x40, did: 'F442' }, VOLT),
+    Object.assign({ ecu: 0x1A, did: 'F442' }, VOLT),
 ];
 const SME = 0x07;
 const V12_ECUS = V12.map((c) => c.ecu).filter((e, i, a) => a.indexOf(e) === i);
 // every read has its own short wait: the link is shared with knock (twice a second) and the gearbox, and the
 // default 4 s per unanswered identifier could hold them up for ~12 s a turn on a hybrid whose SME differs
-const HV_SOC = [{ ecu: SME, did: 'DDBC', bytes: 2, at: 0, factor: 0.1, offset: 0, min: 0, max: 100, timeoutMs: 1000 }];
+const HV_SOC = [{ ecu: SME, did: 'DDBC', bytes: 2, at: 0, factor: 0.1, offset: 0, min: 0.5, max: 100, timeoutMs: 1000 }];
 const HV_V = [
     { ecu: SME, did: 'DDB4', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 600 },
     { ecu: SME, did: 'DD68', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 800 },
     { ecu: SME, did: 'DD66', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 800 },
     { ecu: SME, did: 'DDEF', bytes: 2, factor: 1, min: 150, max: 500, timeoutMs: 800 },
+    { ecu: SME, did: 'E54D', bytes: 2, factor: 0.01, min: 150, max: 500, timeoutMs: 600 },
 ];
 const HV_A = [{ ecu: SME, did: 'DD69', bytes: 4, factor: 0.01, signed: true, min: -800, max: 800, timeoutMs: 600 }];
 const POWER_SIGN = -1;                // eDrive's powerSign: kW = V x A / 1000 x -1 (+ = the battery gives power)

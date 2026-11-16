@@ -976,15 +976,15 @@ function electricalChecks() {
             linkP2.physical = function () { const x = physP.apply(this, arguments); if (!/DD/.test(this.asked[this.asked.length - 1])) clock += 1000; return x; };
             const k = mk(settingsFake({ hudHybridSeen: true }), linkP2);
             k.want = { v12: true, hvKw: true, hvSoc: false };
-            const turns = [], fresh = [];
+            const turns = [], fresh = [], NV = Electrical.V12.length;     // the search: one turn per 12 V candidate
             let c = Promise.resolve();
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < NV + 1; i++) {
                 c = c.then(() => { const n = linkP2.asked.length; return k._turn().then(() => { turns.push(linkP2.asked.slice(n)); fresh.push(k.value().hvKw !== null); clock += 100; }); });
             }
             return c.then(() => {
                 const v12n = turns.map((x) => x.filter((key) => !/DD/.test(key)).length);
-                ok(turns.slice(0, 9).every((x) => x[0] === '7:DDB4' && x[1] === '7:DD69'), 'search: the power read first every turn (' + turns.map((x) => x.join(' ')).join(' | ') + ')');
-                ok(v12n.slice(0, 9).every((n) => n === 1) && fresh.every(Boolean), 'search: 1 candidate a turn, the power fresh after each (' + v12n.join() + ' / ' + fresh.join() + ')');
+                ok(turns.slice(0, NV).every((x) => x[0] === '7:DDB4' && x[1] === '7:DD69'), 'search: the power read first every turn (' + turns.map((x) => x.join(' ')).join(' | ') + ')');
+                ok(v12n.slice(0, NV).every((n) => n === 1) && fresh.every(Boolean), 'search: 1 candidate a turn, the power fresh after each (' + v12n.join() + ' / ' + fresh.join() + ')');
                 ok(k.fails.v12 === 1, 'search: one failure for the whole search, not one a turn (' + k.fails.v12 + ')');
             });
         }).then(() => {

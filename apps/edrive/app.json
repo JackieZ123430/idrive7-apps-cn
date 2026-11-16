@@ -1,8 +1,8 @@
 {
   "id": "edrive",
   "title": "eDrive",
-  "description": "Real electric range, live battery power, cells and climate power, HV battery health (SOH) and energy, last charge, charge log, the 12 V battery (charge, voltage, what it does, regen, history) and a home-screen widget; on a 48 V mild hybrid its 48 V battery and DC/DC converter",
-  "version": "2.9.2",
+  "description": "Real electric range (plug-in hybrids and fully electric cars such as the iX3), live battery power, cells and climate power, HV battery health (SOH) and energy, last charge, charge log, the 12 V battery (charge, voltage, what it does, regen, history) and a home-screen widget; on a 48 V mild hybrid its 48 V battery and DC/DC converter",
+  "version": "2.10.0",
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
@@ -63,7 +63,7 @@
     }
   },
   "startWidget": {
-    "comment": "Home-screen widget. Layout and cell names are those of BMW's Drive Recorder widget on this firmware: the drawn image goes into BackgroundImage1, the layout shows Title above it. If the image doesn't show or sits wrong, try another 'image' cell or adjust 'size' (pixels: the HMI scales the picture to the big widget and crops it centred; 384 x 256 fits the G05).",
+    "comment": "Home-screen widget. Layout and cell names are those of BMW's Drive Recorder widget on this firmware: the drawn image goes into BackgroundImage1, the layout shows Title above it. If the image doesn't show or sits wrong, try another 'image' cell or adjust 'size' (pixels: the HMI scales the picture to the big widget and crops it centred; 384 x 256 fits the G05). safe: the share it crops off each side ([x, y] or [left, top, right, bottom]); it also fades the picture towards the edges, the top most, so the setting widgetFit keeps the content further in (live.js WIDGET_FIT).",
     "name": "eDrive",
     "layout": "LT_Table_OnlineApps_DriveRecorderWidget",
     "image": "BackgroundImage1",
@@ -198,13 +198,17 @@
     },
     {
       "key": "hybrid",
-      "label": "Hybrid system",
+      "label": "Drive system",
       "type": "choice",
       "default": "auto",
       "options": [
         [
           "auto",
           "Auto"
+        ],
+        [
+          "bev",
+          "Fully electric (BEV)"
         ],
         [
           "yes",
@@ -242,8 +246,60 @@
       ]
     },
     {
+      "key": "designKwhBev",
+      "when": { "hybrid": ["auto", "bev"] },
+      "label": "Fully electric: usable battery when new",
+      "type": "number",
+      "unit": "kWh",
+      "default": 74,
+      "steps": [
+        28.9,
+        40,
+        50,
+        60,
+        64.7,
+        66,
+        70,
+        71,
+        74,
+        80.7,
+        81.2,
+        101.7,
+        105.2
+      ]
+    },
+    {
+      "key": "bevReserve",
+      "when": { "hybrid": ["auto", "bev"] },
+      "label": "Fully electric: range counts down to",
+      "type": "choice",
+      "default": "0",
+      "options": [
+        [
+          "0",
+          "0 % (empty)"
+        ],
+        [
+          "5",
+          "5 %"
+        ],
+        [
+          "10",
+          "10 %"
+        ],
+        [
+          "15",
+          "15 %"
+        ],
+        [
+          "20",
+          "20 %"
+        ]
+      ]
+    },
+    {
       "key": "price",
-      "when": { "hybrid": ["auto", "yes"] },
+      "when": { "hybrid": ["auto", "yes", "bev"] },
       "label": "Electricity price",
       "type": "number",
       "unit": "EUR/kWh",
@@ -428,7 +484,30 @@
         80,
         100,
         120,
-        150
+        150,
+        200,
+        250,
+        300
+      ]
+    },
+    {
+      "key": "widgetFit",
+      "label": "Home-screen widget: picture",
+      "type": "choice",
+      "default": "large",
+      "options": [
+        [
+          "small",
+          "Small, clear of the edges"
+        ],
+        [
+          "medium",
+          "Medium"
+        ],
+        [
+          "large",
+          "Fill the widget"
+        ]
       ]
     },
     {
@@ -509,7 +588,7 @@
     }
   ],
   "config": {
-    "comment": "HV battery values and the 12 V voltage are read with UDS ReadDataByIdentifier (0x22). Each value tries its candidates in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). 'ecu' on a candidate overrides battery.ecu (decimal: 7 = SME battery unit, 18 = DME engine unit). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong. F442 is the standard OBD 'control module voltage' (terminal 30, i.e. the 12 V battery). The live pages (live.js) read config.battery.fast (pack voltage and current, as fast as the car answers) and config.battery.slow (cells, temperatures, limits, every slowPoll s): each a list of candidates { ecu (optional, decimal), did, fields }, every field { at, bytes, factor, offset, signed, min, max } on the same reply; the first that answers is used. powerSign: kW = V x A / 1000 x powerSign (+ = the battery gives power); if regen shows while accelerating, set it to 1. probes: climate-unit values (IHKA 0x78; with a factor, the climate's kW on the Energy page); scanKnown: identifiers the Scan page compares when a unit has no saved scan. Without a hybrid system (battery12.js): soc40 (40AD) and cap12 (40A9) are candidates with fields too; v12 keeps asking the candidate that answered (an engine unit like a G20 320i's answers 402B with all FF and refuses F442: OBD 42 or the gearbox unit then)",
+    "comment": "HV battery values and the 12 V voltage are read with UDS ReadDataByIdentifier (0x22). Each value tries its candidates in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). 'ecu' on a candidate overrides battery.ecu (decimal: 7 = SME battery unit, 18 = DME engine unit). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong. F442 is the standard OBD 'control module voltage' (terminal 30, i.e. the 12 V battery). The live pages (live.js) read config.battery.fast (pack voltage and current, as fast as the car answers) and config.battery.slow (cells, temperatures, limits, every slowPoll s): each a list of candidates { ecu (optional, decimal), did, fields }, every field { at, bytes, factor, offset, signed, min, max } on the same reply; the first that answers is used. powerSign: kW = V x A / 1000 x powerSign (+ = the battery gives power); if regen shows while accelerating, set it to 1. probes: climate-unit values (IHKA 0x78; with a factor, the climate's kW on the Energy page); scanKnown: identifiers the Scan page compares when a unit has no saved scan. Without a hybrid system (battery12.js): soc40 (40AD) and cap12 (40A9) are candidates with fields too; v12 keeps asking the candidate that answered (an engine unit like a G20 320i's answers 402B with all FF and refuses F442: OBD 42 or the gearbox unit then). Fully electric (fifth-generation eDrive, e.g. the iX3 G08): the battery unit answers DDBC with zero bytes (so its min is 0.5: a zero is never taken as an empty battery) and has the charge in E5CE, stored and usable energy in E5C7 (energy; usable kWh over bevMinKwh = a fully electric car), pack voltage in E54D and current in E561; it refuses DD68, DD69, DDBF, DFA0 and 6335 (OBDb captures of 2021-2023 iX3s and the iX). E5CE also holds the lowest and highest cell's charge (the Battery page's Cells when no cell voltages answer); fifth-generation battery units keep the cell voltages in E554 (every cell) and E553 (lowest, highest), confirmed on the iX1, tried first. Without a voltage reading, packV (V at 0 % and 100 %) estimates it from the charge for the live power on a fully electric car. The v12 candidates on the engine and gearbox units (0x12, 0x13, 0x18) are not asked on a fully electric car.",
     "battery": {
       "ecu": 7,
       "soc": [
@@ -519,10 +598,50 @@
           "at": 0,
           "factor": 0.1,
           "offset": 0,
+          "min": 0.5,
+          "max": 100,
+          "note": "plug-in hybrids; min 0.5: fully electric cars answer zero bytes here"
+        },
+        {
+          "did": "E5CE",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.01,
+          "offset": 0,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "note": "fully electric (iX3 G08, iX): charge in 0.01 %, then the lowest and highest cell's"
         }
       ],
+      "energy": [
+        {
+          "did": "E5C7",
+          "fields": {
+            "stored": {
+              "bytes": 2,
+              "factor": 0.01,
+              "offset": -50,
+              "min": -2,
+              "max": 200
+            },
+            "cap": {
+              "at": 2,
+              "bytes": 2,
+              "factor": 0.01,
+              "offset": -50,
+              "min": 10,
+              "max": 200
+            }
+          },
+          "note": "fully electric (iX3 G08, iX): energy stored now and usable capacity, kWh"
+        }
+      ],
+      "bevMinKwh": 45,
+      "packV": {
+        "empty": 330,
+        "full": 395,
+        "note": "iX3: 94 cells in series, about 3.5 V empty and 4.2 V full; only used on a fully electric car without a voltage reading"
+      },
       "soh": [
         {
           "did": "DD7B",
@@ -638,6 +757,28 @@
           "min": 5,
           "max": 18,
           "note": "battery voltage from the battery sensor, 1 mV (seen on F32 DMEs)"
+        },
+        {
+          "ecu": 64,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "body domain controller BDC (0x40), not yet confirmed on a car"
+        },
+        {
+          "ecu": 26,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "electric drive unit EME (0x1A, holds the DC/DC converter on fully electric cars), not yet confirmed on a car"
         }
       ],
       "chargeMinPct": 3,
@@ -689,6 +830,19 @@
                 "max": 500
               }
             }
+          },
+          {
+            "did": "E54D",
+            "timeoutMs": 600,
+            "fields": {
+              "v": {
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 150,
+                "max": 500
+              }
+            },
+            "note": "fully electric (fifth-generation eDrive): confirmed on the iX, likely on the iX3"
           }
         ],
         "hvI": [
@@ -704,6 +858,20 @@
                 "max": 800
               }
             }
+          },
+          {
+            "did": "E561",
+            "timeoutMs": 600,
+            "fields": {
+              "a": {
+                "bytes": 4,
+                "factor": 0.01,
+                "signed": true,
+                "min": -800,
+                "max": 800
+              }
+            },
+            "note": "fully electric (iX3 G08, iX): the same layout and direction as DD69 (negative = the battery gives power)"
           }
         ]
       },
@@ -715,13 +883,69 @@
               "pct": {
                 "bytes": 2,
                 "factor": 0.1,
-                "min": 0,
+                "min": 0.5,
                 "max": 100
               }
             }
+          },
+          {
+            "did": "E5CE",
+            "fields": {
+              "pct": {
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 0,
+                "max": 100
+              },
+              "cellMin": {
+                "at": 2,
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 0,
+                "max": 100
+              },
+              "cellMax": {
+                "at": 4,
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 0,
+                "max": 100
+              }
+            },
+            "note": "fully electric: the charge, then the lowest and highest cell's charge (confirmed on 2021-2023 iX3s: 24.22, 23.84, 24.69 %)"
           }
         ],
         "cellV": [
+          {
+            "did": "E554",
+            "array": {
+              "bytes": 2,
+              "factor": 0.001,
+              "min": 2.5,
+              "max": 4.4
+            },
+            "note": "fifth-generation eDrive (iX1, likely the iX3): every cell's voltage, 2 bytes each in 112 slots, 7FFF after the last cell"
+          },
+          {
+            "did": "E553",
+            "fields": {
+              "min": {
+                "at": 0,
+                "bytes": 2,
+                "factor": 0.001,
+                "min": 2.5,
+                "max": 4.4
+              },
+              "max": {
+                "at": 2,
+                "bytes": 2,
+                "factor": 0.001,
+                "min": 2.5,
+                "max": 4.4
+              }
+            },
+            "note": "fifth-generation eDrive (iX1, likely the iX3): the lowest and highest cell's voltage"
+          },
           {
             "did": "DFA5",
             "array": {
