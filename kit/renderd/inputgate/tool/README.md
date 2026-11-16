@@ -14,3 +14,9 @@ It is the Store's own preload layout (a boot guard before the HMI, a check after
 
 `mgu-inputgate.so` is a copy of `../../prebuilt/mgu-inputgate.so` (the Store reads a tool's files from its own
 folder): copy it here again whenever the gate is rebuilt, and raise the version in `component.json`.
+
+What is held (1.2.0): while an app has the controller, the gate file (`/run/mgu-renderd/inputgate`) may name parts
+with the words `knob`, `press`, `tilt`; the parts not named stay the HMI's. An empty file, or one without those
+words, holds all three. Renderers that only touch the file, the older gates and the apps in this repository (they
+never name parts) keep holding the whole controller, as before. The library carries `mgu-inputgate-hold:` so
+mgu-store's mgu-render can offer `controllerHold` to the apps that want it.

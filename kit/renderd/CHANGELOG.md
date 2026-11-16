@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- The controller gate (`mgu-inputgate.so`) can hold parts of the iDrive controller: the words `knob`, `press`, `tilt` in its file (`/run/mgu-renderd/inputgate`) name what the HMI doesn't get while an app grabs it; the parts not named stay the HMI's (an app that holds the knob and the press still lets a tilt leave it). An empty file, what every renderer writes today, holds all three as before, and so do words it doesn't know. The library carries the marker `mgu-inputgate-hold:` for renderers to find (mgu-store's mgu-render offers `controllerHold` then). Needs the gate rebuilt (`make build/mgu-inputgate.so` in the build image) and copied to `inputgate/tool/` with its version raised.
+- The controller gate (`mgu-inputgate.so`) can hold parts of the iDrive controller: the words `knob`, `press`, `tilt` in its file (`/run/mgu-renderd/inputgate`) name what the HMI doesn't get while an app grabs it; the parts not named stay the HMI's (an app that holds the knob and the press still lets a tilt leave it). An empty file, what every renderer writes today, holds all three as before, and so do words it doesn't know. The library carries the marker `mgu-inputgate-hold:` for renderers to find (mgu-store's mgu-render offers `controllerHold` then). Our apps don't name parts, so they keep the whole controller. Store tool `mgu-inputgate` 1.2.0 (rebuilt; a new version also clears the boot guard's strikes).
 
 ## idrive7-apps mgu-renderd 2.1.18
 
