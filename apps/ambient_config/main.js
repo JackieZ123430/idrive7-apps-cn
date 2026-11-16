@@ -15,8 +15,8 @@
  * Everything goes to the car as it is picked. The lights are driven through the body controller (lights.js); a car
  * whose body controller does not answer keeps BMW's own colours (ambient.js), offered on the Colour tab.
  * It runs from the platform's start (app.json "autostart"): the look and the driving modes work with the app closed.
- * With IterioDev's Comfort tool running (others.js), the Colour and Animations tabs warn that it writes the same
- * lights and recommend uninstalling it: one ambient app at a time.
+ * With IterioDev's Comfort tool running (others.js), which writes the same lights, it stands aside (no light writes
+ * until Comfort is gone) and the Colour and Animations tabs say so in red and recommend uninstalling it.
  */
 const mgu = require('./kit/mgu');
 const G = require('./kit/gauges');
@@ -117,6 +117,14 @@ async function background(bg) {
         if (key === 'turnGlow' || key === 'doorRed' || key === 'hazardRed' || key === 'drive') control.signals();
     });
     const others = new Others({ log }).start();
+    // IterioDev's Comfort tool writes the same lights: while it runs, ours stand aside (no writes, so the two don't fight
+    // and the lights don't jump), and carry on once it is gone
+    const besideComfort = () => {
+        lights.hold('comfort', others.comfort);
+        if (others.comfort) log.warn('lights: IterioDev\'s Comfort tool is running, Ambient config stands aside until it is gone');
+    };
+    others.on('change', besideComfort);
+    besideComfort();
     // the high beam strobe and the light show (strobe.js): only for use on private property, behind its setting,
     // with someone in the car; the light show also with the car standing still (kit/parked.js, checked again on every
     // step: it stops when the car moves off); why not, or null
@@ -190,17 +198,20 @@ mgu.run({
         const stepHue = (d) => { const c = partColour(look()); return setRgb(S.hsv(S.stepHue(S.hueOf(c.rgb), d), 1, 1)); };
 
         // another ambient app's service writing the same lights: says so in place of the status, wrapped to width w
-        const COMFORT_WARNING = 'IterioDev\'s Comfort tool is running. It changes the ambient lights too, so the colours jump ' +
-            'between the two apps. Uninstall it in the Store (Installed, Head-unit tools, Comfort) and use one ambient app at a time.';
+        const COMFORT_WARNING = 'IterioDev\'s Comfort tool is running and changes the same lights, so Ambient config has stopped ' +
+            'changing them. Uninstall Comfort in the Store (Installed, Head-unit tools, Comfort) to use Ambient config.';
+        // in red, so it is seen: nothing on these tabs reaches the lights while Comfort runs
         function warnOthers(cv, t, x, y, w) {
-            cv.text('Another ambient app', x, y, 22, t.warn, { font: 'bold' });
+            const head = cv.textWidth(translate('Another ambient app is running'), 22, { font: 'bold', literal: true }) <= w
+                ? 'Another ambient app is running' : 'Another ambient app';
+            cv.text(head, x, y, 22, t.crit, { font: 'bold' });
             const lines = [];
             // translated whole before wrapping, so a localized build wraps its own sentence
             translate(COMFORT_WARNING).split(' ').forEach((word) => {
                 const last = lines.length - 1, joined = last >= 0 ? lines[last] + ' ' + word : word;
                 if (last >= 0 && cv.textWidth(joined, 18, { literal: true }) <= w) lines[last] = joined; else lines.push(word);
             });
-            lines.forEach((line, i) => cv.text(line, x, y + 30 + i * 24, 18, t.text, { literal: true }));
+            lines.forEach((line, i) => cv.text(line, x, y + 30 + i * 24, 18, t.crit, { literal: true }));
         }
         function status(cv, t, x, y) {
             if (others.comfort) return warnOthers(cv, t, x, y, 1560 - x);
