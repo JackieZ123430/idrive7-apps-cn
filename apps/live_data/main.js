@@ -367,7 +367,17 @@ mgu.run({
                 const h = {};
                 fields[i].forEach((f) => { h[f] = (v) => sigFeed(i, f, v, false); });
                 return ctx.signals.watch(i, '1', h, log, SIG.POLL[i] ? { pollMs: SIG.POLL[i] } : undefined).then((s) => { sigSubs.push(s); return s; });
-            })).then((all) => log.info('car signals: ' + all.map((s) => SIG.short(s.iface) + (s.error ? ' (error: ' + s.error + ')' : '')).join(' ')));
+            }).concat(
+                // the car's pressure unit: boost and tyre pressures come in it
+                ctx.signals.watch('de.bmw.infotainment.vehicle.Vehicle', '1', {
+                    statusNewCurrentUnitsStatusExt: (v) => {
+                        const p = SIG.pressUnitOf(v && v.unitOfMeasurementAirPressure);
+                        if (p === SIG.units.press) return;
+                        SIG.units.press = p;
+                        log.info('car units: pressure ' + (p || '?'));
+                    },
+                }, log).then((s) => { sigSubs.push(s); return s; })
+            )).then((all) => log.info('car signals: ' + all.map((s) => SIG.short(s.iface) + (s.error ? ' (error: ' + s.error + ')' : '')).join(' ')));
             setTimeout(() => {
                 const names = (on) => sigSubs.filter((s) => !!s.available === on).map((s) => SIG.short(s.iface)).join(' ') || 'none';
                 log.info('car signals after 15 s: offered ' + names(true) + '; not offered ' + names(false));

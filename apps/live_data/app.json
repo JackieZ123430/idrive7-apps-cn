@@ -2,13 +2,17 @@
   "id": "live_data",
   "title": "Live Data",
   "description": "Read-only live values from the car and its control units, a trip computer with fuel cost, and gauge screens of your own, one of them as the home-screen widget",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "vendor": "custom",
   "loggingId": "OA9D",
   "iconGlyph": "gauge",
   "mguHmi": ["ID7", "ID8"],
   "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
   "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "the car's pressure unit: boost and tyre pressures come in it",
+      "statusNewCurrentUnitsStatusExt": "rs"
+    },
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
       "_methods": [

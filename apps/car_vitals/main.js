@@ -306,7 +306,9 @@ mgu.run({
                 statusSwitchDriveDynamicSport2: (v) => {
                     logRaw('FES boost', v.displayBoostPressure);
                     logRaw('FES g [lat, long]', [v.displayLateralAcceleration, v.displayLongitudinalAcceleration]);
-                    put('boostFes', sc('boost', v.displayBoostPressure));
+                    // in the car's pressure unit: 0.01 bar (or 1 kPa) a step, 0.1 psi a step on a car set to psi (issue #186)
+                    const b = sc('boost', v.displayBoostPressure);
+                    put('boostFes', G.isNum(b) && carUnits.press === 'PSI' ? b * 10 / 14.5038 : b);
                 },
                 // the HMI's sport display: power / torque in % of the car's maximum
                 statusVehicleDynamicEngine: (v) => { put('powerPct', sc('sportPct', v.displaySportEnginePower)); put('torquePct', sc('sportPct', v.displaySportEngineTorque)); },

@@ -159,7 +159,9 @@ mgu.run({
                 const raw = v && v.displayBoostPressure;
                 if (typeof raw !== 'number' || raw === 255 || raw < 0) return;
                 if (boost.first === null) boost.first = raw; else if (raw !== boost.first) boost.moved = true;
-                boost.v = raw * 0.01; boost.t = Date.now();
+                // in the car's pressure unit, as BMW's sport display shows it: 0.01 bar (or 1 kPa) a step, 0.1 psi a step on
+                // a car set to psi (issue #186: 20 psi sent as raw 200 read as 2.0 bar, 29 psi)
+                boost.v = tyres.units.press === 'PSI' ? raw * 0.1 / 14.5038 : raw * 0.01; boost.t = Date.now();
             },
         },
         'de.bmw.infotainment.vehicle.CDS2': {

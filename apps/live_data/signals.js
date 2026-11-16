@@ -18,6 +18,14 @@
  * Known scalings: BMW's own (M Laptimer's TypeConverters, x_call's converters); M Vitals for the rest.
  */
 const CDS = 'de.bmw.infotainment.vehicle.CDS', CDS2 = 'de.bmw.infotainment.vehicle.CDS2', V2 = 'de.bmw.infotainment.vehicle.Vehicle2';
+// the car's display units (Vehicle.statusNewCurrentUnitsStatusExt, set by main.js): the sport display's boost and the
+// tyre pressures come in the car's pressure unit; shown here in bar
+const units = { press: null };
+const PRESS_UNITS = { 1: 'BAR', 2: 'KPA', 3: 'PSI' };
+const pressUnitOf = (x) => PRESS_UNITS[x] || (['BAR', 'KPA', 'PSI'].indexOf(x) >= 0 ? x : null);
+// boost: 0.01 bar or 1 kPa a step, 0.1 psi a step (issue #186); tyres: 0.1 bar / kPa / psi a step
+const boostK = () => (units.press === 'PSI' ? 0.1 / 14.5038 : 0.01);
+const tyreK = () => (units.press === 'PSI' ? 0.1 / 14.5038 : units.press === 'KPA' ? 0.001 : 0.1);
 const KOMBI = 'de.bmw.infotainment.KombiIF', FES = 'de.bmw.infotainment.drivingexcitement.FES', TPMS = 'de.bmw.infotainment.vehicle.TPMS';
 const VI = 'de.bmw.infrastructure.VehicleInformation', ENV = 'de.bmw.infrastructure.EnvironmentalInformation';
 const PEDAL = 'de.bmw.powertrain.AcceleratorPedal', PT = 'de.bmw.powertrain.Powertrain';
@@ -68,8 +76,8 @@ const GROUPS = [
         { id: 'torquePct', name: 'Torque, % of maximum (sport display)', i: FES, f: 'statusVehicleDynamicEngine', m: 'displaySportEngineTorque', u: '%', d: 0, bad: [255] },
         { id: 'powerMax', name: 'Maximum power (sport display)', i: FES, f: 'statusVehicleDynamicEngineMaxValue', m: 'displayMaximumValuePower', raw: true, bad: [65535] },
         { id: 'torqueMax', name: 'Maximum torque (sport display)', i: FES, f: 'statusVehicleDynamicEngineMaxValue', m: 'displayMaximumValueTorque', raw: true, bad: [65535] },
-        { id: 'boost', name: 'Boost (sport display)', i: FES, f: 'statusSwitchDriveDynamicSport2', m: 'displayBoostPressure', k: 0.01, u: 'bar', d: 2, bad: [255], q: true },
-        { id: 'boostMax', name: 'Boost peak (sport display)', i: FES, f: 'statusSwitchDriveDynamicSport2', m: 'displayMaximumValueBoostPressure', k: 0.01, u: 'bar', d: 2, bad: [255], q: true },
+        { id: 'boost', name: 'Boost (sport display)', i: FES, f: 'statusSwitchDriveDynamicSport2', m: 'displayBoostPressure', k: boostK, u: 'bar', d: 2, bad: [255], q: true },
+        { id: 'boostMax', name: 'Boost peak (sport display)', i: FES, f: 'statusSwitchDriveDynamicSport2', m: 'displayMaximumValueBoostPressure', k: boostK, u: 'bar', d: 2, bad: [255], q: true },
         { id: 'pedal', name: 'Accelerator pedal', i: PEDAL, f: 'AngleAcceleratorPedal', m: 'actualValueAngleAcceleratorPedal', k: 0.025, u: '%', d: 0, lim: [-2, 102], q: true },
         { id: 'coolant', name: 'Coolant', i: CDS, f: 'statusEngineTemperature', m: 'temperatureEngineDrive', o: -48, u: '°C', d: 0, bad: [255] },
         { id: 'oil', name: 'Engine oil', i: CDS, f: 'statusEngineTemperature', m: 'temperatureEngineOilDrive', o: -48, u: '°C', d: 0, bad: [255] },
@@ -123,13 +131,13 @@ const GROUPS = [
             0: 'below minimum', 1: 'at minimum', 2: '1/4', 3: '2/4', 4: '3/4', 5: 'full', 6: 'above full', 7: 'overfilled', 13: 'OK', 14: 'measuring', 15: null } },
     ] },
     { group: 'Tyres', items: [].concat(
-        // 0.1 bar a step, 65532 and up = no value (x_call); temperatures in °C + 40 (M Vitals, seen on a car)
+        // 0.1 a step in the car's pressure unit (shown in bar), 65532 and up = no value (x_call); temperatures in °C + 40 (M Vitals, seen on a car)
         corner('Tyre pressure', [['pFL', 'actualValuePressureTyreFLH'], ['pFR', 'actualValuePressureTyreFRH'], ['pRL', 'actualValuePressureTyreRLH'], ['pRR', 'actualValuePressureTyreRRH']],
-            { i: TPMS, f: 'statusTyrePressure', k: 0.1, u: 'bar', d: 1, max: 65532 }),
+            { i: TPMS, f: 'statusTyrePressure', k: tyreK, u: 'bar', d: 1, max: 65532 }),
         corner('Tyre temperature', [['tFL', 'actualValueTemperatureTyreFLH'], ['tFR', 'actualValueTemperatureTyreFRH'], ['tRL', 'actualValueTemperatureTyreRLH'], ['tRR', 'actualValueTemperatureTyreRRH']],
             { i: TPMS, f: 'statusTyreTemperature', o: -40, u: '°C', d: 0, bad: [65535], lim: [-40, 150] }),
         corner('Tyre pressure target', [['ptFL', 'targetPressureTyreFLH'], ['ptFR', 'targetPressureTyreFRH'], ['ptRL', 'targetPressureTyreRLH'], ['ptRR', 'targetPressureTyreRRH']],
-            { i: TPMS, f: 'statusTargetTyrePressure', k: 0.1, u: 'bar', d: 1, max: 65532 })) },
+            { i: TPMS, f: 'statusTargetTyrePressure', k: tyreK, u: 'bar', d: 1, max: 65532 })) },
     // sent on the car's own networks; whether the head unit gets them, and their scaling, is still to be seen
     { group: 'Chassis (raw numbers)', items: [].concat(
         corner('Wheel speed', [['wFL', 'actualValueRPMWheelFLH'], ['wFR', 'actualValueRPMwheelFRH'], ['wRL', 'actualValueRPMWheelRLH'], ['wRR', 'actualValueRPMWheelRRH']],
@@ -177,7 +185,7 @@ function value(it, src, v) {
     if ((it.bad && it.bad.indexOf(raw) >= 0) || (it.max !== undefined && raw >= it.max)) return { bad: true };
     if (it.raw) return { n: raw, raw: true, x: !!it.x };
     if (it.s16 && raw >= 32768) raw -= 65536;
-    const n = raw * (it.k === undefined ? 1 : it.k) + (it.o || 0);
+    const n = raw * (it.k === undefined ? 1 : typeof it.k === 'function' ? it.k() : it.k) + (it.o || 0);
     if (it.lim && (n < it.lim[0] || n > it.lim[1])) return { bad: true };
     return { n, u: typeof it.u === 'function' ? it.u(v) : it.u };
 }
@@ -271,4 +279,4 @@ function demo(s, t, st) {
     ];
 }
 
-module.exports = { GROUPS, ITEMS, POLL, sourcesOf, fields, short, value, words, Flow, demo };
+module.exports = { GROUPS, ITEMS, POLL, sourcesOf, fields, short, value, words, Flow, demo, units, pressUnitOf };
