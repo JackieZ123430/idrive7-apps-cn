@@ -42,6 +42,8 @@ const QUICK = [['Red', [255, 0, 0]], ['Orange', [255, 100, 0]], ['Amber', [255, 
 const RING = { cx: 290, cy: 288, R: 186, r: 136 }, DIAL = { cx: 655, cy: 400, R: 54, r: 43 };
 
 const ON_BY_DEFAULT = ['follow', 'flashAlerts'];
+const MOVE_DRAW_MS = 250;            // a moving scene's picture: at most 4 a second
+const FIND_LATER_MS = 5000;          // lights known from an earlier start: read again once the first colour is out
 const IDLE_MS = 15 * 60000;          // without the car's own state: not driven nor the app used this long = parked and left
 /* The car's turn signals (Light.StatusFunctionsIndicators activeFunctionIndicateDirection, by name or number): the
  * driver's (held or tapped), the driving assistant's, and the hazards; the lock and alarm flashes are none. */
@@ -65,15 +67,17 @@ async function background(bg) {
     await ambient.start();
     const diag = await new Diag(signals, log).init();
     diag.quiet = true; diag.busyLog = false;
-    const lights = new Lights({ diag, log });
+    // the lights found at an earlier start: the colour goes out at once, and the buses are read again after it
+    const lights = new Lights({ diag, log, known: settings.get('lightsKnown') });
     const control = new Control({ settings, lights, ambient, log });
     control.start();
     // with the lights answering, the driving modes' looks replace BMW's colours by mode (ambient.js)
     lights.on('change', () => { ambient.slotsOff = lights.lights.length > 0; });
+    lights.on('found', (l) => settings.set('lightsKnown', l));
     // lights that did not answer: asked again every 2 min while the car is in use (parked and left: the car sleeps)
     const again = () => setTimeout(() => { if (control._away) again(); else find(); }, 120000);
     const find = () => lights.find().then((l) => { if (!l.length) again(); }, (e) => { log.warn('lights: ' + e); again(); });
-    find();
+    setTimeout(find, lights.lights.length ? FIND_LATER_MS : 0);
     signals.watch('de.bmw.infotainment.vehicle.Vehicle', '1', {
         statusDayNightChangeOver: (v) => {
             const x = v && typeof v === 'object' ? v.dayNightChangeOver : v, c = typeof x === 'string' ? DAY_NIGHT[x] : x;
@@ -500,12 +504,16 @@ mgu.run({
             }
         };
         setInterval(pauseCheck, 250);
-        // moving lights redraw a few times a second, the rest when something changes
+        // moving lights redraw MOVE_DRAW_MS apart (the lights' writes share the app's one thread), the rest when something
+        // changes
+        let movedAt = 0;
         const tick = () => {
             if (page === 4) { strobeSeen = Date.now(); pauseCheck(); }
             const moving = (lights.scene && S.moves(lights.scene)) || (page === 1 && control.on() && S.moves(look()));
+            const due = moving && page <= 1 && Date.now() - movedAt >= MOVE_DRAW_MS;
+            if (due) movedAt = Date.now();
             // (the Strobe tab: its checks follow the car, so it draws on each tick)
-            return dirty || (moving && page <= 1) || page === 4 ? render() : null;
+            return dirty || due || page === 4 ? render() : null;
         };
 
         if (ctx.onTap) {
