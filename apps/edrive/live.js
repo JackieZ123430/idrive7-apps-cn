@@ -70,7 +70,7 @@ class Demo {
         const v = 352 - kw * 0.12;
         return {
             kw, v, a: -kw * 1000 / v, speed: standing ? 0 : 55 + 20 * Math.sin(s / 9), engine: false,
-            soc: 64 - (s / 60) % 30, cellV: demoCells(s), cellT: { min: 21.4 + 2.5 * Math.sin(s / 500), max: 23.9 + 2.8 * Math.sin(s / 500), avg: 22.5 + 2.6 * Math.sin(s / 500) },
+            soc: 64 - (s / 60) % 30, cellSoc: { min: 63.6 - (s / 60) % 30, max: 64.3 - (s / 60) % 30 }, cellV: demoCells(s), cellT: { min: 21.4 + 2.5 * Math.sin(s / 500), max: 23.9 + 2.8 * Math.sin(s / 500), avg: 22.5 + 2.6 * Math.sin(s / 500) },
             coolant: 20.8 + 2 * Math.sin(s / 520),
             limits: { chargeA: 165, dischargeA: 330 }, ambient: 29, climate: 'ac', blower: 4, blowerTop: 8,
             acKw: 1.15 + 0.2 * Math.sin(s / 7), seats: { DR: 1 }, wheel: false,
@@ -96,7 +96,7 @@ module.exports = function live(ctx, sh) {
     process.on('exit', () => { if (JSON.stringify(st) !== saved) save(); });
 
     /* ---------- this part's own values (the battery unit's); the car's are eDrive's (L) ---------- */
-    const live = { v: null, vT: 0, a: null, kw: null, kwT: 0, soc: null, cellV: null, cellT: null, coolant: null, limits: null, slowT: {} };
+    const live = { v: null, vT: 0, a: null, kw: null, kwT: 0, soc: null, cellSoc: null, cellV: null, cellT: null, coolant: null, limits: null, slowT: {} };
 
     /* ---------- the power as fast as the car's eDRIVE needle (fastkw.js), learned from the readings below ----------
      * eDrive's signal handler gives each needle here (L.needleFn); setting "kwFast": fast, or the readings only */
@@ -105,7 +105,10 @@ module.exports = function live(ctx, sh) {
     L.needleFn = (drive, recup) => { fast.needle(drive, recup, Date.now()); if (fastOn() && sh.onPower) sh.onPower(); };
 
     /* ---------- UDS: candidates with several fields on one reply ---------- */
-    const pick = {};
+    // the candidate that answered each value, kept across starts (in live.json once one has answered): the next start
+    // asks that one first
+    const pick = Object.assign({}, st.pick || {});
+    Object.defineProperty(st, 'pick', { enumerable: true, configurable: true, get: () => (Object.keys(pick).length ? pick : undefined) });
     const fieldsOf = (c) => (c.array ? ['min', 'max', 'avg'] : Object.keys(c.fields || {}));
     // short waits: one request that hangs holds the link for every read behind it (the power read too).
     // The kit's defaults (busy: 1-4 s pauses, "response pending": 10 s, transport call: 8 s) are for one-off reads
@@ -126,8 +129,10 @@ module.exports = function live(ctx, sh) {
                 const v = raw * (f.factor == null ? 1 : f.factor) + (f.offset || 0);
                 cells.push((f.min != null && v < f.min) || (f.max != null && v > f.max) ? null : v);
             }
+            // the slots after the last cell (E554 has 112, filled up with 7FFF) are not cells
+            while (cells.length && cells[cells.length - 1] === null) cells.pop();
             const ok = cells.filter(G.isNum);
-            if (ok.length < cells.length / 2) return null;
+            if (!ok.length || ok.length < cells.length / 2) return null;
             out.cells = cells;
             out.min = Math.min(...ok); out.max = Math.max(...ok); out.avg = ok.reduce((a, v) => a + v, 0) / ok.length;
             out.minAt = cells.indexOf(out.min) + 1; out.maxAt = cells.indexOf(out.max) + 1;
@@ -153,6 +158,18 @@ module.exports = function live(ctx, sh) {
         const start = pick[name] || 0;
         for (let k = 0; k < list.length; k++) {
             const i = (start + k) % list.length, v = await readFields(list[i]);
+            if (v) { pick[name] = i; return v; }
+        }
+        return null;
+    }
+    /** readGroup with each candidate in a turn of its own on the link: a power read can go between them, so candidates
+     *  that don't answer (each waits out its timeout) never hold the link for all of them. */
+    async function readTurns(name, list) {
+        list = list || [];
+        const start = pick[name] || 0;
+        for (let k = 0; k < list.length; k++) {
+            const i = (start + k) % list.length;
+            const v = await exclusive(() => readFields(list[i]).catch((e) => { log.warn(name + ': ' + e); return null; }), false, name + ' ' + list[i].did);
             if (v) { pick[name] = i; return v; }
         }
         return null;
@@ -206,6 +223,18 @@ module.exports = function live(ctx, sh) {
     const trace = [];
     const push = (arr, keep, v) => { const now = Date.now(); arr.push([now, v]); while (arr.length && now - arr[0][0] > keep * 1000) arr.shift(); };
     let iFail = 0, iTry = 0, vTick = 0, iOk = false, pMiss = 0, pLogT = 0;
+    // the pack voltage: the candidate asked next, rounds without an answer. No candidate answered at an earlier start
+    // (st.noV): asked again after 30 s, not three rounds first
+    let vAt = pick.hvV || 0, vMiss = st.noV ? 3 : 0, vTry = st.noV ? Date.now() : 0;
+    /* Fully electric without a voltage reading (neither the battery unit nor the car's signal): the pack voltage
+     * from the charge, between config.battery.packV.empty and .full - enough for the power's kW (a few % off under
+     * load); shown with "~". */
+    function estV() {
+        const pv = cfg.packV;
+        if (!pv || !(sh.isBev && sh.isBev()) || !G.isNum(pv.empty) || !G.isNum(pv.full)) return null;
+        const s = G.isNum(live.soc) ? live.soc : L.soc;
+        return G.isNum(s) ? pv.empty + (pv.full - pv.empty) * G.clamp(s, 0, 100) / 100 : null;
+    }
     /* measured consumption: the battery's own energy (out - regen) per km driven with the engine off,
      * standing in traffic included - over the last USE_KM km (st.use, kept across restarts) and the
      * last minute (useNow). This is what "range at this rate" on the Energy page divides by. */
@@ -261,17 +290,29 @@ module.exports = function live(ctx, sh) {
     async function readPower() {
         // a car without the current identifier: only every 30 s. One that has answered keeps being asked
         // (no high-voltage battery: nothing to ask; the tries cost the 12 V reads seconds every 30 s)
-        if (sh.kind && sh.kind() !== 'phev') return;
+        if (sh.kind && sh.kind() !== 'phev' && sh.kind() !== 'bev') return;
         if (!diag.available || !inUse() || (!iOk && iFail >= 3 && Date.now() - iTry < 30000)) return;
         const queued = Date.now();
         await exclusive(async () => {
             const w = Date.now() - queued;
             perf.wait += w; perf.maxWait = Math.max(perf.maxWait, w);
             try {
-                // the pack voltage moves little: every 5 s is enough, so the current gets nearly every read
-                if (!G.isNum(live.v) || Date.now() - live.vT > 5000) {
-                    const r = await readGroup('hvV', cfg.fast.hvV);
-                    if (r) { live.v = r[fieldsOf(cfg.fast.hvV[pick.hvV])[0]]; live.vT = Date.now(); }
+                // the pack voltage moves little: every 5 s is enough, so the current gets nearly every read. One candidate
+                // per read, from the one that answered last: each that doesn't answer waits out its timeout, and all five
+                // in one read held the link ~4 s. Three rounds without an answer: asked again every 30 s only (the car's
+                // voltage signal or the estimate meanwhile), and remembered for the next start (st.noV)
+                const vl = cfg.fast.hvV || [];
+                if (vl.length && (!G.isNum(live.v) || Date.now() - live.vT > 5000) && (vMiss < 3 || Date.now() - vTry > 30000)) {
+                    vTry = Date.now();
+                    const i = vAt % vl.length, rv = await readFields(vl[i]);
+                    if (rv) {
+                        pick.hvV = vAt = i; live.v = rv[fieldsOf(vl[i])[0]]; live.vT = Date.now(); vMiss = 0;
+                        if (st.noV) { st.noV = false; save(); }
+                    } else {
+                        vAt = (i + 1) % vl.length;
+                        // back at the one that answered last (or the first): a whole round without an answer
+                        if (vAt === (pick.hvV || 0) % vl.length && ++vMiss >= 3 && !st.noV) { st.noV = true; save(); }
+                    }
                 }
                 iTry = Date.now();
                 const r = await readGroup('hvI', cfg.fast.hvI);
@@ -287,7 +328,7 @@ module.exports = function live(ctx, sh) {
                 iFail = 0; iOk = true;
                 const a = r[fieldsOf(cfg.fast.hvI[pick.hvI])[0]], now = Date.now();
                 live.a = a;
-                const volts = live.vT && now - live.vT < 60000 ? live.v : L.lscVT && now - L.lscVT < 60000 ? L.lscV : null;
+                const volts = live.vT && now - live.vT < 60000 ? live.v : L.lscVT && now - L.lscVT < 60000 ? L.lscV : estV();
                 if (G.isNum(volts) && G.isNum(a)) onPower(volts * a / 1000 * (cfg.powerSign < 0 ? -1 : 1), now);
             } catch (e) { log.warn('power: ' + e); }
         }, true, 'power');
@@ -320,8 +361,8 @@ module.exports = function live(ctx, sh) {
             if (asked && name !== 'soc') continue;
             if (!(cfg.slow[name] || []).length || Date.now() < (slowSkipUntil[name] || 0)) continue;
             if (!pageShown() && name !== 'soc' && name !== 'limits') continue;
-            // each try is its own turn on the link, so a power read can go between them
-            const one = () => exclusive(() => readGroup(name, cfg.slow[name]).catch((e) => { log.warn(name + ': ' + e); return null; }), false, name);
+            // each candidate is its own turn on the link, so a power read can go between them
+            const one = () => readTurns(name, cfg.slow[name]);
             let r = await one();
             // busy or no reply (the battery unit is asked something ~10 times a second): once more
             if (!r) { await new Promise((res) => setTimeout(res, 150)); r = await one(); }
@@ -338,7 +379,11 @@ module.exports = function live(ctx, sh) {
             }
             slowMiss[name] = 0;
             const f = fieldsOf(cfg.slow[name][pick[name]]);
-            live[name] = f.length === 1 ? r[f[0]] : r;
+            if (name === 'soc') {
+                // the charge, and on a fully electric car (E5CE) the lowest and highest cell's charge after it
+                live.soc = r[f[0]];
+                live.cellSoc = G.isNum(r.cellMin) && G.isNum(r.cellMax) ? { min: r.cellMin, max: r.cellMax } : null;
+            } else live[name] = f.length === 1 ? r[f[0]] : r;
             live.slowT[name] = Date.now();
         }
         if (pageShown()) await readProbes();
@@ -403,7 +448,8 @@ module.exports = function live(ctx, sh) {
      * found by scanning with something off, then on (heater, A/C). Battery replies holding a 2-byte value
      * that reads as a cell voltage (3.0-4.3 V at 1 mV) or a pack voltage (200-460 V at 0.01 V) are flagged. */
     const SCAN_UNITS = {
-        7: { name: 'battery unit (SME)', ranges: [[0xDD00, 0xDDFF], [0xDF00, 0xDFFF], [0xD600, 0xD6FF], [0x6300, 0x63FF]] },
+        // (E500-E5FF: where fifth-generation eDrive battery units, e.g. the iX3's, keep charge, energy, voltage and current)
+        7: { name: 'battery unit (SME)', ranges: [[0xDD00, 0xDDFF], [0xDF00, 0xDFFF], [0xD600, 0xD6FF], [0x6300, 0x63FF], [0xE500, 0xE5FF]] },
         120: { name: 'climate unit (IHKA)', ranges: [[0xD000, 0xDFFF], [0x4000, 0x41FF]] },
     };
     const scanUnit = () => (SCAN_UNITS[+settings.get('scanUnit')] ? +settings.get('scanUnit') : 7);
@@ -594,10 +640,11 @@ module.exports = function live(ctx, sh) {
         const staleAfter = Math.max(30, settings.get('slowPoll') * 4) * 1000;
         const stale = {}; SLOW.forEach((k) => { stale[k] = !!live.slowT[k] && now - live.slowT[k] > staleAfter ? now - live.slowT[k] : 0; });
         const read = live.kwT && now - live.kwT < KW_KEEP ? live.kw : null, fk = fastOn() ? fast.now(now) : null;
+        const vRead = fresh(live.vT, 60) ? live.v : fresh(L.lscVT, 60) ? L.lscV : null, vEst = vRead === null ? estV() : null;
         return {
             demo: false, kw: G.isNum(fk) ? fk : read, kwAge: G.isNum(fk) ? 0 : live.kwT ? now - live.kwT : null, kwRead: read, kwFast: G.isNum(fk), stale,
-            v: fresh(live.vT, 60) ? live.v : fresh(L.lscVT, 60) ? L.lscV : null, a: fresh(live.kwT, 10) ? live.a : null,
-            speed: L.speed, engine: engineOn(), soc: slowOk('soc') ? live.soc : null,
+            v: vRead !== null ? vRead : vEst, vEst: vEst !== null, a: fresh(live.kwT, 10) ? live.a : null,
+            speed: L.speed, engine: engineOn(), soc: slowOk('soc') ? live.soc : null, cellSoc: slowOk('soc') ? live.cellSoc : null,
             cellV: slowOk('cellV') ? live.cellV : null, cellT: slowOk('cellT') ? live.cellT : null, carT: L.batt,
             coolant: slowOk('coolant') ? live.coolant : null, limits: slowOk('limits') ? live.limits : null,
             ambient: L.ambient, climate: L.climate, blower: L.blower, blowerTop: L.blowerTop,
@@ -702,7 +749,7 @@ module.exports = function live(ctx, sh) {
         cv.text('kW', x + 34 + vw, ky, big ? 38 : 30, t.dim, { font: 'bold' });
         const pcol = pw.what === 'REGEN' || pw.what === 'CHARGING' ? GO : pw.kw === null ? t.dim : t.text;
         cv.text(pw.what, r, y + 72, 26, pcol, { font: 'bold', spacing: 2, align: 'right' });
-        cv.text(G.isNum(d.v) ? G.fmt(d.v, 0) + ' V' + (G.isNum(d.a) ? '  ·  ' + G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : '') : 'pack --', r, y + 106, 22, t.dim, { align: 'right' });
+        cv.text(G.isNum(d.v) ? (d.vEst ? '~' : '') + G.fmt(d.v, 0) + ' V' + (G.isNum(d.a) ? '  ·  ' + G.fmt(-d.a * (cfg.powerSign < 0 ? 1 : -1), 0) + ' A' : '') : 'pack --', r, y + 106, 22, t.dim, { align: 'right' });
         if (d.engine) cv.text('ENGINE RUNNING', r, y + 138, 20, t.warn, { font: 'bold', spacing: 1.5, align: 'right' });
         const by = ky + 30;
         powerBar(cv, t, x + 24, by, w - 48, pw.kw, lim);
@@ -718,28 +765,37 @@ module.exports = function live(ctx, sh) {
     /** Battery: its power now (left; Battery health under it is eDrive's, main.js: 24, 360, 560, 152) and every cell. */
     function renderBattery(cv, t, d) {
 
-        // ---- every cell's voltage: the lowest and highest marked, scaled to the spread; the cells' temperature
+        // ---- every cell's voltage: the lowest and highest marked, scaled to the spread; the cells' temperature. A battery
+        // unit without a voltage per cell: the lowest and highest cell's voltage and / or charge (a fully electric car's
+        // E5CE), with their spread
         const x = 608, w = 968, r = x + w - 24;
-        const cvv = d.cellV, cells = cvv && cvv.cells;
+        const cvv = d.cellV, cells = cvv && cvv.cells, cs = d.cellSoc;
         const ex = G.panel(cv, t, x, 44, w, 468, 'Cells' + (cells ? '  (' + cells.length + ')' : '')).h - 468;   // (room below the page: taller bars)
-        const spread = cvv && G.isNum(cvv.min) && G.isNum(cvv.max) ? (cvv.max - cvv.min) * 1000 : null;
+        const hasV = !!cvv && G.isNum(cvv.min) && G.isNum(cvv.max);
+        const spread = hasV ? (cvv.max - cvv.min) * 1000 : null;
         const scol = !G.isNum(spread) ? t.dim : spread > 100 ? t.crit : spread > 50 ? t.warn : GO;
         const head = (hx, label, v, c, sub) => {
             cv.text(label, hx, 112, 18, t.dim, { font: 'bold', spacing: 1.2 });
             cv.text(v, hx, 148, 32, c, { font: 'bold' });
             if (sub) cv.text(sub, hx, 172, 16, t.dim);
         };
-        head(x + 24, 'LOWEST', cvv && G.isNum(cvv.min) ? G.fmt(cvv.min, 3) + ' V' : '--', t.warn, cvv && cvv.minAt ? translate('cell') + ' ' + cvv.minAt : '');
-        head(x + 234, 'HIGHEST', cvv && G.isNum(cvv.max) ? G.fmt(cvv.max, 3) + ' V' : '--', t.accent2 || t.text, cvv && cvv.maxAt ? translate('cell') + ' ' + cvv.maxAt : '');
-        head(x + 444, 'SPREAD', G.isNum(spread) ? G.fmt(spread, 0) + ' mV' : '--', scol,
-            G.isNum(spread) ? (spread > 100 ? 'out of balance' : spread > 50 ? 'high (normal under load)' : 'well balanced') : '');
+        if (hasV || !cs) {
+            head(x + 24, 'LOWEST', hasV ? G.fmt(cvv.min, 3) + ' V' : '--', t.warn, cvv && cvv.minAt ? translate('cell') + ' ' + cvv.minAt : '');
+            head(x + 234, 'HIGHEST', hasV ? G.fmt(cvv.max, 3) + ' V' : '--', t.accent2 || t.text, cvv && cvv.maxAt ? translate('cell') + ' ' + cvv.maxAt : '');
+            head(x + 444, 'SPREAD', G.isNum(spread) ? G.fmt(spread, 0) + ' mV' : '--', scol,
+                G.isNum(spread) ? (spread > 100 ? 'out of balance' : spread > 50 ? 'high (normal under load)' : 'well balanced') : '');
+        } else {
+            head(x + 24, 'LOWEST', G.fmt(cs.min, 2) + ' %', t.warn, 'cell charge');
+            head(x + 234, 'HIGHEST', G.fmt(cs.max, 2) + ' %', t.accent2 || t.text, 'cell charge');
+            head(x + 444, 'SPREAD', G.fmt(cs.max - cs.min, 2) + ' %', t.text, 'lowest to highest cell');
+        }
         const ct = cellTemps(d);
         head(x + 654, 'TEMPERATURE', ct ? fmtT(ct.avg) : '--', ct ? tempColor(t, ct.avg) : t.dim,
             ct && G.isNum(ct.min) && G.isNum(ct.max) ? G.fmt(T(ct.min), 0) + ' - ' + G.fmt(T(ct.max), 0) + ' ' + tU() : '');
         cv.text('CHARGE', r, 112, 18, t.dim, { font: 'bold', spacing: 1.2, align: 'right' });
         const pc = cv.text('%', r, 148, 20, t.dim, { font: 'bold', align: 'right' });
         cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 1) : '--', r - pc - 6, 148, 32, d.stale && d.stale.soc ? t.dim : t.text, { font: 'bold', align: 'right' });
-        if (G.isNum(d.soc)) cv.text('~' + G.fmt(d.soc / 100 * settings.get('designKwh'), 1) + ' kWh', r, 172, 16, t.dim, { align: 'right' });
+        if (G.isNum(d.soc)) cv.text('~' + G.fmt(d.soc / 100 * (sh.fullKwh ? sh.fullKwh() : settings.get('designKwh')), 1) + ' kWh', r, 172, 16, t.dim, { align: 'right' });
         if (cells) {
             // bars: from a floor below the lowest cell, so the differences show
             const x0 = x + 80, bw0 = r - x0, btop = 210, base = 420 + G.toMargin(ex, 70), n = cells.length, bw = bw0 / n;
@@ -757,6 +813,21 @@ module.exports = function live(ctx, sh) {
             });
             for (let i = 0; i < n; i += 12) cv.text(String(i + 1), x0 + i * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
             cv.text(String(n), x0 + (n - 1) * bw + bw / 2, base + 22, 14, t.dim, { align: 'center' });
+        } else if (hasV || cs) {
+            // no voltage per cell: the spread between the lowest and highest cell, as kit bars (as Holds and Full)
+            const rows = [];
+            if (hasV) {
+                rows.push({ label: 'Cell voltage spread', value: spread, text: G.fmt(spread, 0), unit: 'mV', max: 100, step: 25,
+                    color: GO, zones: [{ from: 50, to: 100, color: 'warn' }, { from: 100, to: 1e9, color: 'crit' }] });
+            }
+            if (cs) {
+                rows.push({ label: 'Cell charge spread', value: cs.max - cs.min, text: G.fmt(cs.max - cs.min, 2), unit: '%', max: 5, step: 1,
+                    color: G.mix(t.text, t.bg, 0.25) });
+            }
+            // (room below the page: the rows spread down)
+            const two = rows.length > 1, gap = 130 + Math.round(ex / 3), y0 = (two ? 214 : 262) + Math.round(ex / (two ? 6 : 2));
+            rows.forEach((g, i) => G.bar(cv, t, x + 24, y0 + i * gap, w - 48, 92, g));
+            if (!hasV) cv.text('Cell voltages: ' + (settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading'), x + 24, G.BOTTOM - G.MARGIN + ex, 18, t.dim);
         } else cv.text(settings.get('diagPage') ? 'no reading - see Diagnostics' : 'no reading yet', x + w / 2, 300 + Math.round(ex / 2), 24, t.dim, { align: 'center' });
     }
 
@@ -916,36 +987,48 @@ module.exports = function live(ctx, sh) {
             ctx.widget.set(inst.spawnId, k, cells[k][0], cells[k][1]);
         });
     }
-    /* Big widget picture. The HMI fills the widget with it and crops a fixed share of every edge
-     * (about 5 % on the car, whatever the picture's size), so everything stays inside app.json
-     * startWidget.safe (share of width / height kept clear on each side; it also fades the top, so
-     * that share is the larger) and draws startWidget.scale times the pixels. The layout's title is
-     * set empty (startWidget.cells), so the picture has the whole widget. */
+    /* Big widget picture. The HMI fills the widget with it, crops a fixed share of every edge (about 5 % on the car,
+     * whatever the picture's size: app.json startWidget.safe, [x, y] or [left, top, right, bottom]) and fades the
+     * picture towards its edges, the top most. The setting widgetFit keeps everything that much further in
+     * (WIDGET_FIT: share of the picture on each side, [left, top, right, bottom]; large = the picture as before 2.10,
+     * which the fade reached on an iX3), and the layout (WIDGET_BOX at large) scales down to the room left. Drawn at
+     * startWidget.scale times the pixels. The layout's title is set empty (startWidget.cells), so the picture has the
+     * whole widget. */
+    const WIDGET_FIT = { large: [0, 0, 0, 0], medium: [0.06, 0.04, 0.06, 0.02], small: [0.11, 0.09, 0.11, 0.05] };
+    const WIDGET_BOX = [314, 168];
+    function widgetBox(w, h, safe, fit) {
+        const sf = safe.length === 4 ? safe : [safe[0], safe[1], safe[0], safe[1]], f = WIDGET_FIT[fit] || WIDGET_FIT.large;
+        return { x0: Math.round(w * (sf[0] + f[0])), y0: Math.round(h * (sf[1] + f[1])),
+            x1: w - Math.round(w * (sf[2] + f[2])), y1: h - Math.round(h * (sf[3] + f[3])) };
+    }
     function renderWidget(inst) {
         if (inst) widgetCells(inst);
         const sw0 = ctx.spec.startWidget || {};
-        const [w, h] = sw0.size || [384, 256], [sx, sy] = sw0.safe || [0.09, 0.1];
+        const [w, h] = sw0.size || [384, 256];
         const key = w + 'x' + h, scale = sw0.scale || 1;
         const cv = (wcan[key] = wcan[key] || new ScaledCanvas(w, h, scale)).clear([0, 0, 0, 0]);
         const t = ctx.theme(), d = data(), pw = power(d, t), lim = limitsKw(d);
         const scol = pw.what === 'REGEN' || pw.what === 'CHARGING' ? GO : pw.kw === null ? t.dim : t.text;
-        const x0 = Math.round(w * sx), x1 = w - x0, y0 = Math.round(h * sy), y1 = h - y0, iw = x1 - x0;
+        const b = widgetBox(w, h, sw0.safe || [0.09, 0.1], settings.get('widgetFit')), x0 = b.x0, x1 = b.x1, iw = x1 - x0;
+        // the layout at scale s, centred in the room from top to bottom: Y(y) and F(size) in the layout's own units
+        const s = Math.min(1, iw / WIDGET_BOX[0], (b.y1 - b.y0) / WIDGET_BOX[1]);
+        const top = b.y0 + Math.round((b.y1 - b.y0 - WIDGET_BOX[1] * s) / 2), Y = (v) => top + v * s, F = (v) => v * s;
         // top row: state left, electric range left right
-        cv.text(pw.what, x0, y0 + 18, 18, scol, { font: 'bold', spacing: 1.5 });
-        cv.text(sh.rangeText ? sh.rangeText(d.soc) : '', x1, y0 + 18, 18, t.text, { font: 'bold', align: 'right' });
-        if (d.engine || d.demo) cv.text(d.engine ? 'ENGINE ON' : 'DEMO', (x0 + x1) / 2, y0 + 18, 13, t.warn, { font: 'bold', spacing: 1, align: 'center' });
+        cv.text(pw.what, x0, Y(18), F(18), scol, { font: 'bold', spacing: F(1.5) });
+        cv.text(sh.rangeText ? sh.rangeText(d.soc) : '', x1, Y(18), F(18), t.text, { font: 'bold', align: 'right' });
+        if (d.engine || d.demo) cv.text(d.engine ? 'ENGINE ON' : 'DEMO', (x0 + x1) / 2, Y(18), F(13), t.warn, { font: 'bold', spacing: F(1), align: 'center' });
         // power and charge
-        const ky = y0 + 92;
-        const vw = cv.text(pw.text, x0, ky, 70, pw.col, { font: 'num' });
-        cv.text('kW', x0 + 8 + vw, ky, 22, t.dim, { font: 'bold' });
-        const pc = cv.text('%', x1, ky, 20, t.dim, { font: 'bold', align: 'right' });
-        cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--', x1 - pc - 4, ky, 46, G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'right' });
-        widgetBar(cv, t, x0, ky + 16, iw, 12, pw.kw, lim);
+        const ky = Y(92);
+        const vw = cv.text(pw.text, x0, ky, F(70), pw.col, { font: 'num' });
+        cv.text('kW', x0 + F(8) + vw, ky, F(22), t.dim, { font: 'bold' });
+        const pc = cv.text('%', x1, ky, F(20), t.dim, { font: 'bold', align: 'right' });
+        cv.text(G.isNum(d.soc) ? G.fmt(d.soc, 0) : '--', x1 - pc - F(4), ky, F(46), G.isNum(d.soc) ? t.text : t.dim, { font: 'num', align: 'right' });
+        widgetBar(cv, t, x0, ky + F(16), iw, F(12), pw.kw, lim);
         // bottom row
-        const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip, yb = y1 - 26;
+        const ct = cellTemps(d), tp = d.demo ? { out: 2.84, regen: 0.61 } : trip, yb = Y(WIDGET_BOX[1] - 26);
         const colm = (x, label, v, c, align) => {
-            cv.text(label, x, yb, 13, t.dim, { font: 'bold', spacing: 1, align });
-            cv.text(v, x, yb + 24, 21, c, { font: 'bold', align });
+            cv.text(label, x, yb, F(13), t.dim, { font: 'bold', spacing: F(1), align });
+            cv.text(v, x, yb + F(24), F(21), c, { font: 'bold', align });
         };
         colm(x0, 'CELLS', ct ? fmtT(ct.avg) : '--', ct ? tempColor(t, ct.avg) : t.dim);
         colm((x0 + x1) / 2, 'THIS DRIVE', G.fmt(tp.out - tp.regen, 2) + ' kWh', t.text, 'center');

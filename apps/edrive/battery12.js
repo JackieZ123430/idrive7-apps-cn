@@ -23,7 +23,8 @@
  * run while the car is driven (and IDLE_AFTER_MOVE after) and IDLE_AFTER_USER after the start or the page was opened
  * or a button pressed; parked longer they stop ("Read now" asks again), as live.js's do.
  *
- *   const b12 = require('./battery12')(ctx, { diag, reader, exclusive, live, st, save, usingDemo, kind, page, render })
+ *   const b12 = require('./battery12')(ctx, { diag, reader, exclusive, live, st, save, usingDemo, kind, skip, page, render })
+ *   (skip(candidate): true for a v12 candidate on a unit this car doesn't have, never asked)
  *   b12.PAGES, b12.NAMES; b12.readVolt(force) -> V or null; b12.readValues(force); b12.allowed(force);
  *   b12.fast() (read every FAST_MS now); b12.onSpeed(kmh); b12.touched(); b12.draw(name, cv, t, d)
  */
@@ -162,14 +163,16 @@ module.exports = function battery12(ctx, sh) {
             return v;
         };
         let v = null;
-        const p = vs.pick !== null && list[vs.pick] ? vs.pick : null;
+        // sh.skip: candidates on units this car doesn't have (a fully electric car's engine and gearbox units)
+        const skipped = (i) => !!(sh.skip && sh.skip(list[i]));
+        const p = vs.pick !== null && list[vs.pick] && !skipped(vs.pick) ? vs.pick : null;
         if (p !== null) {
             v = await one(p);
             if (v !== null) vs.miss = 0;
             else if (++vs.miss < MISS_LIMIT) { return null; }
         }
         if (v === null) {
-            const order = list.map((c, i) => i).filter((i) => i !== p)
+            const order = list.map((c, i) => i).filter((i) => i !== p && !skipped(i))
                 .sort((a, b) => RANK[vs.res[a] || 'new'] - RANK[vs.res[b] || 'new'] || a - b);
             if (p !== null) order.push(p);
             for (const i of order) {
@@ -457,7 +460,7 @@ module.exports = function battery12(ctx, sh) {
         kv(cv, t, 'REGEN', mmss(tr.regenS) + '  ·  ' + times(tr.regenN), x0, Y(374), w, t.cold || t.accent);
         kv(cv, t, 'CHARGING', mmss(tr.chargeS), x0, Y(410), w, GO);
         kv(cv, t, 'VOLTAGE RANGE', G.isNum(tr.minV) ? G.fmt(tr.minV, 2) + ' - ' + G.fmt(tr.maxV, 2) + ' V' : '--', x0, Y(446), w);
-        cv.text('Hybrid car? Settings > Hybrid system', x0, Y(492), 18, t.dim);
+        cv.text('Hybrid or electric car? Settings > Drive system', x0, Y(492), 18, t.dim);
     }
 
     function renderHistory(cv, t, d) {

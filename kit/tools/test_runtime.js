@@ -2,7 +2,8 @@
 
 // Kit runtime (display.js, renderd.js, mgu.js Settings) against a stand-in mgu-render on a Unix socket: the
 // unchanged-frame skip and its keepalive, a sheet that throws, X_STATE front flips, a reconnect after a cut
-// message, the theme kept on a fresh install. No SDK, renderer or car needed:
+// message, the theme kept on a fresh install; signals.js's queue of native calls against a stand-in someip module.
+// No SDK, renderer or car needed:
 //   node kit/tools/test_runtime.js
 
 const assert = require('assert');
@@ -339,6 +340,71 @@ test('iDrive 8 (the Store\'s renderer offers no controller there): never connect
         assert.strictEqual(conns, 0, 'no new connection');
         assert.strictEqual(t.d.ctlTries, 0, 'no try counted');
     } finally { t.end(); }
+});
+
+/* signals.js: one native call at a time, method calls (urgent: UDS) ahead of the watch() set-ups waiting, and never
+ * so many urgent calls in a row that the set-ups are shut out. A copy of signals.js, with its interface configs in
+ * someipdefs/ next to it, against a stand-in for the native someip module that logs each native call as the queue
+ * lets it through: 'call', 'build <interface>', 'avail <interface>', 'sub <field>'. */
+const URGENT_RUN = 4;
+function signalsWithFakeNative() {
+    const app = path.join(dir, 'signals-' + cases.length + '-' + Date.now()), kit = path.join(app, 'javascript', 'kit');
+    fs.mkdirSync(kit, { recursive: true });
+    fs.mkdirSync(path.join(app, 'someipdefs'));                      // signals.js DIRS: kit/../../someipdefs
+    ['test.Uds', 'test.Cds', 'test.Gear'].forEach((n) =>
+        fs.writeFileSync(path.join(app, 'someipdefs', n.replace(/\./g, '_') + '.json'), JSON.stringify({ name: n, fields: {} })));
+    const file = path.join(kit, 'signals.js');
+    fs.copyFileSync(path.join(__dirname, '..', 'runtime', 'signals.js'), file);
+    const log = [];
+    const native = (what, v) => { log.push(what); return new Promise((r) => setImmediate(() => r(v))); };
+    const fake = {
+        buildProxy: (cfg) => native('build ' + cfg.name, {
+            init: () => Promise.resolve(),
+            callMethod: () => native('call', {}),
+            subscribeToAvailability: () => { log.push('avail ' + cfg.name); return null; },
+            subscribe: (o) => native('sub ' + o.name),
+            isAvailable: () => true,
+            getValue: () => Promise.resolve({}),
+        }),
+    };
+    const Module = require('module'), load = Module._load;
+    Module._load = function (request) { return request === 'someip' ? fake : load.apply(this, arguments); };
+    try { return { sig: require(file), log }; } finally { Module._load = load; }
+}
+
+test('signals: a method call goes ahead of the watch() set-ups waiting', async () => {
+    const { sig, log } = signalsWithFakeNative();
+    const uds = await sig.proxy('test.Uds', '1');
+    log.length = 0;
+    const watches = ['test.Cds', 'test.Gear'].map((n) => sig.watch(n, '1', { a: () => {}, b: () => {} }));
+    await sig.call(uds, 'read');
+    // (the first set-up was already running when the call came)
+    assert(log.indexOf('call') === 1, 'the call ran as native call ' + (log.indexOf('call') + 1) + ': ' + log.join(', '));
+    const w = await Promise.all(watches);
+    assert(w.every((x) => !x.error && x.available), JSON.stringify(w.map((x) => x.error)));
+});
+
+test('signals: watch() set-ups still go while method calls keep the urgent lane full', async () => {
+    const { sig, log } = signalsWithFakeNative();
+    const uds = await sig.proxy('test.Uds', '1');
+    log.length = 0;
+    // three UDS readers, each asking again as soon as its answer comes: the urgent lane is never empty
+    let stop = false, calls = 0;
+    const reader = async () => { while (!stop && calls < 400) { calls++; await sig.call(uds, 'read'); } };
+    const readers = [reader(), reader(), reader()];
+    for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
+    const from = log.length;
+    const w = await sig.watch('test.Cds', '1', { rpm: () => {}, gear: () => {} });
+    stop = true;
+    await Promise.all(readers);
+    assert(!w.error && w.available, 'watch: ' + w.error);
+    // its set-ups in order (the proxy, its availability, a subscribe per field), each after at most URGENT_RUN calls
+    const after = log.slice(from), runs = [];
+    let run = 0;
+    after.forEach((x) => { if (x === 'call') run++; else { runs.push(run); run = 0; } });
+    assert.deepStrictEqual(after.filter((x) => x !== 'call'), ['build test.Cds', 'avail test.Cds', 'sub rpm', 'sub gear']);
+    assert(runs.every((n) => n <= URGENT_RUN), 'calls in a row before each set-up: ' + runs.join(', ') + ' (at most ' + URGENT_RUN + ')');
+    assert(calls < 40, 'the watch done within ' + calls + ' calls');
 });
 
 (async () => {

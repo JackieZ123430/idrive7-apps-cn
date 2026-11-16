@@ -2392,5 +2392,18 @@
   "Fast (the car's eDRIVE needle)": "빠르게 (차량 eDRIVE 게이지 바늘)",
   "Battery readings only": "배터리 측정값만",
   "Police": "경찰",
-  "Strobe": "스트로브"
+  "Strobe": "스트로브",
+  "Drive system": "구동 시스템",
+  "Fully electric (BEV)": "순수 전기차 (BEV)",
+  "Fully electric: usable battery when new": "전기차: 신차 배터리 가용 용량",
+  "Fully electric: range counts down to": "전기차: 주행거리 0 기준 충전량",
+  "0 % (empty)": "0 % (완전 방전)",
+  "Real range": "실제 주행거리",
+  "down to": "주행 가능 하한",
+  "cell charge": "셀 충전량",
+  "lowest to highest cell": "최저 셀 ~ 최고 셀",
+  "Cell voltage spread": "셀 전압 편차",
+  "Cell charge spread": "셀 충전량 편차",
+  "Cell voltages": "셀 전압",
+  "Hybrid or electric car? Settings > Drive system": "하이브리드·전기차: 설정 > 구동 시스템"
 }

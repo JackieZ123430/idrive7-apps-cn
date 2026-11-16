@@ -1841,3 +1841,19 @@ Hybrid Eco	Гибрид Эко
 Hybrid Comfort	Гибрид Комфорт
 Electric Individual	Электро индивидуальный
 Sport Boost	Спорт Буст
+Fully electric (BEV)	Электромобиль (BEV)
+Fully electric: usable battery when new	Электромобиль: полезная ёмкость новой батареи
+Fully electric: range counts down to	Электромобиль: запас хода считается до
+0 % (empty)	0 % (полный разряд)
+Real range	Реальный запас хода
+down to	запас до
+cell charge	заряд ячейки
+lowest to highest cell	мин. – макс. ячейка
+Cell voltage spread	Разброс напряжения ячеек
+Cell charge spread	Разброс заряда ячеек
+Cell voltages	Напряжения ячеек
+no reading	нет показаний
+Hybrid or electric car? Settings > Drive system	Гибрид или электромобиль? Настройки > Привод
+Battery power	Мощность батареи
+Fast (the car's eDRIVE needle)	Быстро (стрелка eDRIVE автомобиля)
+Battery readings only	Только показания батареи
