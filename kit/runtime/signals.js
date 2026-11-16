@@ -29,13 +29,19 @@ const DIRS = [path.join(APP_ROOT, 'someipInterfaces'), path.join(__dirname, '..'
 // time - do the same.
 // Two queues, still one call at a time: method calls and the set-up of a proxy for them (proxy, on, onAvailable:
 // the diagnostic link) go before the watch() set-ups waiting. An app that watches ten interfaces queues ~40 of
-// those at start, and every UDS request used to wait behind all of them.
+// those at start, and every UDS request used to wait behind all of them. After URGENT_RUN urgent calls in a row a
+// set-up waiting goes next: an app with several UDS readers going at once (Live Data's engine page, Redline's
+// knock, gearbox and 12 V) can keep the urgent lane busy without a break, and its signals (rpm, gear) would start
+// late or never.
 const lanes = [[], []];         // [urgent, set-up]
-let running = false;
+const URGENT_RUN = 4;
+let running = false, urgentRun = 0;
 function pump() {
     if (running) return;
-    const job = lanes[0].shift() || lanes[1].shift();
+    const setup = lanes[1].length > 0 && (!lanes[0].length || urgentRun >= URGENT_RUN);
+    const job = setup ? lanes[1].shift() : lanes[0].shift();
     if (!job) return;
+    urgentRun = setup ? 0 : urgentRun + 1;
     running = true;
     setImmediate(() => {
         let p;
