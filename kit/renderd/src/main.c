@@ -922,7 +922,9 @@ static void ctl_gate_update(uint64_t t) {
     if (ccu_fd < 0) want = 0;
     if (want) {
         if (!ctl_gate_on || t - ctl_gate_t >= GATE_TOUCH_US) {
-            int fd = open(cfg.controller_gate, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0644);
+            /* emptied: an empty file holds the whole controller (gate 1.2.0 reads part words that another renderer
+             * may have left; older gates only look at its age) */
+            int fd = open(cfg.controller_gate, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
             if (fd >= 0) { futimens(fd, NULL); close(fd); }
             if (!ctl_gate_on) log_info("controller: held for an app");
             ctl_gate_on = 1; ctl_gate_t = t;
