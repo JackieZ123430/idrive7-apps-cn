@@ -67,6 +67,38 @@ function hashMarker(tag) {
     return [0x62, 0xF3, 1].concat(Array.from(payload));
 }
 
+// The marker read on a G05 (B58, BM3 ROM R4C9F4P03, 2026-11-16) at 807FFE50: an 80-byte binary block, "~|~" at 84.
+const G05_MARKER = Buffer.from(
+    '424D335F1E68FB8ECFE9DEB5EF67A7C47F14D8D419555292F52C28D6B460EA1D7D51EECFB0D1AA79D3B3F09335967A41' +
+    'FBE9A8910BC28318E9D80E7BACF061B84FE275C3965C08E6A065CB92C65DF2CA38BEB3757E7C7E5F5F5F5F5F5F5F5F5F' +
+    '5F5F5F5F5F235234433946345030334B495359300000000000000000000000000000000000000000000000005F5F5F5F' +
+    '5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5F5FFFFFFFFF' +
+    'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+    'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF', 'hex');
+
+async function g05Checks() {
+    assert.strictEqual(G05_MARKER.length, 255);
+    assert.strictEqual(G05_MARKER.toString('latin1').indexOf('~|~'), 84);
+    assert.strictEqual(G05_MARKER.toString('latin1').indexOf('#'), 101);
+    assert.strictEqual(markerRom([0x62, 0xF3, 1].concat(Array.from(G05_MARKER)), bundled), 'R4C9F4P03');
+    // through identify(): dynamic DID read, then the profile's map read-back
+    const p = new Bm3Protocol({ available: true, physical: async (target, sid, data) => {
+        if (sid === 0x2C) return [0x6C, data[0], 0xF3, 1];
+        if (sid === 0x22) return [0x62, 0xF3, 1].concat(Array.from(G05_MARKER));
+        if (sid === 0x23) return [0x63, 2];
+        throw new Error('unexpected ' + sid);
+    } }, bundled, { bm3MarkerAddress: '807FFE50' });
+    assert.deepStrictEqual(await p.identify(), { rom: 'R4C9F4P03' });
+    assert.strictEqual(p.profile.mapSwActAddr, '60038006');
+    assert.strictEqual(await p.currentMap(), 2);
+    // the 80-byte layout still needs its "_"s, "#", a known ROM + 5 build characters and the NUL
+    const broken = (fn) => { const b = Buffer.from(G05_MARKER); fn(b); return [0x62, 0xF3, 1].concat(Array.from(b)); };
+    assert.throws(() => markerRom(broken((b) => { b[85] = 0x21; }), bundled));             // no "~|~"
+    assert.throws(() => markerRom(broken((b) => { b[101] = 0x5F; }), bundled));            // no "#"
+    assert.throws(() => markerRom(broken((b) => { b.write('ZZZZ', 102, 'latin1'); }), bundled));   // unknown ROM
+    assert.throws(() => markerRom(broken((b) => { b[116] = 0x41; }), bundled));            // no NUL after the token
+}
+
 async function markerDetectionChecks() {
     // the S58 marker (G87 M2 with F4C9L8R02, issue #175)
     assert.strictEqual(markerRom(hashMarker('F4C9L8R02GGGJM_G87_RWD_USA_KOR_ULEV246_'), bundled), 'F4C9L8R02');
@@ -200,6 +232,7 @@ async function markerDetectionChecks() {
     assert.throws(() => addressBytes('not-an-address'), /invalid/);
     assert.throws(() => markerRom([0x62, 0xF3, 1, 0], {}), /marker length/);
     await markerDetectionChecks();
+    await g05Checks();
     assert.strictEqual(Object.keys(bundled).length, 150);
     const relocated = ['F4C9G5705', 'F4C9G5905', 'F4C9G5F05', 'F4C9G5H05',
         'F4C9L8A05', 'F4C9L8C05', 'F4C9L8E05', 'F4C9L8G05', 'F4C9L8J05',

@@ -17,12 +17,19 @@ function positive(reply, sid, prefix) {
     return reply;
 }
 
+// Where "~|~" may end the binary block: 68 (64-byte block, G22 and others), 84 (80-byte block, G05 B58 with
+// R4C9F4P03, 2026-11: "BM3_" + 80 bytes + "~|~" + 14 "_" + "#R4C9F4P03KISY0" + NUL, the "#" at byte 101).
+const BINARY_DELIMITERS = [68, 84];
+
 function binaryMarkerTag(data) {
-    // MG1 markers put a 64-byte binary block between BM3_ and ~|~.
-    if (data.length !== MARKER_SIZE || data.subarray(0, 4).toString('latin1') !== 'BM3_' ||
-        data.subarray(68, 71).toString('latin1') !== '~|~') return null;
-    const match = /^_+#([A-Z0-9]+)\x00/.exec(data.subarray(71).toString('latin1'));
-    return match ? match[1] : null;
+    // MG1 markers put a binary block between BM3_ and ~|~, then "_"s, "#" and the ROM token.
+    if (data.length !== MARKER_SIZE || data.subarray(0, 4).toString('latin1') !== 'BM3_') return null;
+    for (const at of BINARY_DELIMITERS) {
+        if (data.subarray(at, at + 3).toString('latin1') !== '~|~') continue;
+        const match = /^_+#([A-Z0-9]+)\x00/.exec(data.subarray(at + 3).toString('latin1'));
+        if (match) return match[1];
+    }
+    return null;
 }
 
 function hashMarkerTag(data) {
