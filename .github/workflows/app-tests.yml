@@ -82,6 +82,8 @@ jobs:
       - run: node kit/tools/test_redline_hud_cache.js
       - run: node kit/tools/test_ambient_config.js
       - run: node kit/tools/test_ambient_rgb.js
+      - run: node kit/tools/test_coldstarts.js
+      - run: node kit/tools/test_wheelspin.js
       - run: node kit/tools/test_ambient_others.js
       - run: node kit/tools/test_ambient_strobe.js
       - run: node kit/tools/test_xdrive_live.js
@@ -118,6 +120,8 @@ jobs:
       - run: node kit/tools/test_redline_hud_nav.js
       - run: node kit/tools/test_redline_features.js
       - run: node kit/tools/test_ambient_rgb.js
+      - run: node kit/tools/test_coldstarts.js
+      - run: node kit/tools/test_wheelspin.js
       - run: node kit/tools/test_fastkw.js
       - run: node kit/tools/test_redline_fuel.js
       - run: node kit/tools/test_redline_powerbar.js

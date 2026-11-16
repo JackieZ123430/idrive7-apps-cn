@@ -1,11 +1,12 @@
 {
   "id": "warmup",
   "title": "Warm-Up",
-  "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit and turbo cool-down",
-  "version": "1.8.2",
+  "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit, turbo cool-down and a cold start counter",
+  "version": "1.9.0",
   "vendor": "custom",
   "loggingId": "OA9A",
   "iconGlyph": "temp",
+  "autostart": true,
   "mguHmi": ["ID7", "ID8"],
   "requires": { "idrive7-renderd": "2.1.15" },
   "signals": {

@@ -3,13 +3,15 @@
  * lights.js - the ambient light modules driven with any colour, through the head unit's diagnostic link to the body
  * controller (lin.js has the bytes, scenes.js what each light shows).
  *
- * find() reads both LIN buses once (the BDC answers after a few seconds). show(scene) puts a scene on, frame by
- * frame (_next). Through the head unit's gateway one write takes ~200 ms and only one is taken at a time, so the
- * number of writes is what counts: NAD 0 reaches every light of a bus at once (car-tested, G20 BDC_G05), so a bus
+ * find() reads both LIN buses once (the BDC answers after a few seconds) and says 'found' with the lights; the lights
+ * found at an earlier start (o.known) are used until then, so a colour goes out at once. show(scene) puts a scene on,
+ * frame by frame (_next). Through the head unit's gateway one write takes ~200 ms and only one is taken at a time, so
+ * the number of writes is what counts: NAD 0 reaches every light of a bus at once (car-tested, G20 BDC_G05), so a bus
  * gets one write for the colour most of its lights want, then single writes only for the lights that differ - a
- * whole-car colour is 2 writes instead of 19. The 6E answer does not prove a light took it: after a still colour the
- * buses are read back once and a light that missed it is written again. A still colour holds 60 s and is written
- * again every 40 s, a moving one holds 5 s. carColour() gives every light back to the car (NAD 0 off, read back).
+ * whole-car colour is 2 writes instead of 19. The 6E answer does not prove a light took it: a still colour's writes
+ * are sent once more AGAIN_MS after the last of them (no read-back: two reads would hold the gateway for seconds). A
+ * still colour holds 60 s and is written again every 40 s, a moving one holds 5 s. carColour() gives every light back
+ * to the car (NAD 0 off, sent once more).
  * flash(rgb, ms) lays a colour over everything for a moment; overlay(key, test, at) lays one over the lights test(light)
  * picks until overlay(key, null) - at(ms, on) with on flipping each frame, so a blink is as fast as the writes go (the turn signal's glow, an open door; the rest keep the scene, or the car's own
  * colour); dim(f) scales the brightness (night). Writes that fail
@@ -28,7 +30,7 @@ const S = require('./scenes');
 const HOLD_S = 60, RENEW_MS = 40000, MOVE_HOLD_S = 5, MOVE_RENEW_MS = 3000;
 const PAUSE_MS = 10000, FAILS = 4, RELEASE_TRIES = 3;
 const ALL = 0;                 // NAD 0: every light of the bus
-const CHECK_MS = 1500;         // a still colour's read-back, this long after its last write
+const AGAIN_MS = 700;          // a still colour's (or a give-back's) writes once more, this long after the last of them
 const HOLD_WAIT_MS = 3000;     // hold(): the longest it waits for a write (or read-back) of ours under way
 
 const echo = (sid, did) => (u) => (u[0] === sid + 0x40 && u[1] === did[0] && u[2] === did[1]) || (u[0] === 0x7f && u[1] === sid);
@@ -38,15 +40,17 @@ class Lights extends EventEmitter {
     constructor(o) {
         super();
         this.diag = o.diag; this.log = o.log; this.now = o.now || Date.now; this.checkMs = o.checkMs;
-        this.lights = [];
-        this.state = 'finding';
+        const ok = (l) => l && typeof l === 'object' && (l.bus === 0 || l.bus === 1) && typeof l.nad === 'number' && typeof l.name === 'string';
+        this.lights = Array.isArray(o.known) && o.known.every(ok) ? o.known.map((l) => Object.assign({}, l)) : [];
+        this.state = this.lights.length ? 'car' : 'finding';
         this.error = null;
         this.scene = null; this.t0 = 0;
         this._flash = null;
         this._dim = 1;
         this._last = new Map();        // light -> { rgb, bright, at }
         this._release = [];            // [{ bus } (every light of it) | { light }] to give back to the car
-        this._sent = new Map();        // light -> the rgb last written to it (the read-back after giving back)
+        this._sentNow = new Set();     // the lights written since the scene came on (sent once more)
+        this._gave = [];               // the buses last given back (given back once more)
         this._checkAt = 0; this._checks = 0; this._checkOff = false;
         this._running = false; this._timer = null; this._stopped = false;
         this._fails = 0; this._pauseTill = 0; this._frame = null; this._frames = [];
@@ -58,9 +62,10 @@ class Lights extends EventEmitter {
     /** Whole frames a second (every light on the same moment of a moving scene). */
     get fps() { const t = this.now(); this._frames = this._frames.filter((x) => t - x < 5000); return this._frames.length / 5; }
 
-    /** Reads which lights the car has. */
+    /** Reads which lights the car has (the ones known so far stay while it reads, and when nothing answers). */
     async find() {
-        this.state = 'finding'; this.emit('change');
+        const had = this.lights;
+        if (!had.length) { this.state = 'finding'; this.emit('change'); }
         const found = [];
         for (let bus = 0; bus < BUSES.length; bus++) {
             const did = BUSES[bus].read;
@@ -70,12 +75,21 @@ class Lights extends EventEmitter {
             if (got) found.push.apply(found, got);
             else if (reply) this.log.info('lights: bus ' + (bus + 1) + ' refused (' + reply.map((x) => x.toString(16)).join(' ') + ')');
         }
-        this.lights = found;
+        if (!found.length && had.length) {
+            this.log.warn('lights: no answer' + (this.error ? ': ' + this.error : '') + ', the ' + had.length + ' known kept');
+            return had;
+        }
+        // a light known already stays the same object (what it shows is kept by it)
+        this.lights = found.map((f) => { const k = had.find((l) => l.bus === f.bus && l.nad === f.nad); return k ? Object.assign(k, f) : f; });
         this.state = found.length ? (this.scene ? 'ours' : 'car') : 'none';
-        if (found.length) { this.error = null; this.log.info('lights: ' + found.length + ' found (' + found.map((l) => l.name).join(', ') + ')'); } else this.log.warn('lights: none found' + (this.error ? ': ' + this.error : ''));
+        if (found.length) {
+            this.error = null;
+            this.log.info('lights: ' + found.length + ' found (' + found.map((l) => l.name).join(', ') + ')');
+            this.emit('found', found.map((l) => Object.assign({}, l)));
+        } else this.log.warn('lights: none found' + (this.error ? ': ' + this.error : ''));
         this.emit('change');
         this._kick();
-        return found;
+        return this.lights;
     }
 
     /** What a light shows now. */
@@ -104,7 +118,8 @@ class Lights extends EventEmitter {
             }, once);
         }
         this._release = [];
-        this._checks = S.moves(scene) ? 0 : 2; this._checkAt = 0; this._checkOff = false;
+        this._sentNow.clear();
+        this._checks = S.moves(scene) ? 0 : 1; this._checkAt = 0; this._checkOff = false;
         if (this.lights.length) this.state = 'ours';
         this.emit('change');
         this._kick();
@@ -150,11 +165,12 @@ class Lights extends EventEmitter {
 
     stop() { this._stopped = true; clearTimeout(this._timer); clearTimeout(this._onceTimer); }
 
-    /** Every bus with a light of ours on it given back (one write each), then read back once. */
+    /** Every bus with a light of ours on it given back (one write each), then once more. */
     _giveBack() {
         const buses = [];
         this.lights.forEach((l) => { if (this._last.has(l) && buses.indexOf(l.bus) < 0) buses.push(l.bus); });
         this._release = buses.map((bus) => ({ bus }));
+        this._gave = [];
         this._checks = buses.length ? 1 : 0; this._checkAt = 0; this._checkOff = true;
     }
 
@@ -211,30 +227,11 @@ class Lights extends EventEmitter {
         return items;
     }
 
-    /**
-     * Reads the buses back: a light that does not show what was written to it is written again (after giving back:
-     * one still showing ours is given back on its own).
-     */
-    async _check() {
-        for (let bus = 0; bus < BUSES.length; bus++) {
-            const on = this.lights.filter((l) => l.bus === bus);
-            if (!on.length) continue;
-            let st = null;
-            try { st = await this.diag.physical(BDC, 0x22, BUSES[bus].read, 15000, echo(0x22, BUSES[bus].read), { pendingTimeoutMs: 15000 }); } catch (e) { /* the next one */ }
-            const mods = st ? parseStatus(bus, st) : null;
-            if (!mods) continue;
-            mods.forEach((m) => {
-                const l = on.find((x) => x.nad === m.nad);
-                if (!l) return;
-                const close = (rgb) => !!rgb && rgb.every((v, i) => Math.abs(Math.min(254, v) - m.rgb[i]) < 3);
-                if (this._checkOff) {
-                    if (close(this._sent.get(l))) { this.log.info('lights: ' + l.name + ' still ours, giving it back'); this._release.push({ light: l }); }
-                } else if (this._last.has(l) && !close(this._last.get(l).rgb)) {
-                    this.log.info('lights: ' + l.name + ' missed its colour, writing it again');
-                    this._last.delete(l);
-                }
-            });
-        }
+    /** A still colour's writes once more (a light that missed one takes it now), or the give-back once more. */
+    _again() {
+        if (this._checkOff) { this._gave.forEach((bus) => this._release.push({ bus, again: true })); this._gave = []; }
+        else this._sentNow.forEach((l) => this._last.delete(l));
+        this._sentNow.clear();
         this._frame = null;
     }
 
@@ -273,11 +270,11 @@ class Lights extends EventEmitter {
                 if (this._stopped || this._holds.size) return;
                 const wait = this._pauseTill - this.now();
                 if (wait > 0) { this._timer = setTimeout(() => this._kick(), wait); return; }
-                if (this._checkAt && this.now() >= this._checkAt && !this._release.length) { this._checkAt = 0; await this._check(); continue; }
+                if (this._checkAt && this.now() >= this._checkAt && !this._release.length) { this._checkAt = 0; this._again(); continue; }
                 const w = this._next();
                 if (!w) {
-                    // all written: a still colour (or giving back) read back once a little later
-                    if (this._checks > 0 && !this._checkAt) { this._checks--; this._checkAt = this.now() + (this.checkMs || CHECK_MS); }
+                    // all written: a still colour (or giving back) sent once more a little later
+                    if (this._checks > 0 && !this._checkAt) { this._checks--; this._checkAt = this.now() + (this.checkMs || AGAIN_MS); }
                     // nothing due: a moving scene looks again soon, a still one when its next renewal is due
                     const moving = S.moves(this.scene) || !!(this._flash && this.now() < this._flash.until);
                     const next = this._checkAt ? Math.max(20, this._checkAt - this.now()) : moving ? 40 : 1000;
@@ -289,10 +286,12 @@ class Lights extends EventEmitter {
                 try { reply = await this.diag.physical(BDC, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }
                 if (reply && reply[0] === 0x6e) {
                     this._fails = 0; this.writes++; this._times.push(this.now());
+                    // (a bus given back: once more later; one not taken is not)
+                    if (w.off && w.r.bus !== undefined && !w.r.again && this._gave.indexOf(w.r.bus) < 0) this._gave.push(w.r.bus);
                     w.lights.forEach((l) => {
                         if (w.off) { this._last.delete(l); return; }
                         this._last.set(l, { rgb: w.want.rgb, bright: w.want.bright, at: this.now() });
-                        this._sent.set(l, w.want.rgb);
+                        this._sentNow.add(l);
                     });
                     if (this.error) { this.error = null; this.emit('change'); }
                 } else {
