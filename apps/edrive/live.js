@@ -975,7 +975,8 @@ module.exports = function live(ctx, sh) {
             TextRecordings: [on ? pw.text + ' kW   ' + (G.isNum(d.soc) ? G.fmt(d.soc, 0) + ' %' : '-- %') : '', 'Text'],
             TextCam: [on ? pw.what + (G.isNum(d.v) ? '  ' + G.fmt(d.v, 0) + ' V  ' + amps : '') : '', 'Text'],
             ProgressbarVisible: [on, 'Bool'],
-            Progress: [on && G.isNum(pw.kw) ? Math.round(G.clamp(Math.abs(pw.kw) / max, 0, 1) * 100) : 0, 'Float'],
+            // the layout's progress bar takes a share 0..1 (a percentage showed it full at any value)
+            Progress: [on && G.isNum(pw.kw) ? Math.round(G.clamp(Math.abs(pw.kw) / max, 0, 1) * 100) / 100 : 0, 'Float'],
             TimeElapsed: [on ? 'Cells ' + (ct ? fmtT(ct.avg) : '--') : '', 'Text'],
             TimeRemaining: [on ? 'Drive ' + G.fmt(tp.out - tp.regen, 2) + ' kWh' : '', 'Text'],
         };

@@ -1421,7 +1421,8 @@ mgu.run({
                 TimeElapsed: [on ? line(list[2]) : '', 'Text'],
                 TimeRemaining: [on ? line(list[3]) : '', 'Text'],
                 ProgressbarVisible: [on && frac !== null, 'Bool'],
-                Progress: [on && frac !== null ? Math.round(frac * 100) : 0, 'Float'],
+                // the layout's progress bar takes a share 0..1 (a percentage showed it full at any value)
+                Progress: [on && frac !== null ? Math.round(frac * 100) / 100 : 0, 'Float'],
             };
             const prev = wtext[inst.spawnId] || (wtext[inst.spawnId] = {});
             Object.keys(cells).forEach((k) => {
