@@ -9,6 +9,7 @@
  *
  * Pages: live run  /  best times + recent runs (saved in data/draggy_runs.json)
  * Speed: Vehicle2.statusCarSpeed2 (centre-of-gravity speed, BMW scaling).
+ * Wheelspin: an estimate for the first seconds after the launch (wheelspin.js), from the speed and CDS2's acceleration.
  */
 const fs = require('fs');
 const path = require('path');
@@ -17,6 +18,7 @@ const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { RunTimer } = require('./kit/run_timer');
 const Demo = require('./demo');
+const { Wheelspin } = require('./wheelspin');
 
 const W = 1600, H = 520;
 const MPH = 1.609344;
@@ -70,6 +72,7 @@ mgu.run({
                 const b = store.best[bestKey(k)];
                 if (!b || run.result[k] < b.s) { store.best[bestKey(k)] = { s: run.result[k], at: run.at, trap: run.trap[k] }; lastNewBest[k] = true; }
             });
+            if (!feedDemo) run.spin = spin.result();
             store.runs.unshift(Object.assign({ unit: settings.get('speedUnit') }, run));
             store.runs = store.runs.slice(0, 30);
             save();
@@ -79,13 +82,14 @@ mgu.run({
         const newTimer = () => {
             store = feedDemo ? demoStore : saved;
             // a new launch: its own peak, and its splits compared with the best (not run 1's NEW BEST)
-            timer = new RunTimer(splits(), { rollout: settings.get('rollout'), onDone, onLaunch: () => { peakG = 0; lastNewBest = {}; } });
+            timer = new RunTimer(splits(), { rollout: settings.get('rollout'), onDone, onLaunch: () => { peakG = 0; lastNewBest = {}; spin.launch(Date.now()); } });
             lastNewBest = {};
         };
 
         /* ---------- live data ---------- */
         const live = { speed: null, g: null, rpm: null };
         let lastCar = 0, feedDemo = false, peakG = 0, speedSub = null;
+        const spin = new Wheelspin();
         const demo = new Demo(), t0 = Date.now();
         // Auto: demo only until the car answers. A parked car sends no new speed for minutes; going by
         // "no speed for 5 s" switched to demo runs while standing (and back on the first real sample).
@@ -98,6 +102,7 @@ mgu.run({
                 const kmh = sc('speed', v.speedVehicleCentreOfGravity);
                 if (kmh === null) return;
                 lastCar = Date.now(); live.speed = kmh;
+                spin.speed(lastCar, kmh);
                 if (!feedDemo) timer.feed(lastCar, kmh);
             },
         }, log).then((s) => { speedSub = s; log.info('speed signal ' + (s.error ? 'error ' + s.error : 'subscribed')); return s; });
@@ -106,6 +111,7 @@ mgu.run({
                 const a = sc('accel', v.longitudinalAccelerationCentreOfGravity);
                 if (a === null) return;
                 live.g = a / 9.80665;
+                spin.accel(Date.now(), a);
                 if (timer.state === 'run' && !feedDemo) peakG = Math.max(peakG, live.g);
             },
         }, log);
@@ -170,6 +176,9 @@ mgu.run({
 
             // --- speed trace ---
             G.panel(cv, t, 568, 44, 520, 468, 'Speed trace');
+            // the launch's wheelspin (an estimate), once the run is under way
+            const ws = timer.state === 'run' || timer.state === 'done' ? (feedDemo ? null : spin.result()) : null;
+            if (ws) cv.text('WHEELSPIN ~' + ws.peak + ' %' + (ws.secs ? ', ' + ws.secs.toFixed(1) + ' s' : ''), 1064, 80, 20, ws.peak >= 10 ? t.warn : t.dim, { align: 'right', font: 'bold', spacing: 1 });
             const px = 640, py = 104, pw = 424, ph = 351 + G.toMargin(ex, 31);      // the trace takes the room (its labels G.MARGIN over the bottom)
             const tr = timer.trace;
             const tMax = Math.max(6, Math.ceil(tr.length ? tr[tr.length - 1][0] / 2 + 0.5 : 0) * 2);
