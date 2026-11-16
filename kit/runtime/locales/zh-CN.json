@@ -1666,5 +1666,21 @@
   "Hybrid Eco": "混合动力节能",
   "Hybrid Comfort": "混合动力舒适",
   "Electric Individual": "纯电个性化",
-  "Sport Boost": "运动增强"
+  "Sport Boost": "运动增强",
+  "Fully electric (BEV)": "纯电动车 (BEV)",
+  "Fully electric: usable battery when new": "纯电动车：新电池可用容量",
+  "Fully electric: range counts down to": "纯电动车：续航下限电量",
+  "0 % (empty)": "0 %（电量耗尽）",
+  "Real range": "实际续航",
+  "down to": "续航下限",
+  "cell charge": "电芯电量",
+  "lowest to highest cell": "最低至最高电芯",
+  "Cell voltage spread": "电芯电压差",
+  "Cell charge spread": "电芯电量差",
+  "Cell voltages": "电芯电压",
+  "no reading": "没有读数",
+  "Hybrid or electric car? Settings > Drive system": "混动或纯电车型：设置 > 驱动系统",
+  "Battery power": "电池功率",
+  "Fast (the car's eDRIVE needle)": "快速（车辆 eDRIVE 功率表）",
+  "Battery readings only": "仅电池读数"
 }
