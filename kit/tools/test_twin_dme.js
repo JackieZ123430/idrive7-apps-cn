@@ -37,7 +37,8 @@ const f150 = (index) => [0x62, 0xF1, 0x50].concat([0, 2, 4].map((i) => parseInt(
  * key = '22 F150', '06 A2', '01 5E'. An address without a function never answers. asked: ['12:22 F150', ...]
  */
 function fakeLink(units) {
-    const l = { asked: [], woken: [], available: true, ready: true, p: {} };
+    // misses: requests in a row each address left unanswered, as kit/readonly-diag.js counts them
+    const l = { asked: [], woken: [], available: true, ready: true, p: {}, misses: {} };
     l.wake = (t) => l.woken.push(t);
     l.silent = () => false;
     l.physical = (target, sid, data, timeoutMs, accept) => {
@@ -46,6 +47,7 @@ function fakeLink(units) {
         (l.waits || (l.waits = {}))[hex2(target) + ':' + key] = timeoutMs;
         const f = units[target];
         const r = f ? f(key, sid, data) : null;
+        if (l.misses) l.misses[target] = r ? 0 : (l.misses[target] || 0) + 1;
         if (r && accept && !accept(r)) throw new Error('reply not accepted: ' + r.map(hex2).join(' ') + ' for ' + key);
         return Promise.resolve(r || null);
     };
@@ -151,7 +153,7 @@ test('TwinDme: a V8 Auto redline, from the index or the VIN maker code (asked on
     } finally { rmTree(dir); }
 });
 
-test('TwinDme: a stored answer trusted for a week, then asked again; a file without its time asked', async () => {
+test('TwinDme: a stored answer trusted for 90 days, then asked again; a file without its time asked', async () => {
     const dir = tmp('twin-'), file = path.join(dir, 'twin_dme.json');
     const unit = (index) => fakeLink({ 0x12: (k) => (k === '22 F150' ? f150(index) : null) });
     const start = async (index, stored) => {
@@ -168,8 +170,11 @@ test('TwinDme: a stored answer trusted for a week, then asked again; a file with
         // a V8 checked yesterday: two units, nothing asked
         r = await start(V8, { twin: true, index: V8, wmi: null, at: now - DAY });
         assert.deepStrictEqual(r.l.asked, []); assert.strictEqual(r.v, true); assert.strictEqual(r.t.perBank, 4);
-        // checked 8 days ago: asked again (and the answer corrected: this head unit is in a B58 now)
-        r = await start(B58, { twin: true, index: V8, wmi: null, at: now - 8 * DAY });
+        // checked 60 days ago: still nothing asked
+        r = await start(V8, { twin: true, index: V8, wmi: null, at: now - 60 * DAY });
+        assert.deepStrictEqual(r.l.asked, []); assert.strictEqual(r.v, true);
+        // checked 91 days ago: asked again (and the answer corrected: this head unit is in a B58 now)
+        r = await start(B58, { twin: true, index: V8, wmi: null, at: now - 91 * DAY });
         assert.deepStrictEqual(r.l.asked, ['12:22 F150']); assert.strictEqual(r.v, false);
         // a time ahead of the clock (the clock set back): asked; a file without a time (written before): asked
         r = await start(V8, { twin: true, index: V8, wmi: null, at: now + DAY });
@@ -182,6 +187,50 @@ test('TwinDme: a stored answer trusted for a week, then asked again; a file with
         const t = new TwinDme(l, { dataDir: dir, log: quiet, vin: true });
         await t.detect();
         assert.deepStrictEqual(l.asked, ['12:22 F150', '12:22 F190']); assert.strictEqual(t.redline, 6500);
+    } finally { rmTree(dir); }
+});
+
+test('TwinDme: a kept V8 whose second unit stops answering (the master answering): the index asked again, once a start', async () => {
+    const dir = tmp('twin-'), file = path.join(dir, 'twin_dme.json');
+    const fresh = { twin: true, index: V8, wmi: null, at: Date.now() - 3600 * 1000 };
+    const gone = /second unit [(]0x13[)] stopped answering/;
+    // a head unit moved from a V8 to a B58: the link's own count (kit/readonly-diag.js)
+    const make = (index, misses) => {
+        fs.writeFileSync(file, JSON.stringify(fresh));
+        const logs = [], l = fakeLink({ 0x12: (k) => (k === '22 F150' ? f150(index) : null) });
+        l.misses = misses;
+        return { l, logs, t: new TwinDme(l, { dataDir: dir, log: { info: (m) => logs.push(m), warn() {}, error() {} } }) };
+    };
+    try {
+        let r = make(B58, { 0x12: 0, 0x13: 2 });
+        assert.strictEqual(await r.t.detect(), true); assert.deepStrictEqual(r.l.asked, [], 'two misses: not yet');
+        r.l.misses[0x13] = 3;
+        assert.strictEqual(await r.t.detect(), false, 'three: asked, and one unit now');
+        assert.deepStrictEqual(r.l.asked, ['12:22 F150']);
+        assert.ok(r.logs.some((m) => gone.test(m)), r.logs.join(' | '));
+        assert.strictEqual(JSON.parse(fs.readFileSync(file, 'utf8')).twin, false, 'kept: one unit');
+        // the master not answering either (cranking, the bus down), or not asked yet: nothing asked
+        r = make(B58, { 0x12: 1, 0x13: 5 });
+        await r.t.detect(); assert.deepStrictEqual(r.l.asked, []);
+        r = make(B58, { 0x13: 5 });
+        await r.t.detect(); assert.deepStrictEqual(r.l.asked, []);
+        // a real V8 whose second unit was only slow: still two units, and not asked again this start
+        r = make(V8, { 0x12: 0, 0x13: 5 });
+        assert.strictEqual(await r.t.detect(), true); assert.deepStrictEqual(r.l.asked, ['12:22 F150']);
+        r.l.misses[0x13] = 9;
+        assert.strictEqual(await r.t.detect(), true); assert.deepStrictEqual(r.l.asked, ['12:22 F150'], 'once a start');
+        // one unit kept: its silence at 0x13 is normal, nothing asked
+        fs.writeFileSync(file, JSON.stringify({ twin: false, index: B58, wmi: null, at: Date.now() }));
+        const l1 = fakeLink({ 0x12: () => f150(B58) });
+        l1.misses = { 0x12: 0, 0x13: 9 };
+        await new TwinDme(l1, { dataDir: dir, log: quiet }).detect();
+        assert.deepStrictEqual(l1.asked, []);
+        // a link without a count (kit/diag.js): slaveReply(); an answer in between starts the count again
+        r = make(B58, null);
+        [false, false, true, false, false].forEach((ok) => r.t.slaveReply(ok));
+        await r.t.detect(); assert.deepStrictEqual(r.l.asked, [], 'two in a row');
+        r.t.slaveReply(false);
+        assert.strictEqual(await r.t.detect(), false); assert.deepStrictEqual(r.l.asked, ['12:22 F150'], 'three in a row');
     } finally { rmTree(dir); }
 });
 
@@ -475,6 +524,19 @@ test('M Vitals: a B58 (one unit) never asks 0x13', async () => {
     assert.ok(b.texts.map((x) => x.str).indexOf('Bank 2') < 0, 'no Bank 2 on a B58');
 });
 
+test('M Vitals: a head unit moved from a V8 to a B58 (a fresh V8 answer kept): found after three misses at 0x13', async () => {
+    const files = { 'twin_dme.json': { twin: true, index: V8, wmi: 'WBS', at: Date.now() - 3600 * 1000 } };
+    const r = await vitalsMisfires({ 0x12: boostUnit(B58, [200, 220]) }, files,
+        { settings: { showBoost: 'on', page: 'engine' }, until: /^engine units: SGBD index 0F26E8 -> one/, render: true });
+    assert.ok(r.logs.some((m) => /second unit [(]0x13[)] stopped answering/.test(m)), r.logs.filter((m) => /engine units/.test(m)).join(' | '));
+    assert.ok(r.logs.some((m) => /SGBD index 0F26E8 -> one/.test(m)), 'one unit now');
+    // each round tries bank 2's boost identifiers in turn (F470 first): three rounds without an answer
+    const n = asked13(r.link).length, rounds = asked13(r.link).filter((k) => k === '13:22 F470').length;
+    assert.strictEqual(rounds, 3, 'three rounds: ' + asked13(r.link).join());
+    await sleep(1500);
+    assert.strictEqual(asked13(r.link).length, n, '0x13 not asked after');
+});
+
 /* ---------- Live Data: Useful lists ---------- */
 test('Live Data Useful: V8-only and single-unit-only entries, bank 2\'s names, all in the built-in catalog', () => {
     const U = require(path.join(ROOT, 'apps', 'live_data', 'useful'));
@@ -642,6 +704,20 @@ test('Live Data: a B58: the Engine page as before, 0x13 never asked', async () =
         assert.deepStrictEqual(asked13(app.link).filter((k) => k !== '13:22 F150'), [], 'nothing asked of 0x13 but its type (a scan)');
         assert.ok(app.link.asked.indexOf('12:22 F150') >= 0, 'the engine unit asked which it is');
         assert.ok(app.logs.some((m) => /engine units: SGBD index 0F26E8 -> one/.test(m)));
+        assert.deepStrictEqual(errorsOf(app), [], 'no errors');
+    } finally { app.stop(); rmTree(app.dir); }
+});
+
+test('Live Data: a head unit moved from a V8 to a B58 (a fresh V8 answer kept): misses at 0x13 ask the index again', async () => {
+    const app = await liveData({ 0x12: ldUnit(B58, masterVals) }, { 'twin_dme.json': { twin: true, index: V8, wmi: null, at: Date.now() - 3600 * 1000 } });
+    try {
+        await app.engineTab();                  // bank 2's values asked of 0x13: no answer
+        for (let i = 0; i < 24 && !app.logs.some((m) => /SGBD index 0F26E8 -> one/.test(m)); i++) await sleep(250);
+        assert.ok(app.logs.some((m) => /second unit [(]0x13[)] stopped answering/.test(m)), app.logs.filter((m) => /engine units/.test(m)).join(' | '));
+        assert.ok(app.logs.some((m) => /SGBD index 0F26E8 -> one/.test(m)), 'one unit now');
+        const all = await app.engineTab();
+        assert.ok(/Ignition angle, cylinder 6/.test(all) && !/BANK 2/i.test(all), 'the B58 Engine page again');
+        assert.strictEqual(JSON.parse(fs.readFileSync(path.join(app.dir, 'twin_dme.json'), 'utf8')).twin, false, 'kept');
         assert.deepStrictEqual(errorsOf(app), [], 'no errors');
     } finally { app.stop(); rmTree(app.dir); }
 });

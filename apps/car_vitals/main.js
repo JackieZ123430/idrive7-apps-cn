@@ -469,11 +469,15 @@ mgu.run({
          * Only the ids its list (MID A0) names are asked (A2.. on its own numbering, or A6.. on the engine's); a unit
          * that doesn't answer is asked again after a minute, so the master's counts never wait for it.
          */
+        // (asked only after the master's counts came: whether the second unit answered at all goes to twin.slaveReply(),
+        // so a head unit moved from a V8 to a car with one engine unit asks the index again)
+        const slaveHeard = (mid) => { const r = rd.raws[rd.monitorKey(TwinDme.SLAVE, mid, misMode)]; twin.slaveReply(!!(r && r.bytes)); };
         async function readSlaveMisfire(tid) {
             if (misSlave === false || (misSlaveFails >= 2 && Date.now() - misSlaveT < SLAVE_RETRY_MS)) return null;
             misSlaveT = Date.now();
             if (misSlave === null) {
                 const sup = await rd.supported(TwinDme.SLAVE, 0xA0, misMode);
+                slaveHeard(0xA0);
                 if (!sup) { misSlaveFails++; return null; }
                 const mids = sup.filter((m) => m >= 0xA2 && m < 0xA2 + 12);
                 misSlave = mids.length ? mids : false;
@@ -483,6 +487,7 @@ mgu.run({
             const out = [];
             for (const mid of misSlave) {
                 const res = await rd.monitor(TwinDme.SLAVE, mid, misMode);
+                slaveHeard(mid);
                 if (!res) { misSlaveFails++; return null; }
                 const tr = res.find((x) => x.tid === tid) || res[0];
                 out.push(tr.value >= 65535 ? null : tr.value);
@@ -547,7 +552,11 @@ mgu.run({
         async function readBoost2() {
             if (!await twin.detect()) return null;       // a twin answer kept from another car: not before the index says so
             await freshBaro();
+            const t0 = Date.now();
             const m = await rd.value('boost2', boost2List);
+            // the master's boost read just before (same round): whether the second unit answered at all (a value or a
+            // refusal) goes to twin.slaveReply()
+            if (Date.now() - (fuelT.boost || 0) < 3000) twin.slaveReply(boost2List.some((c) => { const r = rd.raws[rd.key(c)]; return !!r && r.t >= t0 && !!r.bytes; }));
             // its first replies go to the log, to check the second unit's scaling against the master's
             const c = boost2List[rd.pick.boost2 || 0], r = c && rd.raws[rd.key(c)];
             if (r) logRaw('boost bank 2 ' + DidReader.label(c), r.bytes || r.why);

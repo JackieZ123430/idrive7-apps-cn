@@ -18,6 +18,8 @@
  *   twin.on()            -> twin === true, asking in the background while not known (for pollers)
  *   twin.known()         -> whether one or two is known (asked this start, or kept from an earlier one)
  *   twin.redline         -> the V8's rev limit for an Auto redline (6500 an N63, 7200 an M car's S63 / S68), or null
+ *   twin.slaveReply(ok)  -> what a read from 0x13 got, on a link that doesn't count misses (kit/diag.js): true = an
+ *                           answer (a value or a refusal), false = none while the master answered
  *   TwinDme.isTwinIndex('0F242C') -> true
  *
  * Which V8: N63TU (0F1A20) and S63TU (0F1A10) have indexes of their own, but the G-series ones share them (DME8FF_R:
@@ -26,9 +28,15 @@
  * 5YM (BMW's US plant: its X5 M / X6 M, but some other X5 / X6 too) says nothing either way, so no V8 redline; any
  * other code = not an M car. The VIN itself is neither kept nor logged.
  *
- * detect() asks the master on the first start, then trusts the stored answer for RECHECK_MS (a week) and asks again
+ * detect() asks the master on the first start, then trusts the stored answer for RECHECK_MS (90 days) and asks again
  * after that in the background, so most starts send nothing; never throws. A link not up yet (ready / available
  * false: just made, or the transport down) is not asked and doesn't use up the retry wait.
+ *
+ * A stored V8 whose second unit stops answering while the master answers (MISS_LIMIT requests in a row: the link's
+ * own count on kit/readonly-diag.js, slaveReply() on kit/diag.js) has its index asked again at once, once a start:
+ * a head unit moved from a V8 to a car with one engine unit finds out within seconds. A V8 whose second unit was
+ * only slow (cranking, just woken) answers V8 again and nothing changes. The other way round (a head unit moved
+ * to a V8) sends nothing to 0x13 to miss, so that is found by RECHECK_MS.
  */
 const fs = require('fs');
 const path = require('path');
@@ -48,8 +56,11 @@ const N63_RPM = 6500, M_RPM = 7200;
 const M_INDEX = { '0F1A10': true, '0F1A20': false };
 const M_WMI = ['WBS'], UNSURE_WMI = ['5YM'];
 const RETRY_MS = 30000;
-// a stored answer is trusted this long (an engine doesn't change; a head unit moved to another car is found within it)
-const RECHECK_MS = 7 * 24 * 3600 * 1000;
+// a stored answer is trusted this long (an engine doesn't change; a head unit moved from a car with one engine unit
+// to a V8 is found within it; the other way round the second unit's silence finds it sooner)
+const RECHECK_MS = 90 * 24 * 3600 * 1000;
+// requests in a row the second unit leaves unanswered (the master answering) before the index is asked again
+const MISS_LIMIT = 3;
 const hex2 = (b) => (b < 16 ? '0' : '') + b.toString(16).toUpperCase();
 
 function writeWhole(file, text) {
@@ -68,6 +79,7 @@ class TwinDme {
         this.file = opts && opts.dataDir ? path.join(opts.dataDir, 'twin_dme.json') : null;
         this.twin = null; this.index = null;
         this.confirmed = false; this.triedT = 0; this.pending = null; this.at = 0;
+        this.misses = 0; this.rechecked = false;
         if (this.file) {
             try {
                 const s = JSON.parse(fs.readFileSync(this.file, 'utf8'));
@@ -105,8 +117,28 @@ class TwinDme {
         return this.twin === true;
     }
 
+    /** A read from the second unit (0x13): true = it answered (a value or a refusal), false = no reply while the master answered. */
+    slaveReply(ok) { this.misses = ok ? 0 : this.misses + 1; }
+
+    /**
+     * A V8 taken as known whose second unit has stopped answering while the master answers: MISS_LIMIT misses in a
+     * row (the link's own count where it keeps one, else slaveReply()'s). Once a start.
+     */
+    _slaveGone() {
+        if (this.twin !== true || !this.confirmed || this.rechecked) return false;
+        if (this.misses >= MISS_LIMIT) return true;
+        let link = null;
+        try { link = this.linkOf(); } catch (e) { return false; }
+        const m = link && link.misses;
+        return !!m && typeof m === 'object' && (m[SLAVE] || 0) >= MISS_LIMIT && m[MASTER] === 0;
+    }
+
     /** Two engine units? Asks the master's SGBD index unless a stored answer is fresh (again after RETRY_MS while it doesn't answer). */
     detect() {
+        if (this._slaveGone()) {
+            this.rechecked = true; this.confirmed = false; this.triedT = 0; this.misses = 0;
+            if (this.log) this.log.info('engine units: the second unit (0x13) stopped answering, asking the master for its SGBD index again');
+        }
         if (this.confirmed) return Promise.resolve(this.twin);
         if (this.pending) return this.pending;
         if (Date.now() - this.triedT < RETRY_MS) return Promise.resolve(this.twin);
@@ -173,6 +205,7 @@ TwinDme.SLAVE = SLAVE;
 TwinDme.TWIN = TWIN;
 TwinDme.RETRY_MS = RETRY_MS;
 TwinDme.RECHECK_MS = RECHECK_MS;
+TwinDme.MISS_LIMIT = MISS_LIMIT;
 TwinDme.N63_RPM = N63_RPM;
 TwinDme.M_RPM = M_RPM;
 
