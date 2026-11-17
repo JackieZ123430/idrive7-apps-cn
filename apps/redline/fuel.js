@@ -130,7 +130,14 @@ class FuelWatch {
         const link = this.rd.diag;
         if (link && (link.ready === false || link.available === false)) return;
         // one engine unit or two not known yet (the first start): no reading, rather than one bank's as the engine's
-        if (this.twin && !this.twin.known()) { this._twinOn(); return; }
+        // (the answer read at once when it comes, not at the next poll a second later)
+        if (this.twin && !this.twin.known()) {
+            if (!this.asking) {
+                this.asking = true;
+                Promise.resolve(this.twin.detect()).then(() => { this.asking = false; if (this.timer && this.twin.known()) this._poll(); }, () => { this.asking = false; });
+            }
+            return;
+        }
         let diesel = this.diesel;
         try { diesel = !!this.dieselOf(); } catch (e) { /* keep the last */ }
         if (diesel !== this.diesel) { this.diesel = diesel; this.cands = candidates(diesel); }

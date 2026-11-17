@@ -106,7 +106,7 @@ test('TwinDme: a V8 Auto redline, from the index or the VIN maker code (asked on
         assert.strictEqual(t2.redline, 7200, 'kept for the next start');
         l = unit(V8, 'WBSJF0C51JB000000'); const t3 = new TwinDme(l, { dataDir: dir, log: quiet, vin: true });
         await t3.detect();
-        assert.deepStrictEqual(l.asked, ['12:22 F150'], 'the VIN not asked again');
+        assert.deepStrictEqual(l.asked, [], 'the next start: nothing asked (the answer and its maker code kept)');
         rmTree(dir);
         const dir2 = tmp('twin-');
         l = unit(V8, 'WBAJS0C00LB000000'); t = new TwinDme(l, { dataDir: dir2, log: quiet, vin: true });
@@ -118,8 +118,11 @@ test('TwinDme: a V8 Auto redline, from the index or the VIN maker code (asked on
         l = unit(V8, '5YMJU0C00L9000000'); t = new TwinDme(l, { dataDir: dir3, log: quiet, vin: true }); await t.detect();
         assert.strictEqual(t.redline, null); assert.strictEqual(t.m, null);
         l = unit(V8, '5YMJU0C00L9000000'); t = new TwinDme(l, { dataDir: dir3, log: quiet, vin: true }); await t.detect();
-        assert.deepStrictEqual(l.asked, ['12:22 F150'], '5YM kept: the VIN not asked again');
-        assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(dir3, 'twin_dme.json'), 'utf8')), { twin: true, index: V8, wmi: '5YM' });
+        assert.deepStrictEqual(l.asked, [], '5YM kept: nothing asked the next start');
+        const kept = JSON.parse(fs.readFileSync(path.join(dir3, 'twin_dme.json'), 'utf8'));
+        assert.ok(typeof kept.at === 'number' && Math.abs(Date.now() - kept.at) < 60000, 'its time kept');
+        delete kept.at;
+        assert.deepStrictEqual(kept, { twin: true, index: V8, wmi: '5YM' });
         rmTree(dir3);
         t = new TwinDme(unit(V8, null), { log: quiet, vin: true }); await t.detect();
         assert.strictEqual(t.redline, null);
@@ -145,6 +148,40 @@ test('TwinDme: a V8 Auto redline, from the index or the VIN maker code (asked on
         S.redline = 0; S.engine = 'diesel'; assert.strictEqual(e.redline(), 5000, 'a diesel: its profile');
         S.engine = 'auto'; e.setAuto(null); assert.strictEqual(e.redline(), 7000);
         rmTree(edir);
+    } finally { rmTree(dir); }
+});
+
+test('TwinDme: a stored answer trusted for a week, then asked again; a file without its time asked', async () => {
+    const dir = tmp('twin-'), file = path.join(dir, 'twin_dme.json');
+    const unit = (index) => fakeLink({ 0x12: (k) => (k === '22 F150' ? f150(index) : null) });
+    const start = async (index, stored) => {
+        if (stored) fs.writeFileSync(file, JSON.stringify(stored));
+        const l = unit(index), t = new TwinDme(l, { dataDir: dir, log: quiet });
+        const v = await t.detect();
+        return { l, t, v };
+    };
+    try {
+        const now = Date.now(), DAY = 24 * 3600 * 1000;
+        // a B58 checked yesterday: nothing asked, one unit
+        let r = await start(B58, { twin: false, index: B58, wmi: null, at: now - DAY });
+        assert.deepStrictEqual(r.l.asked, []); assert.strictEqual(r.v, false);
+        // a V8 checked yesterday: two units, nothing asked
+        r = await start(V8, { twin: true, index: V8, wmi: null, at: now - DAY });
+        assert.deepStrictEqual(r.l.asked, []); assert.strictEqual(r.v, true); assert.strictEqual(r.t.perBank, 4);
+        // checked 8 days ago: asked again (and the answer corrected: this head unit is in a B58 now)
+        r = await start(B58, { twin: true, index: V8, wmi: null, at: now - 8 * DAY });
+        assert.deepStrictEqual(r.l.asked, ['12:22 F150']); assert.strictEqual(r.v, false);
+        // a time ahead of the clock (the clock set back): asked; a file without a time (written before): asked
+        r = await start(V8, { twin: true, index: V8, wmi: null, at: now + DAY });
+        assert.deepStrictEqual(r.l.asked, ['12:22 F150']);
+        r = await start(V8, { twin: true, index: V8 });
+        assert.deepStrictEqual(r.l.asked, ['12:22 F150']);
+        // an app that wants the VIN's maker code and has none yet: asked, though the answer is fresh
+        fs.writeFileSync(file, JSON.stringify({ twin: true, index: V8, wmi: null, at: now - DAY }));
+        const l = fakeLink({ 0x12: (k) => (k === '22 F150' ? f150(V8) : k === '22 F190' ? f190('WBAJS0C00LB000000') : null) });
+        const t = new TwinDme(l, { dataDir: dir, log: quiet, vin: true });
+        await t.detect();
+        assert.deepStrictEqual(l.asked, ['12:22 F150', '12:22 F190']); assert.strictEqual(t.redline, 6500);
     } finally { rmTree(dir); }
 });
 
@@ -278,6 +315,16 @@ test('Redline fuel: both banks\' 5656 added, else OBD 5E, never one bank alone',
         r = await run(l, false);
         assert.ok(near(r.w.value().lph, 1000 * K), 'one engine unit: 5656 as before');
         assert.deepStrictEqual(asked13(l), []);
+        // the first start on a B58 (nothing stored): the reading comes as soon as the index answers, not a poll later
+        l = fakeLink({ 0x12: (k) => (k === '22 F150' ? f150(B58) : unit(1000, 400, 50)(k)), 0x13: unit(1100) });
+        const w = new FuelWatch({ log: quiet }, () => l, { twin: new TwinDme(l, { log: quiet }) });
+        w.start();
+        try {
+            await sleep(100);
+            assert.ok(near(w.value().lph, 1000 * K), 'read within 100 ms: ' + w.value().lph + ' ' + l.asked.join());
+            assert.deepStrictEqual(l.asked.slice(0, 2), ['12:22 F150', '12:22 5656']);
+            assert.deepStrictEqual(asked13(l), []);
+        } finally { w.stop(); }
     } finally { unhook(); }
 });
 
@@ -576,7 +623,10 @@ test('Live Data: a V8 found at run time (the master SGBD index), and remembered'
         const all = await app.engineTab();
         assert.ok(/BANK 2: IGNITION AND KNOCK/i.test(all), 'bank 2 after the answer');
         assert.ok(app.logs.some((m) => /engine units: SGBD index 0F242C -> two/.test(m)), app.logs.join(' | '));
-        assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(app.dir, 'twin_dme.json'), 'utf8')), { twin: true, index: V8, wmi: null });
+        const kept = JSON.parse(fs.readFileSync(path.join(app.dir, 'twin_dme.json'), 'utf8'));
+        assert.ok(typeof kept.at === 'number', 'its time kept');
+        delete kept.at;
+        assert.deepStrictEqual(kept, { twin: true, index: V8, wmi: null });
         assert.deepStrictEqual(errorsOf(app), [], 'no errors');
     } finally { app.stop(); rmTree(app.dir); }
 });

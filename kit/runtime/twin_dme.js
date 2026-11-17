@@ -26,8 +26,9 @@
  * 5YM (BMW's US plant: its X5 M / X6 M, but some other X5 / X6 too) says nothing either way, so no V8 redline; any
  * other code = not an M car. The VIN itself is neither kept nor logged.
  *
- * detect() asks the master once per app start (a stored answer is used meanwhile); never throws. A link not up yet
- * (ready / available false: just made, or the transport down) is not asked and doesn't use up the retry wait.
+ * detect() asks the master on the first start, then trusts the stored answer for RECHECK_MS (a week) and asks again
+ * after that in the background, so most starts send nothing; never throws. A link not up yet (ready / available
+ * false: just made, or the transport down) is not asked and doesn't use up the retry wait.
  */
 const fs = require('fs');
 const path = require('path');
@@ -47,6 +48,8 @@ const N63_RPM = 6500, M_RPM = 7200;
 const M_INDEX = { '0F1A10': true, '0F1A20': false };
 const M_WMI = ['WBS'], UNSURE_WMI = ['5YM'];
 const RETRY_MS = 30000;
+// a stored answer is trusted this long (an engine doesn't change; a head unit moved to another car is found within it)
+const RECHECK_MS = 7 * 24 * 3600 * 1000;
 const hex2 = (b) => (b < 16 ? '0' : '') + b.toString(16).toUpperCase();
 
 function writeWhole(file, text) {
@@ -64,13 +67,17 @@ class TwinDme {
         this.wmi = null;         // the VIN's maker code ('WBS'), null = not read yet
         this.file = opts && opts.dataDir ? path.join(opts.dataDir, 'twin_dme.json') : null;
         this.twin = null; this.index = null;
-        this.confirmed = false; this.triedT = 0; this.pending = null;
+        this.confirmed = false; this.triedT = 0; this.pending = null; this.at = 0;
         if (this.file) {
             try {
                 const s = JSON.parse(fs.readFileSync(this.file, 'utf8'));
                 if (s && typeof s.twin === 'boolean') {
                     this.twin = s.twin; this.index = typeof s.index === 'string' ? s.index : null;
                     this.wmi = typeof s.wmi === 'string' && /^[0-9A-Z]{3}$/.test(s.wmi) ? s.wmi : null;
+                    // checked lately and nothing still to ask (a V8's maker code, where wanted): not asked this start
+                    const age = Date.now() - (typeof s.at === 'number' ? s.at : 0);
+                    this.at = typeof s.at === 'number' ? s.at : 0;
+                    if (this.at && age >= 0 && age < RECHECK_MS && !this._needVin(this.index, this.twin)) this.confirmed = true;
                 }
             } catch (e) { /* not yet */ }
         }
@@ -98,7 +105,7 @@ class TwinDme {
         return this.twin === true;
     }
 
-    /** Two engine units? Asks the master's SGBD index once per start (again after RETRY_MS while it doesn't answer). */
+    /** Two engine units? Asks the master's SGBD index unless a stored answer is fresh (again after RETRY_MS while it doesn't answer). */
     detect() {
         if (this.confirmed) return Promise.resolve(this.twin);
         if (this.pending) return this.pending;
@@ -111,20 +118,20 @@ class TwinDme {
             if (index === null) return this.twin;
             this.confirmed = true;
             const twin = TwinDme.isTwinIndex(index);
-            let changed = false;
             if (twin !== this.twin || index !== this.index) {
                 if (this.log) this.log.info('engine units: SGBD index ' + (index || 'none') + ' -> ' + (twin ? 'two (master 0x12, bank 2 at 0x13)' : 'one'));
                 if (index !== this.index) this.wmi = null;        // another engine: its VIN asked again
-                this.twin = twin; this.index = index || null; changed = true;
+                this.twin = twin; this.index = index || null;
             }
-            const vin = twin && this.wantVin && this.wmi === null && !M_INDEX.hasOwnProperty(index) ? this._askVin(link) : Promise.resolve(null);
+            const vin = this._needVin(index, twin) ? this._askVin(link) : Promise.resolve(null);
             return vin.then((wmi) => {
                 if (wmi) {
-                    this.wmi = wmi; changed = true;
+                    this.wmi = wmi;
                     const m = this.m;
                     if (this.log) this.log.info('engine units: maker code ' + wmi + ' -> ' + (m === true ? 'an M car (S63 / S68)' : m === false ? 'not an M car (N63, or an M60i / 760i S68)' : 'not known (a US-built X5 / X6)') + ', Auto redline ' + (this.redline || 'from the profile'));
                 }
-                if (changed) this._save();
+                this.at = Date.now();
+                this._save();                                     // (its time too: trusted for RECHECK_MS)
                 return this.twin;
             });
         }).then((v) => { this.pending = null; return v; }, () => { this.pending = null; return this.twin; });
@@ -133,8 +140,11 @@ class TwinDme {
 
     _save() {
         if (!this.file) return;
-        try { writeWhole(this.file, JSON.stringify({ twin: this.twin, index: this.index, wmi: this.wmi })); } catch (e) { if (this.log) this.log.warn('twin_dme save: ' + e); }
+        try { writeWhole(this.file, JSON.stringify({ twin: this.twin, index: this.index, wmi: this.wmi, at: this.at })); } catch (e) { if (this.log) this.log.warn('twin_dme save: ' + e); }
     }
+
+    /** The VIN's maker code still to read: a V8 whose index doesn't say M or not, in an app that wants it. */
+    _needVin(index, twin) { return !!twin && this.wantVin && this.wmi === null && !M_INDEX.hasOwnProperty(index); }
 
     /** The maker code of the master's VIN (22 F1 90: 17 characters), 'WBS', or null (no answer, refused, not a VIN). */
     async _askVin(link) {
@@ -162,6 +172,7 @@ TwinDme.MASTER = MASTER;
 TwinDme.SLAVE = SLAVE;
 TwinDme.TWIN = TWIN;
 TwinDme.RETRY_MS = RETRY_MS;
+TwinDme.RECHECK_MS = RECHECK_MS;
 TwinDme.N63_RPM = N63_RPM;
 TwinDme.M_RPM = M_RPM;
 
