@@ -1,0 +1,102 @@
+name: Bug report
+description: One of the apps doesn't work right on your car
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A log is the most useful thing you can send: with it we can usually see what went wrong.
+
+        **Please don't post your VIN, phone number, location or anything else personal.**
+  - type: dropdown
+    id: app
+    attributes:
+      label: App
+      options:
+        - Ambient config
+        - Brake Test
+        - Doom
+        - Drag Timer
+        - eDrive
+        - Engine Config
+        - Fault Scanner
+        - G-Force
+        - Live Data
+        - M Vitals
+        - Redline
+        - Service
+        - Transmission Config
+        - Virtual Dyno
+        - Warm-Up
+        - Other / more than one
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: In the app's Settings, at the top (for example 2.7.4).
+      placeholder: "2.7.4"
+    validations:
+      required: true
+  - type: input
+    id: car
+    attributes:
+      label: Car
+      description: Model, engine and year, and the chassis code if you know it.
+      placeholder: "G21 M340i, B58, 2019"
+    validations:
+      required: true
+  - type: input
+    id: headunit
+    attributes:
+      label: Head unit
+      description: iDrive version and the head unit's software level if you know it (it's on the head unit's software info page).
+      placeholder: "iDrive 7, MGU, 22-07"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you see, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: The steps, and whether the car was parked, idling or driving.
+      placeholder: |
+        1. Start the engine
+        2. Open the app, Colour tab
+        3. Pick a colour
+  - type: markdown
+    attributes:
+      value: |
+        ### The log, as QR codes
+        Open the app's **Settings** and the last row, **QR log**:
+
+        <img src="https://raw.githubusercontent.com/cauliflowermossgrape/idrive7-apps/main/docs/media/qr-log-settings.png" width="560" alt="Settings, QR log row">
+
+        Take a photo of every page (Next for the next one):
+
+        <img src="https://raw.githubusercontent.com/cauliflowermossgrape/idrive7-apps/main/docs/media/qr-log.png" width="560" alt="A QR log page">
+  - type: textarea
+    id: qrlog
+    attributes:
+      label: QR log photos
+      description: |
+        In the app open **Settings > QR log** (the last row) and take a photo of every page, then drag the photos in here.
+        Page 1 has the newest lines. A phone's QR reader shows gibberish: that's fine, we decode the photos.
+        Can't scan it? Press Size: Large. Apps released before the QR log don't have the row yet: use the SSH log below.
+      placeholder: Drag the photos of each QR log page here
+  - type: textarea
+    id: sshlog
+    attributes:
+      label: Log over SSH (if you have SSH)
+      description: "The app's log file, or the lines we asked for. For example: tail -100 /var/opt/public/oap/oap_*/data/<app>.log"
+      render: text
+  - type: textarea
+    id: screens
+    attributes:
+      label: Photos of the screen
+      description: A photo of what the app shows helps too.
