@@ -457,7 +457,37 @@ mgu.run({
          * config.dme.misfire.tid, default 0C = this driving cycle). misMode: which request this engine
          * answers (false = service 06, true = UDS F6xx, null = not found yet); misCyl: cylinders found.
          */
-        let misMode = null, misCyl = 0;
+        let misMode = null, misCyl = 0, misEcu = null, misRetryAt = 0;
+        const MIS_RETRY_MS = 300000;
+        const hx = (n) => n.toString(16).toUpperCase().padStart(2, '0');
+        /* One misfire monitor's results from the unit that has them: asked directly (service 06 or UDS F6xx), or, for a
+         * unit that only answers OBD requests sent to all units (misMode 'all'), that way and its own reply taken. */
+        async function misMonitor(mid) {
+            if (misMode !== 'all') return rd.monitor(misEcu, mid, misMode);
+            const reps = await link.functional(0x06, [mid], { idleMs: 600, maxMs: 2500 });
+            const u = reps.get(misEcu);
+            return u && u[0] === 0x46 ? DidReader.records06(u, mid, false) : null;
+        }
+        /* Which unit and request give the misfire counts: the engine unit (config.dme.misfire.ecu, else the DME) asked
+         * directly, then the V8's second unit (on an S63 it has all eight cylinders' monitors and the master none), then
+         * UDS F6xx, then service 06 to all units (their lists of monitors, MID A0, say which has cylinder 1's).
+         * Nothing found: asked again after MIS_RETRY_MS. */
+        async function findMisfire(m) {
+            const own = m.ecu == null ? dme.ecu : m.ecu;
+            const units = m.ecu == null && own !== TwinDme.SLAVE ? [own, TwinDme.SLAVE] : [own];
+            for (const e of units) if (await rd.monitor(e, 0xA2, false)) { misEcu = e; misMode = false; return true; }
+            if (await rd.monitor(own, 0xA2, true)) { misEcu = own; misMode = true; return true; }
+            const reps = await link.functional(0x06, [0xA0], { idleMs: 800, maxMs: 3000 });
+            for (const [e, u] of reps) {
+                if (u[0] !== 0x46 || u[1] !== 0xA0 || u.length < 6 || !(u[2] & 0x40)) continue;     // 0x40 = A2, cylinder 1
+                let n = 0;
+                while (n < 12 && u[2 + ((n + 1) >> 3)] & (0x80 >> ((n + 1) & 7))) n++;
+                misEcu = e; misMode = 'all'; misCyl = n;
+                log.info('misfire counter: ' + n + ' cylinders at 0x' + hx(e) + ' (OBD to all units)');
+                return true;
+            }
+            return false;
+        }
         // when the misfire counts are coloured: the total from MIS_WARN (yellow) and MIS_CRIT (red), a cylinder from
         // MIS_CYL_WARN
         const MIS_WARN = 100, MIS_CRIT = 500, MIS_CYL_WARN = 50;
@@ -503,6 +533,8 @@ mgu.run({
         async function readMisfire() {
             const counts = await readMasterMisfire();
             if (!counts) return null;
+            // the counts came from the second unit itself, or by asking all units: nothing more to add
+            if (misEcu !== (dme.misfire && dme.misfire.ecu != null ? dme.misfire.ecu : dme.ecu) || misMode === 'all') return counts;
             // a twin-unit engine whose master lists only its own bank: bank 2's after it (cylinders perBank + 1 ..)
             const m = dme.misfire || {};
             if (m.ecu == null && await twin.detect() && misCyl <= twin.perBank) {
@@ -514,13 +546,14 @@ mgu.run({
             return counts;
         }
         async function readMasterMisfire() {
-            const m = dme.misfire || {}, ecu = m.ecu == null ? dme.ecu : m.ecu, tid = parseInt(m.tid || '0C', 16);
+            const m = dme.misfire || {}, tid = parseInt(m.tid || '0C', 16);
             if (misMode === null) {
-                if (await rd.monitor(ecu, 0xA2, false)) misMode = false;
-                else if (await rd.monitor(ecu, 0xA2, true)) misMode = true;
-                else return null;
+                if (Date.now() < misRetryAt) return null;
+                if (!(await findMisfire(m))) { misRetryAt = Date.now() + MIS_RETRY_MS; return null; }
+                if (misMode !== 'all') log.info('misfire counter: at 0x' + hx(misEcu) + (misMode ? ' (UDS F6xx)' : ' (OBD 06)'));
             }
-            if (!misCyl) {
+            const ecu = misEcu;
+            if (!misCyl && misMode !== 'all') {
                 // the engine unit's own list of its misfire monitors (MID A0) gives the cylinder count
                 const sup = await rd.supported(ecu, 0xA0, misMode);
                 let n = 0;
@@ -529,11 +562,12 @@ mgu.run({
             }
             const counts = [];
             for (let c = 0; c < (misCyl || 12); c++) {
-                const res = await rd.monitor(ecu, 0xA2 + c, misMode);
+                const res = await misMonitor(0xA2 + c);
                 if (!res) {
                     // counting without the list: a refusal past cylinder 1 ends the engine; no reply is
                     // a missed round, not the end (it would cut a 6-cylinder short)
-                    if (misCyl || !c || !/^NRC/.test(rd.raws[rd.monitorKey(ecu, 0xA2 + c, misMode)].why)) return null;
+                    const r = rd.raws[rd.monitorKey(ecu, 0xA2 + c, misMode)];
+                    if (misCyl || !c || !r || !/^NRC/.test(r.why)) return null;
                     break;
                 }
                 const tr = res.find((x) => x.tid === tid) || res[0];

@@ -83,15 +83,21 @@ class DidReader {
     async monitor(ecu, mid, did) {
         const uds = await this.ask06(ecu, mid, did), r = this.raws[this.monitorKey(ecu, mid, did)];
         if (!uds) return null;
+        const out = DidReader.records06(uds, mid, did);
+        if (!out) { r.why = 'no test results'; return null; }
+        r.ok = true;
+        return out;
+    }
+
+    /** The test results in a positive service 06 (or 22 F6xx) reply, as monitor() returns them, or null. */
+    static records06(uds, mid, did) {
         const out = [], size = did ? 8 : 9;
         for (let i = did ? 3 : 1; i + size <= uds.length; i += size) {
             const o = did ? i : i + 1;                      // skip the repeated MID in service 06 records
             if (!did && uds[i] !== mid) break;
             out.push({ tid: uds[o], unit: uds[o + 1], value: (uds[o + 2] << 8) | uds[o + 3], min: (uds[o + 4] << 8) | uds[o + 5], max: (uds[o + 6] << 8) | uds[o + 7] });
         }
-        if (!out.length) { r.why = 'no test results'; return null; }
-        r.ok = true;
-        return out;
+        return out.length ? out : null;
     }
 
     /**
