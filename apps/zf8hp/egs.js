@@ -11,10 +11,11 @@ function payload(did, uds) {
 }
 
 /** layout (optional): this EGS variant's own length for the record - { count } fields shaped like the catalog's
- * first, or { raw: true } for a record whose layout differs and is shown as raw bytes. */
-function decode(did, uds, layout) {
+ * first, or { raw: true } for a record whose layout differs and is shown as raw bytes. catalog (optional): the
+ * variant's own (catalog.js's shape), else GSZFBCE's. */
+function decode(did, uds, layout, catalog) {
     did = String(did).toUpperCase();
-    const base = C.records[did], b = payload(did, uds);
+    const base = (catalog || C).records[did], b = payload(did, uds);
     const meta = !base || !layout ? base : layout.raw ? { length: null, fields: [] }
         : { length: layout.count * base.fields[0].bytes, fields: Array.from({ length: layout.count }, (_, i) =>
             Object.assign({}, base.fields[0], { at: i * base.fields[0].bytes })) };
@@ -30,9 +31,9 @@ function decode(did, uds, layout) {
     return { ok: true, raw: b.toString('hex').toUpperCase(), values, bytes: b.length, decoded: values.length > 0 };
 }
 
-function shiftRecords(family, group) {
+function shiftRecords(family, group, catalog) {
     const f = family === '2' || family === 'cold2' ? 2 : 1;
-    return C.shifts.filter((s) => s.family === f && (group === 'up' ? s.toGear > s.fromGear
+    return (catalog || C).shifts.filter((s) => s.family === f && (group === 'up' ? s.toGear > s.fromGear
         : group === 'skip' ? s.fromGear - s.toGear > 1 : s.fromGear - s.toGear === 1));
 }
 

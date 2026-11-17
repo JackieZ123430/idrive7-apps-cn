@@ -53,16 +53,18 @@ mgu.run({
         const tableRow = (top, count) => Math.floor((508 + ex - top) / Math.max(1, count));
         // demo data: Always, or Auto while the diagnostic link is not up (no car)
         const demo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !(reader.diag && reader.diag.available));
+        // the records, gear names and maps of the EGS on the car (reader.js: a variant's own catalog, else GSZFBCE's)
+        const cat = () => (demo() ? C : reader.catalog);
         const records = () => demo() ? DEMO.records : reader.records;
         const rec = (d) => records()[d];
         const values = (d) => rec(d) && rec(d).ok ? rec(d).values : [];
         const value = (d, i) => values(d)[i || 0];
-        const maps = () => E.shiftRecords(String(settings.get('mapFamily')), settings.get('shiftGroup'));
+        const maps = () => E.shiftRecords(String(settings.get('mapFamily')), settings.get('shiftGroup'), cat());
         const chosen = () => { const xs = maps(); if (shift >= xs.length) shift = 0; return xs[shift]; };
         const family = () => String(settings.get('mapFamily'));
         const thermalDid = () => thermal % 2 ? '4440' : '4441';
         // a shift table with maps in this family: cold maps hold single upshifts only, KF2 has no skip downshifts
-        const groupHas = (f, g) => !(/cold/.test(f) && g !== 'up') && E.shiftRecords(f, g).length > 0;
+        const groupHas = (f, g) => !(/cold/.test(f) && g !== 'up') && E.shiftRecords(f, g, cat()).length > 0;
         // another map family, and the upshifts where it has no table for the current group (the page's buttons and View)
         function setFamily(f) {
             if (f === family()) return;
@@ -82,7 +84,7 @@ mgu.run({
             if (page === 4) ds = ds.concat(['4441', '4440', '6005', '601D']);
             if (page === 5) {
                 if (detailMode === 0) ds = ds.concat(DETAIL_DIDS);
-                if (detailMode === 2) ds = ds.concat(recordIds || Object.keys(C.records).sort().slice(recordPage * 7, recordPage * 7 + 7));
+                if (detailMode === 2) ds = ds.concat(recordIds || Object.keys(cat().records).sort().slice(recordPage * 7, recordPage * 7 + 7));
             }
             reader.wantFaults = page === 5 && detailMode === 1;
             reader.setWanted(ds);
@@ -106,7 +108,7 @@ mgu.run({
             if (page === 2 || page === 3) shift = (shift + 1) % Math.max(1, maps().length);
             if (page === 4) thermal = (thermal + 1) % 2;
             if (page === 5) {
-                if (detailMode === 2) recordPage = (recordPage + 1) % Math.ceil(Object.keys(C.records).length / 7);
+                if (detailMode === 2) recordPage = (recordPage + 1) % Math.ceil(Object.keys(cat().records).length / 7);
                 else detailMode = (detailMode + 1) % 3;
             }
             wanted();
@@ -172,7 +174,7 @@ mgu.run({
             if (sub) cv.text(sub, x + 18, 177, 17, t.dim);
         }
         function live(cv, t) {
-            const oil = value('6000'), gear = C.gearNames[value('DA2E')], selector = C.selectorNames[value('DA2E', 1)];
+            const oil = value('6000'), gear = cat().gearNames[value('DA2E')], selector = cat().selectorNames[value('DA2E', 1)];
             card(cv, t, 24, 374, 'Transmission oil', tN(oil), tU(), age(rec('6000')), BLUE);
             card(cv, t, 418, 374, 'Actual gear', gear || '--', selector || '', age(rec('DA2E')));
             card(cv, t, 812, 374, 'Turbine / input', n(value('DA2A')), 'rpm', age(rec('DA2A')));
@@ -232,7 +234,7 @@ mgu.run({
             const f = family() === '2' || family() === 'cold2' ? 2 : 1;
             if (/cold/.test(family()) && s.toGear - s.fromGear === 1) return value(f === 2 ? '41BA' : '41B9', s.fromGear - 1);
             if (s.toGear > s.fromGear) return value(f === 2 ? '4136' : '4133', s.fromGear - 1);
-            const xs = C.shifts.filter((m) => m.family === f && m.toGear < m.fromGear);
+            const xs = cat().shifts.filter((m) => m.family === f && m.toGear < m.fromGear);
             return value(f === 2 ? '4137' : '4134', xs.findIndex((m) => m.did === s.did));
         }
         /** Where the kit runs the screen: the map family picked on the page (else in Settings or with View). Returns the end x. */
@@ -331,10 +333,10 @@ mgu.run({
                 G.panel(cv, t, x, 94, 504, 418, col === 0 ? 'Cold / warm' : col === 1 ? 'Temperature bands' : 'Upper temperature bands');
                 for (let row = 0; row < 8; row++) {
                     const i = col * 8 + row;
-                    if (i >= C.ranges.length) continue;
+                    if (i >= cat().ranges.length) continue;
                     const y = Math.round(180 + row * (304 + ex) / 7), v = vs[i];
                     cv.fillRect(x + 14, y - 23, 474 * (E.finite(v) ? v / max : 0), 29, withAlpha(BLUE, 0.14));
-                    cv.text(tRange(C.ranges[i]) + ' ' + tU(), x + 18, y, 22, t.text);
+                    cv.text(tRange(cat().ranges[i]) + ' ' + tU(), x + 18, y, 22, t.text);
                     cv.text(E.finite(v) ? n(v / 3600, 2) + ' h' : '--', x + 356, y, 23, t.text, { align: 'right', font: 'num' });
                     cv.text(E.finite(v) && total ? n(v / total * 100, 1) + '%' : '--', x + 484, y, 19, t.dim, { align: 'right' });
                 }
@@ -345,7 +347,7 @@ mgu.run({
             cv.text('status 0x' + r.status.toString(16).toUpperCase(), 330, y, 24, t.dim);
         }
         function recordRow(cv, t, d, y) {
-            const r = rec(d), meta = C.records[d];
+            const r = rec(d), meta = cat().records[d];
             cv.text(d, 44, y, 28, BLUE, { font: 'num' });
             cv.text(fit(cv, meta.name.replace(/^_/, ''), 690, 24), 160, y, 24, t.text);
             const deg = meta.fields[0] && meta.fields[0].unit === '°C';
@@ -374,7 +376,7 @@ mgu.run({
             cv.scroll = { y: clipTop, bar };
         }
         function details(cv, t) {
-            const ids = Object.keys(C.records).sort(), all = ids.length;
+            const ids = Object.keys(cat().records).sort(), all = ids.length;
             const head = ['Converter / learning / service data', 'EGS fault memory', 'All available diagnostic records'][detailMode];
             subtitle(cv, t, head, cv.own ? '' : detailMode === 2 ? 'Next item: next records / View: return to summary' : 'Next item: next details view');
             // the summary's age after its title, left of the view's pills (or the bar's hint)
@@ -446,11 +448,11 @@ mgu.run({
             const gs = ['R', '1', '2', '3', '4', '5', '6', '7', '8'], r = rec('DA2E');
             const liveMs = Math.max(1, Number(settings.get('liveInterval')) || 2) * 1000;
             const fresh = demo() || (r && r.ok && !r.cached && Date.now() - r.at < Math.max(10000, 2 * liveMs + 5000));
-            const cur = fresh ? gs.indexOf(C.gearNames[value('DA2E')]) : -1, title = 'Applied elements';
+            const cur = fresh ? gs.indexOf(cat().gearNames[value('DA2E')]) : -1, title = 'Applied elements';
             G.panel(cv, t, 24, 44, 795, 468, title);
             cv.text(fit(cv, 'Controller ' + (demo() ? '0F25D0' : reader.sgbd || 'not identified'), 795 - 66 - cv.textWidth(title, 26, { font: 'bold' }), 19),
                 801, 86, 19, t.dim, { align: 'right' });
-            const rows = gs.map((g, i) => [{ text: g, color: i === cur ? BLUE : t.text }].concat(PACKS.map((p) => C.clutchMatrix[g].indexOf(p) >= 0 ? { text: 'ON', color: BLUE } : '-')));
+            const rows = gs.map((g, i) => [{ text: g, color: i === cur ? BLUE : t.text }].concat(PACKS.map((p) => cat().clutchMatrix[g].indexOf(p) >= 0 ? { text: 'ON', color: BLUE } : '-')));
             const rh = tableRow(135, gs.length);
             if (cur >= 0) cv.roundRect(36, 135 + cur * rh, 766, rh, 8, withAlpha(BLUE, 0.14));
             G.table(cv, t, 44, 103, 750, [{ label: 'Gear', w: 125 }].concat(PACKS.map((p) => ({ label: p, w: 125, align: 'center' }))), rows,

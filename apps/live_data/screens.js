@@ -36,26 +36,28 @@ const nextLayout = (id) => LAYOUTS[(LAYOUTS.indexOf(layout(id)) + 1) % LAYOUTS.l
 /* ---------- scales: [min, max, { warn, red (zones from there), div (dial numbers / div), grow }] ---------- */
 const OIL = [40, 150, { warn: 130, red: 140 }], COOLANT = [40, 130, { warn: 112, red: 120 }];
 const RPM = [0, 7000, { red: 6500, div: 1000 }];        // B58: limiter at about 7000 rpm
+// torque, power and the tank start at a B58's and grow with what the car shows (a V8: 750 Nm, 460 kW, 68-83 l)
+const TQ = [0, 600, { grow: true }], KW = [0, 300, { grow: true }], TANK = [0, 59, { grow: true }];
 const BY_SIGNAL = {
-    rpm: RPM, torque: [0, 600], power: [0, 300], powerPct: [0, 100], torquePct: [0, 100], pedal: [0, 100],
+    rpm: RPM, torque: TQ, power: KW, powerPct: [0, 100], torquePct: [0, 100], pedal: [0, 100],
     boost: [0, 2, { grow: true }], coolant: COOLANT, oil: OIL, oil2: OIL,
-    tank: [0, 59], tankL: [0, 30], tankR: [0, 30], range: [0, 800], flow: [0, 40, { grow: true }], instant: [0, 30, { grow: true }],
+    tank: TANK, tankL: [0, 30], tankR: [0, 30], range: [0, 800], flow: [0, 40, { grow: true }], instant: [0, 30, { grow: true }],
     speed: [0, 260], gLong: [-1.2, 1.2], gLat: [-1.5, 1.5], steer: [-540, 540], outside: [-30, 50], battery: [0, 100],
     tcKm: [0, 50, { grow: true }], tcFuel: [0, 5, { grow: true }], tcAvg: [0, 20, { grow: true }],
 };
 ['FL', 'FR', 'RL', 'RR'].forEach((c) => { BY_SIGNAL['p' + c] = [1.5, 3.5]; BY_SIGNAL['pt' + c] = [1.5, 3.5]; BY_SIGNAL['t' + c] = [-20, 100]; });
 const BY_USEFUL = {
     'Engine speed': RPM, 'Engine load': [0, 100], 'Accelerator pedal': [0, 100], 'Throttle': [0, 100],
-    'Engine torque': [0, 600], 'Engine power (engine unit)': [0, 300], 'Vehicle speed': [0, 260],
+    'Engine torque': TQ, 'Engine power (engine unit)': KW, 'Vehicle speed': [0, 260],
     'Coolant': COOLANT, 'Coolant, radiator outlet': [20, 120], 'Engine oil (after filter)': OIL, 'Engine oil in the sump': OIL,
     'Intake air': [-20, 80], 'Charge air before throttle': [-20, 100], 'Gearbox': [20, 130, { warn: 110, red: 120 }],
     'Oil pressure': [0, 6], 'Boost': [0, 2, { grow: true }], 'Charge pressure (absolute)': [0.8, 3, { grow: true }],
     'High pressure fuel (rail)': [0, 350], 'Low pressure fuel': [0, 8], 'Fuel consumption': [0, 40, { grow: true }],
-    'Fuel mass flow': [0, 30, { grow: true }], 'Fuel in the tank': [0, 59], 'Ignition angle': [-10, 50],
+    'Fuel mass flow': [0, 30, { grow: true }], 'Fuel in the tank': TANK, 'Ignition angle': [-10, 50],
 };
 const BY_UNIT = {
     '°C': [0, 150], bar: [0, 3, { grow: true }], '%': [0, 100], 'km/h': [0, 260], rpm: RPM, V: [10, 16], l: [0, 60],
-    kW: [0, 300], Nm: [0, 600], 'l/h': [0, 40, { grow: true }], 'l/100 km': [0, 30, { grow: true }], g: [-1.5, 1.5], km: [0, 1000],
+    kW: KW, Nm: TQ, 'l/h': [0, 40, { grow: true }], 'l/100 km': [0, 30, { grow: true }], g: [-1.5, 1.5], km: [0, 1000],
 };
 /** the smallest 1 / 2 / 2.5 / 5 x 10^n at or above v */
 function niceCeil(v) {

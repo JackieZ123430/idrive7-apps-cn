@@ -23,6 +23,14 @@ maps; accumulated oil/electronics temperature time in all 23 bands; converter
 and engagement/release learning; EGS fault memory; a browser for all 108
 selected records; and the standard 8HP applied-element reference matrix.
 
+**Other gearboxes.** BMW's index lists more 8HP controllers at `0x18`: `GSZFB1` (`0F21D0`) and the 8HP gen 4
+`GSZF04GF` / `GSZF04GD` (`0F2D60`, `0F2D70`, `0F2D80`, `0F3530`, `0F3540`), which a V8 car (N63 / S63) may have.
+Each variant in `reader.js` can carry its own catalog (`catalog: require('./catalog_<sgbd>')`, the shape of
+`catalog.js`): the reader then asks and decodes only its records, and every page draws its gears and maps from it.
+None is added yet: a catalog needs that SGBD's read schemas and one read on a car. To help, set *EGS variant* to
+*Try any (unverified)*, open each page once, and send the app's log: it has the EGS identification and, for each
+record, the length it answered or the code it refused with.
+
 The data schema was extracted from BMW/ZF `GSZFBCE.prg`, revision 15.000.
 Adaptation words are little endian; the thermal histograms and shaft-speed
 records are big endian. Responses must match the identifier and exact schema

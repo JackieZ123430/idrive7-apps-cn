@@ -482,7 +482,15 @@ The first value needs **two** such plateaus within 100 rpm of each other. After 
 A frozen rpm reading (a stale signal) is ignored.
 
 Which redline is used, first that has one: the *Redline* setting, then the learned limit, then the
-engine profile (petrol 7000, diesel 5000).
+engine's own (a V8's, below), then the engine profile (petrol 7000, diesel 5000).
+
+A V8 with two engine units has its own Auto redline: **6500** for an N63, **7200** for an M car's S63 or S68.
+The G-series V8s share their engine-unit index between the N63 and the S63 (and the S68 of an M5 / XM with that of
+an M60i / 760i), so the engine unit's VIN is read once: only its maker code is kept. WBS (BMW M GmbH) means an M car; 5YM (BMW's US
+plant, its X5 M and X6 M but some other X5 / X6 too) can't tell, so those keep the profile's 7000. The VIN itself is neither kept nor logged. It is asked only while the diagnostics link is open for the HUD's
+knock or fuel readouts, and kept for the next start. The S68 of an M60i / 760i gets 6500 too, though it may cut in
+lower (one spec site lists 6300 rpm). Not yet checked on a car; set *Redline* by hand if your engine
+differs, or let Redline learn the limiter.
 
 ### Shift points, per gear
 
@@ -554,7 +562,9 @@ while it does; it goes before a grade or launch time. On Minimal and Split wings
 the gear turns red (Minimal also writes KNOCK under its lights). The *Knock retard* readout shows the
 degrees, only from 0.75°. A car whose engine unit doesn't answer `554C` shows nothing (logged once:
 `knock: the engine unit gives no knock retard`). The threshold is from the catalogue's scaling and not
-yet checked on a car.
+yet checked on a car. A V8 with two engine units (N63, S63, S68: the master's SGBD index says so,
+`kit/runtime/twin_dme.js`) has each bank's knock control in its own unit: the second one (`0x13`) is read too, and the
+larger retard of the two banks and a knock flag from either count.
 
 ### Fuel use
 
@@ -563,7 +573,9 @@ second while the readout is on and the engine runs (the gearbox reader's link), 
 that answers: `5656` (fuel volume flow, ml/s), OBD `5E` (fuel rate, l/h), `4521` (fuel mass flow, over the
 fuel's density). Shown as **L/100KM** while moving (or **MPG**, **MPG US**, **KM/L**: *Fuel use unit* in
 Units), and as **L/H** (or **GAL/H**) under 5 km/h. Coasting with the fuel cut shows 0.0, and so does the engine off once it has given a rate (electric driving, auto start-stop). A car whose engine
-unit answers none of them shows nothing (logged once). Not yet checked on a car.
+unit answers none of them shows nothing (logged once). Not yet checked on a car. On a V8 with two engine units
+`5656` is each unit's own bank, so the rate is both units' `5656` added, else OBD `5E` (the whole engine's); `4521`
+isn't used there, and such a car shows no rate rather than half of it.
 
 ## Electrical
 

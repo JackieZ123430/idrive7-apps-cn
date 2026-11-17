@@ -11,10 +11,19 @@
  * the engine is off), map: { raw: text }, lin: [a, b] (shown as a + b * value). Temperatures below
  * -45 °C count as no data (an unset sensor reads -48 or -273).
  * Engine unit identifiers: DME8FF_R (B58 / B48 / B38, G series); one that isn't there is skipped.
+ * only: 'twin' = only on an engine with two engine units (the V8s: kit/twin_dme.js), 'single' = only on one with
+ * one. Each unit of a twin-unit engine runs its own bank, and its per-cylinder values (ignition angle,
+ * injector correction) are its own bank's cylinders 1..n, so on the master only bank 1's are listed; the misfire
+ * and rough-running counters are the whole engine's (DME8FF_R lists them up to 12 cylinders; 8 are used here).
+ * BANK2(perBank): the second unit's (0x13) list, its cylinders named perBank + 1 .. (as S63TU_L0's texts have it:
+ * "Zuendwinkel Zylinder 1 (Slave 5)"). Not checked on a car yet: the S63's master answered 4035 (issue #166).
  */
 /* KQE's quality range of a refuelling (Qualitaetsbereich 1 low, 2 medium, 3 high); 0: no refuelling in that place yet */
 const QUALITY = { 0: '-', 1: 'Low', 2: 'Medium', 3: 'High' };
-const cyl = (name, dids, extra) => dids.map((did, i) => Object.assign({ name: name + ', cylinder ' + (i + 1), c: [did] }, extra));
+const cyl = (name, dids, extra, first) => dids.map((did, i) => Object.assign({ name: name + ', cylinder ' + ((first || 1) + i), c: [did] }, extra));
+/** a bank's per-cylinder list: cylinders 1..4 always, 5 and 6 only with one engine unit (on a twin they are bank 2's) */
+const bank = (name, dids, extra) => cyl(name, dids.slice(0, 4), extra).concat(cyl(name, dids.slice(4), Object.assign({ only: 'single' }, extra), 5));
+const IGN = ['4A49', '4A4A', '4A4C', '4A4D', '4A4E', '4A4F'], INJ = ['55B4', '55B5', '55B6', '55B7', '55B8', '55B9'];
 
 const DME = [
     { group: 'Engine', items: [
@@ -95,12 +104,14 @@ const DME = [
     ] },
     { group: 'Ignition and knock', items: [
         { name: 'Ignition angle', c: ['59FA', 'OBD 0E'], u: '°', d: 1 },
-    ].concat(cyl('Ignition angle', ['4A49', '4A4A', '4A4C', '4A4D', '4A4E', '4A4F'], { u: '°', d: 1 }), [
+    ].concat(bank('Ignition angle', IGN, { u: '°', d: 1 }), [
         { name: 'Knock detected', c: ['4A36'], map: { 0: 'no', 1: 'YES' } },
         { name: 'Knock control retard (mean)', c: ['554C'], u: '°', d: 1 },
         { name: 'Knock control adaptation', c: ['554A'], u: '°', d: 1 },
     ], cyl('Misfires', ['4B23', '4B24', '4B25', '4B30', '4B31', '4B32'], { d: 0 }),
-    cyl('Rough running', ['4A30', '4A31', '4A32', '4A33', '4A34', '4A35'], { d: 1 })) },
+    cyl('Misfires', ['4B33', '4B34'], { d: 0, only: 'twin' }, 7),
+    cyl('Rough running', ['4A30', '4A31', '4A32', '4A33', '4A34', '4A35'], { d: 1 }),
+    cyl('Rough running', ['4A43', '4A44'], { d: 1, only: 'twin' }, 7)) },
     { group: 'VANOS and Valvetronic', items: [
         { name: 'Intake camshaft (VANOS)', c: ['452E'], u: '°', d: 1 },
         { name: 'Intake camshaft target', c: ['452B'], u: '°', d: 1 },
@@ -116,7 +127,7 @@ const DME = [
         { name: 'Long term fuel trim', c: ['OBD 07'], u: '%', d: 1 },
         { name: 'Mixture adaptation (factor)', c: ['4A9D'], d: 3 },
         { name: 'Injector flow adaptation (mean)', c: ['546E'], d: 3 },
-    ].concat(cyl('Injector correction', ['55B4', '55B5', '55B6', '55B7', '55B8', '55B9'], { d: 3 })) },
+    ].concat(bank('Injector correction', INJ, { d: 3 })) },
     { group: '12 V', items: [
         { name: 'Battery voltage', c: ['5853', 'OBD 42'], u: 'V', d: 2 },
         { name: 'Battery current', c: ['5852'], u: 'A', d: 1 },
@@ -138,6 +149,49 @@ const DME = [
         { name: 'Stored emission faults', c: ['OBD 01/1'] },
     ] },
 ];
+
+/**
+ * The second engine unit (0x13) of a twin-unit engine: its own bank's values, in the master's identifiers (the
+ * pair's SGBDs are the same, as S63TU_R0 / S63TU_L0 are), shown on the Engine page under "Bank 2". perBank:
+ * cylinders per bank (4 on a V8): its cylinders are named perBank + 1 ..
+ */
+function BANK2(perBank) {
+    const n = Math.max(1, Math.min(4, perBank || 4));
+    return [
+        { group: 'Ignition and knock', items: cyl('Ignition angle', IGN.slice(0, n), { u: '°', d: 1 }, n + 1).concat([
+            { name: 'Knock detected', c: ['4A36'], map: { 0: 'no', 1: 'YES' } },
+            { name: 'Knock control retard (mean)', c: ['554C'], u: '°', d: 1 },
+            { name: 'Knock control adaptation', c: ['554A'], u: '°', d: 1 },
+        ]) },
+        { group: 'Boost and air', items: [
+            { name: 'Charge pressure (absolute)', c: ['4205', '57C1'], u: 'bar', d: 2 },
+            { name: 'Boost target (absolute)', c: ['4AB0'], u: 'bar', d: 2 },
+            { name: 'Boost control deviation', c: ['4536'], u: 'hPa', d: 0 },
+            { name: 'Wastegate position (0 = closed)', c: ['5927'], u: '%', d: 0 },
+            { name: 'Wastegate actuator duty cycle', c: ['4AAB'], u: '%', d: 0 },
+        ] },
+        { group: 'VANOS and Valvetronic', items: [
+            { name: 'Intake camshaft (VANOS)', c: ['452E'], u: '°', d: 1 },
+            { name: 'Intake camshaft target', c: ['452B'], u: '°', d: 1 },
+            { name: 'Exhaust camshaft (VANOS)', c: ['452C'], u: '°', d: 1 },
+            { name: 'Exhaust camshaft target', c: ['452A'], u: '°', d: 1 },
+        ] },
+        { group: 'Mixture and injectors', items: [
+            { name: 'Lambda', c: ['5889', '5640'], d: 3, bad: [65535] },
+            { name: 'Lambda target', c: ['5816'], d: 3, bad: [65535] },
+            { name: 'Mixture adaptation (factor)', c: ['4A9D'], d: 3 },
+            { name: 'Injector flow adaptation (mean)', c: ['546E'], d: 3 },
+        ].concat(cyl('Injector correction', INJ.slice(0, n), { d: 3 }, n + 1)) },
+        { group: 'Fuel and exhaust', items: [
+            { name: 'Fuel consumption', c: ['5656'], u: 'l/h', d: 1 },
+            { name: 'Exhaust after catalyst (model)', c: ['5896', '582F'], u: '°C', d: 0 },
+            { name: 'Particulate filter', c: ['579B'], u: '°C', d: 0 },
+            { name: 'Particulate filter: soot', c: ['5444', '5774'], u: 'g', d: 1 },
+            { name: 'Catalyst oxygen storage', c: ['5433'], u: 'mg', d: 0, bad: [0] },
+            { name: 'Engine unit', c: ['5821'], u: '°C', d: 0 },
+        ] },
+    ];
+}
 
 const BY_SGBD = {
     BATT48: [
@@ -177,4 +231,4 @@ const CONVERT = {
     mV: { V: 0.001 }, cl: { l: 0.01 }, min: { h: 1 / 60 }, s: { h: 1 / 3600 }, '°CA': { '°': 1 }, '°C': { '°': 1 },
 };
 
-module.exports = { 0x12: DME, bySgbd: BY_SGBD, CONVERT };
+module.exports = { 0x12: DME, bySgbd: BY_SGBD, CONVERT, BANK2 };

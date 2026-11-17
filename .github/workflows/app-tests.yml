@@ -65,6 +65,7 @@ jobs:
       - run: node kit/tools/test_service.js
       - run: node kit/tools/test_service_engine.js
       - run: node kit/tools/test_car_vitals.js
+      - run: node kit/tools/test_twin_dme.js
       - run: node kit/tools/test_redline_hud.js
       - run: node kit/tools/test_hud_claim.js
       - run: node kit/tools/test_redline_running.js

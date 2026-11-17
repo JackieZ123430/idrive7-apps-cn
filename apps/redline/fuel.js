@@ -10,6 +10,9 @@
  * Plausible: 0..150 l/h. Smoothed (about 2 s) so the readout doesn't flicker. Never throws; value() is
  *   { lph (litres per hour, or null when not read in the last 3 s) }.
  * fuelItem() turns it and the speed into the HUD's item. Scalings are from the catalogue, not yet checked on a car.
+ * A V8 with two engine units (opts.twin, kit/twin_dme.js): 5656 is each unit's own bank (the SGBD's "LOKAL"),
+ * so it counts only with the second unit's (0x13) added; else the engine's total rate (OBD 5E). 4521 is not used
+ * there (not known to be the whole engine's), so such a car shows no fuel rather than half of it.
  */
 const { DidReader } = require('./kit/dids');
 
@@ -28,6 +31,9 @@ function candidates(diesel) {
         { ecu: 0x12, did: '4521', bytes: 2, at: 0, factor: 0.1 / rho, offset: 0, min: 0, max: 150 },
     ];
 }
+
+/** Bank 2's 5656, from the second engine unit of a two-unit engine. */
+const SLAVE_5656 = { ecu: 0x13, did: '5656', bytes: 2, at: 0, factor: 0.00119209 * 3.6, offset: 0, min: 0, max: 150 };
 
 /** Exponential average: prev moved towards x over dtMs (time constant TAU_MS); x itself when there is no prev or the gap is long. */
 function smooth(prev, x, dtMs) {
@@ -66,10 +72,11 @@ class FuelWatch {
     /**
      * linkOf: () => a ReadOnlyDiag (the gearbox reader's, shared). opts: { diesel: bool or () => bool } (density of
      * 4521): a function is asked on every read, so a diesel found after the start (engine type on Auto, the first
-     * run) or set by hand gets its density at once (2026-11-10 review).
+     * run) or set by hand gets its density at once (2026-11-10 review). opts.twin: a kit/twin_dme.js TwinDme.
      */
     constructor(ctx, linkOf, opts) {
         this.ctx = ctx; this.log = ctx.log; this.linkOf = linkOf;
+        this.twin = (opts && opts.twin) || null; this.src = '';
         this.dieselOf = typeof (opts && opts.diesel) === 'function' ? opts.diesel : () => !!(opts && opts.diesel);
         this.diesel = !!this.dieselOf();
         this.cands = candidates(this.diesel);
@@ -90,7 +97,31 @@ class FuelWatch {
     stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
 
     /** The link stops asking a unit after 5 misses in a row (other readers count too) until it is woken. */
-    _wake() { const l = this.rd && this.rd.diag; if (l && typeof l.wake === 'function') { try { l.wake(0x12); } catch (e) { /* never */ } } }
+    _wake() {
+        const l = this.rd && this.rd.diag;
+        if (l && typeof l.wake === 'function') { try { l.wake(0x12); if (this._twinOn()) l.wake(0x13); } catch (e) { /* never */ } }
+    }
+
+    /** Two engine units (asks once, in the background, while not known)? */
+    _twinOn() { return !!this.twin && this.twin.on(); }
+
+    /**
+     * One reading: { v (l/h or null), src }. One engine unit: the first candidate that answers. Two: both units'
+     * 5656 added (bank 1 + bank 2), else the engine's total (OBD 5E); never one bank's alone.
+     */
+    async _read() {
+        if (!this._twinOn()) {
+            const v = await this.rd.value('fuel', this.cands);
+            return { v, src: v === null ? '' : DidReader.label(this.cands[this.rd.pick.fuel || 0]) };
+        }
+        const a = await this.rd.value('fuel1', [this.cands[0]]);
+        if (a !== null) {
+            const b = await this.rd.value('fuel2', [SLAVE_5656]);
+            if (b !== null) return { v: a + b, src: '5656 of both engine units' };
+        }
+        const t = await this.rd.value('fuelTotal', [this.cands[1]]);
+        return { v: t, src: t === null ? '' : 'OBD 5E' };
+    }
 
     _poll() {
         if (this.busy || !this.rd) return;
@@ -98,6 +129,8 @@ class FuelWatch {
         // would count towards "no fuel rate on this car" and the minute-long back-off (2026-11-10 review)
         const link = this.rd.diag;
         if (link && (link.ready === false || link.available === false)) return;
+        // one engine unit or two not known yet (the first start): no reading, rather than one bank's as the engine's
+        if (this.twin && !this.twin.known()) { this._twinOn(); return; }
         let diesel = this.diesel;
         try { diesel = !!this.dieselOf(); } catch (e) { /* keep the last */ }
         if (diesel !== this.diesel) { this.diesel = diesel; this.cands = candidates(diesel); }
@@ -106,16 +139,16 @@ class FuelWatch {
             this._wake();                                               // and that try really asks it
         }
         this.busy = true;
-        Promise.resolve().then(() => this.rd.value('fuel', this.cands)).then((v) => {
-            const now = Date.now();
+        Promise.resolve().then(() => this._read()).then((got) => {
+            const now = Date.now(), v = got.v;
             this.triedT = now;
             if (v === null) {
-                if (++this.fails === 3) this.log.info('fuel: the engine unit gives no fuel rate (5656, OBD 5E, 4521); no fuel readout on this car');
+                if (++this.fails === 3) this.log.info('fuel: the engine unit gives no fuel rate (' + (this._twinOn() ? '5656 of both engine units, OBD 5E' : '5656, OBD 5E, 4521') + '); no fuel readout on this car');
                 return;
             }
-            if (!this.logged) {
-                this.logged = true;
-                this.log.info('fuel: rate read from the engine unit (' + DidReader.label(this.cands[this.rd.pick.fuel || 0]) + '), ' + v.toFixed(2) + ' l/h');
+            if (!this.logged || got.src !== this.src) {
+                this.logged = true; this.src = got.src;
+                this.log.info('fuel: rate read from the engine unit (' + got.src + '), ' + v.toFixed(2) + ' l/h');
             }
             this.fails = 0;
             this.lph = smooth(this.lph, v, this.t ? now - this.t : 0);
