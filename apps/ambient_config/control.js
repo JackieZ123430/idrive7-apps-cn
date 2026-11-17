@@ -42,8 +42,10 @@ const doorOf = (l) => {
     return side + (l.y < 0.5 ? ' front' : ' rear');        // the door's backlit decor: by where it sits
 };
 /* A door's line light. The turn glow and an open door's red blink only these (one write each a frame, ~2.4 blinks a
- * second on the car against ~0.8 with every light of a side); a car whose side or door has none blinks all of them. */
-const isLine = (l) => / door line( 2)?$/i.test(String(l.name || ''));     // (2: a line's second strip)
+ * second on the car against ~0.8 with every light of a side); a car whose side or door has none blinks all of them.
+ * Not a line's second strip (a G26's "door line 2"): with both strips a side had twice the writes, so the blink went
+ * half as fast and the strips lit visibly one after another (#169). The second strip keeps the look's colour. */
+const isLine = (l) => / door line$/i.test(String(l.name || ''));
 const linesOf = (all, pick) => (l) => pick(l) && (isLine(l) || !all().some((x) => pick(x) && isLine(x)));
 
 const copy = (x) => (x == null ? x : JSON.parse(JSON.stringify(x)));

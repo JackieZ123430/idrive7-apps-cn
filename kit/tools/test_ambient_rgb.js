@@ -315,6 +315,11 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     c.doors(['passenger rear']);
     ok(fake.overs.doors.test(pl(0x10)) && !fake.overs.doors.test(pl(0x12)) && !fake.overs.doors.test(pl(0x22)) && !fake.overs.doors.test(pl(0x0c)),
         'door lines on the car: an open door blinks its own line only');
+    // a G26: each door line in two strips (0x62-0x65); only the first blinks, so the blink keeps its pace (#169)
+    c.doors([]); fake.lights = fake.lights.concat([0x62, 0x63, 0x64, 0x65].map(pl)); c.turn(null); c.turn('left'); c.doors(['passenger front']);
+    ok(fake.overs.turn.test(pl(0x05)) && fake.overs.turn.test(pl(0x09)) && !fake.overs.turn.test(pl(0x62)) && !fake.overs.turn.test(pl(0x63))
+        && fake.overs.doors.test(pl(0x0c)) && !fake.overs.doors.test(pl(0x64)), 'two-strip door lines: the turn glow and an open door blink the first strip only');
+    fake.lights = fake.lights.filter((l) => l.loc < 0x62);
     c.doors([]); c.doors(['driver front']);
     fake.lights = fake.lights.filter((l) => l.loc !== 0x05);
     ok(fake.overs.doors.test(pl(0x07)) && fake.overs.doors.test(pl(0x08)), 'a door without its line: its other lights blink');
