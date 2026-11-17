@@ -43,7 +43,7 @@ const doorOf = (l) => {
 };
 /* A door's line light. The turn glow and an open door's red blink only these (one write each a frame, ~2.4 blinks a
  * second on the car against ~0.8 with every light of a side); a car whose side or door has none blinks all of them. */
-const isLine = (l) => / door line$/i.test(String(l.name || ''));
+const isLine = (l) => / door line( 2)?$/i.test(String(l.name || ''));     // (2: a line's second strip)
 const linesOf = (all, pick) => (l) => pick(l) && (isLine(l) || !all().some((x) => pick(x) && isLine(x)));
 
 const copy = (x) => (x == null ? x : JSON.parse(JSON.stringify(x)));

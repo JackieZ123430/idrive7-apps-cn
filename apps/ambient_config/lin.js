@@ -52,6 +52,9 @@ const PLACES = {
     0x3b: ['Sunroof rear right', 'upper', 0.70, 0.58], 0x3c: ['Sunroof rear right rear', 'upper', 0.70, 0.66],
     0x3d: ['Light blade left', 'upper', 0.12, 0.80, 0.30, 0.86], 0x3e: ['Light blade right', 'upper', 0.70, 0.86, 0.88, 0.80],
     0x4b: ['Cupholder front', 'lower', 0.50, 0.38], 0x4c: ['Cupholder rear', 'lower', 0.50, 0.70],
+    // the door lines' second strip (G26: each door line in two parts, its own module), next to each line
+    0x62: ['Driver front door line 2', 'upper', 0.07, 0.25, 0.07, 0.45], 0x63: ['Driver rear door line 2', 'upper', 0.07, 0.55, 0.07, 0.73],
+    0x64: ['Passenger front door line 2', 'upper', 0.93, 0.25, 0.93, 0.45], 0x65: ['Passenger rear door line 2', 'upper', 0.93, 0.55, 0.93, 0.73],
 };
 // the doors' backlit decor (0x3F-0x46) and the console's (0x47-0x4A)
 [[0x3f, D, 0.28], [0x40, D, 0.40], [0x41, D, 0.58], [0x42, D, 0.70], [0x43, P, 0.28], [0x44, P, 0.40], [0x45, P, 0.58], [0x46, P, 0.70]]
