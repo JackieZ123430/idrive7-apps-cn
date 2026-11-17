@@ -1,7 +1,8 @@
 'use strict';
 /**
- * lever.js - Ambient config: a short pull of the headlight-flasher lever while parked starts the strobe (Strobe page's
- * "Start with the flasher lever", off until switched on).
+ * lever.js - Ambient config: a short pull of the headlight-flasher lever while parked (while driving too with the
+ * setting strobeLeverDriving, for private property) starts the strobe (Strobe page's
+ * Lever start, off until switched on).
  *
  * The car's Vehicle2.statusMainBeam_headlightFlasher is on while the high beam is on or the lever is pulled, so only a
  * short pulse counts: the beam off for at least ARM_MS, then on for at most PULSE_MS, then off again. Held longer it is

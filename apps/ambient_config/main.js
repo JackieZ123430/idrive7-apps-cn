@@ -171,8 +171,9 @@ async function background(bg) {
     strobe.on('learned', (c) => { try { if (chFile) fs.writeFileSync(chFile, JSON.stringify(c)); } catch (e) { log.warn('strobe: ' + e); } });
     const findStrobe = () => { if (settings.get('strobe') === true && !strobe.kind) strobe.find().catch((e) => log.warn('strobe: ' + e)); };
     findStrobe();
-    // the flasher lever (lever.js): a short pull while parked starts the strobe as the Strobe page has it, while its
-    // "Start with the flasher lever" is on (off until switched on); the light status read only from then on
+    // the flasher lever (lever.js): a short pull while parked (also while driving with strobeLeverDriving, for private
+    // property) starts the strobe as the Strobe page has it, while its Lever start is on (off until switched on); the
+    // light status read only from then on
     const lever = new Lever();
     let leverWatch = null;
     const watchLever = () => {
@@ -181,7 +182,9 @@ async function background(bg) {
             statusLightStatus: (v) => {
                 const t = Date.now();
                 if (!lever.beam(beamOf(v && v.statusMainBeam_headlightFlasher), t)) return;
-                if (settings.get('strobeLever') !== true || !strobe.kind || strobe.running || gate('strobe') !== null || parked.moving() !== false) return;
+                // (while driving only with its setting, for private property)
+                const parkedOk = parked.moving() === false || settings.get('strobeLeverDriving') === true;
+                if (settings.get('strobeLever') !== true || !strobe.kind || strobe.running || gate('strobe') !== null || !parkedOk) return;
                 lever.cool(t);
                 log.info('strobe: started with the flasher lever');
                 strobe.start(strobeOptions(settings, strobe)).catch((e) => log.warn('strobe: ' + e));

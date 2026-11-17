@@ -2,7 +2,7 @@
   "id": "ambient_config",
   "title": "Ambient config",
   "description": "Any colour on the ambient light, animations, and a look for each driving mode",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -145,6 +145,12 @@
     {
       "key": "strobe",
       "label": "High beam strobe and light show (only for use on private property)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "strobeLeverDriving",
+      "label": "Lever start of the strobe also while driving (only for use on private property)",
       "type": "bool",
       "default": false
     },
