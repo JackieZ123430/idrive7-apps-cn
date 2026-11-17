@@ -88,6 +88,13 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
             return [0x6e, data[0], data[1]];
         },
     };
+    // a body module that answers "busy, ask again" (7F 22 21) to the first reads, as a G21's did (#197): asked again
+    let busyLeft = 3;
+    const busyDiag = { physical: (target, sid, data) => (sid === 0x22 && busyLeft-- > 0 ? Promise.resolve([0x7f, 0x22, 0x21]) : diag.physical(target, sid, data)) };
+    const waited = [];
+    const patient = new Lights({ diag: busyDiag, log, checkMs: 40, sleep: (ms) => { waited.push(ms); return Promise.resolve(); } });
+    ok((await patient.find()).length === 6 && waited.join() === '400,800,1200', 'find: a busy body module asked again, later each time');
+    patient.stop();
     const lights = new Lights({ diag, log, checkMs: 40 });
     const found = await lights.find();
     ok(found.length === 6 && lights.state === 'car', 'find: both buses, nothing written yet');
