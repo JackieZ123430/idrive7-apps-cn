@@ -56,6 +56,7 @@ jobs:
       - run: node kit/tools/test_dids.js
       - run: node kit/tools/test_engine.js
       - run: node kit/tools/test_edrive.js
+      - run: node kit/tools/test_linkqueue.js
       - run: node kit/tools/test_fastkw.js
       - run: node kit/tools/test_widget_fixes.js
       - run: node kit/tools/test_warmup.js
@@ -86,6 +87,7 @@ jobs:
       - run: node kit/tools/test_wheelspin.js
       - run: node kit/tools/test_ambient_others.js
       - run: node kit/tools/test_ambient_strobe.js
+      - run: node kit/tools/test_ambient_lever.js
       - run: node kit/tools/test_xdrive_live.js
       - run: node kit/tools/test_zh.js
       # The run above loads the English catalog, so it skips the glyph check: test_zh.js has to run on zh-CN stages for

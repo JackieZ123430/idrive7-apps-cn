@@ -732,6 +732,31 @@ const checks = [
         assert(inside(box.medium, 0.15, 0.21, 0.15, 0.19), JSON.stringify(box.medium));
         assert(inside(box.small, 0.20, 0.26, 0.20, 0.22), JSON.stringify(box.small));
     }],
+    ['started with the car: the charge for other apps only while one asks, the link handed to the screens', async () => {
+        [MAIN, LIVE].forEach((f) => { delete require.cache[f]; });
+        require(MAIN);
+        values = { soc: 64.2 }; timers = [];
+        const dir = tmp('bg'), ctx = context(dir), SH = '/tmp/mgu-edrive.json', WA = '/tmp/mgu-edrive-wanted.json';
+        const keep = [SH, WA].map((f) => { try { return fs.readFileSync(f); } catch (e) { return null; } });
+        try {
+            [SH, WA].forEach((f) => { try { fs.unlinkSync(f); } catch (e) { /* none */ } });
+            const bg = app.background({ settings: ctx.settings, log: quiet, spec: SPEC, dataDir: dir, signals: ctx.signals });
+            const link = diag;
+            diag.available = true; diag.emit('available', true); await flush();
+            assert(!fs.existsSync(SH), 'nobody asks: nothing read');
+            fs.writeFileSync(WA, JSON.stringify({ t: now, power: false, soc: true }));
+            diag.emit('available', true); await flush();
+            assert.strictEqual(JSON.parse(fs.readFileSync(SH, 'utf8')).soc, 64.2, 'asked: the charge shared');
+            ctx.background = bg;
+            await app.start(ctx);
+            await flush();
+            assert(diag === link, 'opened: the same link, no second one');
+            fs.writeFileSync(path.join(dir, 'battery.json'), JSON.stringify({ noHybrid: true }));
+            assert.deepStrictEqual(app.background({ settings: ctx.settings, log: quiet, spec: SPEC, dataDir: dir, signals: ctx.signals }), {}, 'no high-voltage battery: nothing in the background');
+        } finally {
+            [SH, WA].forEach((f, i) => { try { if (keep[i]) fs.writeFileSync(f, keep[i]); else fs.unlinkSync(f); } catch (e) { /* none */ } });
+        }
+    }],
 ];
 
 (async () => {
@@ -744,5 +769,6 @@ const checks = [
     console.log('eDrive system checks passed (48 V mild hybrid / none / G20 12 V: voltage source kept, charge, History, regen, parked / setting).');
     console.log('eDrive checks passed (charge logged once across restarts / baseline without seat heating / kWh without SOH / use + otherKw saved).');
     console.log('eDrive fully electric checks passed (iX3 found by itself / DDBC zeros / learning without an engine / slow charge / live power / settings / limits / reserve / hybrid on Auto / 12 V without engine units / first charge / picks kept / cells / widget).');
+    console.log('eDrive background checks passed (the charge only while asked, the link handed over, none without a hybrid battery).');
     process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

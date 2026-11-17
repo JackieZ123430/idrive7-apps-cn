@@ -42,6 +42,9 @@
  *     all driving, and the battery's own kWh (stored now and usable, config.battery.energy) give the kWh
  *     per % and the health against "usable battery when new"
  *
+ * Started with the car (app.json autostart), without its screens: the charge for Cluster functions and the
+ * other apps that ask for it (background(), below), nothing else.
+ *
  * Charge, SOH and 12 V are read with UDS ReadDataByIdentifier over the head
  * unit's diagnostic link (kit/diag.js); the DIDs and scalings live in app.json
  * "config.battery" so they can be adjusted per model. Outside temperature,
@@ -58,6 +61,7 @@ const { t: translate, plural } = require('./kit/i18n');
 const { RangeModel, curve } = require('./range');
 const startLive = require('./live');
 const startBattery12 = require('./battery12');
+const { linkQueue } = require('./linkqueue');
 const Car = require('./kit/car');
 
 const W = 1600, H = 520;
@@ -146,9 +150,56 @@ class Demo {
     }
 }
 
+/* ---------- started with the car (app.json autostart), without the screens ----------
+ * The charge for other apps (Cluster functions' SOC, kW and range) while the app is not opened: only while one of
+ * them asks for it (WANTED fresh) and the car is not locked and left, read every BG_READ_MS, written to SHARED with
+ * no power or range (those come with the screens). A car known to have no high-voltage battery (battery.json
+ * noHybrid, setting "Drive system" not set to one) reads nothing. Opened, start() takes its link over and stops this. */
+const SHARED = '/tmp/mgu-edrive.json', WANTED = '/tmp/mgu-edrive-wanted.json', BG_READ_MS = 10000, BG_WANTED_MS = 5000;
+function background(bg) {
+    const { settings, log } = bg;
+    const cfg = Object.assign({ ecu: 7, soc: [] }, (bg.spec.config && bg.spec.config.battery) || {});
+    let st = {};
+    try { st = JSON.parse(fs.readFileSync(path.join(bg.dataDir, 'battery.json'), 'utf8')) || {}; } catch (e) { /* first run */ }
+    const hy = settings.get('hybrid');
+    if (hy === 'no' || hy === '48v' || (st.noHybrid && hy !== 'yes' && hy !== 'bev') || !cfg.soc.length) return {};
+    const diag = new Diag(bg.signals, log);
+    diag.quiet = true;
+    diag.init();
+    const reader = new DidReader(diag, { ecu: cfg.ecu });
+    Object.assign(reader.pick, st.pick || {});
+    let left = false, busy = false, said = false, stopped = false;
+    Promise.resolve(bg.signals.watch('de.bmw.infrastructure.VehicleCondition', '1', {
+        VehicleCondition: (v) => { const n = Car.conditionOf(v && v.statusConditionVehicle); if (n !== undefined) left = n <= 3; },
+    }, log)).catch(() => { /* read anyway */ });
+    const wanted = () => {
+        try { const w = JSON.parse(fs.readFileSync(WANTED, 'utf8')); return Date.now() - w.t < BG_WANTED_MS && !!(w.soc || w.power); } catch (e) { return false; }
+    };
+    async function read() {
+        if (stopped || busy || left || !diag.available || !wanted()) return;
+        busy = true;
+        try {
+            const soc = await reader.value('soc', cfg.soc);
+            if (stopped || !G.isNum(soc)) return;
+            if (!said) { log.info('background: the charge for other apps (' + G.fmt(soc, 1) + ' %)'); said = true; }
+            const out = { t: Date.now(), kw: null, soc, rangeKm: null, kwRead: null, fast: false, limitOut: null, limitIn: null };
+            fs.writeFileSync(SHARED + '.tmp', JSON.stringify(out), { mode: 0o644 });
+            fs.chmodSync(SHARED + '.tmp', 0o644);
+            fs.renameSync(SHARED + '.tmp', SHARED);
+        } catch (e) { log.warn('background: ' + (e && e.message || e)); } finally { busy = false; }
+    }
+    const timer = setInterval(read, BG_READ_MS);
+    diag.on('available', (a) => { if (a) read(); });
+    return { diag, stop() { stopped = true; clearInterval(timer); } };
+}
+
 mgu.run({
+    background,
     async start(ctx) {
         const { ui, settings, log } = ctx;
+        // started with the car first: its link is ours now, its reads stop
+        const bgLink = ctx.background && ctx.background.diag;
+        if (ctx.background && ctx.background.stop) ctx.background.stop();
         const cfg = Object.assign({ ecu: 7, soc: [], soh: [], v12: [], chargeMinPct: 3 },
             (ctx.spec.config && ctx.spec.config.battery) || {});
         const S = (ctx.spec.config && ctx.spec.config.scaling) || {};
@@ -358,9 +409,9 @@ mgu.run({
 
         // connect in the background: the screen must not wait for the diagnostic link. Set up before the signals below,
         // so the link's own set-up doesn't wait behind theirs (kit/signals.js runs one native call at a time)
-        const diag = new Diag(ctx.signals, log);
+        const diag = bgLink || new Diag(ctx.signals, log);
         diag.quiet = true;                     // polled every few seconds: keep the log file small
-        diag.init();
+        if (!bgLink) diag.init();
 
         // the car locked and left (its own state: parked or standby, nobody in it): nothing is read, so it can sleep
         ctx.signals.watch('de.bmw.infrastructure.VehicleCondition', '1', {
@@ -462,27 +513,8 @@ mgu.run({
         // (in battery.json once one has answered: a start that reads nothing writes nothing)
         Object.assign(pick, st.pick || {});
         Object.defineProperty(st, 'pick', { enumerable: true, configurable: true, get: () => (Object.keys(pick).length ? pick : undefined) });
-        // one request at a time on the diagnostic link: a queue rather than a plain chain, so a live
-        // power read (urgent) goes ahead of the reads that wait
-        const queue = [];
-        let pumping = false;
-        async function pump() {
-            if (pumping) return;
-            pumping = true;
-            while (queue.length) {
-                const j = queue.shift(), t0 = Date.now();
-                try { j.res(await j.fn()); } catch (e) { j.rej(e); }
-                // one turn that holds the link this long delays every read behind it (the live power too): say which
-                const ms = Date.now() - t0;
-                if (ms > 1500) { exclusive.stalls = (exclusive.stalls || 0) + 1; log.warn('link held ' + ms + ' ms by ' + j.label + (queue.length ? ' (' + queue.length + ' waiting)' : '')); }
-            }
-            pumping = false;
-        }
-        const exclusive = (fn, urgent, label) => new Promise((res, rej) => {
-            const j = { fn, res, rej, label: label || (urgent ? 'urgent' : 'read') };
-            if (urgent) queue.unshift(j); else queue.push(j);
-            pump();
-        });
+        // one request at a time on the diagnostic link, the power first but never only the power (linkqueue.js)
+        const exclusive = linkQueue(log);
         /* A value's candidates, starting with the one that answered last (kit/dids.js value()), each in a turn of its own
          * on the link: candidates that don't answer each wait out their timeout, and all of them in one turn kept the live
          * power reads behind them so long that the power went blank. A fully electric car has no engine or gearbox unit
@@ -894,7 +926,7 @@ mgu.run({
          * range at this charge, as the Range page has it) }.
          * Written at each new power reading (at most every SHARE_MIN_MS) and four times a second; nothing while the
          * demo runs. live.js reads the power fast while another app asks for it (its WANTED). */
-        const SHARED = '/tmp/mgu-edrive.json', SHARE_MIN_MS = 80, CI_FILE = '/dev/shm/cluster-info/edrive.json';
+        const SHARE_MIN_MS = 80, CI_FILE = '/dev/shm/cluster-info/edrive.json';
         let sharedAt = 0;
         share = () => {
             if (Date.now() - sharedAt < SHARE_MIN_MS) return;
