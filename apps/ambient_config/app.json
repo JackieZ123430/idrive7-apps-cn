@@ -2,7 +2,7 @@
   "id": "ambient_config",
   "title": "Ambient config",
   "description": "Any colour on the ambient light, animations, and a look for each driving mode",
-  "version": "2.6.2",
+  "version": "2.7.1",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -46,7 +46,8 @@
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
       "_optional": "the car's speed: driven (for a car that does not say it is locked and left), and the light show only standing still",
-      "statusCarSpeed2": "rs"
+      "statusCarSpeed2": "rs",
+      "statusLightStatus": "rs"
     }
   },
   "screens": [
@@ -148,6 +149,12 @@
       "default": false
     },
     {
+      "key": "strobeLeverDriving",
+      "label": "Lever start of the strobe also while driving (only for use on private property)",
+      "type": "bool",
+      "default": false
+    },
+    {
       "key": "strobeLights",
       "label": "Strobe lights",
       "type": "choice",
@@ -194,6 +201,13 @@
       "default": "police",
       "hidden": true,
       "options": [["police", "Police"], ["both", "Strobe"], ["alternate", "In turn"]]
+    },
+    {
+      "key": "strobeLever",
+      "label": "Start the strobe with the flasher lever",
+      "type": "bool",
+      "default": false,
+      "hidden": true
     },
     {
       "key": "strobeRate",

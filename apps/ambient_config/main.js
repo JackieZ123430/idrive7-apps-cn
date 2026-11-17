@@ -28,6 +28,7 @@ const { Lights } = require('./lights');
 const { Control } = require('./control');
 const { Others } = require('./others');
 const { Strobe, gateChecks, gateWhy } = require('./strobe');
+const { Lever, beamOf } = require('./lever');
 const Parked = require('./kit/parked');
 const { t: translate } = require('./kit/i18n');
 const { drawCabin } = require('./cabin');
@@ -60,6 +61,17 @@ const DOOR_FIELDS = { statusDoorSwitchDRD: 'driver front', statusDoorSwitchPSD: 
     statusDoorSwitchPSDR: 'passenger rear' };
 const doorsOf = (v) => Object.keys(DOOR_FIELDS).filter((k) => v && (v[k] === 1 || /_OFFEN$/.test(String(v[k])))).map((k) => DOOR_FIELDS[k]);
 const DAY_NIGHT = { KEINE_AENDERUNG: 0, TAG: 1, NACHT: 2, SIGNAL_UNGUELTIG: 3 };
+
+/* The strobe's options as the Strobe page has them (its buttons' settings), for its Start and the flasher lever. */
+function strobeOptions(settings, strobe) {
+    const cyc = (key, vals, def) => { const v = String(settings.get(key) || def); return vals.indexOf(v) >= 0 ? v : def; };
+    const pattern = ['both', 'alternate', 'police'].indexOf(settings.get('strobePattern')) >= 0 ? settings.get('strobePattern') : 'police';
+    const o = { lights: strobe && strobe.patterns && settings.get('strobeLights') === 'high' ? 'high' : 'all', pattern,
+        rate: settings.get('strobeRate') || 'normal', burst: cyc('policeBurst', ['1', '2', '3', '4'], '4'),
+        flashMs: cyc('strobeFlashMs', ['50', '80', '100', '150'], '80'), order: cyc('policeOrder', ['lbr', 'lrb', 'lr'], 'lbr') };
+    if (strobe && strobe.kind === 'fn') o.every = +cyc('strobeEvery', ['0', '250', '333', '500', '1000'], '0');
+    return o;
+}
 
 async function background(bg) {
     const { settings, signals, log } = bg;
@@ -159,7 +171,31 @@ async function background(bg) {
     strobe.on('learned', (c) => { try { if (chFile) fs.writeFileSync(chFile, JSON.stringify(c)); } catch (e) { log.warn('strobe: ' + e); } });
     const findStrobe = () => { if (settings.get('strobe') === true && !strobe.kind) strobe.find().catch((e) => log.warn('strobe: ' + e)); };
     findStrobe();
-    settings.onChange((key) => { if (key === 'strobe') { if (settings.get('strobe') === true) findStrobe(); else strobe.stop(); } });
+    // the flasher lever (lever.js): a short pull while parked (also while driving with strobeLeverDriving, for private
+    // property) starts the strobe as the Strobe page has it, while its Lever start is on (off until switched on); the
+    // light status read only from then on
+    const lever = new Lever();
+    let leverWatch = null;
+    const watchLever = () => {
+        if (leverWatch || settings.get('strobeLever') !== true) return;
+        leverWatch = Promise.resolve(signals.watch('de.bmw.infotainment.vehicle.Vehicle2', '1', {
+            statusLightStatus: (v) => {
+                const t = Date.now();
+                if (!lever.beam(beamOf(v && v.statusMainBeam_headlightFlasher), t)) return;
+                // (while driving only with its setting, for private property)
+                const parkedOk = parked.moving() === false || settings.get('strobeLeverDriving') === true;
+                if (settings.get('strobeLever') !== true || !strobe.kind || strobe.running || gate('strobe') !== null || !parkedOk) return;
+                lever.cool(t);
+                log.info('strobe: started with the flasher lever');
+                strobe.start(strobeOptions(settings, strobe)).catch((e) => log.warn('strobe: ' + e));
+            },
+        }, log, { pollMs: 500 })).catch((e) => { leverWatch = null; log.warn('flasher lever: ' + (e && e.message || e)); });
+    };
+    watchLever();
+    settings.onChange((key) => {
+        if (key === 'strobe') { if (settings.get('strobe') === true) findStrobe(); else strobe.stop(); }
+        if (key === 'strobeLever') watchLever();
+    });
     // (the car locked and left mid-flash: the gate says no at the next step and the strobe stops)
     return { ambient, lights, control, active, others, strobe, checks };
 }
@@ -415,6 +451,10 @@ mgu.run({
                 cv.text(label + (!ok && why ? ' · ' + why : ''), 70, y, 20, ok ? t.text : t.dim);
             });
             cv.text('Only for use on private property.', 44, 222, 20, t.warn, { font: 'bold' });
+            // a short pull of the flasher lever while parked starts it (lever.js), only while this is on
+            const lever = settings.get('strobeLever') === true;
+            G.button(cv, t, 520, 190, 220, 42, lever ? 'Lever start: On' : 'Lever start: Off', () => { settings.set('strobeLever', !lever); return redraw(); },
+                { primary: lever, key: 'strobe-lever', busy: !strobe });
             if (strobe && strobe.note) cv.text(strobe.note, 44, 248, 18, strobe.noteType === 'warn' ? t.warn : t.dim);
             const pat = ['both', 'alternate', 'police'].indexOf(settings.get('strobePattern')) >= 0 ? settings.get('strobePattern') : 'police';
             const rate = settings.get('strobeRate') || 'normal';
@@ -475,7 +515,7 @@ mgu.run({
             }
             const on = strobe && strobe.running === 'strobe';
             G.button(cv, t, 520, 428, 220, 48, on ? 'Stop' : 'Start strobe', () => {
-                if (on) strobe.stop(); else strobe.start(Object.assign({ lights, pattern: pat, rate, burst, flashMs, order }, timed ? { every: +every } : {})).catch((e) => log.warn('strobe: ' + e));
+                if (on) strobe.stop(); else strobe.start(strobeOptions(settings, strobe)).catch((e) => log.warn('strobe: ' + e));
                 return redraw();
             }, { primary: on, key: 'strobe-go', confirm: !on, busy: !strobe || !strobe.kind || strobe.running === 'show' || strobe.running === 'learn' });
 
