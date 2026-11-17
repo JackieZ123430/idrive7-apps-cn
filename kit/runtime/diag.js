@@ -114,6 +114,10 @@ class Diag extends EventEmitter {
                 // every app gets every frame: only this service's answer (or refusal) is a reply
                 if (f.uds[0] !== sid + 0x40 && !(f.uds[0] === 0x7F && f.uds[1] === sid)) return;
                 if (sid === 0x19 && f.uds[0] === 0x59 && f.uds[1] !== (data || [])[0]) return;   // 0x19 echoes its sub-function
+                // 0x22 echoes its identifier: another app's read of the same unit (62 F4 70 ..) isn't this scan's answer,
+                // and a refusal, which names no identifier (maybe another app's), never replaces an answer
+                if (sid === 0x22 && f.uds[0] === 0x62 && (f.uds[1] !== (data || [])[0] || f.uds[2] !== (data || [])[1])) return;
+                if (sid === 0x22 && f.uds[0] === 0x7F && replies.has(f.ecu) && replies.get(f.ecu)[0] === 0x62) return;
                 const pending = f.uds[0] === 0x7F && f.uds[2] === 0x78;
                 if (!pending || !replies.has(f.ecu)) replies.set(f.ecu, f.uds);
                 if (opts && opts.onReply && !pending) opts.onReply(f.ecu, replies.size);

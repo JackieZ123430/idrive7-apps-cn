@@ -81,7 +81,7 @@ const CAT = {
 const INDEX = CAT.json('sgbd_index.json');
 // a unit type without a catalog of its own uses its family's; every value is still asked on the car
 // (0x13: the second engine unit of a V8, DME8FF_L / DME98_L: the same identifiers as its master's, kit/twin_dme.js;
-// not the N74 V12's MSD87_L0, which isn't supported)
+// only for a V8's index)
 const CLOSEST = { 0x12: 'DME8FF_R', 0x13: 'DME8FF_R' };
 const ABSENT = [0x11, 0x12, 0x31];   // NRCs that mean "this unit has no such value"
 
@@ -167,8 +167,8 @@ mgu.run({
             return soloDme;
         }
         /*
-         * A V8 with two engine units (kit/twin_dme.js): the master's SGBD index says so (asked once a start, the
-         * answer kept), or a scan found a V8's second unit (0x13; an N74 V12's isn't one: not supported). Its bank's
+         * A V8 with two engine units (kit/twin_dme.js): the master's SGBD index says so (asked once, the answer
+         * kept), or a scan found a V8's second unit (0x13, with a V8's index). Its bank's
          * values then come from the second unit:
          * on the Engine page under "Bank 2", and for gauges. Never on demo data (the demo car is a B58).
          */

@@ -8,7 +8,7 @@
  *   - M Vitals' misfire counter: bank 2's cylinders from the second unit after the master's; bank 2's boost beside bank 1's;
  *   - Live Data's Useful lists (cylinders 7 / 8, bank 2's) and the app itself on a V8 and on a B58: the Engine page,
  *     what is asked of which unit;
- *   - a single-unit engine (B58) never has 0x13 asked anything, everywhere; the N74 V12 is not supported (one unit).
+ *   - a single-unit engine (B58) never has 0x13 asked anything, everywhere; nor does an index that isn't a V8's pair.
  *   node kit/tools/test_twin_dme.js
  * Node 8 compatible (the head unit's).
  */
@@ -28,7 +28,8 @@ const rmTree = (p) => { try { fs.readdirSync(p).forEach((f) => { const q = path.
 
 const hex2 = (b) => (b < 16 ? '0' : '') + b.toString(16).toUpperCase();
 const u16 = (v) => [(v >> 8) & 0xFF, v & 0xFF];
-const B58 = '0F26E8', V8 = '0F242C', N74 = '0F1380';
+// OTHER: an index BMW lists with a unit at 0x13 that isn't a V8's: one engine unit, as before
+const B58 = '0F26E8', V8 = '0F242C', OTHER = '0F1380';
 /** F150 reply with an SGBD index ('0F242C') */
 const f150 = (index) => [0x62, 0xF1, 0x50].concat([0, 2, 4].map((i) => parseInt(index.slice(i, i + 2), 16)));
 
@@ -61,14 +62,15 @@ const cases = [];
 const test = (name, fn) => cases.push([name, fn]);
 
 /* ---------- TwinDme ---------- */
-test('TwinDme: the index table is BMW\'s V8 pairs, nothing else (not the N74 V12)', () => {
+test('TwinDme: the index table is BMW\'s V8 pairs, nothing else', () => {
     const I = require(path.join(ROOT, 'apps', 'live_data', 'builtin', 'sgbd_index.json'));
-    const pairs = Object.keys(I).filter((k) => /^13 /.test(k)).map((k) => k.slice(3)).filter((i) => I['12 ' + i] && !/^MSD87/.test(I['12 ' + i])).sort();
+    const V8_SGBD = /^(DME8FF_R|DME98_R|N63TU_R0|S63TU_R0)$/;
+    const pairs = Object.keys(I).filter((k) => /^13 /.test(k)).map((k) => k.slice(3)).filter((i) => V8_SGBD.test(I['12 ' + i] || '')).sort();
     assert.deepStrictEqual(TwinDme.TWIN.slice().sort(), pairs);
     assert.strictEqual(pairs.length, 8);
     assert.strictEqual(TwinDme.isTwinIndex(V8), true);
     assert.strictEqual(TwinDme.isTwinIndex('0f242c'), true, 'any case');
-    [B58, '0F1F70', N74, '', null, undefined, 42, 'constructor', '__proto__', 'indexOf'].forEach((x) => assert.strictEqual(TwinDme.isTwinIndex(x), false, String(x)));
+    [B58, '0F1F70', OTHER, '', null, undefined, 42, 'constructor', '__proto__', 'indexOf'].forEach((x) => assert.strictEqual(TwinDme.isTwinIndex(x), false, String(x)));
 });
 
 test('TwinDme: detect() on a V8, kept for the next start', async () => {
@@ -234,17 +236,93 @@ test('TwinDme: a kept V8 whose second unit stops answering (the master answering
     } finally { rmTree(dir); }
 });
 
+test('TwinDme: another app\'s refusal while the index is asked: not taken for the answer; the VIN asked again', async () => {
+    // the master's answer comes after another app's refusal: the answer counts (a real link waits for its own reply;
+    // this stand-in answers with the first frame, so a refusal first stands for the answer not arriving in time)
+    let n = 0;
+    const l = fakeLink({ 0x12: (k) => (k === '22 F150' ? (n++ ? f150(V8) : [0x7F, 0x22, 0x31]) : k === '22 F190' ? f190('WBSJF0C51LB000001') : null) });
+    let t = new TwinDme(l, { log: quiet, vin: true });
+    assert.strictEqual(await t.detect(), null, 'a refusal: no answer');
+    t.triedT -= TwinDme.RETRY_MS + 1;
+    assert.strictEqual(await t.detect(), true);
+    assert.strictEqual(t.redline, 7200);
+    // the VIN refused (another app's refusal): the maker code asked again in the background, VIN_TRIES at most
+    const dir = tmp('twin-');
+    try {
+        let v = 0;
+        const l2 = fakeLink({ 0x12: (k) => (k === '22 F150' ? f150(V8) : k === '22 F190' ? (v++ < 2 ? [0x7F, 0x22, 0x31] : f190('WBAJS0C51LB000001')) : null) });
+        t = new TwinDme(l2, { dataDir: dir, log: quiet, vin: true });
+        assert.strictEqual(await t.detect(), true);
+        assert.strictEqual(t.wmi, null); assert.strictEqual(t.redline, null, 'no maker code yet');
+        t.vinT -= 2001; await t.detect(); await sleep(5);
+        assert.strictEqual(t.wmi, null, 'refused again');
+        t.vinT -= 2001; await t.detect(); await sleep(5);
+        assert.strictEqual(t.wmi, 'WBA'); assert.strictEqual(t.redline, 6500, 'the third try');
+        assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'twin_dme.json'), 'utf8')).wmi, 'WBA', 'kept');
+        assert.strictEqual(l2.asked.filter((k) => k === '12:22 F150').length, 1, 'the index asked once');
+        // never more than VIN_TRIES a start
+        const l3 = fakeLink({ 0x12: (k) => (k === '22 F150' ? f150(V8) : [0x7F, 0x22, 0x31]) });
+        t = new TwinDme(l3, { log: quiet, vin: true });
+        await t.detect();
+        for (let i = 0; i < 10; i++) { t.vinT -= 2001; await t.detect(); await sleep(2); }
+        assert.strictEqual(l3.asked.filter((k) => k === '12:22 F190').length, TwinDme.VIN_TRIES);
+    } finally { rmTree(dir); }
+});
+
+test('Live Data scan (22 F1 50 to all units): another app\'s replies on the bus are not the units\' answers', async () => {
+    // a real ReadOnlyDiag on a stand-in TASU: every frame goes to every app, as on the car
+    const { ReadOnlyDiag } = require(path.join(KIT, 'readonly-diag'));
+    let cb = null;
+    const frame = (ecu, uds) => cb({ udsResponse: [0, 0, 0, 0, 0, 0, ecu, 0, 0].concat(uds), errorCode: 'NO_ERROR' });
+    const signals = {
+        proxy: async () => ({}), on: async (p, ev, f) => { cb = f; }, onAvailable: async (p, f) => f(true),
+        call: async (p, m, req) => {
+            if (req.targetAddress === 0xDF) {
+                setTimeout(() => frame(0x12, f150(V8)), 20);
+                setTimeout(() => frame(0x13, [0x62, 0xF4, 0x70, 0x0F, 0x15, 0xE0]), 30);    // another app's boost read of 0x13
+                setTimeout(() => frame(0x13, f150(V8)), 40);
+                setTimeout(() => frame(0x12, [0x62, 0xF4, 0x70, 0x0F, 0x15, 0xE0]), 50);    // and of 0x12, after its answer
+                setTimeout(() => frame(0x12, [0x7F, 0x22, 0x31]), 60);                      // another app's refusal
+                setTimeout(() => frame(0x18, [0x7F, 0x22, 0x31]), 70);                      // a unit that refuses: ''
+            }
+            return { TasuErrorEnum: 'NO_ERROR' };
+        },
+    };
+    const link = new ReadOnlyDiag(signals, quiet);
+    await link.init();
+    const units = await link.discover({ idleMs: 200, maxMs: 2000 });
+    assert.deepStrictEqual([...units.entries()].sort(), [[0x12, V8], [0x13, V8], [0x18, '']]);
+});
+
 test('TwinDme: a B58, a refusal, no reply, a link that throws', async () => {
     const dir = tmp('twin-');
     try {
         let t = new TwinDme(fakeLink({ 0x12: () => f150(B58) }), { dataDir: dir, log: quiet });
         assert.strictEqual(await t.detect(), false);
         assert.strictEqual(t.perBank, 0);
-        t = new TwinDme(fakeLink({ 0x12: () => f150(N74) }), { log: quiet });
-        assert.strictEqual(await t.detect(), false, 'the N74 V12: not supported, one unit');
-        t = new TwinDme(fakeLink({ 0x12: () => [0x7F, 0x22, 0x31] }), { log: quiet });
-        assert.strictEqual(await t.detect(), false, 'refused: one unit (not a twin)');
-        assert.strictEqual(t.confirmed, true);
+        t = new TwinDme(fakeLink({ 0x12: () => f150(OTHER) }), { log: quiet });
+        assert.strictEqual(await t.detect(), false, 'not a V8 pair: one unit');
+        // a refusal names no identifier (maybe another app's): never an answer, asked again after RETRY_MS like
+        // no reply at all, and never one unit
+        const refusing = fakeLink({ 0x12: () => [0x7F, 0x22, 0x31] });
+        t = new TwinDme(refusing, { log: quiet });
+        const again = async () => { t.triedT -= TwinDme.RETRY_MS + 1; return t.detect(); };
+        assert.strictEqual(await t.detect(), null, 'refused: not known');
+        for (let i = 0; i < 5; i++) assert.strictEqual(await again(), null, 'refused again: still not known');
+        assert.strictEqual(t.confirmed, false); assert.strictEqual(refusing.asked.length, 6);
+        // a V8 kept, asked again (the 90 days up, or its second unit quiet) while another app's DID is refused:
+        // still a V8 with its redline, the file untouched
+        const dir2 = tmp('twin-'), file2 = path.join(dir2, 'twin_dme.json');
+        try {
+            const old = { twin: true, index: V8, wmi: 'WBS', at: Date.now() - 100 * 24 * 3600 * 1000 };
+            fs.writeFileSync(file2, JSON.stringify(old));
+            const busy = fakeLink({ 0x12: () => [0x7F, 0x22, 0x31] });
+            t = new TwinDme(busy, { dataDir: dir2, log: quiet, vin: true });
+            assert.strictEqual(await t.detect(), true);
+            for (let i = 0; i < 5; i++) assert.strictEqual(await again(), true, 'still a V8');
+            assert.strictEqual(t.redline, 7200, 'its redline kept');
+            assert.deepStrictEqual(JSON.parse(fs.readFileSync(file2, 'utf8')), old, 'the file untouched');
+        } finally { rmTree(dir2); }
         const silent = fakeLink({});
         t = new TwinDme(silent, { log: quiet });
         assert.strictEqual(await t.detect(), null);
@@ -545,7 +623,6 @@ test('Live Data Useful: V8-only and single-unit-only entries, bank 2\'s names, a
     const names = (only) => all(U[0x12]).filter((i) => i.only === only).map((i) => i.name);
     assert.deepStrictEqual(names('twin'), ['Misfires, cylinder 7', 'Misfires, cylinder 8', 'Rough running, cylinder 7', 'Rough running, cylinder 8']);
     assert.deepStrictEqual(names('single'), ['Ignition angle, cylinder 5', 'Ignition angle, cylinder 6', 'Injector correction, cylinder 5', 'Injector correction, cylinder 6']);
-    assert.deepStrictEqual(names('v12'), [], 'no V12 entries');
     assert.ok(!all(U[0x12]).some((i) => /cylinder (9|1[0-2])$/.test(i.name)), 'no cylinders 9..12');
     const b4 = all(U.BANK2(4)).map((i) => i.name);
     ['Ignition angle, cylinder 5', 'Ignition angle, cylinder 8', 'Injector correction, cylinder 8', 'Knock control retard (mean)', 'Fuel consumption']
@@ -722,8 +799,8 @@ test('Live Data: a head unit moved from a V8 to a B58 (a fresh V8 answer kept): 
     } finally { app.stop(); rmTree(app.dir); }
 });
 
-test('Live Data: an N74 V12 (not supported): as before the V8 work, its second unit found by a scan or not', async () => {
-    const app = await liveData({ 0x12: ldUnit(N74, masterVals), 0x13: ldUnit(N74, slaveVals) });
+test('Live Data: an index with a unit at 0x13 that isn\'t a V8 pair: as before the V8 work, its second unit found by a scan or not', async () => {
+    const app = await liveData({ 0x12: ldUnit(OTHER, masterVals), 0x13: ldUnit(OTHER, slaveVals) });
     try {
         await sleep(5300);
         const all = await app.engineTab();
@@ -731,7 +808,7 @@ test('Live Data: an N74 V12 (not supported): as before the V8 work, its second u
         assert.ok(!/cylinder 7|BANK [12]/i.test(all), 'no V8 entries: ' + (all.match(/.*(cylinder 7|BANK 2).*/ig) || []).join(' / '));
         assert.deepStrictEqual(asked13(app.link).filter((k) => k !== '13:22 F150'), [], 'nothing asked of 0x13 but its type (a scan)');
         assert.ok(app.logs.some((m) => /engine units: SGBD index 0F1380 -> one/.test(m)));
-        assert.ok(app.logs.some((m) => /unit 13: SGBD index 0F1380 -> MSD87_L0/.test(m)), 'the scan found the second unit: ' + app.logs.filter((m) => /unit 1[23]:/.test(m)).join(' | '));
+        assert.ok(app.logs.some((m) => /unit 13: SGBD index 0F1380 -> /.test(m)), 'the scan found the second unit: ' + app.logs.filter((m) => /unit 1[23]:/.test(m)).join(' | '));
         assert.deepStrictEqual(errorsOf(app), [], 'no errors');
     } finally { app.stop(); rmTree(app.dir); }
 });

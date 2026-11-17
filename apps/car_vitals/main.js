@@ -471,9 +471,14 @@ mgu.run({
          */
         // (asked only after the master's counts came: whether the second unit answered at all goes to twin.slaveReply(),
         // so a head unit moved from a V8 to a car with one engine unit asks the index again)
-        const slaveHeard = (mid) => { const r = rd.raws[rd.monitorKey(TwinDme.SLAVE, mid, misMode)]; twin.slaveReply(!!(r && r.bytes)); };
+        const slaveHeard = (mid) => { const r = rd.raws[rd.monitorKey(TwinDme.SLAVE, mid, misMode)]; heard2(!!(r && r.bytes)); };
+        // when the second unit last left a request unanswered (0 = it answers): its misfires, asked with service 06's
+        // 4 s wait, are left alone a minute after that, so the master's counts don't wait for a unit that isn't there
+        let quiet2T = 0;
+        const heard2 = (ok) => { quiet2T = ok ? 0 : Date.now(); twin.slaveReply(ok); };
         async function readSlaveMisfire(tid) {
             if (misSlave === false || (misSlaveFails >= 2 && Date.now() - misSlaveT < SLAVE_RETRY_MS)) return null;
+            if (quiet2T && Date.now() - quiet2T < SLAVE_RETRY_MS) return null;
             misSlaveT = Date.now();
             if (misSlave === null) {
                 const sup = await rd.supported(TwinDme.SLAVE, 0xA0, misMode);
@@ -545,20 +550,23 @@ mgu.run({
         }
         /*
          * Bank 2's boost on a twin-unit V8: the second engine unit (0x13) answers the same identifiers for its own
-         * bank's turbo. Asked only while the master's SGBD index says two units, and Boost isn't set to Hide.
+         * bank's turbo. Asked only while the master's SGBD index says two units, and Boost isn't set to Hide; only
+         * the identifier bank 1 is read from (one request a round), with a short wait: a second unit that doesn't
+         * answer (a head unit moved to another car, the unit asleep) mustn't hold up bank 1's readings.
          */
-        const boost2List = (dme.boost || []).map((c) => Object.assign({}, c, { ecu: TwinDme.SLAVE }));
+        const B2_MS = 600;
+        const boost2List = (dme.boost || []).map((c) => Object.assign({}, c, { ecu: TwinDme.SLAVE, timeoutMs: B2_MS }));
         const boost2Wanted = () => boost2List.length > 0 && settings.get(SHOW.boost) !== 'off' && twin.on();
         async function readBoost2() {
             if (!await twin.detect()) return null;       // a twin answer kept from another car: not before the index says so
             await freshBaro();
-            const t0 = Date.now();
-            const m = await rd.value('boost2', boost2List);
-            // the master's boost read just before (same round): whether the second unit answered at all (a value or a
-            // refusal) goes to twin.slaveReply()
-            if (Date.now() - (fuelT.boost || 0) < 3000) twin.slaveReply(boost2List.some((c) => { const r = rd.raws[rd.key(c)]; return !!r && r.t >= t0 && !!r.bytes; }));
+            const c = boost2List[rd.pick.boost || 0];
+            const m = await rd.value('boost2', [c]);
+            const r = rd.raws[rd.key(c)];
+            // the master's boost answered just before (this round, not an earlier one): whether the second unit answered
+            // at all (a value or a refusal) goes to twin.slaveReply()
+            if (fuelT.boost && fuelT.boost >= (fuelTry.boost || 0) && Date.now() - fuelT.boost < 3000) heard2(!!(r && r.bytes));
             // its first replies go to the log, to check the second unit's scaling against the master's
-            const c = boost2List[rd.pick.boost2 || 0], r = c && rd.raws[rd.key(c)];
             if (r) logRaw('boost bank 2 ' + DidReader.label(c), r.bytes || r.why);
             return m === null ? null : (m - baro) / 100;
         }
@@ -799,7 +807,8 @@ mgu.run({
          * under boost (one turbo making less than the other), bank 1 read from the master's same identifier.
          */
         function bank2Boost(cv, t, d, x, y, w) {
-            if (usingDemo() || twin.twin !== true || !fuelT.boost2) return;
+            // (only once the master's boost has proven real, as bank 1's readout from it waits for)
+            if (usingDemo() || twin.twin !== true || !fuelT.boost2 || !trusted('boostDme')) return;
             const now = Date.now(), v = now - fuelT.boost2 < 3000 && G.isNum(live.boost2) ? live.boost2 : null;
             const b1 = G.isNum(d.boost) ? d.boost : null, dec = pressU()[2];
             // apart: against bank 1 from the same identifier of the master (the bar may show the sport display's)

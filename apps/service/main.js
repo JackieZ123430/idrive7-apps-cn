@@ -539,7 +539,9 @@ mgu.run({
         let engineReader = null;
         /* 'diesel' for a B47 / B57 DDE (its SGBD index, 22 F150), 'petrol' for another unit, null without a reply */
         async function engineKind(d) {
-            const ok = (u) => (u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50) || (u[0] === 0x7F && u[1] === 0x22);
+            // only its answer: a refusal names no identifier, and every app gets every frame (another app's refusal
+            // would end the wait and leave a V8 without its bank 2; a unit that refuses gives null either way)
+            const ok = (u) => u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50;
             const u = await d.physical(0x12, 0x22, [0xF1, 0x50], 4000, ok).catch(() => null);
             if (!u || u[0] !== 0x62 || u.length < 6) return null;
             const index = [u[3], u[4], u[5]].map((x) => hex(x)).join('').toUpperCase();

@@ -131,3 +131,4 @@ jobs:
       - run: node kit/tools/test_redline_meter_draw.js
       - run: node kit/tools/test_redline_meter_m.js
       - run: node kit/tools/test_redline_hud_cache.js
+      - run: node kit/tools/test_twin_dme.js

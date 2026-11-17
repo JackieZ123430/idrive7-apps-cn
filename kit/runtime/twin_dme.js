@@ -7,8 +7,7 @@
  *
  * Which engines: the master's SGBD index (UDS 22 F1 50, 3 bytes) is one of TWIN_INDEXES, the 0x12 indexes
  * for which BMW's index (apps/live_data/builtin/sgbd_index.json) also lists a unit at 0x13 ("13 <index>").
- * Any other index (B38 / B48 / B58 / S58, the diesels) = one engine unit, and 0x13 is never asked. The N74 V12
- * (MSD87_R0 / MSD87_L0, 6 cylinders a bank) is not supported: it counts as one engine unit, as before.
+ * Any other index (B38 / B48 / B58 / S58, the diesels) = one engine unit, and 0x13 is never asked.
  *
  *   const twin = new TwinDme(link, { dataDir, log });   // link: kit/diag.js or kit/readonly-diag.js (physical())
  *   await twin.detect()  -> true (two units) / false (one) / null (no answer yet; asked again after RETRY_MS)
@@ -37,6 +36,12 @@
  * a head unit moved from a V8 to a car with one engine unit finds out within seconds. A V8 whose second unit was
  * only slow (cranking, just woken) answers V8 again and nothing changes. The other way round (a head unit moved
  * to a V8) sends nothing to 0x13 to miss, so that is found by RECHECK_MS.
+ *
+ * Only the positive replies count (62 F1 50 / 62 F1 90, which name what they answer): every app gets every frame
+ * from the engine unit, and a refusal (7F 22 ..) doesn't say which identifier it refuses, so it may be the answer to
+ * another app's read (Live Data's refused identifiers, ten a second). A unit that refuses is a unit that didn't
+ * answer: asked again after RETRY_MS, and a V8 kept stays one. The VIN is asked again when it gave no maker code
+ * (VIN_TRIES a start, VIN_RETRY_MS apart).
  */
 const fs = require('fs');
 const path = require('path');
@@ -61,6 +66,11 @@ const RETRY_MS = 30000;
 const RECHECK_MS = 90 * 24 * 3600 * 1000;
 // requests in a row the second unit leaves unanswered (the master answering) before the index is asked again
 const MISS_LIMIT = 3;
+// VIN reads a start for the maker code, this far apart
+const VIN_TRIES = 5, VIN_RETRY_MS = 2000;
+// how long the master has to answer the index or the VIN (it answers in tens of ms; a link reading one request at a
+// time waits this long for one that doesn't)
+const ASK_MS = 1500;
 const hex2 = (b) => (b < 16 ? '0' : '') + b.toString(16).toUpperCase();
 
 function writeWhole(file, text) {
@@ -80,6 +90,7 @@ class TwinDme {
         this.twin = null; this.index = null;
         this.confirmed = false; this.triedT = 0; this.pending = null; this.at = 0;
         this.misses = 0; this.rechecked = false;
+        this.vinTries = 0; this.vinT = 0; this.vinPending = false;
         if (this.file) {
             try {
                 const s = JSON.parse(fs.readFileSync(this.file, 'utf8'));
@@ -139,7 +150,7 @@ class TwinDme {
             this.rechecked = true; this.confirmed = false; this.triedT = 0; this.misses = 0;
             if (this.log) this.log.info('engine units: the second unit (0x13) stopped answering, asking the master for its SGBD index again');
         }
-        if (this.confirmed) return Promise.resolve(this.twin);
+        if (this.confirmed) { this._vinAgain(); return Promise.resolve(this.twin); }
         if (this.pending) return this.pending;
         if (Date.now() - this.triedT < RETRY_MS) return Promise.resolve(this.twin);
         let link = null;
@@ -151,23 +162,40 @@ class TwinDme {
             this.confirmed = true;
             const twin = TwinDme.isTwinIndex(index);
             if (twin !== this.twin || index !== this.index) {
-                if (this.log) this.log.info('engine units: SGBD index ' + (index || 'none') + ' -> ' + (twin ? 'two (master 0x12, bank 2 at 0x13)' : 'one'));
+                if (this.log) this.log.info('engine units: SGBD index ' + index + ' -> ' + (twin ? 'two (master 0x12, bank 2 at 0x13)' : 'one'));
                 if (index !== this.index) this.wmi = null;        // another engine: its VIN asked again
-                this.twin = twin; this.index = index || null;
+                this.twin = twin; this.index = index;
             }
-            const vin = this._needVin(index, twin) ? this._askVin(link) : Promise.resolve(null);
-            return vin.then((wmi) => {
-                if (wmi) {
-                    this.wmi = wmi;
-                    const m = this.m;
-                    if (this.log) this.log.info('engine units: maker code ' + wmi + ' -> ' + (m === true ? 'an M car (S63 / S68)' : m === false ? 'not an M car (N63, or an M60i / 760i S68)' : 'not known (a US-built X5 / X6)') + ', Auto redline ' + (this.redline || 'from the profile'));
-                }
+            const vin = this._needVin(index, twin) ? this._vin(link) : Promise.resolve(null);
+            return vin.then(() => {
                 this.at = Date.now();
                 this._save();                                     // (its time too: trusted for RECHECK_MS)
                 return this.twin;
             });
         }).then((v) => { this.pending = null; return v; }, () => { this.pending = null; return this.twin; });
         return this.pending;
+    }
+
+    /** Read the VIN's maker code (one try of VIN_TRIES); kept and logged when it came. */
+    _vin(link) {
+        this.vinTries++; this.vinT = Date.now();
+        return this._askVin(link).then((wmi) => {
+            if (!wmi) return null;
+            this.wmi = wmi;
+            const m = this.m;
+            if (this.log) this.log.info('engine units: maker code ' + wmi + ' -> ' + (m === true ? 'an M car (S63 / S68)' : m === false ? 'not an M car (N63, or an M60i / 760i S68)' : 'not known (a US-built X5 / X6)') + ', Auto redline ' + (this.redline || 'from the profile'));
+            return wmi;
+        });
+    }
+
+    /** A V8 known, its maker code wanted but not read (no answer): asked again, in the background. */
+    _vinAgain() {
+        if (this.vinPending || !this._needVin(this.index, this.twin) || this.vinTries >= VIN_TRIES || Date.now() - this.vinT < VIN_RETRY_MS) return;
+        let link = null;
+        try { link = this.linkOf(); } catch (e) { return; }
+        if (!link || typeof link.physical !== 'function' || link.ready === false || link.available === false) return;
+        this.vinPending = true;
+        this._vin(link).then((wmi) => { this.vinPending = false; if (wmi) this._save(); }, () => { this.vinPending = false; });
     }
 
     _save() {
@@ -178,23 +206,22 @@ class TwinDme {
     /** The VIN's maker code still to read: a V8 whose index doesn't say M or not, in an app that wants it. */
     _needVin(index, twin) { return !!twin && this.wantVin && this.wmi === null && !M_INDEX.hasOwnProperty(index); }
 
-    /** The maker code of the master's VIN (22 F1 90: 17 characters), 'WBS', or null (no answer, refused, not a VIN). */
+    /** The maker code of the master's VIN (22 F1 90: 17 characters), 'WBS', or null (no answer, not a VIN). */
     async _askVin(link) {
-        const ok = (u) => (u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x90) || (u[0] === 0x7F && u[1] === 0x22);
+        const ok = (u) => u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x90;
         let u;
-        try { u = await link.physical(MASTER, 0x22, [0xF1, 0x90], 4000, ok); } catch (e) { return null; }
+        try { u = await link.physical(MASTER, 0x22, [0xF1, 0x90], ASK_MS, ok); } catch (e) { return null; }
         if (!u || u[0] !== 0x62 || u.length < 3 + 17) return null;
         const wmi = String.fromCharCode(u[3], u[4], u[5]);
         return /^[0-9A-HJ-NPR-Z]{3}$/.test(wmi) ? wmi : null;
     }
 
-    /** The master's SGBD index ('0F242C'), '' when it refused, null without an answer. */
+    /** The master's SGBD index ('0F242C'), or null without an answer (a refusal counts as none: see above). */
     async _ask(link) {
-        const ok = (u) => (u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50) || (u[0] === 0x7F && u[1] === 0x22);
+        const ok = (u) => u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50;
         let u;
-        try { u = await link.physical(MASTER, 0x22, [0xF1, 0x50], 4000, ok); } catch (e) { return null; }
-        if (!u || !u.length) return null;
-        if (u[0] !== 0x62 || u.length < 6) return '';
+        try { u = await link.physical(MASTER, 0x22, [0xF1, 0x50], ASK_MS, ok); } catch (e) { return null; }
+        if (!u || u[0] !== 0x62 || u.length < 6) return null;
         return [u[3], u[4], u[5]].map(hex2).join('');
     }
 
@@ -206,6 +233,7 @@ TwinDme.TWIN = TWIN;
 TwinDme.RETRY_MS = RETRY_MS;
 TwinDme.RECHECK_MS = RECHECK_MS;
 TwinDme.MISS_LIMIT = MISS_LIMIT;
+TwinDme.VIN_TRIES = VIN_TRIES;
 TwinDme.N63_RPM = N63_RPM;
 TwinDme.M_RPM = M_RPM;
 
