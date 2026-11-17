@@ -58,6 +58,7 @@ class Lights extends EventEmitter {
         this._fails = 0; this._pauseTill = 0; this._frame = null; this._frames = [];
         this.writes = 0; this._times = [];
         this._holds = new Set(); this._idle = [];
+        this._cmds = [];               // one-off writes (command()), sent between the lights' writes
     }
 
     get rate() { const t = this.now(); this._times = this._times.filter((x) => t - x < 3000); return this._times.length / 3; }
@@ -172,8 +173,16 @@ class Lights extends EventEmitter {
     }
 
     dim(f) { if (f !== this._dim) { this._dim = f; this._frame = null; this._kick(); } }
+    /**
+     * A one-off write to the body module (2E <data>), sent in turn with the lights' writes (the gateway takes one at a
+     * time) -> its reply, or null (no answer, or the lights not writing: none found, held, stopped).
+     */
+    command(data) {
+        if (this._stopped || this._holds.size || !this.lights.length) return Promise.resolve(null);
+        return new Promise((res) => { this._cmds.push({ data, res }); this._kick(); });
+    }
 
-    stop() { this._stopped = true; clearTimeout(this._timer); clearTimeout(this._onceTimer); }
+    stop() { this._stopped = true; clearTimeout(this._timer); clearTimeout(this._onceTimer); this._cmds.splice(0).forEach((c) => c.res(null)); }
 
     /** Every bus with a light of ours on it given back (one write each), then once more. */
     _giveBack() {
@@ -280,6 +289,13 @@ class Lights extends EventEmitter {
                 if (this._stopped || this._holds.size) return;
                 const wait = this._pauseTill - this.now();
                 if (wait > 0) { this._timer = setTimeout(() => this._kick(), wait); return; }
+                if (this._cmds.length) {
+                    const c = this._cmds.shift();
+                    let r = null;
+                    try { r = await this.diag.physical(BDC, 0x2e, c.data, 1500, echo(0x2e, c.data), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { r = null; }
+                    c.res(r);
+                    continue;
+                }
                 if (this._checkAt && this.now() >= this._checkAt && !this._release.length) { this._checkAt = 0; this._again(); continue; }
                 const w = this._next();
                 if (!w) {

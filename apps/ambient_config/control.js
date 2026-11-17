@@ -46,6 +46,9 @@ const doorOf = (l) => {
  * Not a line's second strip (a G26's "door line 2"): with both strips a side had twice the writes, so the blink went
  * half as fast and the strips lit visibly one after another (#169). The second strip keeps the look's colour. */
 const isLine = (l) => / door line$/i.test(String(l.name || ''));
+// the body module's own open-door warnings (TAB_INNENLICHT_FUNKTIONSMODI), each door's mode; seconds a write lasts
+const CAR_DOOR_MODE = { 'driver front': 0x23, 'driver rear': 0x24, 'passenger front': 0x25, 'passenger rear': 0x26 };
+const CAR_DOOR_S = 4, CAR_DOOR_RENEW_MS = 3000;
 const linesOf = (all, pick) => (l) => pick(l) && (isLine(l) || !all().some((x) => pick(x) && isLine(x)));
 
 const copy = (x) => (x == null ? x : JSON.parse(JSON.stringify(x)));
@@ -56,6 +59,7 @@ class Control {
         this.settings = o.settings; this.lights = o.lights; this.ambient = o.ambient; this.log = o.log;
         this._mode = null; this._night = false; this._away = false; this._shown = null; this._flashAt = 0; this._poll = null;
         this._turn = null; this._doors = [];
+        this._carDoors = {}; this._carDoorTimer = null; this._carDoorNo = false;
     }
 
     look() { const l = this.settings.get('look'); return valid(l) ? copy(l) : copy(DEFAULT_LOOK); }
@@ -84,7 +88,7 @@ class Control {
         this._poll = setInterval(() => this._flashFile(), 300);
     }
 
-    stop() { clearInterval(this._poll); }
+    stop() { clearInterval(this._poll); clearTimeout(this._carDoorTimer); }
 
     /** The driving mode changed. */
     mode(m) {
@@ -131,12 +135,42 @@ class Control {
             this._glow = key;
             this.lights.overlay('turn', sides.length ? linesOf(all, (l) => sides.indexOf(sideOf(l)) >= 0) : null, blink(GLOW));
         }
-        const doors = this.settings.get('doorRed') === true && !this._away ? this._doors : [];
+        this._carDoor();
+        // our red blink: the open doors the car's own warning doesn't show
+        const doors = this.settings.get('doorRed') === true && !this._away ? this._doors.filter((d) => !this._carDoors[d]) : [];
         if (doors.join() !== this._red) {
             this._red = doors.join();
             this.lights.overlay('doors', doors.length ? linesOf(all, (l) => doors.indexOf(doorOf(l)) >= 0) : null, blink(RED));
         }
     }
+
+    /**
+     * Setting doorCar (a test, off by default): an open door shows the body module's own open-door warning, started
+     * with one write (BDC_G05's _INNENLICHT_FUNKTIONSMODI, 2E 48 04 <mode> <seconds>): the body module drives the
+     * lights itself, in step and at its own pace. For CAR_DOOR_S seconds, renewed while the door stays open, so it
+     * ends by itself soon after the door closes. A body module that refuses it: logged, our red blink instead.
+     */
+    _carDoor() {
+        const want = this.settings.get('doorCar') === true && !this._away && !this._carDoorNo ? this._doors : [];
+        Object.keys(this._carDoors).forEach((d) => { if (want.indexOf(d) < 0) delete this._carDoors[d]; });
+        want.forEach((d) => { if (!(d in this._carDoors)) { this._carDoors[d] = true; this._sendCarDoor(d, true); } });
+        clearTimeout(this._carDoorTimer); this._carDoorTimer = null;
+        if (want.length) this._carDoorTimer = setTimeout(() => { want.filter((d) => this._carDoors[d]).forEach((d) => this._sendCarDoor(d, false)); this._carDoor(); }, CAR_DOOR_RENEW_MS);
+    }
+    _sendCarDoor(door, first) {
+        const mode = CAR_DOOR_MODE[door];
+        this.lights.command([0x48, 0x04, mode, CAR_DOOR_S]).then((r) => {
+            const ok = !!r && r[0] === 0x6e;
+            if (first || !ok) this.log.info('door warning (car): ' + door + ' ' + (ok ? 'started' : r ? 'refused (' + r.map((x) => x.toString(16)).join(' ') + ')' : 'no answer'));
+            if (ok || !(door in this._carDoors)) return;
+            // refused or no answer: our own red blink for the doors from now on (until the setting is switched again)
+            this._carDoorNo = true; this._carDoors = {};
+            this.log.warn('door warning (car): the body module did not take it, our red blink instead');
+            this.signals();
+        });
+    }
+    /** doorCar switched: the car's warning asked for again. */
+    carDoorSetting() { this._carDoorNo = false; this.signals(); }
 
     night(on) { this._night = !!on; this.lights.dim(on && this.settings.get('nightDim') !== false ? NIGHT : 1); }
 

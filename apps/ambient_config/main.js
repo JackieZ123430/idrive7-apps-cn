@@ -144,6 +144,7 @@ async function background(bg) {
         if (key === 'nightDim') control.night(control._night);
         if (key === 'follow') control.apply();
         if (key === 'turnGlow' || key === 'doorRed' || key === 'hazardRed' || key === 'drive') control.signals();
+        if (key === 'doorCar') control.carDoorSetting();
     });
     const others = new Others({ log }).start();
     // IterioDev's Comfort tool writes the same lights: while it runs, ours stand aside (no writes, so the two don't fight

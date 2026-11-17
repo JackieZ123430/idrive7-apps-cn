@@ -323,6 +323,20 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     c.doors([]); c.doors(['driver front']);
     fake.lights = fake.lights.filter((l) => l.loc !== 0x05);
     ok(fake.overs.doors.test(pl(0x07)) && fake.overs.doors.test(pl(0x08)), 'a door without its line: its other lights blink');
+    // the car's own open-door warning (doorCar, #169): one write per door (2E 48 04 <mode> <s>), no red blink of ours;
+    // a body module that refuses it: our red blink instead
+    const cmds = [];
+    let carAnswer = [0x6e, 0x48, 0x04];
+    fake.command = (d) => { cmds.push(d.slice()); return Promise.resolve(carAnswer); };
+    c.doors([]); settings.set('doorRed', true); settings.set('doorCar', true); c.carDoorSetting();
+    c.doors(['driver rear']);
+    await sleep(5);
+    ok(cmds.length === 1 && cmds[0].join() === [0x48, 0x04, 0x24, 4].join() && !fake.overs.doors, 'doorCar: the driver rear door asks the car\'s warning (mode 24), no red blink of ours');
+    c.doors([]); cmds.length = 0; carAnswer = [0x7f, 0x2e, 0x31];
+    c.doors(['passenger front']);
+    await sleep(5);
+    ok(cmds.length === 1 && cmds[0][2] === 0x25 && fake.overs.doors && fake.overs.doors.test(pl(0x0c)), 'doorCar refused: our red blink instead');
+    c.doors([]); values.doorCar = undefined; c.carDoorSetting(); delete fake.command;
     delete fake.lights;
     values.turnGlow = undefined; values.doorRed = undefined; c.doors([]); c.turn(null);
     // a restart with Welcome on: the sweep, then the look
