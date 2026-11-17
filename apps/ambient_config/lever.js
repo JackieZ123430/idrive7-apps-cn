@@ -2,7 +2,7 @@
 /**
  * lever.js - Ambient config: a short pull of the headlight-flasher lever while parked (while driving too with the
  * setting strobeLeverDriving, for private property) starts the strobe (Strobe page's
- * Lever start, off until switched on).
+ * Lever start, off until switched on); another pull while it flashes stops it.
  *
  * The car's Vehicle2.statusMainBeam_headlightFlasher is on while the high beam is on or the lever is pulled, so only a
  * short pulse counts: the beam off for at least ARM_MS, then on for at most PULSE_MS, then off again. Held longer it is
@@ -10,7 +10,7 @@
  *
  *   const lv = new Lever(); lv.beam(on, t) -> true once for each pull (t: ms); lv.cool(t)
  */
-const ARM_MS = 1000, PULSE_MS = 1500, COOL_MS = 5000;
+const ARM_MS = 1000, PULSE_MS = 1500, COOL_MS = 2000;
 
 /* The signal's value: true on, false off, null not known (names or wire numbers). */
 const beamOf = (v) => (v === 'EIN' || v === 1 ? true : v === 'AUS' || v === 0 ? false : null);
