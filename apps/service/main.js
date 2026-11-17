@@ -33,6 +33,9 @@
  * page at most once a minute; an engine unit that has none of them shows "--". A B47 / B57 diesel's unit (DDE,
  * told by its SGBD index) has its particulate filter's soot, ash, temperature, pressure and regenerations instead
  * (DIESEL below); while the filter is hotter than a drive makes it, a regeneration is likely running.
+ * A V8 with two engine units (N63, S63, S68: kit/twin_dme.js, told by the same SGBD index): the oil, plugs
+ * and hours are the master's (the whole engine's); each bank has its own particulate filter, so bank 2's soot comes
+ * from the second unit (0x13) too.
  * HMI Polish letters use ASCII equivalents because the upstream font atlases lack Polish glyphs.
  * Raw diagnostic JSON preserves Unicode as escaped code units rather than unreadable glyphs.
  */
@@ -41,6 +44,7 @@ const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { Diag, hex, NRC, replyTo } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
+const TwinDme = require('./kit/twin_dme');
 const { fitText } = require('./kit/text-layout');
 const { cardSheet } = require('./kit/sheet');
 const { t: translate, getLanguage, plural } = require('./kit/i18n');
@@ -101,6 +105,7 @@ const CBS_REFRESH_MS = 60000;
 // the engine unit's wear values (DME8FF_R: B58 / B48 / B38), as Live Data reads them (apps/live_data/useful.js
 // "Oil", "Wear and service"; layouts from its builtin DME8FF_R catalog); kit/dids.js candidates, first that answers
 const ENGINE_REFRESH_MS = 60000;
+// (the identifiers of both units of a twin-unit engine are the master's, its SGBD pair's)
 const ENGINE = {
     oilHours: [{ did: '411A', bytes: 2, at: 0, factor: 1 / 512, min: 0, max: 120 }],          // oil life left by engine hours, %
     oilFuel: [{ did: '411A', bytes: 2, at: 2, factor: 1 / 512, min: 0, max: 120 }],           // by fuel used, %
@@ -530,15 +535,18 @@ mgu.run({
         }
 
         /* ---------- the engine unit's wear values (Engine page) ---------- */
-        const engine = { values: {}, at: null, busy: false, error: '', kind: null };
+        const engine = { values: {}, at: null, busy: false, error: '', kind: null, twin: false };
         let engineReader = null;
         /* 'diesel' for a B47 / B57 DDE (its SGBD index, 22 F150), 'petrol' for another unit, null without a reply */
         async function engineKind(d) {
-            const ok = (u) => (u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50) || (u[0] === 0x7F && u[1] === 0x22);
+            // only its answer: a refusal names no identifier, and every app gets every frame (another app's refusal
+            // would end the wait and leave a V8 without its bank 2; a unit that refuses gives null either way)
+            const ok = (u) => u[0] === 0x62 && u[1] === 0xF1 && u[2] === 0x50;
             const u = await d.physical(0x12, 0x22, [0xF1, 0x50], 4000, ok).catch(() => null);
             if (!u || u[0] !== 0x62 || u.length < 6) return null;
             const index = [u[3], u[4], u[5]].map((x) => hex(x)).join('').toUpperCase();
-            log.info('engine unit: SGBD index ' + index);
+            engine.twin = TwinDme.isTwinIndex(index);
+            log.info('engine unit: SGBD index ' + index + (engine.twin ? ' (two engine units: bank 2 at 0x13)' : ''));
             return DDE_INDEXES.indexOf(index) >= 0 ? 'diesel' : 'petrol';
         }
         async function readEngine(force) {
@@ -551,6 +559,8 @@ mgu.run({
                 const set = engine.kind === 'diesel' ? DIESEL : ENGINE;
                 engine.values = {};
                 for (const k of Object.keys(set)) engine.values[k] = await engineReader.value(k, set[k]);
+                // bank 2's particulate filter on a twin-unit engine: the second unit's soot
+                if (engine.twin && set === ENGINE) engine.values.soot2 = await engineReader.value('soot2', ENGINE.soot.map((c) => Object.assign({}, c, { ecu: TwinDme.SLAVE })));
                 engine.error = Object.keys(set).some((k) => engine.values[k] !== null) ? '' : 'the engine unit has none of these values';
             } catch (e) {
                 engine.error = String(e.message || e);
@@ -641,10 +651,13 @@ mgu.run({
                 ['SPARK PLUGS: DRIVEN', km(v.plugsDriven)], ['ENGINE HOURS', num(v.engineHours, 0, 'h')]]
                 .forEach((r, i) => row(568, 452, 136 + i * step, r[0], r[1], r[2]));
             G.panel(cv, t, 1064, 44, 512, 468, 'Particulate filter');
-            [['SOOT', num(v.soot, 1, 'g')], ['LOAD (ADAPTED)', num(v.opfLoad, 3)], ['ASH (ADAPTED)', num(v.opfAsh, 3)]]
-                .forEach((r, i) => row(1088, 464, 136 + i * step, r[0], r[1]));
+            const two = engine.twin && !useDemo();
+            [[two ? 'SOOT, BANK 1' : 'SOOT', num(v.soot, 1, 'g')]].concat(two ? [['SOOT, BANK 2', num(v.soot2, 1, 'g')]] : [],
+                [['LOAD (ADAPTED)', num(v.opfLoad, 3)], ['ASH (ADAPTED)', num(v.opfAsh, 3)]])
+                .forEach((r, i) => row(1088, 464, 136 + i * (two ? Math.round(step * 0.78) : step), r[0], r[1]));
+            const at = engine.at ? new Date(engine.at).toTimeString().slice(0, 5) : '';
             const note = useDemo() ? '' : engine.busy ? 'Reading the engine unit...' : engine.error ? 'Engine unit: ' + engine.error
-                : engine.at ? 'From the engine unit (B58 / B48 / B38), read ' + new Date(engine.at).toTimeString().slice(0, 5) : 'Not read yet';
+                : engine.at ? (two ? 'From the engine unit' + '  ·  ' + at : 'From the engine unit (B58 / B48 / B38), read ' + at) : 'Not read yet';
             cv.text(fit(cv, note, 20, 1500), 48, 496 + ex, 20, engine.error ? t.warn : t.dim);
         }
 

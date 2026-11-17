@@ -91,6 +91,27 @@ for (const r of readings) {
     variants = 'any';
     await other.read('6000');
     assert(other.supported && other.records['6000'].values[0] === 60 && other.status() === 'LIVE · UNVERIFIED', 'Try any reads it, marked unverified');
+    // a variant with its own catalog (another SGBD): its records are read and decoded with it, GSZFBCE's are not asked
+    const own = { records: { '6000': { length: 2, fields: [{ at: 0, bytes: 2, little: false, signed: false, factor: 0.1, offset: -40, unit: 'C' }] } },
+        shifts: [{ did: '7777', family: 1, fromGear: 1, toGear: 2 }], gearNames: {}, selectorNames: {}, ranges: [], clutchMatrix: {} };
+    Reader.VARIANTS['0F2D60'] = { name: 'test GSZF04GF', catalog: own };
+    try {
+        const g4 = new Reader(ctx), g4asked = [];
+        g4.diag = { available: true, p: {}, physical: async (target, sid, args) => {
+            g4asked.push(args.map((x) => x.toString(16).padStart(2, '0')).join('').toUpperCase());
+            if (args[0] === 0xF1) return [0x62, 0xF1, 0x50, 0x0F, 0x2D, 0x60];
+            return [0x62, args[0], args[1], 0x03, 0x20];          // 800 x 0.1 - 40 = 40
+        } };
+        await g4.read('F150');
+        assert(g4.verified && g4.supported && g4.catalog === own, 'its own catalog');
+        await g4.read('6000');
+        assert.strictEqual(g4.records['6000'].values[0], 40, 'decoded with its catalog: ' + JSON.stringify(g4.records['6000']));
+        g4.setWanted(['6000', '4110', 'DA2E']);
+        assert.deepStrictEqual(g4.wanted, ['6000'], 'only its records wanted');
+        await assert.rejects(() => g4.read('4110'), /Not an allowed read identifier/, 'a GSZFBCE record is not asked of it');
+        assert.deepStrictEqual(g4asked, ['F150', '6000']);
+        assert.strictEqual(E.shiftRecords('1', 'up', own).length, 1, 'its maps');
+    } finally { delete Reader.VARIANTS['0F2D60']; }
     // the G20 330e's hybrid 8HP (0F21E0): read by default; records it refuses are not asked; its own lengths
     const hybrid = new Reader(ctx), asked = [];
     hybrid.diag = { available: true, p: {}, physical: async (target, sid, args) => {

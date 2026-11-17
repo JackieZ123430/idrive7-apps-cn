@@ -2405,5 +2405,9 @@
   "Cell voltage spread": "셀 전압 편차",
   "Cell charge spread": "셀 충전량 편차",
   "Cell voltages": "셀 전압",
-  "Hybrid or electric car? Settings > Drive system": "하이브리드·전기차: 설정 > 구동 시스템"
+  "Hybrid or electric car? Settings > Drive system": "하이브리드·전기차: 설정 > 구동 시스템",
+  "Bank 2": "뱅크 2",
+  "SOOT, BANK 1": "그을음, 뱅크 1",
+  "SOOT, BANK 2": "그을음, 뱅크 2",
+  "Bank 1": "뱅크 1"
 }

@@ -10,6 +10,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Try any. Per variant: records it refuses (not asked, shown as not on this EGS) and records whose length differs
 // from GSZFBCE's (layouts: { count } values of the same shape, or { raw: true }). 0F21E0: every record read once on
 // a G20 330e (hybrid 8HP, no torque converter: its converter and lock-up records are refused).
+// A variant whose records differ more (another SGBD: GSZFB1 0F21D0, the 8HP gen 4 GSZF04GF / GD, as a V8's may be)
+// gets catalog: require('./catalog_<sgbd>') in catalog.js's shape (records, shifts, gearNames, selectorNames, ranges,
+// clutchMatrix), built from that SGBD's read schemas and checked on a car; every page then reads and draws with it.
 const HISTOGRAMS = ['4800', '4801', '4802', '4803', '4804', '4805', '4806', '4807', '4808', '4809', '480A', '480B', '480C', '480D', '480E', '480F'];
 const VARIANTS = {
     '0F25D0': { name: 'GSZFBCE', absent: [], layouts: {} },
@@ -41,9 +44,10 @@ class Reader {
         this.snapshotFile = path.join(ctx.dataDir, 'egs-snapshot.json');
         try {
             const old = JSON.parse(fs.readFileSync(this.snapshotFile, 'utf8'));
+            const cat = catalogOf(old.sgbd);
             if (old.sgbd && old.records) Object.keys(old.records).forEach((k) => {
                 const r = old.records[k];
-                if (C.records[k] && r && Array.isArray(r.values)) this.records[k] = Object.assign({}, r, { cached: true });
+                if (cat.records[k] && r && Array.isArray(r.values)) this.records[k] = Object.assign({}, r, { cached: true });
             });
         } catch (e) {}
     }
@@ -57,15 +61,15 @@ class Reader {
     }
 
     setVisible(on) { this.visible = !!on; }
-    setWanted(ids) { this.wanted = Array.from(new Set(ids.filter((d) => C.records[d]))); }
+    setWanted(ids) { const cat = this.catalog; this.wanted = Array.from(new Set(ids.filter((d) => cat.records[d]))); }
     refresh() { this.wanted.forEach((d) => { delete this.attempts[d]; }); this.faultAttempt = 0; }
 
     async read(did) {
-        if (!C.records[did] || !/^[0-9A-F]{4}$/.test(did)) throw new Error('Not an allowed read identifier');
+        if (!(did === 'F150' ? C : this.catalog).records[did] || !/^[0-9A-F]{4}$/.test(did)) throw new Error('Not an allowed read identifier');
         if (did !== 'F150' && !this.supported) return;
         const id = parseInt(did, 16), time = Date.now(), v = this.variant;
         this.attempts[did] = time;
-        if (did !== 'F150' && v && v.absent.indexOf(did) >= 0) {
+        if (did !== 'F150' && v && (v.absent || []).indexOf(did) >= 0) {
             this.records[did] = { ok: false, values: [], at: 0, error: 'Not on this EGS (' + v.name + ')', absent: true };
             return;
         }
@@ -74,7 +78,7 @@ class Reader {
             || (b[0] === 0x7F && b[1] === 0x22));
         const uds = await this.diag.physical(0x18, 0x22, [id >> 8, id & 255], 1800, accept,
             { maxRetries: 0, callTimeoutMs: 2500, hardTimeoutMs: 6500, pendingTimeoutMs: 2500 });
-        const got = E.decode(did, uds, v && v.layouts[did]);
+        const got = E.decode(did, uds, v && v.layouts && v.layouts[did], did === 'F150' ? C : this.catalog);
         if (got.ok) {
             this.records[did] = Object.assign(got, { at: Date.now(), cached: false });
             this.lastGood = Date.now();
@@ -101,6 +105,9 @@ class Reader {
         } else {
             const err = !uds ? 'No response' : uds[0] === 0x7F ? 'NRC ' + uds[2].toString(16).toUpperCase() : got.error;
             this.lastError = did + ': ' + err;
+            // once per record, for adding a variant: what this EGS answered instead (a refusal, another length)
+            if (!this.logged) this.logged = {};
+            if (!this.logged['x' + did]) { this.logged['x' + did] = true; this.ctx.log.info('EGS ' + did + ' not read: ' + err); }
             if (this.records[did] && this.records[did].ok) this.records[did].error = err;
             else this.records[did] = { ok: false, values: [], at: 0, error: err };
         }
@@ -155,6 +162,8 @@ class Reader {
     get verified() { return !!this.sgbd && !!VARIANTS[this.sgbd]; }
     /** Its variant's entry (refused records, differing layouts); with Try any, another EGS reads with GSZFBCE's. */
     get variant() { return VARIANTS[this.sgbd] || null; }
+    /** Its records, gear names and maps: the variant's own catalog, else GSZFBCE's (also for Try any). */
+    get catalog() { return catalogOf(this.sgbd); }
     /** Read it: verified, or another identified variant with the setting EGS variant: Try any. Every record is still
      * checked against its identifier and exact length, so a different layout shows as an error, not as numbers. */
     get supported() { return this.verified || (!!this.sgbd && this.ctx.settings.get('variants') === 'any'); }
@@ -167,4 +176,7 @@ class Reader {
     }
 }
 
+function catalogOf(sgbd) { return (sgbd && VARIANTS[sgbd] && VARIANTS[sgbd].catalog) || C; }
+
+Reader.VARIANTS = VARIANTS;
 module.exports = Reader;

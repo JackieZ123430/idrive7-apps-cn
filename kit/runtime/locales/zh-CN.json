@@ -1682,5 +1682,9 @@
   "Hybrid or electric car? Settings > Drive system": "混动或纯电车型：设置 > 驱动系统",
   "Battery power": "电池功率",
   "Fast (the car's eDRIVE needle)": "快速（车辆 eDRIVE 功率表）",
-  "Battery readings only": "仅电池读数"
+  "Battery readings only": "仅电池读数",
+  "Bank 2": "气缸列 2",
+  "SOOT, BANK 1": "碳烟，气缸列 1",
+  "SOOT, BANK 2": "碳烟，气缸列 2",
+  "Bank 1": "气缸列 1"
 }

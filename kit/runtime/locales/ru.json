@@ -1841,5 +1841,9 @@
   "Hybrid or electric car? Settings > Drive system": "Гибрид или электромобиль? Настройки > Привод",
   "Battery power": "Мощность батареи",
   "Fast (the car's eDRIVE needle)": "Быстро (стрелка eDRIVE автомобиля)",
-  "Battery readings only": "Только показания батареи"
+  "Battery readings only": "Только показания батареи",
+  "Bank 2": "Банк 2",
+  "SOOT, BANK 1": "САЖА, БАНК 1",
+  "SOOT, BANK 2": "САЖА, БАНК 2",
+  "Bank 1": "Банк 1"
 }

@@ -66,6 +66,7 @@ const PICK = require('./picker');
 const PAGES = require('./pages');
 const { t: translate, plural } = require('./kit/i18n');
 const Sim = require('./kit/sim');
+const TwinDme = require('./kit/twin_dme');
 
 const W = 1600, H = 520, COLS = 5, CARDS = 30, ROWS = PAGES.ROWS, ROW_H = PAGES.ROW_H;
 const GO = '#2fd27a';
@@ -79,7 +80,9 @@ const CAT = {
 };
 const INDEX = CAT.json('sgbd_index.json');
 // a unit type without a catalog of its own uses its family's; every value is still asked on the car
-const CLOSEST = { 0x12: 'DME8FF_R' };
+// (0x13: the second engine unit of a V8, DME8FF_L / DME98_L: the same identifiers as its master's, kit/twin_dme.js;
+// only for a V8's index)
+const CLOSEST = { 0x12: 'DME8FF_R', 0x13: 'DME8FF_R' };
 const ABSENT = [0x11, 0x12, 0x31];   // NRCs that mean "this unit has no such value"
 
 // the baked fonts are ASCII + a few signs: German letters spelled out
@@ -133,12 +136,13 @@ mgu.run({
         const changed = () => { version++; if (loop) loop.kick(); };
         // the car signals' page, as a "unit" for the lists
         const SIGU = { sig: true, addr: 'sig', ver: 0, view: null };
-        const relayout = () => { layoutVer++; units.forEach((u) => { u.view = null; u.eview = null; }); if (soloDme) soloDme.eview = null; SIGU.view = null; changed(); };
+        const relayout = () => { layoutVer++; units.forEach((u) => { u.view = null; u.eview = null; }); if (soloDme) soloDme.eview = null; if (soloSlave) soloSlave.view = null; SIGU.view = null; changed(); };
 
         function makeUnit(addr, index, demo) {
             const variant = index ? INDEX[hex(addr) + ' ' + index] || null : null;
             let sgbd = variant && catalog(variant) ? variant : null, closest = false;
-            if (!sgbd && CLOSEST[addr] && catalog(CLOSEST[addr])) { sgbd = CLOSEST[addr]; closest = true; }
+            const near = CLOSEST[addr] && (addr !== 0x13 || !index || TwinDme.isTwinIndex(index));
+            if (!sgbd && near && catalog(CLOSEST[addr])) { sgbd = CLOSEST[addr]; closest = true; }
             const u = { addr, index, variant, sgbd, closest, demo, res: {}, ver: 0, rows: null, energyRows: null, view: null, obd: null };
             // what an earlier Read all found (values from then, until read again)
             const old = readJson(scanFile(u), null);
@@ -154,7 +158,7 @@ mgu.run({
         })();
         const unitName = (u) => ECU[u.addr] || u.variant || 'ECU 0x' + hex(u.addr);
         // the engine unit (0x12) is there on every car this is for: its values are read with or without a scan
-        let soloDme = null;
+        let soloDme = null, soloSlave = null;       // the engine unit without a scan; a twin-unit engine's second one
         function engineUnit() {
             const u = units.find((x) => x.addr === 0x12);
             if (u) return u;
@@ -162,7 +166,50 @@ mgu.run({
             if (!soloDme || !!soloDme.demo !== demo) { soloDme = makeUnit(0x12, null, demo); layoutVer++; }
             return soloDme;
         }
-        const unitAt = (addr) => (addr === 0x12 ? engineUnit() : units.find((y) => y.addr === addr) || null);
+        /*
+         * A V8 with two engine units (kit/twin_dme.js): the master's SGBD index says so (asked once, the answer
+         * kept), or a scan found a V8's second unit (0x13, with a V8's index). Its bank's
+         * values then come from the second unit:
+         * on the Engine page under "Bank 2", and for gauges. Never on demo data (the demo car is a B58).
+         */
+        const twin = new TwinDme(link, { dataDir: ctx.dataDir, log });
+        let twinSeen = null;
+        const isTwin = () => twin.twin === true || units.some((u) => u.addr === 0x13 && !u.demo && TwinDme.isTwinIndex(u.index));
+        /** the twin state (or its cylinders per bank) changed: the Useful lists (what each unit lists) and the pages again */
+        function twinCheck() {
+            const now = isTwin() + ':' + twin.perBank;
+            if (now === twinSeen) return;
+            twinSeen = now;
+            units.concat(soloDme ? [soloDme] : [], soloSlave ? [soloSlave] : []).forEach((u) => { u.useful = undefined; });
+            relayout();
+        }
+        let slaveWokenT = 0;
+        setInterval(() => {
+            try {
+                if (!useDemo() && link.available) twin.detect().then(twinCheck, () => {});
+                twinCheck();
+                // the second unit without a scan, given up on after misses in a row (asleep while the ignition came
+                // on): asked again every 30 s, as a scan would (the master's own unit is woken by a scan)
+                if (soloSlave && soloSlave.silent && Date.now() - slaveWokenT > 30000) { slaveWokenT = Date.now(); soloSlave.silent = false; link.wake(0x13); changed(); }
+            } catch (e) { log.warn('engine units: ' + e); }
+        }, 5000);
+        /** the second engine unit (0x13) of a twin-unit engine, scanned or not; null on any other car and on demo data */
+        function slaveUnit() {
+            if (!isTwin() || useDemo()) return null;
+            const u = units.find((x) => x.addr === 0x13);
+            if (u) return u.demo ? null : u;
+            if (!soloSlave) { soloSlave = makeUnit(0x13, null, false); layoutVer++; }
+            return soloSlave;
+        }
+        /*
+         * A Useful entry's name as shown: on a twin-unit engine the values each unit has for its own bank (those in
+         * USEFUL.BANK2 but its cylinders') are "Bank 1: ..." on the master and "Bank 2: ..." on the second unit.
+         */
+        const PER_BANK = USEFUL.BANK2(4).reduce((m, g) => { g.items.forEach((i) => { if (!/, cylinder \d+$/.test(i.name)) m[i.name] = 1; }); return m; }, {});
+        const bankName = (u, item) => (!u || !PER_BANK[item.name] || !isTwin() ? item.name
+            : u.addr === 0x13 ? 'Bank 2: ' + item.name : u.addr === 0x12 ? 'Bank 1: ' + item.name : item.name);
+        const unitAt = (addr) => (addr === 0x12 ? engineUnit() : addr === 0x13 ? slaveUnit() || units.find((y) => y.addr === addr) || null
+            : units.find((y) => y.addr === addr) || null);
 
         /* ---------- values of a unit ---------- */
         // rows: one per value; key = what is asked ('F190', 'OBD 0C', '4A36'), field = which value of its reply
@@ -207,14 +254,17 @@ mgu.run({
         // each entry's candidates resolved to rows of this unit; one the unit type doesn't list is left out
         function usefulOf(u) {
             if (u.useful !== undefined) return u.useful;
-            const groups = USEFUL[u.addr] || USEFUL.bySgbd[u.sgbd];
+            // items marked only: 'twin' / 'single' (useful.js) by the engine's units; the second unit: its bank's list
+            const two = isTwin();
+            const groups = u.addr === 0x13 ? (two ? USEFUL.BANK2(twin.perBank) : null) : USEFUL[u.addr] || USEFUL.bySgbd[u.sgbd];
             if (!groups) return (u.useful = null);
+            const fits = (item) => !item.only || (item.only === 'twin') === two;
             const index = {};
             rowsOf(u, true).forEach((row) => { index[row.key + '/' + row.field] = row; });
             const find = (c) => index[c.indexOf('/') > 0 ? c : c + '/0'];
             u.useful = groups.map((g) => ({
                 group: g.group,
-                items: g.items.map((item) => {
+                items: g.items.filter(fits).map((item) => {
                     const cands = (item.c || []).map(find).filter(Boolean), parts = item.minus ? item.minus.map(find) : null;
                     return (parts ? parts.every(Boolean) : cands.length) ? { item, cands, parts } : null;
                 }).filter(Boolean),
@@ -290,22 +340,30 @@ mgu.run({
         }
         /** the Engine page: the engine unit's Useful list, those it may have; for a type without one, its OBD-II values */
         function engineView() {
-            const u = engineUnit();
-            if (u.eview && u.eview.ver === u.ver) return u.eview.rows;
+            const u = engineUnit(), s2 = slaveUnit(), ver = u.ver + ':' + (s2 ? s2.addr + '.' + s2.ver : '-');
+            if (u.eview && u.eview.ver === ver) return u.eview.rows;
             const rows = [], groups = usefulOf(u);
+            const mayHave = (x, ur) => (ur.parts ? ur.parts.every((p) => maybe(x, p)) : ur.cands.some((r) => maybe(x, r)));
             if (groups && groups.length) {
                 groups.forEach((g) => {
                     if (g.group === '12 V') return;    // shown on Energy, but remains available to gauges
-                    const items = g.items.filter((ur) => (ur.parts ? ur.parts.every((p) => maybe(u, p)) : ur.cands.some((r) => maybe(u, r))));
+                    const items = g.items.filter((ur) => mayHave(u, ur));
                     if (!items.length) return;
                     rows.push({ header: g.group });
                     items.forEach((ur) => rows.push({ useful: ur }));
+                });
+                // a twin-unit engine: bank 2's values from its own unit, each row with that unit
+                (s2 ? usefulOf(s2) || [] : []).forEach((g) => {
+                    const items = g.items.filter((ur) => mayHave(s2, ur));
+                    if (!items.length) return;
+                    rows.push({ header: translate('Bank 2') + ': ' + translate(g.group) });
+                    items.forEach((ur) => rows.push({ unit: s2, useful: ur }));
                 });
             } else {
                 const obd = rowsOf(u).filter((row) => row.kind === 'obd' && maybe(u, row));
                 if (obd.length) { rows.push({ header: 'OBD-II' }); obd.forEach((row) => rows.push(row)); }
             }
-            u.eview = { ver: u.ver, rows };
+            u.eview = { ver, rows };
             return rows;
         }
         /** Energy: only the 12 V, 48 V battery and converter values selected in useful.js. */
@@ -435,19 +493,55 @@ mgu.run({
          * fuel signal learns its scaling from: { u, rows, got: { lph, t } | null }; rows = what to ask it for that
          */
         const FUEL = ['Fuel consumption', 'Fuel mass flow'];
+        /*
+         * A twin-unit engine (kit/twin_dme.js): 5656 is each unit's own bank ("LOKAL" in the SGBD), so the master's
+         * only counts with the second unit's added; the engine's total (OBD 5E) is taken as it is, and the mass flow
+         * (4521, not known to be the whole engine's) not at all. Half the engine's fuel would teach the fuel signal
+         * a wrong scaling for good (data/signals.json).
+         */
+        const LOCAL_FUEL = ['5656'];
         function dmeFuel() {
             const u = engineUnit();
             if (u.demo) return null;
-            const list = [];
+            const list = [], s2 = slaveUnit();
             (usefulOf(u) || []).forEach((g) => g.items.forEach((ur) => { if (FUEL.indexOf(ur.item.name) >= 0) list.push(ur); }));
             let got = null;
-            list.forEach((ur) => {
-                const row = active(u, ur), r = row && u.res[row.key];
-                if (got || !r || Date.now() - r.t > 1500) return;
-                const v = usefulOne(u, ur, row);
-                if (typeof v.n === 'number') got = { lph: v.u === 'kg/h' ? v.n / 0.745 : v.n, t: r.t };        // petrol: 0.745 kg a litre
+            const fresh = (x, row) => { const r = row && x.res[row.key]; return r && Date.now() - r.t <= 1500 ? r : null; };
+            const lph = (x, ur, row) => { const v = usefulOne(x, ur, row); return typeof v.n === 'number' ? (v.u === 'kg/h' ? v.n / 0.745 : v.n) : null; };     // petrol: 0.745 kg a litre
+            // one engine unit or two not known yet (the master's SGBD index not answered): asked, but nothing learned
+            const unsure = !s2 && !twin.known() && !isTwin();
+            if (!s2) {
+                list.forEach((ur) => {
+                    const row = active(u, ur), r = fresh(u, row);
+                    if (got || !r) return;
+                    const v = lph(u, ur, row);
+                    if (v !== null) got = { lph: v, t: r.t };
+                });
+                return { u, rows: list.map((ur) => active(u, ur)).filter(Boolean), got: unsure ? null : got };
+            }
+            const rows = [], more = [];
+            const cons = list.find((ur) => ur.item.name === 'Fuel consumption');
+            const ur2 = ((usefulOf(s2) || []).find((g) => g.items.some((x) => x.item.name === 'Fuel consumption')) || { items: [] })
+                .items.find((x) => x.item.name === 'Fuel consumption');
+            // the first source that can give the whole engine's figure, and only that one is asked
+            (cons ? cons.cands : []).some((row) => {
+                if (!maybe(u, row)) return false;
+                if (LOCAL_FUEL.indexOf(row.key) >= 0) {
+                    // bank 2's figure: the same identifier on the second unit
+                    const row2 = ur2 && ur2.cands.find((x) => x.key === row.key);
+                    if (!row2 || !maybe(s2, row2)) return false;
+                    rows.push(row); more.push(row2);
+                    const r = fresh(u, row), r2 = fresh(s2, row2);
+                    const a = r && lph(u, cons, row), b = r2 && lph(s2, ur2, row2);
+                    if (typeof a === 'number' && typeof b === 'number') got = { lph: a + b, t: Math.min(r.t, r2.t) };
+                    return true;
+                }
+                rows.push(row);
+                const r = fresh(u, row), v = r && lph(u, cons, row);
+                if (typeof v === 'number') got = { lph: v, t: r.t };
+                return true;
             });
-            return { u, rows: list.map((ur) => active(u, ur)).filter(Boolean), got };
+            return { u, rows, got, more: more.length ? { u: s2, rows: more } : null };
         }
         /** something that passes test(value) is shown: on the page on screen or on the home-screen widget */
         function shownBy(test) {
@@ -583,7 +677,8 @@ mgu.run({
             items.set(k, x);
             return x;
         }
-        const itemName = (x) => (x.isSig ? (x.sig ? x.sig.name : x.fav.name || '?') : x.useful ? x.useful.item.name : x.row ? nameOf(x.unit, x.row) : x.fav.name || '?');
+        // (bank 2's values of a twin-unit engine: "Bank 2: ..." where the master has the same name)
+        const itemName = (x) => (x.isSig ? (x.sig ? x.sig.name : x.fav.name || '?') : x.useful ? bankName(x.unit, x.useful.item) : x.row ? nameOf(x.unit, x.row) : x.fav.name || '?');
         /** what a value shows: { text, dim, warn } */
         function itemText(x) {
             if (x.isSig) return x.sig ? sigText(x.sig) : { text: 'not in this version', dim: true };
@@ -629,8 +724,17 @@ mgu.run({
             (usefulOf(u) || []).forEach((g) => out.push({
                 name: translate('Engine unit') + ': ' + translate(g.group),
                 items: g.items.map((ur) => ({
-                    key: u.addr + ':useful:' + ur.item.name, name: ur.item.name, text: () => usefulValue(u, ur),
+                    key: u.addr + ':useful:' + ur.item.name, name: bankName(u, ur.item), text: () => usefulValue(u, ur),
                     fav: { addr: u.addr, sgbd: u.sgbd, useful: ur.item.name, c: ur.item.c || ur.item.minus, minus: !!ur.item.minus, u: ur.item.u, name: ur.item.name },
+                })),
+            }));
+            // a twin-unit engine's second unit: bank 2's values (named "Bank 2: ..." on a gauge)
+            const s2 = slaveUnit();
+            (s2 ? usefulOf(s2) || [] : []).forEach((g) => out.push({
+                name: translate('Engine unit') + ', ' + translate('Bank 2') + ': ' + translate(g.group),
+                items: g.items.map((ur) => ({
+                    key: s2.addr + ':useful:' + ur.item.name, name: ur.item.name, text: () => usefulValue(s2, ur),
+                    fav: { addr: s2.addr, sgbd: s2.sgbd, useful: ur.item.name, c: ur.item.c || ur.item.minus, minus: !!ur.item.minus, u: ur.item.u, name: 'Bank 2: ' + ur.item.name },
                 })),
             }));
             // a unit with a full catalog (made here): every value it answered
@@ -763,7 +867,8 @@ mgu.run({
         const scrollOf = (pg) => lists[listKey(pg)] || (lists[listKey(pg)] = { y: 0, max: 0 });
         function pages() {
             const eu = engineUnit();
-            const v = [layoutVer, SIGU.ver, scrVer, tripsOn(), scrolls, eu.ver, units.map((u) => u.ver).join(',')].join(':');
+            const s2 = slaveUnit();
+            const v = [layoutVer, SIGU.ver, scrVer, tripsOn(), scrolls, eu.ver, s2 ? s2.ver : '-', units.map((u) => u.ver).join(',')].join(':');
             if (pagesCache && pagesCache.v === v) return pagesCache.list;
             const list = [], n = (rows) => (scrolls ? 1 : Math.max(1, Math.ceil(rows / ROWS)));
             const ns = screens.length + (screens.length < SCR.MAX_SCREENS ? 1 : 0);
@@ -900,12 +1005,16 @@ mgu.run({
             const rowAsks = (u, r) => (r.header || r.sig ? [] : r.useful ? usefulRows(u, r.useful) : [r]);
             const shown = its.length ? its.filter((x) => x.unit).map((x) => [x.unit, x.useful ? usefulRows(x.unit, x.useful) : x.row ? [x.row] : []])
                 : pg && pg.group === 'energy' ? shownRows(pg).filter((r) => r.unit).map((r) => [r.unit, rowAsks(r.unit, r)])
-                    : pg && pg.unit && !pg.unit.sig ? shownRows(pg).map((r) => [pg.unit, rowAsks(pg.unit, r)]) : [];
+                    : pg && pg.unit && !pg.unit.sig ? shownRows(pg).map((r) => [r.unit || pg.unit, rowAsks(r.unit || pg.unit, r)]) : [];
             // the fuel signal's l/h shown but its scaling not learned yet, or the trip computer needing a fuel figure:
             // the engine unit's figures alongside (for the trip computer each once a second)
             if (!flow.k && !sigDemo()) {
                 const want = flow.last && fuelShown() ? -1 : tripsNeedDme() ? 1000 : 0;
-                if (want) { const d = dmeFuel(); if (d && d.rows.length) shown.push([d.u, d.rows, want > 0 ? want : 0]); }
+                if (want) {
+                    const d = dmeFuel();
+                    if (d && d.rows.length) shown.push([d.u, d.rows, want > 0 ? want : 0]);
+                    if (d && d.more) shown.push([d.more.u, d.more.rows, want > 0 ? want : 0]);
+                }
             }
             const todo = [], seen = {}, age = fg ? 100 : 500;
             shown.forEach(([u, rows, every]) => {
@@ -1203,14 +1312,16 @@ mgu.run({
         function drawEngine(cv, t, pg) {
             const u = engineUnit(), all = engineView(), rows = listRows(pg);
             const items = all.filter((r) => !r.header);
-            const ok = items.filter((r) => (r.useful ? usefulRows(u, r.useful).every((x) => state(u.res[x.key]) === 'ok') : state(u.res[r.key]) === 'ok')).length;
+            const ok = items.filter((r) => { const x = r.unit || u; return r.useful ? usefulRows(x, r.useful).every((y) => state(x.res[y.key]) === 'ok') : state(x.res[r.key]) === 'ok'; }).length;
             const note = browseNote('knob: scroll  ·  push up / down: page') || (u.silent ? 'The engine unit isn\'t answering (ignition on?)'
                 : (scrolls || items.length <= ROWS ? '' : translate('page') + ' ' + (pg.p + 1) + ' ' + translate('of') + ' ' + pg.n + '  ·  ') + ok + ' ' + translate('of') + ' ' + items.length + ' ' + translate('values read'));
             gliding = PAGES.listPanel(cv, t, G, fit, {
                 title: 'Engine', note, noteColor: u.silent ? t.warn : null, details: details(),
                 rows: rows.map((row) => {
                     if (row.header) return row;
-                    if (row.useful) { const v = usefulValue(u, row.useful); return { name: row.useful.item.name, source: usefulSource(u, row.useful), text: v.text, dim: v.dim, warn: v.warn }; }
+                    const ru = row.unit || u;
+                    // (bank 2's rows are under their own headers: their names as they are)
+                    if (row.useful) { const v = usefulValue(ru, row.useful); return { name: row.unit ? row.useful.item.name : bankName(u, row.useful.item), source: (row.unit ? '13:' : '') + usefulSource(ru, row.useful), text: v.text, dim: v.dim, warn: v.warn }; }
                     const v = baseValue(u, row);
                     return { name: nameOf(u, row), source: sourceOf(row), text: v.text, dim: v.dim, warn: v.warn };
                 }),
