@@ -1,0 +1,545 @@
+" carried over to the readout switches
+(OBD 06)
+(OBD to all units)
+(UDS F6xx)
+(built in)
+(closest)
+(engine off)
+(err)
+(error:
+(first)
+(high beam
+(kept
+(layout
+(not in front)
+(not known)
+(profile)
+(reply
+(running/READY)
+(simulated)
+(the driver\'s own)
+(the driving mode\'s own place)
+(this engine)
+(two engine units: bank 2 at 0x13)
+(xDrive
+) - extended session:
+) carried into the Comfort profile
+) failed
+) missed
+), reaction lead now
+), retrying
+), using BasicDataSet when it moves
+): hybrid readouts offered
+): plug-in hybrid
+, Auto redline
+, adapter=
+, catalog
+, experimental)
+, fuel from
+, high beam channels to learn
+, high beam on channels
+, made again in
+, mgu-render/1
+, pausing
+, police with the
+, read=
+, regen
+, renderer
+, replies in
+, rest
+, shown by id:
+, stalls
+, targets
+, the
+, the tach gives way to the call card
+, then
+, transport busy
+, upstream dialect (no mgu-render/1)
+, verified=
+, waiting for a second
+- running without it:
+-> xDrive
+10 03 (extended session, the
+12 V from
+12 V: in use again (driving)
+12 V: in use again (user)
+12 V: parked, reads paused, the car can sleep
+12 V: this drive reset
+22 F1 50 to all units: no answer - asking each address
+48 V battery answers: mild hybrid
+5656 of both engine units, OBD 5E
+5656, OBD 5E, 4521
+: OBD-II PIDs
+: first image in
+: gauge
+: handle
+: no answer
+: no answer from HMI after 4 s
+: no answer to 22 F1 50 (asked again next scan)
+: off, the HUD back to the app that stands on it
+: one identifier a request (
+: png written
+: refused (
+: shown after
+: the tyre widget shows
+: up to
+BM3 burbles read:
+BM3 map read:
+DME ident:
+EGS diagnostic link:
+EGS identification
+EGS reader:
+EGS snapshot:
+HUD claim:
+HV voltage
+IterioDev\'s Comfort tool is no longer running
+IterioDev\'s Comfort tool is running: it writes the ambient lights too, so the colours jump between the two apps
+KombiInterface_2:
+TASU error during scan:
+TASU proxy ready (available=
+TASU:
+UDS -> DME
+a second), drawn at
+action
+all-wheel drive detected
+ambient
+ambient light:
+ambient: a plug-in hybrid\'s driving modes
+ambient: driving mode
+ambient: hold:
+ambient: the Strobe tab left, the lights carry on
+ambient: the car sends driving mode
+an M car (S63 / S68)
+animation
+answer,
+asked for it)
+awd save:
+back:
+background start:
+background:
+background: the charge for other apps (
+baseline cleared
+baseline pinned
+battery temperature
+best times cleared
+blocked a diagnostic request:
+browsing ended
+browsing with the knob
+burble readback:
+buttons
+by hand
+bytes
+car moving: game paused
+car signals (
+car signals:
+car signals: subscribing
+charge
+cleared
+climate control
+climate unit
+climate2
+close paused at
+close resumed at
+cold starts:
+confirmed=
+control units,
+controller: live (knob, push and press drive the game)
+controller: sent cyclically
+counts/s at
+covered by an HMI popup
+cylinders (MID
+cylinders (counted)
+cylinders (engine unit list)
+cylinders at 0x
+day / night:
+decoded
+destroy handle:
+diag init:
+diagnostic link:
+display:
+display: back (controller pushed left)
+display: in front without the controller, connecting to the renderer again (
+display: no frame taken by the renderer 2 s after showing - the last frame drawn in the HMI too
+display: no mgu-renderd socket - software rendering until it appears
+display: renderer has the app in front again
+display: renderer placement
+display: repaint
+display: software rendering (setting)
+display: the renderer does not have this app in front while its screen shows - drawing in the HMI (journalctl -u mgu-render says why)
+done)
+doom app started
+doom crashed
+doom start
+doom: wasm ready in
+doors:
+driving mode
+dyno run
+eDRIVE needle: drive
+electrical:
+electrical: 12 V from
+electrical: high-voltage battery found (
+electrical: no high-voltage battery unit (
+engine save:
+engine started while driving at
+engine type:
+engine unit poll:
+engine unit: SGBD index
+engine units:
+engine units: SGBD index
+engine units: maker code
+engine units: the second unit (0x13) stopped answering, asking the master for its SGBD index again
+engine: Auto redline
+entry point
+error
+exhaust_control ready (source=
+fast power:
+faults
+faults back at once after the clear:
+first frame drawn
+first render
+flasher lever:
+flashes
+flashes (police)
+found (
+fps sent
+from the profile
+fuel price:
+fuel signal:
+fuel: rate read from the engine unit (
+fuel: the engine unit gives no fuel rate (
+full needle
+gear selection:
+gearbox programme:
+gearbox: EGS
+gearbox: EGS gives no temperature (
+gearbox: EGS has no
+gearbox: diag link:
+gearbox: diagnostic link:
+gearbox: no diagnostic link
+gearbox: signal
+gearbox: signal:
+gearbox: the gearbox unit has no oil temperature identifier: the signal only
+given up)
+has focus again
+has no misfire monitors
+hidden
+hmi visible:
+hud: In Comfort (
+hud: back on
+hud: call state not read:
+hud: cluster-render went away, reconnecting
+hud: cluster_render_client.js is missing from the app
+hud: connected to cluster-render (
+hud: connecting to cluster-render
+hud: demo stopped, the car moved
+hud: directions layer refused by the client
+hud: directions:
+hud: dropped, the car is switching off (state
+hud: hidden in
+hud: layer
+hud: low tyre
+hud: moved to
+hud: no new layer while the car is off or switching on / off (state
+hud: off
+hud: phone
+hud: playing the demo (
+hud: reaction time reset
+hud: refused
+hud: rpm samples every
+hud: scene
+hud: shift after a lift, not used for the reaction time
+hud: shift at
+hud: still ringing after
+hud: tach layer refused by the client
+hud: tach on at
+hud: target
+hud: test layer refused by the client
+hud: test pattern pixels refused
+hud: test pattern up
+hybrid battery unit answers
+identifiers a request
+identifiers answer
+identify
+in use again (driving)
+in use again (user)
+info memory:
+initialized (start reason
+interfaces
+item(s)
+kW, off by
+kW/unit, regen
+kWh: fully electric
+kWh: plug-in hybrid
+knob: live
+knock: bank 2 retard read from the second engine unit (0x13 554C),
+knock: retard read from the engine unit (554C),
+known kept
+l/h ->
+l/h per count/s (spread
+launch: best times forgotten
+layout
+learned data reset from the bar button
+light show ended
+light show:
+light updates
+lights: IterioDev\'s Comfort tool is running, Ambient config stands aside until it is gone
+lights: bus
+lights: holding the writes (
+lights: no answer
+lights: none found
+lights: writing again (
+limiter:
+limiter: learned
+limiter: learned redline forgotten
+link held
+live car data
+live speed
+map entry state
+mapped entry
+min: parked
+misfire counter reset at
+misfire counter: a new driving cycle, the reset is done with
+misfire counter: at 0x
+misfire counter: second engine unit
+missed so far
+ms after
+ms avg /
+ms by
+ms each, queued
+ms early
+ms late
+ms max, poll
+ms on average
+ms per frame
+ms per frame (max
+ms, continuing
+ms, hmi
+nav: directions not started:
+nav: probe on, writing redline-nav.log
+new game: episode
+no 48 V battery: 12 V only
+no RHMI component named
+no battery energy reading (
+no catalog
+no hybrid battery unit: 12 V only
+no needle yet
+no rhmiData/application.json:
+no screens for this start: running in the background
+not a mode,
+not an M car (N63, or an M60i / 760i S68)
+not asked (
+not known (a US-built X5 / X6)
+not on screen
+not read:
+not set: the car\'s ambient light does not answer
+nothing yet
+on (A/C)
+on screen
+open entry state
+own directions
+parked check: speed
+path VIP
+paused for the Strobe tab
+peaks reset
+poll:
+power (
+power distribution
+power gap
+power reads:
+power:
+ratio relearning
+read all
+read all:
+reading:
+readings
+real data from the car:
+redline
+refused (
+registerActive:
+registered active
+render
+renderd error:
+renderd: connected, screen
+renderd: connection closed
+renderd: pixel images need the upstream dialect
+renderd: socket
+requestCBSServiceHint
+requests,
+reset list:
+resettable:
+route without readable turns, BMW\'s directions shown
+rpm per km/h
+run done
+s, the tach back
+sample:
+save ids:
+save runs:
+save screens:
+save signals:
+save trips:
+save units:
+saved
+saved game loaded
+scan done:
+scan failed:
+scan save:
+scan units:
+scan: no replies, stopped
+screen
+screen removed,
+scroll
+seat heating
+seen save:
+service list:
+setMode
+settings
+settings migration:
+settings save:
+settings: HUD "Shows
+sheet
+sheet draw
+shift
+shift.json:
+shiftmap: learned torque curve and ratios forgotten
+shifts
+short TASU frame
+shutdown requested by MainApp
+signals
+signals:
+someone is in the car: our colour again
+speed
+speed signal
+speed:
+starting
+steering wheel
+steps
+still pending after
+still refused
+strobe: body controller
+strobe: body controller light functions (22 D542
+strobe: fitted channels
+strobe: high beam learned on channels
+strobe: no headlight or lamp output control found
+strobe: started with the flasher lever
+strobe: stopped with the flasher lever
+subscribe
+subscribing signals
+the car is in use again
+the car is locked and left: no reads, so it can sleep
+the car is parked: the car\'s own light
+the driver\'s own back
+this unit has no
+times
+times in a row - skipped until woken
+transport busy (
+tries
+trip computer (
+trip ended:
+trip started
+tune detect (BM3):
+tune:
+tune: DME refused 2F
+turn signals:
+twin_dme save:
+two (master 0x12, bank 2 at 0x13)
+tyres: car units: pressure
+tyres: raw
+tyres: the car sends tyre pressures: the TYRES tab and readout offered
+ui: iDrive 8 screens
+unhandled
+units cleared
+unknown type
+values in 30 s
+vehicle state: from
+vehicle state: none from the car, not driven or used for
+visible
+waiting)
+watch:
+widget draw
+widget event:
+widget initialized
+widget loop: png
+widget tapped (
+widget: no component
+widget: this SDK has no start widget support
+without an answer
+xdrive
+xdrive live:
+xdrive live: torque goes to the front axle: an xDrive car
+xdrive-diagnostic
+xdrive:
+xdrive: DBE1
+xdrive: DSC
+xdrive: LMV DB32 qualifier
+xdrive: VIP DB44
+, temperature
+-> accepted=
+: SGBD index
+: no answer 3 rounds, paused 60 s
+UDS <-
+ambient:
+ambient: colour
+ambient: setting colour
+battery holds
+car signals raw:
+car units: pressure
+clear all:
+click
+climate
+demo data on
+doom:
+drive mode
+driving mode:
+fuel:
+hud: directions layer
+identifiers
+limiter: plateau at
+no reply
+not read
+refused
+renderd:
+reset
+save scan:
+scan:
+shiftmap: gear
+signal
+state
+strobe: hold:
+unknown
+UDS ->
+after
+clear
+condition
+controller
+ended
+gearbox:
+image
+knock:
+launch:
+misfire counter:
+no answer
+shiftmap:
+vehicle state:
+widget
+lights:
+target
+save:
+strobe:
+first frame done
+first render:
+error:
+subscribed
+ (UTC)
+ -> MAIN
+ timed out
+-- 20
+ERROR 
+Error: 
+SDK_ERROR 
+Service unavailable for call 
+WARN 
+display: renderer placement {"x":0,"y":0,"w":1920,"h":720
+failed due to { Error: 
+mapped entry 
+promiseWithTimeout: 
+starting 
