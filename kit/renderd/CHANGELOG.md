@@ -1,5 +1,9 @@
 # mgu-render changelog
 
+## Unreleased
+
+- The controller gate (`mgu-inputgate.so`) follows the HMI's knob re-centres. Once an app had held the knob, the gate took the turns made meanwhile off every later knob position for the rest of the HMI's run; when the HMI re-centred the knob (the car woken, the display on or off, a controller overflow) it took 0x7fff as the last position it saw, so the next turn reached it as one jump of about that many detents (seen as the Surround View camera ring cycling on its own, robertnisipeanu/mgu-store#326). The gate drops that offset at each re-centre: the HMI's `rotaryEncoderControl` setter with `frontMidPositionValueSet` = 1, or an overflow event that moves the knob. The position it gives the HMI stays within 0..0xfffe, so it never wraps past 0 / 65535 (a jump of ~65,000 detents to the HMI). Store tool `mgu-inputgate` 1.2.1.
+
 ## idrive7-apps mgu-renderd 2.1.19
 
 - The controller gate's file is emptied when this renderer holds the controller (it was only touched): an empty file holds the whole controller, so part words another renderer may have left behind (mgu-store's mgu-render, with gate 1.2.0) can't make our apps hold only some parts.

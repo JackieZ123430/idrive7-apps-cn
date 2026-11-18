@@ -20,8 +20,18 @@
 // "@mgu-renderd-ccu"), which hands it to the app holding the controller: the app gets exactly
 // what the HMI would have got, even where its own SOME/IP copy doesn't arrive (the VM).
 //
-// The hook: CommonAPI-SomeIP's Connection::handleProxyReceive (every notification for the HMI's
-// proxies passes there; called through the PLT, so the preloaded definition is the one used).
+// The HMI re-centres the knob now and then: it sets FrontCCU's rotaryEncoderControl (setter 3) with
+// frontMidPositionValueSet = 1 (the car woken, the display on or off, ...), or it gets an event
+// with frontOverflowRotaryController = 1 (byte 5) that moves the knob (it takes that step first).
+// Either way the HMI takes 0x7fff as the last position it saw. The offset ends there too: the
+// HMI's position is 0x7fff again, as the knob's.
+// The HMI's position stays within 0..0xfffe (it counts the steps between two positions without
+// wrapping, and 0xffff is "invalid").
+//
+// The hooks: CommonAPI-SomeIP's Connection::handleProxyReceive (every notification for the HMI's
+// proxies passes there; called through the PLT, so the preloaded definition is the one used) and
+// Connection::sendMessageWithReplyAsync (the HMI's setter calls; a virtual whose vtable slot is
+// bound by name, so again the preloaded definition is the one used).
 #include <vsomeip/vsomeip.hpp>   // compat (v2) API, as used by CommonAPI-SomeIP 3.1.12
 
 #include <dlfcn.h>
@@ -44,7 +54,8 @@ namespace {
 
 const char *GATE_FILE = "/run/mgu-renderd/inputgate";
 const long GATE_MS = 700;           // file older than this: gate open (HMI has the controller)
-const uint16_t SVC_CCU = 0xb508, EVT_ROTARY = 0x8002;
+const uint16_t SVC_CCU = 0xb508, EVT_ROTARY = 0x8002, SET_ROTARY_CONTROL = 3;
+const uint16_t KNOB_MID = 0x7fff;    // the knob's position after a re-centre
 // the parts of the controller the gate can hold from the HMI
 const unsigned HOLD_KNOB = 1, HOLD_PRESS = 2, HOLD_TILT = 4, HOLD_ALL = 7;
 
@@ -121,6 +132,14 @@ std::mutex g_mu;
 uint16_t g_offset, g_hmi_pos;
 bool g_have_pos, g_was_closed;
 
+// the HMI re-centred the knob (g_mu held)
+void recentred()
+{
+    g_offset = 0;
+    g_hmi_pos = KNOB_MID;
+    g_have_pos = true;
+}
+
 void filter(const std::shared_ptr<vsomeip::message> &msg)
 {
     if (!msg || msg->get_service() != SVC_CCU || msg->get_method() != EVT_ROTARY) return;
@@ -134,33 +153,70 @@ void filter(const std::shared_ptr<vsomeip::message> &msg)
     unsigned held = gate_held();
     bool knob_held = (held & HOLD_KNOB) != 0;
     std::lock_guard<std::mutex> lk(g_mu);
+    uint16_t hmi_was = g_hmi_pos;
+    bool had_pos = g_have_pos;
     // the knob the HMI's: it moves on from where the HMI last saw it ("invalid" passes as it is)
     if (pos != 0xffff && !knob_held) {
         if (g_was_closed && g_have_pos) g_offset = uint16_t(pos - g_hmi_pos);   // carry on
         g_was_closed = false;
-        g_hmi_pos = uint16_t(pos - g_offset);
+        uint16_t hmi = uint16_t(pos - g_offset);
+        if (g_offset && g_have_pos) {
+            // the real step on from where the HMI is, never past 0 or 0xfffe (the offset follows)
+            int v = g_hmi_pos + int16_t(uint16_t(hmi - g_hmi_pos));
+            if (v < 0 || v > 0xfffe) { v = v < 0 ? 0 : 0xfffe; g_offset = uint16_t(pos - v); }
+            hmi = uint16_t(v);
+        }
+        g_hmi_pos = hmi;
         g_have_pos = true;
     }
     if (!held) {
-        if (pos == 0xffff || !g_offset) return; // nothing to change
-        d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos);
+        if (pos != 0xffff && g_offset) {        // otherwise nothing to change
+            d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos);
+            pl->set_data(d, n);
+        }
+    } else {
+        // closed: the app gets the real event; the HMI: what is held stands still (knob), not pressed, centred
+        forward(d, n);
+        if (knob_held) {
+            g_was_closed = true;
+            if (g_have_pos) { d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos); }
+        } else if (pos != 0xffff && g_offset) {
+            d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos);
+        }
+        if (held & HOLD_PRESS) d[3] = 0;        // not pressed
+        if (held & HOLD_TILT) d[4] = 0;         // centre
         pl->set_data(d, n);
-        return;
     }
-    // closed: the app gets the real event; the HMI: what is held stands still (knob), not pressed, centred
-    forward(d, n);
-    if (knob_held) {
-        g_was_closed = true;
-        if (g_have_pos) { d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos); }
-    } else if (pos != 0xffff && g_offset) {
-        d[1] = uint8_t(g_hmi_pos >> 8); d[2] = uint8_t(g_hmi_pos);
-    }
-    if (held & HOLD_PRESS) d[3] = 0;            // not pressed
-    if (held & HOLD_TILT) d[4] = 0;             // centre
-    pl->set_data(d, n);
+    if (n > 5 && d[5] == 1 && pos != 0xffff && had_pos && g_hmi_pos != hmi_was) recentred();   // overflow
 }
 
+// the HMI re-centres the knob: no offset from here on
+void recentre(const std::shared_ptr<vsomeip::message> &msg)
+{
+    if (!msg || msg->get_service() != SVC_CCU || msg->get_method() != SET_ROTARY_CONTROL) return;
+    std::shared_ptr<vsomeip::payload> pl = msg->get_payload();
+    if (!pl || pl->get_length() < 2 || pl->get_data()[1] != 1) return;   // [1] frontMidPositionValueSet
+    std::lock_guard<std::mutex> lk(g_mu);
+    recentred();
+}
+
+// Connection::sendMessageWithReplyAsync(const Message &, std::unique_ptr<MessageReplyAsyncHandler>,
+// const CallInfo *) const: the handler, passed by value, comes as the address of the caller's copy and
+// is handed on as it is. CommonAPI::SomeIP::Message holds the vsomeip message as its only member.
+typedef bool (*send_async_t)(const void *self, const void *message, void *handler, const void *info);
+send_async_t g_real_send;
+const char SEND_ASYNC[] = "_ZNK9CommonAPI6SomeIP10Connection25sendMessageWithReplyAsyncERKNS0_7MessageESt10unique_ptr"
+    "INS0_15ProxyConnection24MessageReplyAsyncHandlerESt14default_deleteIS7_EEPKNS_8CallInfoE";
+
 }  // namespace
+
+extern "C" bool _ZNK9CommonAPI6SomeIP10Connection25sendMessageWithReplyAsyncERKNS0_7MessageESt10unique_ptrINS0_15ProxyConnection24MessageReplyAsyncHandlerESt14default_deleteIS7_EEPKNS_8CallInfoE(
+    const void *self, const void *message, void *handler, const void *info)
+{
+    if (!g_real_send) g_real_send = reinterpret_cast<send_async_t>(dlsym(RTLD_NEXT, SEND_ASYNC));
+    try { recentre(*static_cast<const std::shared_ptr<vsomeip::message> *>(message)); } catch (...) { }
+    return g_real_send ? g_real_send(self, message, handler, info) : false;
+}
 
 extern "C" void _ZN9CommonAPI6SomeIP10Connection18handleProxyReceiveERKSt10shared_ptrIN7vsomeip7messageEE(
     void *self, const std::shared_ptr<vsomeip::message> &msg)
@@ -176,4 +232,5 @@ __attribute__((constructor)) static void init()
 {
     g_real = reinterpret_cast<handle_proxy_receive_t>(dlsym(RTLD_NEXT,
         "_ZN9CommonAPI6SomeIP10Connection18handleProxyReceiveERKSt10shared_ptrIN7vsomeip7messageEE"));
+    g_real_send = reinterpret_cast<send_async_t>(dlsym(RTLD_NEXT, SEND_ASYNC));
 }
