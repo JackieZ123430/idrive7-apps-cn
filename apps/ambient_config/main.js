@@ -15,8 +15,8 @@
  * Everything goes to the car as it is picked. The lights are driven through the body controller (lights.js); a car
  * whose body controller does not answer keeps BMW's own colours (ambient.js), offered on the Colour tab.
  * It runs from the platform's start (app.json "autostart"): the look and the driving modes work with the app closed.
- * With IterioDev's Comfort tool running (others.js), which writes the same lights, it stands aside (no light writes
- * until Comfort is gone) and the Colour and Animations tabs say so in red and recommend uninstalling it.
+ * With IterioDev's Comfort tool writing the same lights (others.js: its own ambient colour on), it stands aside (no
+ * light writes until that is off or Comfort is gone) and the Colour and Animations tabs say so in red and recommend uninstalling it.
  */
 const mgu = require('./kit/mgu');
 const G = require('./kit/gauges');
@@ -147,11 +147,12 @@ async function background(bg) {
         if (key === 'doorCar') control.carDoorSetting();
     });
     const others = new Others({ log }).start();
-    // IterioDev's Comfort tool writes the same lights: while it runs, ours stand aside (no writes, so the two don't fight
-    // and the lights don't jump), and carry on once it is gone
+    // IterioDev's Comfort tool writes the same lights while its own ambient colour is on: then ours stand aside (no
+    // writes, so the two don't fight and the lights don't jump), and carry on once it is off or gone. Comfort running
+    // for the Seats app alone (its ambient off) leaves the lights to us (others.js).
     const besideComfort = () => {
         lights.hold('comfort', others.comfort);
-        if (others.comfort) log.warn('lights: IterioDev\'s Comfort tool is running, Ambient config stands aside until it is gone');
+        if (others.comfort) log.warn('lights: IterioDev\'s Comfort tool has its ambient on, Ambient config stands aside until it is off or gone');
     };
     others.on('change', besideComfort);
     besideComfort();
@@ -259,8 +260,9 @@ mgu.run({
         const stepHue = (d) => { const c = partColour(look()); return setRgb(S.hsv(S.stepHue(S.hueOf(c.rgb), d), 1, 1)); };
 
         // another ambient app's service writing the same lights: says so in place of the status, wrapped to width w
-        const COMFORT_WARNING = 'IterioDev\'s Comfort tool is running and changes the same lights, so Ambient config has stopped ' +
-            'changing them. Uninstall Comfort in the Store (Installed, Head-unit tools, Comfort) to use Ambient config.';
+        const COMFORT_WARNING = 'IterioDev\'s Comfort tool has its ambient colour on and changes the same lights, so Ambient config ' +
+            'has stopped changing them. Turn its colour and its drive-mode colours off in IterioDev\'s Ambient Light app (the seats ' +
+            'keep working), or uninstall Comfort in the Store (Installed, Head-unit tools, Comfort).';
         // in red, so it is seen: nothing on these tabs reaches the lights while Comfort runs
         function warnOthers(cv, t, x, y, w) {
             const head = cv.textWidth(translate('Another ambient app is running'), 22, { font: 'bold', literal: true }) <= w
