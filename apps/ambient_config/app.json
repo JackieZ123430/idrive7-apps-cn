@@ -2,7 +2,7 @@
   "id": "ambient_config",
   "title": "Ambient config",
   "description": "Any colour on the ambient light, animations, and a look for each driving mode",
-  "version": "2.7.7",
+  "version": "2.7.8",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -137,7 +137,7 @@
     },
     {
       "key": "doorCar",
-      "label": "Open door: the car's own warning (test, G20 / G26)",
+      "label": "Open door: the car's own warning (G20 / G26)",
       "type": "bool",
       "default": false
     },

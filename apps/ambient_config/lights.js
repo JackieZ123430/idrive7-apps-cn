@@ -59,6 +59,7 @@ class Lights extends EventEmitter {
         this.writes = 0; this._times = [];
         this._holds = new Set(); this._idle = [];
         this._cmds = [];               // one-off writes (command()), sent between the lights' writes
+        this._own = new Map();         // carOwn(): key -> test(light), the lights the car drives itself meanwhile
     }
 
     get rate() { const t = this.now(); this._times = this._times.filter((x) => t - x < 3000); return this._times.length / 3; }
@@ -69,7 +70,7 @@ class Lights extends EventEmitter {
     async find() {
         const had = this.lights;
         if (!had.length) { this.state = 'finding'; this.emit('change'); }
-        const found = [];
+        const found = [], silent = [];
         for (let bus = 0; bus < BUSES.length; bus++) {
             const did = BUSES[bus].read;
             let reply = null;
@@ -84,8 +85,9 @@ class Lights extends EventEmitter {
                 await this.sleep(BUSY_MS * (tries + 1));
             }
             const got = reply ? parseStatus(bus, reply) : null;
-            if (got) found.push.apply(found, got);
-            else if (reply) this.log.info('lights: bus ' + (bus + 1) + ' refused (' + reply.map((x) => x.toString(16)).join(' ') + ')');
+            if (got) { found.push.apply(found, got); continue; }
+            silent.push(bus);
+            if (reply) this.log.info('lights: bus ' + (bus + 1) + ' refused (' + reply.map((x) => x.toString(16)).join(' ') + ')');
             else {
                 // silent, or "still working" (7F 22 78) until the wait ran out: which one says what the body module does
                 const how = pending ? pending + ' x "still working" (78), then nothing' : 'nothing at all';
@@ -95,6 +97,13 @@ class Lights extends EventEmitter {
         if (!found.length && had.length) {
             this.log.warn('lights: no answer' + (this.error ? ': ' + this.error : '') + ', the ' + had.length + ' known kept');
             return had;
+        }
+        // a bus that didn't answer this time (refused, busy, the gateway taken) keeps the lights known on it (#169: a
+        // refused bus 1 lost the passenger side's lights until the next start)
+        const kept = had.filter((l) => silent.indexOf(l.bus) >= 0 && !found.some((f) => f.bus === l.bus && f.nad === l.nad));
+        if (kept.length) {
+            this.log.info('lights: bus ' + silent.map((b) => b + 1).join(', ') + ' kept its ' + kept.length + ' known');
+            found.push.apply(found, kept.map((l) => Object.assign({}, l)));
         }
         // a light known already stays the same object (what it shows is kept by it)
         this.lights = found.map((f) => { const k = had.find((l) => l.bus === f.bus && l.nad === f.nad); return k ? Object.assign(k, f) : f; });
@@ -112,6 +121,7 @@ class Lights extends EventEmitter {
     /** What a light shows now. */
     at(light, scene, t) {
         const now = this.now();
+        if (this.carOwns(light)) return null;
         if (this._flash && now < this._flash.until) return { rgb: this._flash.rgb, bright: 100 };
         // the overlay set last wins
         const ov = this._overs ? Array.from(this._overs.values()).reverse().find((o) => o.test(light)) : null;
@@ -134,7 +144,7 @@ class Lights extends EventEmitter {
                 else this.show(scene.then || Object.assign({}, scene, { kind: 'solid' }));
             }, once);
         }
-        this._release = [];
+        this._release = this._ownRelease();
         this._sentNow.clear();
         this._checks = S.moves(scene) ? 0 : 1; this._checkAt = 0; this._checkOff = false;
         if (this.lights.length) this.state = 'ours';
@@ -177,6 +187,21 @@ class Lights extends EventEmitter {
         this._frame = null;
         this._kick();
     }
+
+    /**
+     * carOwn(key, test): the lights test(light) picks are the car's meanwhile (the body module's own open-door warning
+     * runs on them): no colour of ours, and given back now, so the car's shows at once. test null: ours again.
+     */
+    carOwn(key, test) {
+        if (!test) { if (!this._own.delete(key)) return; }
+        else this._own.set(key, test);
+        this._release = this._release.filter((r) => !r.light).concat(this._ownRelease());
+        this._frame = null;
+        this._kick();
+    }
+    carOwns(light) { for (const t of this._own.values()) if (t(light)) return true; return false; }
+    // a give-back for each car-owned light that still has a colour of ours
+    _ownRelease() { return this._own.size ? this.lights.filter((l) => this._last.has(l) && this.carOwns(l)).map((l) => ({ light: l })) : []; }
 
     dim(f) { if (f !== this._dim) { this._dim = f; this._frame = null; this._kick(); } }
     /**

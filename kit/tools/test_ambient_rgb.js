@@ -111,6 +111,14 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     const before = fresh.lights[0];
     await fresh.find();
     ok(saved && saved.length === 6 && fresh.lights[0] === before, 'find(): the lights said (to keep), the known ones the same');
+    // a bus whose read the transport refuses this time keeps the lights known on it (#169: the passenger side was lost)
+    const flaky = { physical: (t, sid, data) => (sid === 0x22 && data[0] === 0xda ? Promise.reject(new Error('transport refused: APP_REQUEST_TEMPORARILY_NOT_ACCEPTED')) : diag.physical(t, sid, data)) };
+    const keepy = new Lights({ diag: flaky, log, known: JSON.parse(JSON.stringify(found)) });
+    let said = null;
+    keepy.on('found', (l) => { said = l; });
+    const kept = await keepy.find();
+    ok(kept.length === 6 && kept.filter((l) => l.bus === 0).length === 2 && said && said.length === 6, 'find: a bus refused this time keeps its known lights');
+    keepy.stop();
     fresh.stop();
     await sleep(100);
     writes.length = 0; lit.forEach((b) => b.forEach((x, i) => { b[i] = [0, 0, 0]; }));
@@ -203,6 +211,19 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     writes.length = 0; await sleep(300);
     ok(writes.length === 0, 'and nothing after');
     refuse = false; asleep = false;
+    // carOwn (the car's own open-door warning on a door's lights): given back at once, no colour of ours meanwhile
+    lights.show(look('solid', { upper: { rgb: [0, 0, 255], bright: 80 }, lower: { rgb: [0, 0, 255], bright: 80 } }));
+    await sleep(150);
+    const door = lights.lights.find((l) => l.bus === 0 && l.nad === 2);
+    writes.length = 0;
+    lights.carOwn('carDoor', (l) => l === door);
+    await sleep(150);
+    const gaveBack = writes.filter((w) => w[0] === 0xda && w[2] === door.nad && w[3] === 0), coloured = writes.filter((w) => w[0] === 0xda && (w[2] === door.nad || w[2] === 0) && w[3] === 1);
+    ok(door && gaveBack.length >= 1 && !coloured.length && lights.at(door) === null, 'carOwn: the light given back at once, no colour of ours on it');
+    writes.length = 0;
+    lights.carOwn('carDoor', null);
+    await sleep(150);
+    ok(writes.some((w) => w[0] === 0xda && (w[2] === door.nad || w[2] === 0) && w[3] === 1), 'carOwn off: our colour on it again');
     lights.stop();
 
     // control: the driver's look, driving modes, favourites
@@ -210,7 +231,8 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     const settings = { get: (k) => values[k], set: (k, v) => { values[k] = v; fns.forEach((f) => f(k, v)); }, onChange: (f) => fns.push(f) };
     const shows = [];
     const fake = { scene: null, overs: {}, show(s) { this.scene = s; shows.push(s); }, carColour() { this.scene = null; shows.push(null); }, dim(f) { this.f = f; }, flash(rgb, ms) { this.flashed = [rgb, ms]; },
-        overlay(k, test, at) { if (test) this.overs[k] = { test, at }; else delete this.overs[k]; } };
+        overlay(k, test, at) { if (test) this.overs[k] = { test, at }; else delete this.overs[k]; },
+        carOwn(k, test) { if (test) this.owns = test; else delete this.owns; } };
     const amb = new EventEmitter(); amb._m = 'comfort'; amb.mode = () => amb._m;
     const c = new Control({ settings, lights: fake, ambient: amb, log });
     c.start();
@@ -332,10 +354,13 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     c.doors(['driver rear']);
     await sleep(5);
     ok(cmds.length === 1 && cmds[0].join() === [0x48, 0x04, 0x24, 4].join() && !fake.overs.doors, 'doorCar: the driver rear door asks the car\'s warning (mode 24), no red blink of ours');
+    ok(fake.owns && fake.owns({ name: 'Driver rear door line' }) && fake.owns({ name: 'Driver rear door line 2' }) && fake.owns({ name: 'Driver rear door handle' })
+        && !fake.owns({ name: 'Driver front door line' }), 'doorCar: that door\'s lights (both strips, the handle) are the car\'s meanwhile');
     c.doors([]); cmds.length = 0; carAnswer = [0x7f, 0x2e, 0x31];
     c.doors(['passenger front']);
     await sleep(5);
     ok(cmds.length === 1 && cmds[0][2] === 0x25 && fake.overs.doors && fake.overs.doors.test(pl(0x0c)), 'doorCar refused: our red blink instead');
+    ok(!fake.owns, 'doorCar refused: the door\'s lights ours again');
     c.doors([]); values.doorCar = undefined; c.carDoorSetting(); delete fake.command;
     delete fake.lights;
     values.turnGlow = undefined; values.doorRed = undefined; c.doors([]); c.turn(null);

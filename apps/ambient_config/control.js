@@ -59,7 +59,7 @@ class Control {
         this.settings = o.settings; this.lights = o.lights; this.ambient = o.ambient; this.log = o.log;
         this._mode = null; this._night = false; this._away = false; this._shown = null; this._flashAt = 0; this._poll = null;
         this._turn = null; this._doors = [];
-        this._carDoors = {}; this._carDoorTimer = null; this._carDoorNo = false;
+        this._carDoors = {}; this._carDoorTimer = null; this._carDoorNo = false; this._carOwn = '';
     }
 
     look() { const l = this.settings.get('look'); return valid(l) ? copy(l) : copy(DEFAULT_LOOK); }
@@ -154,6 +154,13 @@ class Control {
         const want = this.settings.get('doorCar') === true && !this._away && !this._carDoorNo ? this._doors : [];
         Object.keys(this._carDoors).forEach((d) => { if (want.indexOf(d) < 0) delete this._carDoors[d]; });
         want.forEach((d) => { if (!(d in this._carDoors)) { this._carDoors[d] = true; this._sendCarDoor(d, true); } });
+        // the doors' lights (both strips, the handle) are the car's while its warning runs: ours would cover it (#169)
+        const own = Object.keys(this._carDoors).sort().join();
+        if (own !== this._carOwn) {
+            this._carOwn = own;
+            const doors = Object.assign({}, this._carDoors);
+            this.lights.carOwn('carDoor', own ? (l) => !!doors[doorOf(l)] : null);
+        }
         clearTimeout(this._carDoorTimer); this._carDoorTimer = null;
         if (want.length) this._carDoorTimer = setTimeout(() => { want.filter((d) => this._carDoors[d]).forEach((d) => this._sendCarDoor(d, false)); this._carDoor(); }, CAR_DOOR_RENEW_MS);
     }
@@ -164,7 +171,7 @@ class Control {
             if (first || !ok) this.log.info('door warning (car): ' + door + ' ' + (ok ? 'started' : r ? 'refused (' + r.map((x) => x.toString(16)).join(' ') + ')' : 'no answer'));
             if (ok || !(door in this._carDoors)) return;
             // refused or no answer: our own red blink for the doors from now on (until the setting is switched again)
-            this._carDoorNo = true; this._carDoors = {};
+            this._carDoorNo = true; this._carDoors = {}; this._carOwn = ''; this.lights.carOwn('carDoor', null);
             this.log.warn('door warning (car): the body module did not take it, our red blink instead');
             this.signals();
         });
