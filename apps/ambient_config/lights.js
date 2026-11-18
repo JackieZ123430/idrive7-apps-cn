@@ -94,6 +94,15 @@ class Lights extends EventEmitter {
                 this.log.info('lights: bus ' + (bus + 1) + ' no answer after ' + Math.round((this.now() - t0) / 1000) + ' s: ' + how + (this.error ? ' (' + this.error + ')' : ''));
             }
         }
+        // every bus silent: is the body module there at all? One read every module answers (its session, 22 F186),
+        // once a start, says whether the light reads alone go unanswered or nothing reaches it (#197)
+        if (!found.length && silent.length === BUSES.length && !this._probed) {
+            this._probed = true;
+            let r = null, err = null;
+            try { r = await this.diag.physical(BDC, 0x22, [0xf1, 0x86], 5000, echo(0x22, [0xf1, 0x86])); } catch (e) { err = String(e && e.message || e); }
+            this.log.info('lights: the body module itself: ' + (r ? 'answers (' + r.map((x) => x.toString(16)).join(' ') + ')'
+                : 'no answer either' + (err ? ' (' + err + ')' : '')));
+        }
         if (!found.length && had.length) {
             this.log.warn('lights: no answer' + (this.error ? ': ' + this.error : '') + ', the ' + had.length + ' known kept');
             return had;

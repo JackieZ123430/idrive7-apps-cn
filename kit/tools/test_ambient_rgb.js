@@ -119,6 +119,13 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     const kept = await keepy.find();
     ok(kept.length === 6 && kept.filter((l) => l.bus === 0).length === 2 && said && said.length === 6, 'find: a bus refused this time keeps its known lights');
     keepy.stop();
+    // every bus silent: the body module asked once (22 F186) whether it answers at all, the reply logged
+    const said2 = [], probes = [];
+    const deaf = { physical: (t, sid, data) => { if (sid === 0x22 && data[0] === 0xf1) { probes.push(data.slice()); return Promise.resolve([0x62, 0xf1, 0x86, 0x01]); } return Promise.resolve(null); } };
+    const lonely = new Lights({ diag: deaf, log: { info: (m) => said2.push(m), warn: (m) => said2.push(m) } });
+    await lonely.find(); await lonely.find();
+    ok(probes.length === 1 && said2.some((m) => /body module itself: answers \(62 f1 86 1\)/.test(m)), 'every bus silent: the body module asked once if it answers at all');
+    lonely.stop();
     fresh.stop();
     await sleep(100);
     writes.length = 0; lit.forEach((b) => b.forEach((x, i) => { b[i] = [0, 0, 0]; }));
