@@ -75,16 +75,22 @@ class Lights extends EventEmitter {
             let reply = null;
             // "busy, ask again" (7F 22 21: a G21's body module while it drives the lights itself): asked again, a
             // little later each time, rather than taken as a no
+            let pending = 0;
+            const t0 = this.now();
             for (let tries = 0; ; tries++) {
                 reply = null;
-                try { reply = await this.diag.physical(BDC, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000 }); } catch (e) { this.error = String(e && e.message || e); }
+                try { reply = await this.diag.physical(BDC, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000, onPending: () => { pending++; } }); } catch (e) { this.error = String(e && e.message || e); }
                 if (!(reply && reply[0] === 0x7f && reply[2] === 0x21) || tries >= BUSY_TRIES) break;
                 await this.sleep(BUSY_MS * (tries + 1));
             }
             const got = reply ? parseStatus(bus, reply) : null;
             if (got) found.push.apply(found, got);
             else if (reply) this.log.info('lights: bus ' + (bus + 1) + ' refused (' + reply.map((x) => x.toString(16)).join(' ') + ')');
-            else this.log.info('lights: bus ' + (bus + 1) + ' no answer' + (this.error ? ' (' + this.error + ')' : ''));
+            else {
+                // silent, or "still working" (7F 22 78) until the wait ran out: which one says what the body module does
+                const how = pending ? pending + ' x "still working" (78), then nothing' : 'nothing at all';
+                this.log.info('lights: bus ' + (bus + 1) + ' no answer after ' + Math.round((this.now() - t0) / 1000) + ' s: ' + how + (this.error ? ' (' + this.error + ')' : ''));
+            }
         }
         if (!found.length && had.length) {
             this.log.warn('lights: no answer' + (this.error ? ': ' + this.error : '') + ', the ' + had.length + ' known kept');

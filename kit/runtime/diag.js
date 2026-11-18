@@ -151,6 +151,7 @@ class Diag extends EventEmitter {
                 if (f.ecu !== target) return;
                 if (f.uds[0] === 0x7F && f.uds[2] === 0x78) {      // response pending: never the reply itself
                     if (f.uds[1] !== sid) return;                       // another request's (another app's) 78
+                    if (opts && opts.onPending) opts.onPending();        // (the caller counts them: a log can say it)
                     clearTimeout(t);
                     t = setTimeout(() => finish(null), opts && opts.pendingTimeoutMs || 10000);
                     return;
