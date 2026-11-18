@@ -160,7 +160,9 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     writes.length = 0;
     lights.show(look('rainbow'));
     await sleep(60);
-    ok(writes.length >= 2 && writes.slice(0, 2).every((w) => w[2] === 0 && w.slice(5, 8).join() === writes[0].slice(5, 8).join()), 'rainbow: the whole car one colour, 2 writes a frame');
+    // (from the rainbow's first write: the breathing's write under way at the switch may land first)
+    const rw = writes.slice(Math.max(0, writes.findIndex((w) => w[2] === 0)));
+    ok(rw.length >= 2 && rw.slice(0, 2).every((w) => w[2] === 0 && w.slice(5, 8).join() === rw[0].slice(5, 8).join()), 'rainbow: the whole car one colour, 2 writes a frame');
     writes.length = 0;
     lights.show(look('wave'));
     await sleep(100);
@@ -399,6 +401,31 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
         await sleep(100);
         ok(writes.length > 0 && !lh.held, 'let go: the scene is written again (' + writes.length + ' writes)');
         lh.stop && lh.stop();
+        await sleep(50);
+    }
+
+    // after a blink longer than its renewal (the other lights renewed with the blink's 5 s hold), the still colour is
+    // renewed before those 5 s run out, not 40 s later (the car's own colour in between, #197)
+    {
+        let clock = 1e6;
+        const hw = [];
+        const hdiag = { physical: async (t, sid, data) => {
+            await sleep(1);
+            if (sid === 0x22) return diag.physical(t, sid, data);
+            hw.push({ at: clock, on: data[3] }); return [0x6e, data[0], data[1]];
+        } };
+        const lc = new Lights({ diag: hdiag, log, now: () => clock, checkMs: 40 });
+        await lc.find();
+        lc.show(look('solid', { upper: { rgb: [0, 0, 255], bright: 80 }, lower: { rgb: [0, 0, 255], bright: 80 } }));
+        await sleep(200); clock += 1000; await sleep(200);
+        lc.overlay('doors', (x) => x.bus === 0 && x.nad === 1, (t, on) => (on ? { rgb: [255, 0, 0], bright: 100 } : { rgb: [0, 0, 0], bright: 0 }));
+        for (let i = 0; i < 60; i++) { await sleep(15); clock += 100; }
+        lc.overlay('doors', null);
+        await sleep(200);
+        const end = clock; hw.length = 0;
+        for (let i = 0; i < 10; i++) { clock += 500; lc._kick(); await sleep(100); }
+        ok(hw.some((w) => w.on === 1 && w.at - end < 5000), 'after a blink: the still colour renewed before the blink\'s 5 s hold runs out');
+        lc.stop();
         await sleep(50);
     }
 

@@ -255,10 +255,12 @@ class Lights extends EventEmitter {
             }
             while (this._frame.todo.length) {
                 const it = this._frame.todo.shift();
-                const due = it.need.some((l) => { const had = this._last.get(l); return !same(it.want, had) || now - had.at > renew; });
+                // renewed in time for its hold, which may be a shorter one than now's (#197: a blink's writes hold 5 s,
+                // and the still colour after it was renewed only after 40 s: the car's own colour in between)
+                const due = it.need.some((l) => { const had = this._last.get(l); return !same(it.want, had) || now - had.at > Math.min(renew, had.hold * 1000 - 2000); });
                 if (!due) continue;
                 this._frame.wrote = true;
-                return { lights: it.lights, want: it.want, frame: writeFrame(it.lights[0].bus, it.nad, it.want.rgb, it.want.bright, hold) };
+                return { lights: it.lights, want: it.want, hold, frame: writeFrame(it.lights[0].bus, it.nad, it.want.rgb, it.want.bright, hold) };
             }
         }
         return null;
@@ -356,7 +358,7 @@ class Lights extends EventEmitter {
                     if (w.off && w.r.bus !== undefined && !w.r.again && this._gave.indexOf(w.r.bus) < 0) this._gave.push(w.r.bus);
                     w.lights.forEach((l) => {
                         if (w.off) { this._last.delete(l); return; }
-                        this._last.set(l, { rgb: w.want.rgb, bright: w.want.bright, at: this.now() });
+                        this._last.set(l, { rgb: w.want.rgb, bright: w.want.bright, at: this.now(), hold: w.hold });
                         this._sentNow.add(l);
                     });
                     if (this.error) { this.error = null; this.emit('change'); }
