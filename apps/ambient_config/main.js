@@ -172,9 +172,10 @@ async function background(bg) {
     strobe.on('learned', (c) => { try { if (chFile) fs.writeFileSync(chFile, JSON.stringify(c)); } catch (e) { log.warn('strobe: ' + e); } });
     const findStrobe = () => { if (settings.get('strobe') === true && !strobe.kind) strobe.find().catch((e) => log.warn('strobe: ' + e)); };
     findStrobe();
-    // the flasher lever (lever.js): a short pull while parked (also while driving with strobeLeverDriving, for private
-    // property) starts the strobe as the Strobe page has it, while its Lever start is on (off until switched on), and another pull while it flashes stops it; the
-    // light status read only from then on
+    // the flasher lever (lever.js): three quick pulls while parked (also while driving with strobeLeverDriving, for
+    // private property) start the strobe as the Strobe page has it, while its Lever start is on (off until switched on),
+    // and three more while it flashes stop it; the light status read only from then on, 10 times a second (a quick pull
+    // is shorter than a slower read)
     const lever = new Lever();
     let leverWatch = null;
     const watchLever = () => {
@@ -183,7 +184,7 @@ async function background(bg) {
             statusLightStatus: (v) => {
                 const t = Date.now();
                 if (!lever.beam(beamOf(v && v.statusMainBeam_headlightFlasher), t)) return;
-                // a pull while the strobe flashes stops it (however it was started; stopping needs no checks)
+                // three pulls while the strobe flashes stop it (however it was started; stopping needs no checks)
                 if (strobe.running === 'strobe') {
                     lever.cool(t);
                     log.info('strobe: stopped with the flasher lever');
@@ -197,7 +198,7 @@ async function background(bg) {
                 log.info('strobe: started with the flasher lever');
                 strobe.start(strobeOptions(settings, strobe)).catch((e) => log.warn('strobe: ' + e));
             },
-        }, log, { pollMs: 500 })).catch((e) => { leverWatch = null; log.warn('flasher lever: ' + (e && e.message || e)); });
+        }, log, { pollMs: 100 })).catch((e) => { leverWatch = null; log.warn('flasher lever: ' + (e && e.message || e)); });
     };
     watchLever();
     settings.onChange((key) => {
@@ -459,7 +460,7 @@ mgu.run({
                 cv.text(label + (!ok && why ? ' · ' + why : ''), 70, y, 20, ok ? t.text : t.dim);
             });
             cv.text('Only for use on private property.', 44, 222, 20, t.warn, { font: 'bold' });
-            // a short pull of the flasher lever while parked starts it (lever.js), only while this is on
+            // three quick pulls of the flasher lever while parked start it, three more stop it (lever.js), only while this is on
             const lever = settings.get('strobeLever') === true;
             G.button(cv, t, 520, 190, 220, 42, lever ? 'Lever start: On' : 'Lever start: Off', () => { settings.set('strobeLever', !lever); return redraw(); },
                 { primary: lever, key: 'strobe-lever', busy: !strobe });
