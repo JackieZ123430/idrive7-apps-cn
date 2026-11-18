@@ -88,7 +88,7 @@ def main(args):
             files.append(a)
     if not files:
         sys.exit(__doc__)
-    logs = {}                                  # app version -> {page: text}, pages
+    logs = {}                                  # (app version, pages, page 1's text) -> {page: text}
     for f in files:
         try:
             got = [p for p in (page(c) for c in codes(f)) if p]
@@ -98,9 +98,13 @@ def main(args):
         if not got:
             print('# %s: no QR log code found' % f, file=sys.stderr)
         for app, n, of, text in got:
-            entry = logs.setdefault((app, of), {})
-            entry[n] = text
-    for (app, of), pages in logs.items():
+            # photos of the QR log at different times are different logs (their page 1s differ): kept apart.
+            # A page other than 1 joins the log it was photographed with (the same app, version and page count).
+            key = (app, of, text if n == 1 else None)
+            if n != 1:
+                key = next((k for k in logs if k[:2] == (app, of) and n not in logs[k]), key)
+            logs.setdefault(key, {})[n] = text
+    for (app, of, _), pages in logs.items():
         missing = [str(i) for i in range(1, of + 1) if i not in pages]
         print('# %s, %d of %d pages%s' % (app, len(pages), of, ', missing: ' + ', '.join(missing) if missing else ''))
         for i in sorted(pages, reverse=True):      # page 1 is the newest: printed last, so the log reads in time order
