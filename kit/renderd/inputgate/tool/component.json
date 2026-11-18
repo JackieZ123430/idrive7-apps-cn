@@ -1,7 +1,7 @@
 {
   "id": "mgu-inputgate",
   "kind": "tool",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "title": "Controller gate",
   "description": "Lets the apps have the iDrive controller (tabs, page buttons, settings, Doom); loads into the HMI at the next start (iDrive 7 and iDrive 8)",
   "mguHmi": ["ID7", "ID8"],
