@@ -11,7 +11,8 @@
  *                    choose(c)         c = [key, fav] or null (an empty gauge)
  *                    layouts, layout   [{ id, name }], the screen's; setLayout(id)
  *                    remove()          (optional) removes the screen
- *   priceSheet(o)  the fuel price: the knob 0.10 a step, buttons 1.00 / 0.10 / 0.01. o:
+ *   priceSheet(o)  the fuel price: buttons 10 / 1.00 / 0.10 / 0.01, the knob a step that fits the price (0.10
+ *                  under 20, 1 under 200, else 10: HUF, CZK or JPY prices in hundreds). o:
  *                    price(), nudge(by), keep(), currency()
  *
  * Both: a finger drags the list (scroll / release), the knob moves the choice (move), press takes it,
@@ -113,7 +114,8 @@ function valueSheet(o) {
 }
 
 function priceSheet(o) {
-    const steps = [[-1, '-1.00'], [-0.1, '-0.10'], [-0.01, '-0.01'], [0.01, '+0.01'], [0.1, '+0.10'], [1, '+1.00']];
+    const steps = [[-10, '-10'], [-1, '-1.00'], [-0.1, '-0.10'], [-0.01, '-0.01'], [0.01, '+0.01'], [0.1, '+0.10'], [1, '+1.00'], [10, '+10']];
+    const knob = () => (o.price() < 20 ? 0.1 : o.price() < 200 ? 1 : 10);
     const keep = () => { o.keep(); return 'close'; };
     return {
         title: 'Fuel price',
@@ -122,7 +124,7 @@ function priceSheet(o) {
             r.text('FUEL PRICE', 800, 104, 24, t.dim, { align: 'center', font: 'bold', spacing: 2 });
             r.text(o.price().toFixed(2), 800, 232, 120, t.text, { align: 'center', font: 'num' });
             r.text(o.currency() + ' a litre', 800, 278, 26, t.dim, { align: 'center' });
-            const targets = [], bw = 200, gap = 16, x0 = 800 - (steps.length * bw + (steps.length - 1) * gap) / 2, by = 318;
+            const targets = [], bw = 168, gap = 12, x0 = 800 - (steps.length * bw + (steps.length - 1) * gap) / 2, by = 318;
             steps.forEach(([d, label], i) => {
                 const bx = x0 + i * (bw + gap);
                 r.roundRect(bx, by, bw, 64, 32, withAlpha('#ffffff', 0.08));
@@ -134,10 +136,11 @@ function priceSheet(o) {
             r.roundRect(kx, ky, kw, 64, 32, withAlpha(t.sel || t.accent, 0.9));
             r.text('KEEP', 800, ky + 43, 28, '#ffffff', { align: 'center', font: 'bold', spacing: 1.5 });
             targets.push({ x: kx, y: ky, w: kw, h: 64, act: keep });
-            r.text('Knob: ±0.10  ·  press: keep  ·  this trip, and trips that had no price, follow it; the others keep theirs', 800, 500, 20, t.dim, { align: 'center' });
+            const k = knob();
+            r.text('Knob: ±' + (k < 1 ? k.toFixed(2) : k) + '  ·  press: keep  ·  this trip, and trips that had no price, follow it; the others keep theirs', 800, 500, 20, t.dim, { align: 'center' });
             return targets;
         },
-        move(d) { o.nudge(d * 0.1); },
+        move(d) { o.nudge(d * knob()); },
         press: keep,
         back: keep,
         top() { return true; },

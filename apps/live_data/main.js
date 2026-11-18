@@ -836,12 +836,13 @@ mgu.run({
         }
         /** the fuel price */
         const nudgePrice = (by) => { tc.setPrice(Math.min(999, Math.max(0, tc.price + by))); changed(); };
-        function openPrice() {
-            openSheet(PICK.priceSheet({
-                price: () => tc.price, nudge: nudgePrice, currency,
-                keep: () => { saveTrips(); log.info('fuel price: ' + tc.price.toFixed(2) + ' ' + currency()); buttons(); },
-            }));
-        }
+        const priceSheet = () => PICK.priceSheet({
+            price: () => tc.price, nudge: nudgePrice, currency,
+            keep: () => { saveTrips(); log.info('fuel price: ' + tc.price.toFixed(2) + ' ' + currency()); buttons(); },
+        });
+        function openPrice() { openSheet(priceSheet()); }
+        // also in Settings (#204: the Trips page's button was easy to miss)
+        if (ctx.settingsRow) ctx.settingsRow({ label: 'Fuel price', value: () => (tc.price ? tc.price.toFixed(2) + ' ' + currency() + ' a litre' : 'Not set'), open: priceSheet });
         // a sheet the kit doesn't draw (no renderer that runs the screen): on the page, the knob drives it
         let inline = null, picker = null;
         const pickerItems = () => (picker ? picker.listed().map((it) => item(it.key, it.fav)) : []);
