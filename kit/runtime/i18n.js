@@ -21,6 +21,7 @@ const PLURAL_RULES = {
     },
     'zh-CN': () => 0,
     ko: () => 0,
+    es: (n) => (n === 1 ? 0 : 1),
 };
 function plural(n, one, other, lang) {
     const key = one + '|' + other, lng = lang || language;
@@ -33,6 +34,17 @@ const folded = Object.create(null);
 Object.keys(dict).forEach((key) => { folded[key.toLowerCase()] = dict[key]; });
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const phrases = Object.keys(dict).filter((s) => s.length >= 4 && s.indexOf('|') < 0).sort((a, b) => b.length - a.length);
+// Spanish: a text found only through a key of another case takes the case the English draws it in:
+// "HARDEST STOP" by "Hardest stop" stays uppercase, "Dial" by "dial" starts with a capital, "shifts" in
+// a sentence by "Shifts" starts small (unless the translation starts with an acronym such as HUD).
+// Other catalogs keep their own case.
+function caseLike(word, text) {
+    if (language !== 'es' || !text) return text;
+    if (/[A-Z]/.test(word) && word === word.toUpperCase()) return text.toUpperCase();
+    if (/^[A-Z]/.test(word)) return text.charAt(0).toUpperCase() + text.slice(1);
+    if (/^[a-z]/.test(word) && /^.\p{Ll}/u.test(text)) return text.charAt(0).toLowerCase() + text.slice(1);
+    return text;
+}
 const pattern = new RegExp('(^|[^A-Za-z0-9_./])(' + phrases.map(escape).join('|') + ')(?=$|[^A-Za-z0-9_./])', 'gi');
 function t(value) {
     const s = String(value == null ? '' : value);
@@ -46,7 +58,7 @@ function t(value) {
     if (Object.prototype.hasOwnProperty.call(dict, key)) {
         out = s.slice(0, s.indexOf(key)) + dict[key] + s.slice(s.indexOf(key) + key.length);
     } else if (Object.prototype.hasOwnProperty.call(folded, key.toLowerCase())) {
-        out = s.slice(0, s.indexOf(key)) + folded[key.toLowerCase()] + s.slice(s.indexOf(key) + key.length);
+        out = s.slice(0, s.indexOf(key)) + caseLike(key, folded[key.toLowerCase()]) + s.slice(s.indexOf(key) + key.length);
     } else {
         // Short words need context: "min 70" is a minimum, "12 min" is minutes.
         // Keep numeric battery capacity values/units while removing the English "of".
@@ -54,8 +66,13 @@ function t(value) {
             language === 'zh-CN' ? s.replace(/\bmin(?=\s+-?\d)/g, '最小').replace(/\bmax(?=\s+-?\d)/g, '最大')
             .replace(/\bAVG(?=\s+[+-]?\d)/g, '平均').replace(/\bACC\b/g, '加速') :
             language === 'ru' ? s.replace(/\bmin(?=\s+-?\d)/g, 'мин.').replace(/\bmax(?=\s+-?\d)/g, 'макс.')
-                .replace(/\bAVG(?=\s+[+-]?\d)/g, 'СРЕД.').replace(/\bACC\b/g, 'РАЗГОН') : s;
-        out = out.replace(pattern, (_, before, word) => before + (dict[word] || folded[word.toLowerCase()]));
+                .replace(/\bAVG(?=\s+[+-]?\d)/g, 'СРЕД.').replace(/\bACC\b/g, 'РАЗГОН') :
+            language === 'es' ? s.replace(/\bmin(?=\s+-?\d)/g, 'mín.').replace(/\bmax(?=\s+-?\d)/g, 'máx.')
+                .replace(/\bAVG(?=\s+[+-]?\d)/g, 'MED.').replace(/\bACC\b/g, 'ACEL.')
+                // "2 of 3" -> "2 de 3"; "5 min ago" (or a number before a translated "min atrás") -> "hace 5 min"
+                .replace(/(\d) of (?=[~\d])/g, '$1 de ')
+                .replace(/(\d+) ?(s|m|min|h|days|días) (?:ago|atrás)\b/g, (_, n, u) => 'hace ' + n + ' ' + ({ m: 'min', days: 'días' }[u] || u)) : s;
+        out = out.replace(pattern, (_, before, word) => before + (dict[word] || caseLike(word, folded[word.toLowerCase()])));
     }
     if (cache.size >= 2048) cache.clear();
     cache.set(s, out);

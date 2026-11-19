@@ -682,9 +682,21 @@ def build(app_id, language='en', preview_only=False):
             p = os.path.join(src, 'javascript', 'kit', 'locales', name)
             if os.path.exists(p):
                 os.remove(p)
+    if language != 'es':
+        # the Spanish catalog only in Spanish packages: the others keep main's file set
+        for name in ('es.json', 'es.tsv'):
+            p = os.path.join(src, 'javascript', 'kit', 'locales', name)
+            if os.path.exists(p):
+                os.remove(p)
     if language == 'ru':
         shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'cyrillic-ru.json'),
                     os.path.join(src, 'javascript', 'kit', 'fonts', 'cyrillic.json'))
+    if language == 'es':
+        # The Latin atlases with the Spanish letters added (kit/tools/bake_spanish.py); their own cacheKey
+        # keeps them apart from an English app's atlases in the shared renderer.
+        for name in ('label.json', 'bold.json', 'light.json', 'num.json'):
+            shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'es', name),
+                        os.path.join(src, 'javascript', 'kit', 'fonts', name))
     if language == 'ko':
         # Korean and Chinese are separate fixed-language packages. Loading both large
         # atlases could fragment the renderer's two 1024x4096 glyph shelves.
@@ -809,7 +821,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--language', type=normalize_language, choices=languages(), default='en',
-                        help='UI language; Korean also accepts ko-KR, ko-kr and ko_KR')
+                        help='UI language; Korean also accepts ko-KR, ko-kr and ko_KR, Spanish es-ES and es_ES')
     parser.add_argument('--preview-only', action='store_true', help='stage an offline preview without BMW SDK or installable archives')
     parser.add_argument('apps', nargs='*')
     args = parser.parse_args()

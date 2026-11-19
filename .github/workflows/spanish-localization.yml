@@ -1,0 +1,33 @@
+name: Spanish localization
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spanish-localization-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spanish-tests:
+    name: Spanish translations and fonts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Spanish catalog matches editable TSV
+        run: |
+          python3 kit/tools/sync_locales.py es
+          git diff --exit-code -- kit/runtime/locales/es.json
+      - name: Check Spanish menus, font coverage and runtime
+        run: cd kit/tools && python3 test_es.py

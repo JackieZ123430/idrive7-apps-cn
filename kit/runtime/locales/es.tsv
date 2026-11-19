@@ -1,0 +1,2608 @@
+# English<TAB>Español. Solo el texto que se ve; los campos del protocolo y los valores de los ajustes no cambian.
+M Vitals	M Vitals
+Redline	Redline
+Rev scale up to	Escala de rpm hasta
+Virtual Dyno	Banco virtual
+Brake Test	Prueba de frenos
+Drag Timer	Cronómetro drag
+G-Force	Fuerza G
+Warm-Up	Calentamiento
+Fault Scanner	Escáner de averías
+eDrive	eDrive
+Service	Mantenimiento
+Doom	Doom
+Settings	Ajustes
+Version	Versión
+Next page	Página siguiente
+Previous page	Página anterior
+Next item	Siguiente
+Details	Detalles
+Read now	Leer ahora
+Scan now	Escanear ahora
+Scan again	Volver a escanear
+Clear all	Borrar todo
+Reset max	Borrar máx.
+Reset run	Borrar pasada
+Cancel run	Cancelar pasada
+Yes, clear	Sí, borrar
+Clear log	Borrar registro
+Delete all	Borrar todo
+Reset best	Borrar récord
+Current	Actual
+Incl. history	Incl. historial
+Start page	Página de inicio
+Engine	Motor
+Engine torque	Par motor
+Chassis	Chasis
+Thermals	Temperaturas
+Fuel & ignition	Combustible y encendido
+Colour theme	Tema de color
+M Red	M Red
+M Tricolour	M Tricolour
+Ice White	Ice White
+Night Amber	Night Amber
+Demo data	Datos demo
+Auto	Auto
+Always	Siempre
+Never	Nunca
+On	Activado
+Off	Desactivado
+Yes	Sí
+No	No
+Show	Mostrar
+Hide	Ocultar
+Auto (first that works)	Auto (el primero que funcione)
+Auto (learned)	Auto (aprendido)
+Hide (RWD)	Ocultar (propulsión)
+No (12 V only)	No (solo 12 V)
+Speed unit	Unidad de velocidad
+Speed display rate	Refresco de velocidad
+Speed	Velocidad
+Power unit	Unidad de potencia
+Torque unit	Unidad de par
+Temperature unit	Unidad de temperatura
+Pressure unit	Unidad de presión
+Boost gauge max	Escala máx. de turbo
+Distance unit	Unidad de distancia
+Temperature	Temperatura
+Celsius	Celsius
+Fahrenheit	Fahrenheit
+Units	Unidades
+metres	metros
+feet	pies
+miles	millas
+1/4 mile	1/4 de milla
+1/8 mile	1/8 de milla
+Renderer	Renderizado
+GPU 60 fps (default)	GPU 60 fps (por defecto)
+GPU 60 fps	GPU 60 fps
+Software	Software
+Screen layout	Diseño de pantalla
+Full screen	Pantalla completa
+Standard	Estándar
+Peak hold	Mantener pico
+Peak hold (0 = until reset)	Mantener pico (0 = hasta borrar)
+Show peak markers	Mostrar marcas de pico
+Max power (100% on sport display)	Pot. máx. (100% en el indicador Sport)
+Power from	Potencia según
+Sport display	Indicador Sport
+Torque x rpm	Par x rpm
+Oil temp warning	Aviso de temp. aceite
+Boost	Turbo
+Boost from	Turbo según
+Engine unit (OBD)	Unidad del motor (OBD)
+Gearbox oil temperature	Temperatura del aceite del cambio
+Gearbox temperature (EGS)	Temperatura del cambio (EGS)
+Gearbox oil is warm at	Aceite del cambio caliente desde
+GEARBOX	CAMBIO
+GEARBOX READY IN	CAMBIO LISTO EN
+GEARBOX WARMING UP	CALENTANDO CAMBIO
+GEARBOX HOT - EASE OFF	CAMBIO CALIENTE - AFLOJA
+Tyre card	Tarjeta de neumáticos
+Tyre temperatures	Temperaturas de neumáticos
+xDrive card	Tarjeta xDrive
+Intake air temperature	Temperatura del aire de admisión
+High pressure fuel	Combustible alta presión
+Low pressure fuel	Combustible baja presión
+Ignition timing	Avance de encendido
+Misfire counter	Contador de fallos de encendido
+Cold rev limit	Límite de rpm en frío
+Cold-engine rev guard	Protección de rpm en frío
+Oil warm at	Aceite caliente a
+Shift point before redline	Punto de cambio antes de la línea roja
+Blink and flash at shift point	Parpadeo y destello en el punto de cambio
+Shift light style	Estilo del indicador de cambio
+M (green-yellow-red)	M (verde-amarillo-rojo)
+Race (green-red-blue)	Carreras (verde-rojo-azul)
+Theme colour	Color del tema
+Weight with driver + fuel	Peso con conductor + combustible
+Body shape (air drag)	Carrocería (resistencia al aire)
+Coupe / sedan	Coupé / berlina
+Touring / hatch	Touring / compacto
+SUV	SUV
+Drivetrain loss	Pérdidas de transmisión
+Graph up to	Gráfica hasta
+Overlay ECU torque	Superponer par de la ECU
+Baseline	Referencia
+Tests	Pruebas
+Distance split	Parcial de distancia
+One-foot rollout	Rollout de un pie
+Circle size	Escala del círculo
+G-force display rate	Refresco de la fuerza G
+Trail length	Longitud de la estela
+Swap left / right	Invertir izq. / dcha.
+Counts as hard braking above	Frenada fuerte a partir de
+Oil is warm at	Aceite caliente desde
+Coolant is warm at	Refrigerante caliente desde
+Rev limit when cold	Límite de revol. en frío
+Turbo cool-down after hard driving	Enfriar turbo tras conducción intensa
+Hybrid system	Sistema híbrido
+Battery size when new (gross)	Capacidad bruta de la batería nueva
+Electric range when full, 20 °C	Autonomía eléctrica con carga completa, 20 °C
+Engine starts at	El motor arranca al
+Electricity price	Precio de la electricidad
+Read charge every	Leer la carga cada
+Read battery health every	Leer la salud de la batería cada
+Diagnostics page	Página de diagnóstico
+Diagnostics page (UDS replies)	Página de diagnóstico (respuestas UDS)
+Scan when opened	Escanear al abrir
+Faults to read	Averías a leer
+Also read info memory	Leer también la memoria de información
+Play	Jugar
+Continue	Continuar
+New game	Nueva partida
+Back up	Retroceder
+Turn left	Girar izq.
+Turn right	Girar dcha.
+Walk left	Andar izq.
+Walk right	Andar dcha.
+Walk	Andar
+Stand	Quieto
+Weapon	Arma
+Move speed	Vel. de movimiento
+Slow walk (easiest to steer)	Andar despacio (más fácil de manejar)
+Run	Correr
+Aim speed (controller turn)	Vel. de apuntado (giro del mando)
+Slow	Lento
+Normal	Normal
+Fast	Rápido
+Aim direction	Dirección de apuntado
+Reversed	Invertida
+Difficulty (new game)	Dificultad (nueva partida)
+I'm too young to die	Soy muy joven para morir
+Too young to die	Muy joven para morir
+Hey, not too rough	Eh, no tan fuerte
+Not too rough	No tan fuerte
+Hurt me plenty	Hazme mucho daño
+Ultra-Violence	Ultraviolencia
+Nightmare!	¡Pesadilla!
+Episode (new game)	Episodio (nueva partida)
+1: Outpost Outbreak	1: Outpost Outbreak
+2: Military Labs	2: Military Labs
+3: Event Horizon	3: Event Horizon
+4: Double Impact	4: Double Impact
+Render resolution	Resolución de render
+Full: 1920 x 504, every screen pixel	Completa: 1920 x 504, todos los píxeles de la pantalla
+Medium: 1440 x 378	Media: 1440 x 378
+Low: 960 x 252	Baja: 960 x 252
+DEMO	DEMO
+EST.	APROX.
+OK	OK
+READY	LISTO
+Ready	Listo
+Oil	Aceite
+OIL	ACEITE
+Coolant	Refrigerante
+COOLANT	REFRIGERANTE
+WATER	AGUA
+RPM	RPM
+SPEED	VELOCIDAD
+POWER	POTENCIA
+TORQUE	PAR
+PEAK	MÁX.
+PEAK POWER	POTENCIA MÁX.
+PEAK TORQUE	PAR MÁX.
+PEAK DECEL	DECEL. MÁX.
+DECEL g	DECEL. g
+FROM	DESDE
+WHEN	CUÁNDO
+DATE	FECHA
+STATUS	ESTADO
+VALUE	VALOR
+READ	LEÍDO
+REPLY	RESPUESTA
+DECODED	DECODIF.
+TEMP	TEMP.
+ADDED	AÑADIDO
+COST	COSTE
+LEARNED	APRENDIDO
+FULL	CARGADA
+RANGE	AUTON.
+ENERGY	ENERGÍA
+ALL TIME	HISTÓRICO
+THIS MONTH	ESTE MES
+FROM - TO	DE - A
+WITH ENGINE	CON MOTOR
+LAST CHARGE	ÚLTIMA CARGA
+IN THE BATTERY NOW	AHORA EN LA BATERÍA
+HV BATTERY	BATERÍA AT
+OUTSIDE	EXTERIOR
+CHARGING	CARGANDO
+CLIMATE ON	CLIMA ENCENDIDO
+CLIMATE & ON-BOARD	CLIMA Y RED DE A BORDO
+CLIMATE OFF · ON-BOARD	CLIMA APAGADO · RED DE A BORDO
+CLIMATE OFF  ·  ON-BOARD	CLIMA APAGADO  ·  RED DE A BORDO
+ENGINE ON  ·  battery	MOTOR ENCENDIDO  ·  batería
+CHARGING  (engine / DC-DC running)	CARGANDO  (motor / DC-DC en marcha)
+KWH PER DAY, 14 DAYS	KWH POR DÍA, 14 DÍAS
+Engine oil	Aceite del motor
+Engine speed	Régimen del motor
+Gearbox oil	Aceite del cambio
+Gearbox (EGS)	Cambio (EGS)
+Ambient	Ambiente
+Intake air (IAT)	Aire de admisión (IAT)
+Intake air above outside	Admisión sobre exterior
+Ignition timing (before TDC)	Avance de encendido (APMS)
+Misfires	Fallos de encendido
+Tyres	Neumáticos
+Power	Potencia
+Torque	Par
+G-force	Fuerza G
+Front	Delante
+FRONT	DELANTE
+Rear	Detrás
+FL	DI
+FR	DD
+RL	TI
+RR	TD
+2WD	2WD
+4WD	4WD
+2WD mode	Modo 2WD
+4WD Sport	4WD Sport
+Sand	Arena
+DERATED / OFF	LIMITADO / OFF
+Power (torque x rpm)	Potencia (par x rpm)
+last 5 min	últimos 5 min
+this drive	este trayecto
+engine temperatures	temperaturas del motor
+heat soak	calor acumulado
+needs IAT + outside temperature	necesita IAT + temperatura exterior
+not available on this car	no disponible en este coche
+no data	sin datos
+no data from the car	sin datos del coche
+no target	sin objetivo
+no diagnostic link	sin conexión de diagnóstico
+no reading from the engine unit	sin lectura de la unidad del motor
+No data from the engine unit yet	Aún no hay datos de la unidad del motor
+Values show up here once the car answers. Settings: set one to Show to keep it on screen.	Los valores aparecen aquí cuando responde el coche. Ajustes: pon uno en Mostrar para dejarlo en pantalla.
+diagnostic link down	conexión de diagnóstico caída
+reading...	leyendo...
+engine unit: reading...	unidad del motor: leyendo...
+not changing	sin cambios
+no boost from the sport display	sin presión de turbo del indicador Sport
+all-wheel drive detected	tracción total detectada
+car sends no torque split	el coche no envía el reparto de par
+transfer case	caja de transferencia
+transfer case, estimated	caja de transferencia, estimado
+transfer case: clutch open	caja de transferencia: embrague abierto
+(transfer case)	(caja de transferencia)
+target	objetivo
+max	máx.
+min	min
+engine off	motor apagado
+Cyl	Cil.
+cylinders (counted)	cilindros (contados)
+cylinders (engine unit list)	cilindros (lista de la unidad del motor)
+car sends	el coche envía
+sport display sends	el indicador Sport envía
+stuck at	fijo en
+from	de
+raw	bruto
+front	delantera
+Tach	Tacómetro
+Shift accuracy	Precisión de los cambios
+Shift log	Registro de cambios
+Recent upshifts	Subidas de marcha recientes
+LAST SHIFT	ÚLTIMO CAMBIO
+SHIFT AT	CAMBIO A
+SHIFT	CAMBIA
+EARLY	PRONTO
+LATE	TARDE
+SPOT ON	EXACTO
+LIMITER	LIMITADOR
+COLD	FRÍO
+COLD REV	RPM FRÍO
+COLD  ·  LIMIT	FRÍO  ·  LÍMITE
+OIL COLD  ·  GO EASY	ACEITE FRÍO  ·  SUAVE
+AVG	MED.
+No shifts yet - go and use the rev range.	Aún no hay cambios - sal a estirar las marchas.
+rpm vs shift point	rpm respecto al punto de cambio
+Dyno sheet	Gráfica del banco
+Saved runs	Pasadas guardadas
+No pull yet	Aún no hay pasadas
+No runs yet.	Aún no hay pasadas.
+Next run	Pasada siguiente
+Recording	Grabando
+NEW RUN RECORDED	NUEVA PASADA GRABADA
+BASELINE	REFERENCIA
+ECU TORQUE	PAR ECU
+POWER NOW	POT. ACTUAL
+SETUP	AJUSTES
+SPEED RANGE	RANGO DE VEL.
+Peak	Pico
+estimate at the crank	estimación en el cigüeñal
+waiting for a pull	esperando una pasada
+keep it pinned...	mantén a fondo...
+pull too short	pasada demasiado corta
+Full throttle in 3rd gear from ~2000 rpm to the limiter, on a flat road	Acelerador a fondo en 3.ª desde ~2000 rpm hasta el limitador, en llano
+Brake test	Prueba de frenos
+All stops	Todas las frenadas
+Brake fade	Fatiga de frenos
+History	Historial
+Last stop	Última frenada
+Deceleration	Deceleración
+Stopping	Frenando
+STOPPING	FRENANDO
+STOPPED	DETENIDO
+BRAKE HARD	FRENA FUERTE
+GET ABOVE	SUPERA
+BEST	MEJOR
+NEW BEST	NUEVO RÉCORD
+CONSISTENT	ESTABLE
+FADING  +	FATIGA  +
+WARM  +	CALIENTES  +
+No stops yet.	Aún no hay frenadas.
+no stops yet	aún no hay frenadas
+need 3 stops	se necesitan 3 frenadas
+Brake hard from above	Frena fuerte desde más de
+Brake released - stop not counted	Freno soltado - frenada no válida
+stop	parada
+vs best	vs. récord
+Drag timer	Cronómetro drag
+Speed trace	Curva de velocidad
+Splits	Parciales
+Best times	Mejores tiempos
+Recent runs	Últimas pasadas
+Come to a stop to arm	Detén el coche para armar
+Launch when ready	Sal cuando estés listo
+STOP TO ARM	DETENTE PARA ARMAR
+READY - LAUNCH	LISTO - ¡SAL!
+FINISHED	TERMINADO
+TIMING	MIDIENDO
+ROLLOUT 1 FT	ROLLOUT 1 FT
+No runs yet - stop, launch, and they show up here.	Aún no hay pasadas - detente, sal y aparecerán aquí.
+no best yet	aún sin récord
+live speed	velocidad en vivo
+best	récord
+error	error
+All-time records	Récords absolutos
+Records	Registros
+Now	Ahora
+Session peaks	Máximos de la sesión
+Hardest launch	Salida más fuerte
+Hardest stop	Frenada más fuerte
+Left-hander	Curva a izquierdas
+Right-hander	Curva a derechas
+Top speed	Velocidad máx.
+Combined	Combinada
+COMBINED	COMBINADA
+LATERAL	LATERAL
+LONGITUDINAL	LONGITUDINAL
+LEFT	IZQUIERDA
+RIGHT	DERECHA
+ACCEL	ACEL.
+BRAKE	FRENO
+ACC	ACEL.
+BRK	FRENO
+TOP	MÁX.
+MIN	MIN
+Warm-up	Calentamiento
+ENGINE OFF	MOTOR APAGADO
+NOT WARMING	NO SE CALIENTA
+electric driving	conducción eléctrica
+drive to warm up	conduce para calentar
+NO OIL TEMP	SIN TEMP. ACEITE
+OIL HOT - EASE OFF	ACEITE CALIENTE - AFLOJA
+COOLED - OK TO SWITCH OFF	ENFRIADO - YA PUEDES APAGAR
+TURBO COOL-DOWN	ENFRIANDO TURBO
+WARMING UP	CALENTANDO
+SAFE REV LIMIT	LÍMITE DE REVOL.
+COOL-DOWN LEFT	ENFRIAMIENTO RESTANTE
+OIL READY IN	ACEITE LISTO EN
+COOLANT READY IN	REFRIGERANTE LISTO EN
+Oil ready in ~	Aceite listo en ~
+Engine off - oil not warming	Motor apagado - el aceite no se calienta
+Oil not warming	El aceite no se calienta
+Oil warm	Aceite caliente
+keep it gentle	conduce con suavidad
+paused - stay under	en pausa - no pases de
+Real electric range	Autonomía eléctrica real
+Range	Autonomía
+Energy	Energía
+Charge log	Registro de cargas
+Diagnostics	Diagnóstico
+Signals	Señales
+Car signals	Señales del coche
+Battery diagnostics	Diagnóstico de la batería
+Battery health	Salud de la batería
+12 V battery	Batería de 12 V
+Driving	Conducción
+Driving by speed	Consumo por velocidad
+Climate (heating / A/C)	Clima (calefacción / A/C)
+On-board electrics	Red de a bordo
+Seat heating	Calefacción de asientos
+Steering wheel	Volante
+Outside	Exterior
+HV energy	Energía HV
+HV voltage	Tensión HV
+Charge	Carga
+Charges	Cargas
+Totals	Totales
+Where the power goes now	Reparto de potencia actual
+Raw values as the car sends them - for checking the scalings (config.scaling in app.json).	Valores en bruto tal como los envía el coche - para comprobar las escalas (config.scaling en app.json).
+A value n/a or wrong? Adjust config.battery in apps/edrive/app.json and rebuild.	¿Algún valor n/d o incorrecto? Ajusta config.battery en apps/edrive/app.json y vuelve a compilar.
+No hybrid system	Sin sistema híbrido
+Hybrid car? Settings > Hybrid system > Yes	¿Híbrido? Ajustes > Sistema híbrido > Sí
+No high-voltage battery answered, so	No ha respondido ninguna batería de alta tensión, así que
+eDrive shows the 12 V battery only.	eDrive solo muestra la batería de 12 V.
+No charges logged yet.	Aún no hay cargas registradas.
+Every charge of	Cada carga de
+% or more shows up here,	% o más aparece aquí,
+also overnight charges.	también las cargas nocturnas.
+Holds	Capacidad
+Full:	Carga completa:
+no charge reading yet	aún sin lectura de carga
+no reading yet	aún sin lectura
+no reply	sin respuesta
+not read yet	aún sin leer
+not read	no leído
+not started	no iniciado
+not yet	aún no
+none yet	aún nada
+now	ahora
+today	hoy
+days ago	días atrás
+h ago	h atrás
+min ago	min atrás
+s ago	s atrás
+learns as you drive electric	aprende mientras conduces en eléctrico
+learns as you drive	aprende mientras conduces
+estimate - learns as you drive electric	estimación - aprende mientras conduces en eléctrico
+typical	típico
+measured	medido
+(est.)	(estim.)
+(typical)	(típico)
+your pace now	tu ritmo actual
+your pace	tu ritmo
+typical pace	ritmo habitual
+engine starts at	el motor arranca al
+last hour  ·  healthy at rest: 12.4-12.8 V	última hora  ·  sana en reposo: 12.4-12.8 V
+GOOD  (about 75 %)	BUENA  (aprox. 75 %)
+HALF  (about 50 %) - drive or charge soon	MEDIA  (aprox. 50 %) - conduce o carga pronto
+LOW - charge the battery	BAJA - carga la batería
+Main page: demo data until the link answers	Página principal: datos demo hasta que responda la conexión
+CAR SHOWS  (no power distribution from the car yet)	EL COCHE MUESTRA  (aún sin reparto de potencia del coche)
+CAR SHOWS  drive	EL COCHE MUESTRA  propulsión
+with engine: + = charging the battery, - = still using it	con motor: + = cargando la batería, - = aún la gasta
+screens, units, pumps	pantallas, unidades, bombas
+battery temp	temp. batería
+battery temperature	temperatura de la batería
+climate control	climatización
+seat heating	calefacción de asientos
+steering wheel	volante
+rear L	tras. izq.
+rear R	tras. dcha.
+pass.	acomp.
+driver	conductor
+link down	conexión caída
+link up	conexión activa
+no hybrid battery unit: 12 V only	sin unidad de batería híbrida: solo 12 V
+available	disponible
+n/a	n/d
+Control units	Unidades de control
+Faults	Averías
+Check Control	Check Control
+CHECK CONTROL	CHECK CONTROL
+Check Control messages	Mensajes Check Control
+Control units that answered	Unidades de control que han respondido
+Active now	Activas ahora
+INFO MEMORY	MEMORIA DE INFORMACIÓN
+INFO:	INFO:
+No faults stored	No hay averías memorizadas
+No active Check Control messages	No hay mensajes Check Control activos
+No control unit answered	No ha respondido ninguna unidad de control
+No control unit answered - ignition on?	No ha respondido ninguna unidad de control - ¿contacto puesto?
+No answer	Sin respuesta
+no answer	sin respuesta
+answering...	respondiendo...
+No faults	Sin averías
+Nothing to clear	Nada que borrar
+Scan first	Escanea primero
+Scan first, then clear	Escanea primero y luego borra
+Press "Scan now" (ignition on)	Pulsa "Escanear ahora" (contacto puesto)
+Scanning...	Escaneando...
+Asking every control unit...	Consultando todas las unidades de control...
+Identifying control units...	Identificando unidades de control...
+Reading info memory...	Leyendo memoria de información...
+Info memory not read this time (unit busy) - scan again for it	Memoria de información no leída esta vez (unidad ocupada) - vuelve a escanear para leerla
+Last scan	Último escaneo
+Scan failed:	Error al escanear:
+Clears	Borrar
+Clearing	Borrando
+Cleared	Borradas
+control units,	unidades de control,
+faults	averías
+fault	avería
+info	info
+more	más
+possible texts (depends on unit type)	textos posibles (según el tipo de unidad)
+present right now	presentes ahora mismo
+stored	en memoria
+scanning again	volviendo a escanear
+Message	Mensaje
+Head unit	Unidad principal
+DME engine	DME motor
+DME 2	DME 2
+EGS gearbox	Cambio EGS
+BDC body	Carrocería BDC
+BDC gateway	Gateway BDC
+ATM telematics	Telemática ATM
+KOMBI cluster	Cuadro KOMBI
+ACSM airbag	Airbag ACSM
+DSC brakes	Frenos DSC
+DSC brake booster	Servofreno DSC
+EPS steering	Dirección EPS
+EME e-motor	Motor eléctrico EME
+SME HV battery	Batería de alta tensión SME
+OBC charger	Cargador OBC
+IHKA climate	IHKA climatización
+RAM audio	Audio RAM
+ZBE controller	Mando ZBE
+GWS gear selector	Selector de marchas GWS
+VTG xDrive	VTG xDrive
+KAFAS camera	Cámara KAFAS
+ICAM cameras	Cámaras ICAM
+PDC parking	Aparcamiento PDC
+USS park sensors	Sensores de aparcamiento USS
+SAS assist sensors	Sensores de asistencia SAS
+FRR front radar	Radar delantero FRR
+SRR corner radar	Radar de esquina SRR
+DCS driver camera	Cámara del conductor DCS
+FZD roof	Techo FZD
+FLM headlight	Faro FLM
+HKFM tailgate	Portón trasero HKFM
+SM seat module	Módulo de asiento SM
+TFM fuel tank	Depósito de combustible TFM
+VDP dampers	Amortiguadores VDP
+Service requirements	Necesidades de mantenimiento
+Next service	Próximo mantenimiento
+Service due	Mantenimiento pendiente
+Front brakes	Frenos delanteros
+Rear brakes	Frenos traseros
+Brake fluid	Líquido de frenos
+Vehicle check	Revisión del vehículo
+Statutory vehicle inspection	Inspección técnica (ITV)
+DUE NOW	PENDIENTE YA
+DUE SOON	PRONTO
+Due now	Pendiente ya
+Due soon	Pronto
+Diagnostics - what the instrument cluster sends	Diagnóstico - lo que envía el cuadro de instrumentos
+No details for this item	Sin detalles para este elemento
+Details not available (	Detalles no disponibles (
+Waiting for the service data from the instrument cluster (ignition on)...	Esperando los datos de mantenimiento del cuadro de instrumentos (contacto puesto)...
+Asking the car...	Preguntando al coche...
+waiting for the car	esperando al coche
+instrument cluster not reachable	cuadro de instrumentos no accesible
+connecting...	conectando...
+not available yet	aún no disponible
+nothing received	no se ha recibido nada
+item(s)	elemento(s)
+items	elementos
+(demo)	(demo)
+Loading...	Cargando...
+Doom stopped	Doom detenido
+Doom stopped:	Doom detenido:
+In the game, BACK returns here and saves	En el juego, BACK vuelve aquí y guarda
+Saved game:	Partida guardada:
+Game:	Partida:
+health	salud
+(default)	(por defecto)
+LAST	ÚLT.
+answered	respondido
+messages	mensajes
+record	récord
+ELECTRIC	ELECTRIC
+over	por encima de
+battery	batería
+climate	clima
+blower	ventilador
+seats	asientos
+wheel	volante
+cells	celdas
+heating	calefacción
+compressor	compresor
+charging	cargando
+charge	carga
+charges	cargas
+climate boost	refuerzo de clima
+seat bars	barras de asientos
+no link	sin conexión
+use learning	usar aprendizaje
+using	usando
+with engine	con motor
+cold: less range, slower charging	frío: menos autonomía, carga más lenta
+from your last	según tus últimos
+lasts ~	da para ~
+a typical	un valor típico
+there	ahí
+at	a
+cell	celda
+pace	ritmo
+learned	aprendido
+in	en
+by	antes de
+or	o
+of	de
+Scan	Escanear
+Reading	Leyendo
+Fault	Avería
+Info memory	Memoria de información
+minimum	mínimo
+maximum	máximo
+ACTIVE	ACTIVA
+WARNING LAMP	TESTIGO
+PENDING	PENDIENTE
+STORED	GUARDADA
+HISTORY	HISTÓRICA
+general reject	rechazo general
+service not supported	servicio no admitido
+sub-function not supported	subfunción no admitida
+bad length	longitud incorrecta
+busy	ocupado
+conditions not correct	condiciones no cumplidas
+out of range	fuera de rango
+security access denied	acceso de seguridad denegado
+programming failure	fallo de programación
+pending	pendiente
+not supported in session	no admitido en esta sesión
+FAULTS	AVERÍAS
+CHARGES	CARGAS
+EDrive	eDrive
+Battery power now	Potencia actual de la batería
+Battery unit	Unidad de batería
+Battery unit (UDS)	Unidad de batería (UDS)
+Battery (SME 0x07)	Batería (SME 0x07)
+Battery unit (SME)	Unidad de batería (SME)
+Climate, heater, A/C (IHKA 0x78)	Clima, calefacción, A/C (IHKA 0x78)
+Diagnostics pages (UDS replies, scan, raw signals)	Páginas de diagnóstico (respuestas UDS, escaneo, señales en bruto)
+Home-screen widget: redraw per second	Widget de inicio: refrescos por segundo
+Power gauge up to (until the car reports its limits)	Medidor de potencia hasta (mientras el coche no indique sus límites)
+Read cells, temperatures, limits every	Leer celdas, temperaturas y límites cada
+Read power every (0.1 = as fast as the car answers)	Leer la potencia cada (0.1 = tan rápido como responda el coche)
+Reset drive totals	Borrar trayecto
+Scan page: control unit	Página de escaneo: unidad de control
+CELLS	CELDAS
+Cells	Celdas
+Drive	Conducción
+THIS DRIVE	ESTE TRAYECTO
+This drive	Este trayecto
+CHARGE	CARGA
+DRIVING	EN MARCHA
+DRAWING	CONSUMIENDO
+REGEN	REGEN.
+IDLE	REPOSO
+ENGINE ON	MOTOR EN MARCHA
+ENGINE RUNNING	MOTOR EN MARCHA
+READING	LEYENDO
+NO DIAGNOSTIC LINK	SIN CONEXIÓN DE DIAGNÓSTICO
+NO REPLY	SIN RESPUESTA
+NO REPLY - SEE DIAGNOSTICS	SIN RESPUESTA - VER DIAGNÓSTICO
+BATTERY MAX	MÁX. BATERÍA
+REGEN MAX	REGEN. MÁX.
+NET	NETO
+USED	USADO
+CAR SHOWS	SEGÚN EL COCHE
+CHANGED SINCE RESET	CAMBIOS TRAS BORRAR
+CLIMATE	CLIMA
+CLIMATE OFF	CLIMA APAGADO
+ON-BOARD	RED DE A BORDO
+HYBRID	HYBRID
+HIGHEST	MÁXIMA
+LOWEST	MÍNIMA
+SPREAD	DIFERENCIA
+TEMPERATURE	TEMPERATURA
+SCANNING	ESCANEANDO
+DONE	HECHO
+ALL THAT ANSWER (identifier: bytes)	TODOS LOS QUE RESPONDEN (identificador: bytes)
+LIVE COMPARISON: starts when the scan is done	COMPARACIÓN EN VIVO: empieza al terminar el escaneo
+LOOK LIKE CELL VOLTAGES (V)	PARECEN TENSIONES DE CELDA (V)
+LOOK LIKE PACK VOLTAGE (V)	PARECE TENSIÓN DE LA BATERÍA (V)
+ENGINE ON: charges = the engine fills the battery, uses = the battery still helps	MOTOR EN MARCHA: carga = el motor llena la batería, consume = la batería sigue ayudando
+Climate OFF, press Reset drive totals, then set HI (heater) or LO with A/C: the values that follow it show up here.	Apaga el clima, pulsa Borrar trayecto y pon HI (calefacción) o LO con A/C: aquí aparecen los valores que lo siguen.
+the engine charges the battery	el motor carga la batería
+the battery still helps	la batería sigue ayudando
+from the battery	de la batería
+battery unit (SME)	unidad de batería (SME)
+climate unit (IHKA)	unidad de climatización (IHKA)
+cell core (battery unit)	núcleo de celda (unidad de batería)
+the car's battery temperature	la temperatura de la batería según el coche
+no reading - see Diagnostics	sin lectura - ver Diagnóstico
+no diagnostic link yet	aún sin conexión de diagnóstico
+well balanced	bien equilibradas
+out of balance	desequilibradas
+high (normal under load)	alta (normal bajo carga)
+just now	ahora mismo
+current pace	ritmo actual
+range at 20 °C	autonomía a 20 °C
+range when full, 20 °C	autonomía con carga completa, 20 °C
+last measured	última medición
+measured before	medido antes
+per km	por km
+learning what the battery does meanwhile	aprendiendo qué hace la batería mientras tanto
+(unit not answering)	(la unidad no responde)
+on (est.)	activado (estim.)
+electric	eléctrico
+charged	cargada
+uses	consume
+peak	máx.
+ambient	ambiente
+power distribution	reparto de potencia
+s (cell core), else the car	s (núcleo de celda), si no, el coche
+Engine Config	Configuración del motor
+Transmission Config	Configuración del cambio
+Open	Abrir
+Close	Cerrar
+OEM	OEM
+Exhaust Flap	Válvula de escape
+Disarmed — simulated (safe)	Desarmado — simulado (seguro)
+Armed — actuates the real valve	Armado — acciona la válvula real
+Tuning software	Software de reprogramación
+Off — nothing is sent to the car (safe)	Desactivado — no se envía nada al coche (seguro)
+BM3 — engine map, burbles, ASD	BM3 — mapa motor, petardeo, ASD
+MHD — engine map, Max Cooling	MHD — mapa motor, Max Cooling
+View / refresh	Ver / actualizar
+EGS variant	Variante EGS
+Verified only (0F25D0)	Solo verificada (0F25D0)
+Try any (unverified)	Probar cualquiera (sin verificar)
+Refresh while visible	Actualizar si está visible
+Live refresh interval	Intervalo de actualización
+Shift map family	Familia de mapas de cambio
+Cold KF1	KF1 en frío
+Cold KF2	KF2 en frío
+Shift table	Tabla de cambios
+Upshifts	Subidas de marcha
+Downshifts	Bajadas de marcha
+Skip downshifts	Bajadas saltando marchas
+Boost target vs actual	Turbo objetivo y real
+Air charge req. vs actual	Carga de aire solic. y real
+Power gauge up to	Escala de potencia hasta
+Live battery usage	Uso de la batería en vivo
+Learns while driving	Aprende mientras conduces
+Low battery: electric up to	Batería baja: eléctrico hasta
+RANGE AT THIS RATE	AUTONOMÍA A ESTE RITMO
+IN BATTERY	EN LA BATERÍA
+IN IT NOW	CONTIENE AHORA
+HOLDS	CAPACIDAD
+TOTAL	TOTAL
+Reset	Reiniciar
+Scan:	Escaneo:
+% per	% cada
+- see Diagnostics page	- ver la página Diagnóstico
+Battery	Batería
+Diagnostic	Diagnóstico
+battery held at 5-	batería mantenida al 5-
+battery helps -	la batería ayuda -
+charge read	carga leída
+charging +	cargando +
+climate unit	unidad de climatización
+engine started while driving at	motor arrancado en marcha al
+hybrid battery unit answers	la unidad de batería híbrida responde
+identifiers answer	identificadores responden
+identifiers known for this car	identificadores conocidos para este coche
+Reset = new baseline	Borrar = nueva referencia
+learned from	aprendido en
+live, at	en vivo, a
+ms avg /	ms de media /
+ms each	ms cada una
+ms each, queued	ms cada una, en cola
+ms max, poll	ms máx., sondeo
+pack --	batería --
+power reads:	lecturas de potencia:
+scan done:	escaneo terminado:
+scan: no replies, stopped	escaneo: sin respuestas, detenido
+SEATS	ASIENTOS
+baseline	referencia
+missed	sin respuesta
+power missed	potencia sin respuesta
+power read	lectura de potencia
+power sign	signo de potencia
+Air charge: requested vs actual	Carga de aire: solicitada y real
+Boost: target vs actual	Turbo: objetivo y real
+REQUESTED	SOLICITADO
+TARGET	OBJETIVO
+FES boost	Turbo FES
+FES g [lat, long]	FES g [lat., long.]
+gear programme	programa del cambio
+gear selection	selección de marcha
+gearbox oil	aceite del cambio
+lateral acceleration	aceleración lateral
+longitudinal acceleration	aceleración longitudinal
+on target	en el objetivo
+over target	por encima del objetivo
+under target	por debajo del objetivo
+target only: the actual value does not answer	solo objetivo: el valor real no responde
+target tyre pressure	presión objetivo de neumáticos
+tyre pressure	presión de neumáticos
+tyre temperature	temperatura de neumáticos
+temperature	temperatura
+- not a real value	- no es un valor real
+- waiting for it to change	- esperando a que cambie
+Accepted	Aceptado
+Active Sound	Sonido activo
+Active Sound Design — the last setting the DME accepted	Active Sound Design — último ajuste aceptado por la DME
+Active map — read from the DME	Mapa activo — leído de la DME
+Aggression	Intensidad
+Aggression 0.0 – 12.0	Intensidad 0.0 – 12.0
+Apply	Aplicar
+BM3 ROM not identified	ROM de BM3 no identificada
+BM3 flap control is not armed	El control de válvula de BM3 no está armado
+BM3 — exhaust flap	BM3 — válvula de escape
+Bosch MG1 — electric flap	Bosch MG1 — válvula eléctrica
+Burbles	Petardeo
+CLOSED	CERRADO
+DME (unvalidated)	DME (sin validar)
+DME accepted	Aceptado por la DME
+DME detected but not supported	DME detectada pero no compatible
+DME took it	La DME lo aceptó
+DME took it (read back)	La DME lo aceptó (releído)
+ERROR	ERROR
+Engine Map	Mapa motor
+Engine off — needs over	Motor parado — necesita más de
+Engine running —	Motor en marcha —
+Engine speed unknown	Régimen del motor desconocido
+MAP	MAPA
+MAP –	MAPA –
+MG1 flap control is confirmed but not armed (needs bench validation + authorisation)	El control de válvula MG1 está confirmado pero no armado (requiere validación en banco + autorización)
+MHD flap control is not armed	El control de válvula de MHD no está armado
+MHD — exhaust flap	MHD — válvula de escape
+Map	Mapa
+Max Cooling	Max Cooling
+NONE	NINGUNO
+No answer from the DME	Sin respuesta de la DME
+Not available for this tune	No disponible para esta reprogramación
+Not available on this car	No disponible en este coche
+Now on the DME:	Ahora en la DME:
+OFF	OFF
+OPEN	ABIERTO
+Pick a map	Elige un mapa
+SIM	SIM
+Selected map — accepted by the DME	Mapa seleccionado — aceptado por la DME
+Sending	Enviando
+Simulated	Simulado
+Start the engine first — Max Cooling needs over	Arranca antes el motor — Max Cooling necesita más de
+The engine light may flash while the map changes — that is normal	El testigo del motor puede parpadear mientras cambia el mapa — es normal
+UNKNOWN	DESCONOCIDO
+Unavailable	No disponible
+Waiting for the diagnostic link	Esperando la conexión de diagnóstico
+burbles off	petardeo desactivado
+custom value	valor personalizado
+exhaust control not available on this car	control del escape no disponible en este coche
+no BM3 flash	sin reprogramación BM3
+no DME detected	no se detecta la DME
+no MHD flash	sin reprogramación MHD
+no MHD or BM3 flash	sin reprogramación MHD ni BM3
+no read	sin lectura
+no read-back on BM3	sin relectura en BM3
+no read-back on MHD	sin relectura en MHD
+no state read for this DME	sin lectura de estado para esta DME
+not sent:	no enviado:
+real control blocked:	control real bloqueado:
+real flap control is not validated/authorised on this build	el control real de la válvula no está validado/autorizado en esta versión
+selected — press Apply to send	seleccionado — pulsa Aplicar para enviar
+simulated (safe) mode	modo simulado (seguro)
+unexpected reply	respuesta inesperada
+accepted by the DME	aceptado por la DME
+confirmed by the DME	confirmado por la DME
+- control blocked (not armed)	- control bloqueado (no armado)
+Map 1	Mapa 1
+Map 2	Mapa 2
+Map 3	Mapa 3
+Map 4	Mapa 4
+Disarmed · simulated (safe)	Desarmado · simulado (seguro)
+Armed · actuates the real valve	Armado · acciona la válvula real
+Off · nothing is sent to the car (safe)	Desactivado · no se envía nada al coche (seguro)
+BM3 · engine map, burbles, ASD	BM3 · mapa motor, petardeo, ASD
+MHD · engine map, Max Cooling	MHD · mapa motor, Max Cooling
+Active Sound Design · the last setting the DME accepted	Active Sound Design · último ajuste aceptado por la DME
+Active map · read from the DME	Mapa activo · leído de la DME
+BM3 · exhaust flap	BM3 · válvula de escape
+Bosch MG1 · electric flap	Bosch MG1 · válvula eléctrica
+Engine off · needs over	Motor parado · necesita más de
+MHD · exhaust flap	MHD · válvula de escape
+Selected map · accepted by the DME	Mapa seleccionado · aceptado por la DME
+Start the engine first · Max Cooling needs over	Arranca antes el motor · Max Cooling necesita más de
+The engine light may flash while the map changes · that is normal	El testigo del motor puede parpadear mientras cambia el mapa · es normal
+selected · press Apply to send	seleccionada · pulsa Aplicar para enviar
+LIVE · UNVERIFIED	EN VIVO · SIN VERIFICAR
+60-0 / 100-0 mph	60-0 / 100-0 mph
+Parked only (pauses while driving)	Solo aparcado (se pausa al circular)
+Reset service	Poner a cero
+Service reset (brake fluid, vehicle check)	Puesta a cero (líquido de frenos, revisión del vehículo)
+24 cells	24 celdas
+64 cells	64 celdas
+down	abajo
+skip	con salto
+ago	hace
+Max Cooling ON	Max Cooling ON
+Max Cooling OFF	Max Cooling OFF
+up	subidas
+m ago	min atrás
+Language	Idioma
+Up	Subir
+Down	Bajar
+Skip	Saltar
+Summary	Resumen
+Read again	Volver a leer
+Electronics	Electrónica
+DUE BY	FECHA LÍMITE
+TIME LEFT	TIEMPO RESTANTE
+DISTANCE LEFT	DISTANCIA RESTANTE
+Due by	Fecha límite
+Time left	Tiempo restante
+Distance left	Distancia restante
+month	mes
+months	meses
+January	Enero
+February	Febrero
+March	Marzo
+April	Abril
+May	Mayo
+June	Junio
+July	Julio
+August	Agosto
+September	Septiembre
+October	Octubre
+November	Noviembre
+December	Diciembre
+overdue	vencido
+this month	este mes
+Front brake pads	Pastillas de freno delanteras
+Rear brake pads	Pastillas de freno traseras
+Service Inclusive	Service Inclusive
+Particulate filter (OPF/DPF)	Filtro de partículas (OPF/DPF)
+State of Health	Estado de salud
+Spark / glow plugs	Bujías / calentadores
+NOx additive	Aditivo NOx
+Visual inspection / vehicle check	Inspección visual / revisión del vehículo
+Delivery inspection	Inspección de entrega
+Running-in check	Revisión de rodaje
+Water filter	Filtro de agua
+Statutory vehicle inspection (HU)	Inspección técnica (HU)
+Emissions inspection (AU)	Inspección de emisiones (AU)
+Transmission oil	Aceite del cambio
+Clutch	Embrague
+Pedestrian-protection bonnet struts	Actuadores del capó (protección de peatones)
+First-aid kit	Botiquín
+Tyre repair kit	Kit de reparación de neumáticos
+Catalytic converter	Catalizador
+Shock absorbers	Amortiguadores
+Service item	Elemento de mantenimiento
+Diagnostics - read-only CBS	Diagnóstico - CBS solo lectura
+Diagnostics is read-only	El diagnóstico es de solo lectura
+Not read yet	Aún sin leer
+Not read / unavailable	Sin leer / no disponible
+Reading CBS (read-only)...	Leyendo CBS (solo lectura)...
+CBS read stopped (demo enabled)	Lectura CBS detenida (demo activada)
+CBS read complete	Lectura CBS completada
+read(s) failed; see below	lectura(s) fallida(s); ver abajo
+CBS read failed:	Error en la lectura CBS:
+Reset is off - turn on "Service reset" in Settings	Puesta a cero desactivada - activa "Puesta a cero" en Ajustes
+No reset in demo mode	No se puede poner a cero en modo demo
+CBS read in progress - wait before resetting	Lectura CBS en curso - espera antes de poner a cero
+Reset is limited to native brake fluid and vehicle check items	Solo se pueden poner a cero los elementos nativos de líquido de frenos y revisión del vehículo
+Asking the instrument cluster what can be reset...	Preguntando al cuadro de instrumentos qué se puede poner a cero...
+The instrument cluster allows no reset right now	El cuadro de instrumentos no permite poner nada a cero ahora
+Select	Selecciona
+with "Next item", then "Reset service"	con "Siguiente" y después "Poner a cero"
+Press	Pulsa
+Confirm reset	Sí, poner a cero
+"Reset service" again	"Poner a cero" otra vez
+to confirm (5 s)	para confirmar (5 s)
+Reset not available:	Puesta a cero no disponible:
+Resetting	Poniendo a cero
+reset	puesta a cero
+NOT reset:	NO puesto a cero:
+- the list updates within a minute	- la lista se actualiza en menos de un minuto
+UDS candidate fields - validate for this car	Campos UDS provisionales - verifícalos en este coche
+UDS only - not a native service requirement	Solo UDS - no es una necesidad de mantenimiento nativa
+Service counter*	Contador de mantenimiento*
+Availability*	Disponibilidad*
+Source	Origen
+Distance interval*	Intervalo de distancia*
+Time interval*	Intervalo de tiempo*
+Remaining*	Restante*
+Record status*	Estado del registro*
+UDS due date*	Fecha límite UDS*
+CBS identifier	Identificador CBS
+* Candidate decoding; see Diagnostics for all ECU records and raw bytes.	* Decodificación provisional; en Diagnóstico están todos los registros de la unidad de control y los bytes en bruto.
+CBS details	Detalles CBS
+Reading...	Leyendo...
+Read CBS	Leer CBS
+UDS / UNVERIFIED	UDS / SIN VERIFICAR
+DEMO: diagnostic requests disabled	DEMO: peticiones de diagnóstico desactivadas
+UDS candidate:	UDS provisional:
+counter	contador
+availability	disponibilidad
+interval	intervalo
+remaining	restante
+DEMO: diagnostic reads are disabled	DEMO: lecturas de diagnóstico desactivadas
+fault|faults	avería|averías
+charge|charges	carga|cargas
+messages|messages	mensaje|mensajes
+items|items	elemento|elementos
+month|months	mes|meses
+shifts|shifts	cambio|cambios
+cells|cells	celda|celdas
+records|records	registro|registros
+control unit(s) - press again within 5 s|control unit(s) - press again within 5 s	unidad de control - pulsa de nuevo en 5 s|unidades de control - pulsa de nuevo en 5 s
+control unit(s) - scanning again|control unit(s) - scanning again	unidad de control - volviendo a escanear|unidades de control - volviendo a escanear
+control units answered|control units answered	unidad de control ha respondido|unidades de control han respondido
+answered|answered	respondió|respondieron
+identifiers known for this car|identifiers known for this car	identificador conocido para este coche|identificadores conocidos para este coche
+possible texts (depends on unit type)|possible texts (depends on unit type)	texto posible (según el tipo de unidad)|textos posibles (según el tipo de unidad)
+Auto (from the car)	Auto (del coche)
+Diesel	Diésel
+Petrol	Gasolina
+Torque gauge max (kgm only)	Escala máx. de par (solo kgm)
+G-force circle: swap accel / brake (brake on top)	Círculo de fuerza G: invertir acel. / freno (freno arriba)
+Swap accel / brake (brake on top)	Invertir acel. / freno (freno arriba)
+AA Cluster Companion App	App AA en el cuadro
+AA Cluster Companion	AA en el cuadro
+Map zoom	Zoom del mapa
+Turn card	Tarjeta de giro
+Apply changes	Aplicar cambios
+xDrive (experimental)	xDrive (experimental)
+Off · nothing is sent (safe)	Desactivado · no se envía nada (seguro)
+On · xDrive tab, xDrive off until ignition off	Activado · pestaña xDrive, xDrive desactivado hasta quitar el contacto
+RWD REQUESTED	RWD SOLICITADO
+xDrive active · read from the DSC	xDrive activo · leído del DSC
+xDrive off · read from the DSC · back after an ignition cycle	xDrive desactivado · leído del DSC · vuelve al quitar y poner el contacto
+Start the engine without switching the ignition off	Arranca el motor sin quitar el contacto
+This DSC does not offer LMV_FUNKTION	Este DSC no ofrece LMV_FUNKTION
+The DSC reports the mode with the engine running	El DSC indica el modo con el motor en marcha
+Live car data	Datos del coche en vivo
+Stationary	Detenido
+Selector in P	Selector en P
+Parking brake on	Freno de estacionamiento puesto
+tested variant	variante probada
+untested variant	variante no probada
+DSC variant unknown	Variante de DSC desconocida
+Experimental	Experimental
+xDrive returns when the ignition is switched off	xDrive vuelve al quitar el contacto
+Front axle torque · the transfer case does not report it	Par del eje delantero · la caja de transferencia no lo indica
+Front axle	Eje delantero
+actual	real
+peak requested while moving	pico solicitado en marcha
+Front axle torque shows with the engine running	El par del eje delantero se muestra con el motor en marcha
+Confirm xDrive off	Confirmar desactivar xDrive
+xDrive off	xDrive desactivado
+Switch on xDrive (experimental) in Settings	Activa xDrive (experimental) en Ajustes
+Busy	Ocupado
+DSC not answering yet	El DSC aún no responde
+No live car data	Sin datos del coche en vivo
+Press again to switch xDrive off until the ignition is switched off	Pulsa otra vez para desactivar xDrive hasta que se quite el contacto
+Sending to the DSC…	Enviando al DSC…
+Accepted by the DSC · start the engine without switching the ignition off	Aceptado por el DSC · arranca el motor sin quitar el contacto
+No answer from the DSC	Sin respuesta del DSC
+conditions not met · ignition on, engine off, P, parking brake on, car stationary	no se cumplen las condiciones · contacto puesto, motor parado, P, freno de estacionamiento puesto, coche detenido
+not supported by this DSC	no compatible con este DSC
+refused (security access) · switch drive readiness off: engine off, not READY (ignition on only)	rechazado (acceso de seguridad) · desactiva la disponibilidad de marcha: motor parado, sin READY (solo contacto puesto)
+not allowed even in the extended diagnostic session	no permitido ni en la sesión de diagnóstico ampliada
+Live Data	Datos en vivo
+Gauges	Medidores
+Gauge	Medidor
+New screen	Nueva pantalla
+Trips	Trayectos
+Layout	Diseño
+Browse	Explorar
+Stop browsing	Dejar de explorar
+Dial + 2 numbers	Esfera + 2 números
+Dial + 3 numbers	Esfera + 3 números
+2 dials	2 esferas
+3 dials	3 esferas
+2 bars	2 barras
+Bar + 3 numbers	Barra + 3 números
+4 numbers	4 números
+Fuel consumption (car signal)	Consumo (señal del coche)
+Consumption, this trip	Consumo, este trayecto
+Distance, this trip	Distancia, este trayecto
+Cost, this trip	Coste del trayecto
+no trip yet	aún no hay trayectos
+Trip computer	Ordenador de a bordo
+The first trip starts with the engine: every drive is counted, also while this screen is closed	El primer trayecto empieza al arrancar el motor: se cuentan todos los trayectos, también con esta pantalla cerrada
+The trip computer is off (Settings)	El ordenador de a bordo está desactivado (Ajustes)
+Last 5 trips	Últimos 5 trayectos
+Started	Inicio
+Time	Tiempo
+Distance	Distancia
+Fuel	Combustible
+Cost	Coste
+max speed	vel. máx.
+Tank	Depósito
+No completed trip yet	Aún no hay ningún trayecto terminado
+This trip	Este trayecto
+Last 7 days	Últimos 7 días
+Last 30 days	Últimos 30 días
+All recorded	Todo lo registrado
+Fuel price	Precio del combustible
+Set the fuel price	Fijar el precio del combustible
+not set	sin definir
+a litre	por litro
+Change	Cambiar
+Change it with the knob or the buttons.	Cámbialo con el mando o con los botones.
+The Fuel price button, then the knob.	El botón Precio del combustible y luego el mando.
+This trip, and trips that had no price, follow it; the others keep theirs.	Se aplica a este trayecto y a los que no tenían precio; los demás conservan el suyo.
+Fuel: the car's own fuel signal	Combustible: la señal de combustible del propio coche
+A trip runs from the engine start until the engine has been off for 10 minutes. Currency: Settings.	Un trayecto va desde que arranca el motor hasta que lleva 10 minutos parado. Moneda: Ajustes.
+A trip runs from the engine start until the engine has been off for 10 minutes.  Currency: Settings.	Un trayecto va desde que arranca el motor hasta que lleva 10 minutos apagado.  Moneda: Ajustes.
+Unit pages show	Las páginas de unidad muestran
+What the unit may have	Lo que puede tener la unidad
+Only what answered	Solo lo que ha respondido
+Everything it lists	Todo lo que tiene en su lista
+Names	Nombres
+English	Inglés
+German (BMW)	Alemán (BMW)
+BMW identifiers	Identificadores BMW
+Scan units when opened	Escanear unidades al abrir
+Home-screen widget shows	El widget de inicio muestra
+Gauges 1	Medidores 1
+Gauges 2	Medidores 2
+Gauges 3	Medidores 3
+Gauges 4	Medidores 4
+Gauges 5	Medidores 5
+Gauges 6	Medidores 6
+Home-screen widget: picture	Widget de inicio: imagen
+Small, clear of the edges	Pequeño, separado de los bordes
+Medium	Medio
+Fill the widget	Llenar el widget
+Trip computer (counts every drive)	Ordenador de a bordo (cuenta todos los trayectos)
+Currency	Moneda
+Show sources and unverified values	Mostrar fuentes y valores sin verificar
+Scan units	Escanear unidades
+Read all	Leer todo
+Stop reading	Dejar de leer
+Engine power (torque x speed)	Potencia del motor (par x régimen)
+Power, % of maximum (sport display)	Potencia, % del máximo (indicadores Sport)
+Torque, % of maximum (sport display)	Par, % del máximo (indicadores Sport)
+Maximum power (sport display)	Potencia máxima (indicadores Sport)
+Maximum torque (sport display)	Par máximo (indicadores Sport)
+Boost peak (sport display)	Pico de presión de turbo (indicadores Sport)
+Accelerator pedal	Pedal del acelerador
+Engine oil (fuel signal)	Aceite del motor (señal de combustible)
+running	en marcha
+starting	arrancando
+on	activado
+off	desactivado
+Auto start-stop	Start-Stop automático
+Fuel in the tank	Combustible en el depósito
+Fuel tank, left half	Depósito, mitad izquierda
+Fuel tank, right half	Depósito, mitad derecha
+Odometer	Cuentakilómetros
+Fuel consumption per 100 km	Consumo cada 100 km
+Fuel injection signal (raw)	Señal de inyección (en bruto)
+Average consumption, trip 1	Consumo medio, trayecto 1
+Average speed, trip 1	Velocidad media, trayecto 1
+Average consumption, trip 2	Consumo medio, trayecto 2
+Average speed, trip 2	Velocidad media, trayecto 2
+Driving time	Tiempo de conducción
+Distance driven	Distancia recorrida
+Fuel used, this trip	Combustible gastado, este trayecto
+Cost of this trip	Coste de este trayecto
+Time, this trip	Tiempo, este trayecto
+Driving mode	Modo de conducción
+Acceleration, forward	Aceleración longitudinal
+Acceleration, sideways	Aceleración lateral
+Yaw rate	Velocidad de guiñada
+Roll rate	Velocidad de balanceo
+Pitch rate	Velocidad de cabeceo
+Steering wheel angle	Ángulo del volante
+Parking brake	Freno de estacionamiento
+Outside temperature	Temperatura exterior
+12 V battery charge	Carga de la batería de 12 V
+Engine oil level	Nivel de aceite del motor
+Tyre pressure, front left	Presión de neumático, delantero izquierdo
+Tyre pressure, front right	Presión de neumático, delantero derecho
+Tyre pressure, rear left	Presión de neumático, trasero izquierdo
+Tyre pressure, rear right	Presión de neumático, trasero derecho
+Tyre temperature, front left	Temperatura de neumático, delantero izquierdo
+Tyre temperature, front right	Temperatura de neumático, delantero derecho
+Tyre temperature, rear left	Temperatura de neumático, trasero izquierdo
+Tyre temperature, rear right	Temperatura de neumático, trasero derecho
+Tyre pressure target, front left	Presión nominal de neumático, delantero izquierdo
+Tyre pressure target, front right	Presión nominal de neumático, delantero derecho
+Tyre pressure target, rear left	Presión nominal de neumático, trasero izquierdo
+Tyre pressure target, rear right	Presión nominal de neumático, trasero derecho
+Chassis (raw numbers)	Chasis (valores en bruto)
+Wheel speed, front left	Velocidad de rueda, delantera izquierda
+Wheel speed, front right	Velocidad de rueda, delantera derecha
+Wheel speed, rear left	Velocidad de rueda, trasera izquierda
+Wheel speed, rear right	Velocidad de rueda, trasera derecha
+Road gradient, along	Pendiente de la vía, longitudinal
+Road gradient, across	Pendiente de la vía, transversal
+Vehicle mass	Masa del vehículo
+ABS status	Estado del ABS
+Traction control (ASC) status	Estado del control de tracción (ASC)
+Stability control (DSC) status	Estado del control de estabilidad (DSC)
+Driver braking	Frenada del conductor
+Fuel and trip	Combustible y trayecto
+No finished trip yet	Aún no hay trayectos terminados
+Last trip	Último trayecto
+Last trips	Últimos trayectos
+Fuel used	Combustible gastado
+Consumption	Consumo
+Average speed	Velocidad media
+Fuel: from the car's own fuel signal	Combustible: de la señal de combustible del propio coche
+Fuel: from the engine unit until the car's fuel signal has learned its scaling	Combustible: de la unidad del motor hasta que la señal de combustible del coche aprenda su escala
+Tap or press here to choose its value	Toca o pulsa aquí para elegir su valor
+page	página
+with a value	con valor
+Engine load	Carga del motor
+Throttle	Mariposa
+Engine power (engine unit)	Potencia del motor (unidad del motor)
+Vehicle speed	Velocidad del vehículo
+Time since engine start	Tiempo desde el arranque
+Temperatures	Temperaturas
+Coolant, radiator outlet	Refrigerante, salida del radiador
+Engine oil (after filter)	Aceite del motor (tras el filtro)
+Engine oil in the sump	Aceite del motor en el cárter
+Intake air	Aire de admisión
+Charge air before throttle	Aire de sobrealimentación antes de la mariposa
+Gearbox	Cambio
+Engine unit	Unidad del motor
+Exhaust after catalyst (model)	Escape tras el catalizador (modelado)
+Particulate filter	Filtro de partículas
+Catalyst, bank 1 sensor 1	Catalizador, bancada 1 sensor 1
+Oil pressure	Presión del aceite
+Oil pressure (absolute)	Presión del aceite (absoluta)
+Oil level above minimum	Nivel de aceite sobre el mínimo
+Oil level	Nivel de aceite
+Oil life left (by engine hours)	Vida restante del aceite (por horas de motor)
+Oil life left (by fuel used)	Vida restante del aceite (por combustible gastado)
+Engine hours on this oil	Horas de motor con este aceite
+Distance on this oil	Distancia con este aceite
+Fuel in the oil	Combustible en el aceite
+Oil pump duty cycle	Ciclo de trabajo de la bomba de aceite
+Fuel tank level	Nivel del depósito
+Time since refuelling	Tiempo desde el repostaje
+High pressure fuel (rail)	Combustible a alta presión (rampa)
+High pressure fuel target	Combustible a alta presión, objetivo
+Fuel consumption	Consumo
+Fuel mass flow	Caudal másico de combustible
+Ethanol in the fuel	Etanol en el combustible
+Fuel quality (adapted)	Calidad del combustible (adaptada)
+Boost and air	Turbo y aire
+Charge pressure (absolute)	Presión de turbo (absoluta)
+Boost target (absolute)	Turbo objetivo (absoluto)
+Boost control deviation	Desviación del control de turbo
+Intake manifold pressure	Presión del colector de admisión
+Ambient pressure	Presión ambiente
+Air mass flow	Caudal másico de aire
+Air charge (relative)	Carga de aire (relativa)
+Wastegate position (0 = closed)	Posición wastegate (0 = cerrada)
+Wastegate actuator duty cycle	Ciclo de trabajo del actuador wastegate
+Ignition and knock	Encendido y picado
+Ignition angle	Ángulo de encendido
+Knock detected	Picado detectado
+Knock control retard (mean)	Retardo por picado (medio)
+Knock control adaptation	Adaptación del control de picado
+VANOS and Valvetronic	VANOS y Valvetronic
+Intake camshaft (VANOS)	Árbol de levas de admisión (VANOS)
+Intake camshaft target	Árbol de levas de admisión objetivo
+Exhaust camshaft (VANOS)	Árbol de levas de escape (VANOS)
+Exhaust camshaft target	Árbol de levas de escape objetivo
+Intake valve lift (Valvetronic)	Alzada de válvulas de admisión (Valvetronic)
+Intake valve lift target	Alzada de válvulas de admisión objetivo
+Mixture and injectors	Mezcla e inyectores
+Lambda	Lambda
+Lambda target	Lambda objetivo
+Short term fuel trim	Ajuste de combustible a corto plazo
+Long term fuel trim	Ajuste de combustible a largo plazo
+Mixture adaptation (factor)	Adaptación de mezcla (factor)
+Injector flow adaptation (mean)	Adaptación del caudal de inyectores (media)
+Battery and charging	Batería y carga
+Battery voltage	Tensión de la batería
+Battery current	Corriente de la batería
+Battery temperature	Temperatura de la batería
+Battery charge	Carga de la batería
+Alternator current	Corriente del alternador
+Wear and service	Desgaste y mantenimiento
+Spark plugs: remaining distance	Bujías: distancia restante
+Spark plugs: distance driven	Bujías: distancia recorrida
+Spark plug wear (normalised)	Desgaste de bujías (normalizado)
+Particulate filter: soot	Filtro de partículas: hollín
+Particulate filter: load (adapted)	Filtro de partículas: carga (adaptada)
+Particulate filter: ash (adapted)	Filtro de partículas: ceniza (adaptada)
+Catalyst oxygen storage	Oxígeno almacenado en el catalizador
+Engine operating hours	Horas de funcionamiento del motor
+Check engine lamp (MIL) on	Testigo de motor (MIL) encendido
+Stored emission faults	Averías de emisiones memorizadas
+The engine unit isn't answering (ignition on?)	La unidad del motor no responde (¿contacto puesto?)
+The engine unit has no values to show	La unidad del motor no tiene valores que mostrar
+values read	valores leídos
+Applied elements	Elementos aplicados
+Controller	Unidad de control
+Scan units to see the car's control units (ignition on)	Escanea las unidades para ver las unidades de control del coche (contacto puesto)
+Only reads: identification and live values, nothing is written or changed in the car.	Solo lee: identificación y valores en vivo, no se escribe ni se cambia nada en el coche.
+Reading the DME - press again in a moment	Leyendo la DME - vuelve a pulsar en un momento
+Take a photo when it says DONE. Settings > Scan unit picks the unit. Replies are saved in the app's data folder (scan_07.json).	Haz una foto cuando termine. En Ajustes > Unidad a escanear se elige la unidad. Las respuestas se guardan en la carpeta de datos de la app (scan_07.json).
+CLOSE	CERRAR
+ON	ON
+RECORDS	RÉCORDS
+ELECTRONICS	ELECTRÓNICA
+ALL UNITS	TODAS LAS UNIDADES
+Back	Atrás
+Done	Hecho
+Engine off	Motor parado
+None (an empty gauge)	Ninguno (medidor vacío)
+Boost (sport display)	Turbo (indicador Sport)
+All	Todos
+days	días
+dial	esfera
+number	número
+gauge	medidor
+read	leído
+battery held at	batería mantenida al
+speed	velocidad
+Engine off, not READY	Motor parado, sin READY
+Needs: engine off, not READY	Requiere: motor parado, sin READY
+Needs: stationary	Requiere: coche detenido
+Needs: selector in p	Requiere: selector en P
+Needs: parking brake on	Requiere: freno de estacionamiento puesto
+DSC refused the extended diagnostic session	El DSC ha rechazado la sesión de diagnóstico ampliada
+8HP hybrid	8HP hybrid
+A / B: brakes. C / D / E: clutches.	A / B: frenos. C / D / E: embragues.
+Actual gear	Marcha actual
+Adapt. count	N.º adapt.
+Adaptation count	Número de adaptaciones
+Additional measured data	Otros datos medidos
+Age	Antigüedad
+All available diagnostic records	Todos los registros de diagnóstico disponibles
+Cell indices do not reveal RPM/torque limits.	Los índices de celda no indican los límites de RPM/par.
+Clutch fill adaptation / A - E	Adaptación del llenado de embragues / A - E
+Clutches	Embragues
+Cold / warm	Frío / caliente
+Cold KF	KF en frío
+Cold correction (raw units)	Corrección en frío (unidades brutas)
+Cold evaluations	Evaluaciones en frío
+Cold maps contain single upshifts only	Los mapas en frío solo contienen subidas de una marcha
+Cold shift counter	Contador de cambios en frío
+Controller on this car:	Unidad de control de este coche:
+Converter / learning / service data	Convertidor / aprendizaje / datos de mantenimiento
+Converter clutch	Embrague del convertidor
+Counts belong to adaptation learning. Map statistics are learned pressure offsets; they are not shift durations.	Los contadores corresponden al aprendizaje de adaptación. Las estadísticas de mapa son desviaciones de presión aprendidas; no son duraciones de los cambios de marcha.
+Data source: BMW/ZF GSZFBCE rev. 15.000.	Fuente de datos: BMW/ZF GSZFBCE rev. 15.000.
+EGS chip 1	Chip EGS 1
+EGS chip 2	Chip EGS 2
+EGS electronics	Electrónica EGS
+EGS fault memory	Memoria de averías EGS
+EGS identification	Identificación EGS
+EGS oil-service RPM window	Rango de rpm para el cambio de aceite EGS
+EGS oil-service temperature window	Rango de temperatura para el cambio de aceite EGS
+EGS operating time (without standby)	Tiempo de funcionamiento EGS (sin reposo)
+EXPERIMENTAL	EXPERIMENTAL
+Engagement evaluations	Evaluaciones de acoplamiento
+Engagement offset D1 / D2 / R	Desviación de acoplamiento D1 / D2 / R
+Expected applied elements / reference	Elementos acoplados previstos / referencia
+Fast fill ms	Llenado rápido ms
+Fill pressure and time: learned corrections.	Presión y tiempo de llenado: correcciones aprendidas.
+Gear	Marcha
+IDENTIFYING	IDENTIFICANDO
+KF1 / KF2 keep separate adaptation maps.	KF1 / KF2 tienen mapas de adaptación separados.
+LINK STALE	DATOS ANTIGUOS
+LIVE	EN VIVO
+LIVE — UNVERIFIED	EN VIVO — SIN VERIFICAR
+LOCKED HIGH	BLOQUEADO ALTO
+LOCKED LOW	BLOQUEADO BAJO
+Learned offsets	Desviaciones aprendidas
+Learned pressure offset / mbar	Desviación de presión aprendida / mbar
+Live	En vivo
+Max mbar	Máx. mbar
+Maximum	Máximo
+Mean	Media
+Mean mbar	Media mbar
+Measured at the transmission	Medido en el cambio
+Mechatronics / converter	Mecatrónica / convertidor
+Min mbar	Mín. mbar
+Minimum	Mínimo
+NO LINK	SIN CONEXIÓN
+Next item: change plotted temperature.	Elemento siguiente: cambiar la temperatura del gráfico.
+Next item: next details view	Elemento siguiente: siguiente vista de detalles
+Next item: next records / View: return to summary	Elemento siguiente: siguientes registros / Ver: volver al resumen
+Next item: oil / electronics. Historical time counters read from EGS; these are not recommended temperature limits.	Elemento siguiente: aceite / electrónica. Contadores de tiempo históricos leídos de la EGS; no son límites de temperatura recomendados.
+Next item: shift   /   View: map family	Elemento siguiente: cambio   /   Ver: familia de mapas
+No matching positive response	Sin respuesta positiva coincidente
+No pending or confirmed EGS faults returned	La EGS no ha devuelto averías pendientes ni confirmadas
+No response	Sin respuesta
+Not an allowed read identifier	Identificador de lectura no permitido
+Not on this EGS (	No disponible en esta EGS (
+OPENING	ABRIENDO
+OTHER EGS	OTRA EGS
+Output shaft	Eje de salida
+Pack	Paquete
+Pending and confirmed faults / read only	Averías pendientes y confirmadas / solo lectura
+Per-shift map summary /	Resumen de mapas por cambio /
+Positive / negative offsets are both possible.	Puede haber desviaciones tanto positivas como negativas.
+Pressure and fast-fill time are corrections to base calibration. Next item: select pack.	La presión y el tiempo de llenado rápido son correcciones sobre la calibración base. Elemento siguiente: elegir paquete.
+Pressure eval.	Eval. presión
+Pressure mbar	Presión mbar
+REGULATED HIGH	REGULADO ALTO
+REGULATED LOW	REGULADO BAJO
+Raw-only records are saved without a guessed decoder. Snapshot keeps raw payloads and decoded values.	Los registros solo en bruto se guardan sin suponer un decodificador. La instantánea guarda los datos en bruto y los valores decodificados.
+ReadDTCByStatusMask 0x0C / no erase command.	ReadDTCByStatusMask 0x0C / sin comando de borrado.
+Record	Registro
+Reference	Referencia
+Reference matrix: ZF external transmission training, 8HP power flow. Applied-element diagram, not a pressure measurement.	Matriz de referencia: formación externa de ZF sobre cambios, flujo de fuerza del 8HP. Diagrama de elementos acoplados, no una medida de presión.
+Refresh requested	Actualización solicitada
+Release evaluations	Evaluaciones de desacoplamiento
+Release offset D1 / D2 / R	Desviación de desacoplamiento D1 / D2 / R
+Reported oil-service window	Ventana para cambio de aceite
+Rows and columns are storage-cell indices. Physical RPM/torque breakpoints are not supplied by this record.	Filas y columnas son índices de celdas de memoria. Este registro no incluye los puntos físicos de rpm/par.
+Rows: turbine-speed support-point index. Columns: torque support-point index; physical breakpoints not supplied.	Filas: índice de punto de apoyo de régimen de turbina. Columnas: índice de punto de apoyo de par; no se incluyen los puntos físicos.
+Settings: EGS variant, Try any (unverified) reads it anyway; values that don't fit show as errors	Ajustes: Variante EGS, Probar cualquiera (sin verificar) la lee igualmente; los valores que no encajan salen como errores
+Shift	Cambio
+Shift adaptation /	Adaptación de cambios /
+Shifts	Cambios
+Snapshot saved in the app data folder	Instantánea guardada en la carpeta de datos de la app
+Start evaluations	Evaluaciones de arrancada
+Stationary adaptation counter	Contador de adaptaciones en parado
+TCC base-point adaptation	Adaptación del punto base TCC
+TCC base-point evaluation counter	Contador de evaluaciones del punto base TCC
+TCC fast-fill correction	Corrección de llenado rápido TCC
+TCC fast-fill evaluation counter	Contador de evaluaciones de llenado rápido TCC
+TO LOCKED HIGH	HACIA BLOQUEADO ALTO
+TO LOCKED LOW	HACIA BLOQUEADO BAJO
+TO REGULATED HIGH	HACIA REGULADO ALTO
+TO REGULATED LOW	HACIA REGULADO BAJO
+Temperature bands	Franjas de temperatura
+Temperature tables show accumulated time.	Las tablas de temperatura muestran el tiempo acumulado.
+Thermal	Temperatura
+This EGS variant is not supported by the verified decoder	El decodificador verificado no admite esta variante de EGS
+This map family has no selected shift group	Esta familia de mapas no tiene el grupo de cambios seleccionado
+This map family has no such shift	Esta familia de mapas no tiene ese cambio
+Three elements transmit each forward ratio.	Tres elementos transmiten cada marcha hacia delante.
+Time eval.	Eval. tiempo
+Total recorded	Total registrado
+Turbine / input	Turbina / entrada
+Understanding the data	Cómo interpretar los datos
+Unexpected length:	Longitud inesperada:
+Unsupported EGS variant:	Variante de EGS no admitida:
+Updated	Actualizado
+Upper temperature bands	Franjas de temperatura altas
+View / refresh: open selected map	Ver / actualizar: abrir el mapa seleccionado
+View / refresh: save snapshot.	Ver / actualizar: guardar instantánea.
+Waiting for an EGS fault-memory response	Esperando respuesta de la memoria de averías de la EGS
+Waiting for fresh temperature samples	Esperando nuevas muestras de temperatura
+Waiting for the selected map	Esperando el mapa seleccionado
+ZF 8HP / shift-element reference	ZF 8HP / referencia de elementos de cambio
+bytes / raw	bytes / en bruto
+last good	último válido
+min recorded	min registrados
+not identified yet	aún sin identificar
+read error	con error de lectura
+status 0x	estado 0x
+synthetic demo	demo sintética
+waiting for EGS	esperando a la EGS
+saved	guardado
+current session	sesión actual
+cold adaptation	adaptación en frío
+map summary	resumen del mapa
+lifetime temperature distribution	distribución histórica de temperatura
+Per-shift map summary	Resumen de mapas por cambio de marcha
+Next item: next pack	Elemento siguiente: siguiente paquete
+Next item: next temperature	Elemento siguiente: siguiente temperatura
+Next item: oil / electronics	Elemento siguiente: aceite / electrónica
+Gear engagement / release	Acoplamiento / desacoplamiento
+EGS / oil service	EGS / cambio de aceite
+Fast-fill correction	Corrección de llenado rápido
+Fast-fill evaluations	Evaluaciones de llenado rápido
+Base-point adaptation	Adaptación del punto base
+Base-point evaluations	Evaluaciones del punto base
+Engage, mbar	Acoplamiento, mbar
+Engage evaluations	Evaluaciones de acoplamiento
+Release, mbar	Desacoplamiento, mbar
+Operating time (no standby)	Tiempo de funcionamiento (sin reposo)
+Stationary adaptations	Adaptaciones en parado
+Oil-service temperature	Temp. para cambio de aceite
+Oil-service speed	Revol. para cambio de aceite
+Status	Estado
+More map	Más mapa
+Larger text	Texto grande
+Custom	Personalizado
+the slot's own size	el tamaño propio del hueco
+about	aprox.
+% more map	% más de mapa
+% larger text	% texto más grande
+Shown	Visible
+Hidden	Ocultos
+card hidden	tarjeta oculta
+card shown	tarjeta visible
+Hidden: the card is cropped off the top of the map,	Oculta: la tarjeta se recorta por arriba del mapa,
+and Maps shows its trip bar (time, distance, arrival).	y Maps muestra su barra de trayecto (tiempo, distancia, llegada).
+Asking aa-on-cluster...	Consultando a aa-on-cluster...
+Android Auto on cluster not installed	Android Auto on cluster no está instalado
+Install it (0.5 or newer) from the Store.	Instálalo (0.5 o posterior) desde la Store.
+Until then this is a demo.	Hasta entonces, esto es una demo.
+Unknown firmware	Firmware desconocido
+Android Auto map is off	El mapa de Android Auto está desactivado
+aa-on-cluster does not know this firmware	aa-on-cluster no reconoce este firmware
+and changes nothing.	y no cambia nada.
+aa-on-cluster put stock aapd back	aa-on-cluster ha restaurado el aapd de serie
+(removed, or after a crash). Reinstall it.	(desinstalado o tras un fallo). Reinstálalo.
+On the cluster now	Ahora en el cuadro
+Not running yet: restart once after installing	Aún no funciona: reinicia una vez tras instalar
+Selected:	Selección:
+Restart failed:	Reinicio fallido:
+Next start:	Próximo inicio:
+Nothing to apply	Nada que aplicar
+Restarting the head unit...	Reiniciando la unidad principal...
+Restart head unit to apply changes	Reiniciar unidad principal y aplicar
+Not reachable (	No accesible (
+set to	fijado en
+outside the app	fuera de la app
+about {percent}% more map	aprox. un {percent}% más de mapa
+about {percent}% larger text	texto aprox. un {percent}% más grande
+Applying...	Aplicando...
+Not applied:	No aplicado:
+Asking for a restart...	Solicitando reinicio...
+Restart refused:	Reinicio rechazado:
+Demo: the head unit would restart now	Demo: ahora se reiniciaría la unidad principal
+Accelerator pedal (relative)	Pedal del acelerador (relativo)
+Accelerator pedal angle (normalised)	Ángulo del pedal del acelerador (normalizado)
+Accelerator pedal position D	Posición del pedal del acelerador D
+Accelerator pedal position E	Posición del pedal del acelerador E
+Active diagnostic session	Sesión de diagnóstico activa
+Adapted fuel quality factor (0 = RON 98, 1 = RON 91)	Factor de calidad de combustible adaptado (0 = RON 98, 1 = RON 91)
+Air mass flow (filtered)	Caudal másico de aire (filtrado)
+Air mass flow taking part in combustion	Caudal másico de aire que participa en la combustión
+Air mass flow through throttle, bank 1	Caudal másico de aire por la mariposa, bancada 1
+Air mass meter flow (16 bit)	Caudal del caudalímetro de aire (16 bits)
+Alcohol in the fuel	Alcohol en el combustible
+Ash mass in particulate filter (adapted)	Masa de ceniza en el filtro de partículas (adaptada)
+BMW coding	Codificación BMW
+Barometric pressure	Presión barométrica
+Battery sensor (IBS) battery current	Sensor de batería (IBS): corriente de la batería
+Battery sensor (IBS) battery temperature	Sensor de batería (IBS): temperatura de la batería
+Battery sensor (IBS) battery voltage	Sensor de batería (IBS): tensión de la batería
+Battery state of charge now	Estado de carga actual de la batería
+Boost actuator output duty cycle	Ciclo de trabajo de salida del actuador del turbo
+Boost pressure control deviation, bank 1	Desviación de regulación de la presión de turbo, bancada 1
+Boost pressure target	Presión de turbo objetivo
+Catalyst 1 oxygen storage capacity, bank 1	Capacidad de almacenamiento de oxígeno del catalizador 1, bancada 1
+Catalyst temperature, bank 1 sensor 1	Temperatura del catalizador, banco 1 sensor 1
+Catalyst temperature, bank 1 sensor 2	Temperatura del catalizador, banco 1 sensor 2
+Catalyst temperature, bank 2 sensor 1	Temperatura del catalizador, banco 2 sensor 1
+Catalyst temperature, bank 2 sensor 2	Temperatura del catalizador, banco 2 sensor 2
+Closed loop	Lazo cerrado
+Closed loop (sensor fault)	Lazo cerrado (avería de sensor)
+Clutch engine torque actual	Par motor real en el embrague
+Control module voltage	Tensión del módulo de control
+Current gear, internal (incl. neutral and reverse)	Marcha actual, interna (incl. punto muerto y marcha atrás)
+Default	Predeterminado
+Dipstick fault	Avería del sensor de nivel de aceite
+Distance since faults cleared	Distancia desde el borrado de averías
+Distance with check engine lamp on	Distancia con el testigo de motor encendido
+Effective engine power	Potencia efectiva del motor
+Electric wastegate actual position (0 = closed, 100 = open)	Posición real de la wastegate eléctrica (0 = cerrada, 100 = abierta)
+Engine friction torque	Par de fricción del motor
+Engine load (absolute)	Carga del motor (absoluta)
+Engine load (calculated)	Carga del motor (calculada)
+Engine oil level above minimum (cl)	Nivel de aceite del motor sobre el mínimo (cl)
+Engine torque without anti-jerk (clutch torque)	Par motor sin antisacudidas (par en el embrague)
+Ethanol	Etanol
+Evaporative purge (commanded)	Purga del cánister (consigna)
+Exhaust VANOS spread actual	Calado VANOS de escape, real
+Exhaust VANOS spread target	Calado VANOS de escape, objetivo
+Exhaust temperature after catalyst (model)	Temperatura de escape tras el catalizador (modelo)
+Exhaust temperature after main catalyst (model)	Temperatura de escape tras el catalizador principal (modelo)
+Extended	Extendida
+Fuel level, left tank half	Nivel de combustible, mitad izquierda del depósito
+Fuel level, right tank half	Nivel de combustible, mitad derecha del depósito
+Fuel rail pressure	Presión del rail de combustible
+Fuel rail pressure (to manifold)	Presión del rail (respecto al colector)
+Fuel rate	Caudal de combustible
+Fuel system	Sistema de combustible
+Fuel type	Tipo de combustible
+Fuel volume flow (ml/s)	Caudal volumétrico de combustible (ml/s)
+Generator output current	Corriente de salida del alternador
+Hardware number	Número de hardware
+Hybrid diesel	Híbrido diésel
+Hybrid petrol	Híbrido gasolina
+Ignition timing advance	Avance del encendido
+Injector flow adaptation, mean of all cylinders	Adaptación de caudal de los inyectores, media de todos los cilindros
+Intake VANOS spread actual	Calado VANOS de admisión, real
+Intake VANOS spread target	Calado VANOS de admisión, objetivo
+Intake air temperature before throttle (measured)	Temperatura del aire de admisión antes de la mariposa (medida)
+Intake manifold absolute pressure (measured)	Presión absoluta en el colector de admisión (medida)
+Intake valve lift (Valvetronic, with adaptation and prediction)	Alzada de las válvulas de admisión (Valvetronic, con adaptación y predicción)
+Intake valve lift target (filtered)	Alzada objetivo de las válvulas de admisión (filtrada)
+Lambda (commanded)	Lambda (consigna)
+Lambda actual (from sensor)	Lambda real (de la sonda)
+Lambda sensor current, bank 1 sensor 1	Corriente de la sonda lambda, banco 1 sensor 1
+Lambda target at the lambda sensor	Lambda objetivo en la sonda lambda
+Lambda, bank 1 sensor 1	Lambda, banco 1 sensor 1
+Lambda, bank 2 sensor 1	Lambda, banco 2 sensor 1
+Long term fuel trim, bank 1	Ajuste de combustible a largo plazo, banco 1
+Long term fuel trim, bank 2	Ajuste de combustible a largo plazo, banco 2
+Low fuel pressure raw value (unfiltered)	Presión de combustible de baja, valor bruto (sin filtrar)
+Low pressure fuel sensor: fuel pressure raw value	Sensor de baja presión de combustible: valor bruto de la presión
+Manufacturing date	Fecha de fabricación
+Mass flow at the intake valve (without correction factor)	Caudal másico en la válvula de admisión (sin factor de corrección)
+Mean ignition retard by knock control (all cylinders)	Retardo medio del encendido por control de picado (todos los cilindros)
+Methanol	Metanol
+Mixture adaptation multiplicative correction	Adaptación de mezcla, corrección multiplicativa
+Oil availability from fuel used	Vida del aceite según el combustible consumido
+Oil availability from operating hours	Vida del aceite según las horas de funcionamiento
+Oil level (unfiltered) in mm	Nivel de aceite (sin filtrar) en mm
+Oil operating hours	Horas de funcionamiento del aceite
+Oil pressure PWM duty cycle	Ciclo de trabajo PWM de la presión de aceite
+Oil pressure actual (absolute)	Presión de aceite real (absoluta)
+Oil remaining distance (dipstick)	Distancia restante del aceite (sensor de nivel)
+Oil temperature	Temperatura del aceite
+Oil temperature (unfiltered)	Temperatura del aceite (sin filtrar)
+Oil temperature after filter	Temperatura del aceite tras el filtro
+Oil temperature in the sump	Temperatura del aceite en el cárter
+Oil wear function	Función de desgaste del aceite
+Open loop (cold)	Lazo abierto (en frío)
+Open loop (fault)	Lazo abierto (avería)
+Open loop (load)	Lazo abierto (carga)
+Operating hours counter	Contador de horas de funcionamiento
+Outside air temperature	Temperatura exterior
+Particulate filter temperature, bank 1	Temperatura del filtro de partículas, bancada 1
+Particulate filter total load (adapted)	Carga total del filtro de partículas (adaptada)
+Petrol + alcohol in the oil (total mass)	Gasolina + alcohol en el aceite (masa total)
+Pressure before throttle (0...5120 hPa)	Presión antes de la mariposa (0...5120 hPa)
+Programming	Programación
+Radiator outlet coolant temperature	Temperatura del refrigerante a la salida del radiador
+Rail pressure actual (filtered, absolute)	Presión del rail real (filtrada, absoluta)
+Rail pressure control target	Objetivo de regulación de la presión del rail
+Relative air charge	Carga de aire relativa
+SGBD index (control unit type)	Índice SGBD (tipo de unidad de control)
+Serial number	Número de serie
+Short term fuel trim, bank 1	Ajuste de combustible a corto plazo, banco 1
+Short term fuel trim, bank 2	Ajuste de combustible a corto plazo, banco 2
+Soot mass in particulate filter, bank 1	Masa de hollín en el filtro de partículas, bancada 1
+Soot mass in the particulate filter	Masa de hollín en el filtro de partículas
+Spare part number	Número de recambio
+Spark plug distance	Distancia recorrida de las bujías
+Spark plug wear model, current values	Modelo de desgaste de las bujías, valores actuales
+Spark plug wear, current set (accumulated, normalised)	Desgaste de las bujías, juego actual (acumulado, normalizado)
+Spark plugs: estimated remaining distance	Bujías: distancia restante estimada
+State of health	Estado de salud
+Supplier software version	Versión de software del proveedor
+System name	Nombre del sistema
+System supplier	Proveedor del sistema
+Throttle actuator (commanded)	Actuador de la mariposa (consigna)
+Throttle angle above lower stop	Ángulo de la mariposa sobre el tope inferior
+Throttle position	Posición de la mariposa
+Throttle position (relative)	Posición de la mariposa (relativa)
+Throttle position B	Posición de la mariposa B
+Time since faults cleared	Tiempo desde el borrado de averías
+Time since last refuelling	Tiempo desde el último repostaje
+Time with check engine lamp on	Tiempo con el testigo de motor encendido
+Torque demanded by the driver	Par solicitado por el conductor
+Vehicle identification number (VIN)	Número de bastidor (VIN)
+Warm-ups since faults cleared	Calentamientos desde el borrado de averías
+Ignition angle, cylinder 1	Ángulo de encendido, cilindro 1
+Ignition angle, cylinder 2	Ángulo de encendido, cilindro 2
+Ignition angle, cylinder 3	Ángulo de encendido, cilindro 3
+Ignition angle, cylinder 4	Ángulo de encendido, cilindro 4
+Ignition angle, cylinder 5	Ángulo de encendido, cilindro 5
+Ignition angle, cylinder 6	Ángulo de encendido, cilindro 6
+Injector flow correction (limited), cylinder 1	Corrección de caudal del inyector (limitada), cilindro 1
+Injector flow correction (limited), cylinder 2	Corrección de caudal del inyector (limitada), cilindro 2
+Injector flow correction (limited), cylinder 3	Corrección de caudal del inyector (limitada), cilindro 3
+Injector flow correction (limited), cylinder 4	Corrección de caudal del inyector (limitada), cilindro 4
+Injector flow correction (limited), cylinder 5	Corrección de caudal del inyector (limitada), cilindro 5
+Injector flow correction (limited), cylinder 6	Corrección de caudal del inyector (limitada), cilindro 6
+Misfire counter, cylinder 1	Contador de fallos de encendido, cilindro 1
+Misfire counter, cylinder 2	Contador de fallos de encendido, cilindro 2
+Misfire counter, cylinder 3	Contador de fallos de encendido, cilindro 3
+Misfire counter, cylinder 4	Contador de fallos de encendido, cilindro 4
+Misfire counter, cylinder 5	Contador de fallos de encendido, cilindro 5
+Misfire counter, cylinder 6	Contador de fallos de encendido, cilindro 6
+Rough running, cylinder 1	Marcha irregular, cilindro 1
+Rough running, cylinder 2	Marcha irregular, cilindro 2
+Rough running, cylinder 3	Marcha irregular, cilindro 3
+Rough running, cylinder 4	Marcha irregular, cilindro 4
+Rough running, cylinder 5	Marcha irregular, cilindro 5
+Rough running, cylinder 6	Marcha irregular, cilindro 6
+State of charge	Estado de carga
+Voltage	Tensión
+CAPACITY	CAPACIDAD
+ORIGINAL	ORIGINAL
+EARLIER	ANTES
+Voltage range	Rango de tensión
+Voltage, last 2 min	Tensión, últimos 2 min
+low	bajo
+resting	en reposo
+alternator	alternador
+voltage says:	según la tensión:
+voltage says: alternator charging	según la tensión: el alternador está cargando
+12V Battery	Batería de 12V
+Read voltage / current every	Leer tensión / corriente cada
+Battery type (voltage estimate)	Tipo de batería (estimación por tensión)
+Flooded (lead-acid)	Convencional (plomo-ácido)
+Swap charge / discharge direction	Invertir sentido de carga / descarga
+PAUSED	EN PAUSA
+parked: reads stopped so the car can sleep	aparcado: lecturas detenidas para que el coche entre en reposo
+NO READING	SIN LECTURA
+waiting for the engine unit	esperando a la unidad del motor
+slowing down: braking energy charges the battery	decelerando: la energía de frenado carga la batería
+charge low: charged all the time until it recovers	carga baja: se carga continuamente hasta que se recupere
+strong charge after a start or a deep drain	carga fuerte tras un arranque o una descarga profunda
+the alternator charges the battery	el alternador carga la batería
+SUPPLYING	ALIMENTANDO
+alternator resting, battery feeds the car (normal)	alternador en reposo, la batería alimenta el coche (normal)
+DISCHARGING	DESCARGANDO
+engine off: the battery feeds the car	motor apagado: la batería alimenta el coche
+resting, but low: charge or drive soon	en reposo, pero baja: cárgala o conduce pronto
+hardly any current	casi sin corriente
+engine off, car awake:	motor apagado, coche despierto:
+GOOD	BIEN
+well charged	bien cargada
+about half charged or more	cargada a la mitad o más
+low - drive or charge soon	baja - conduce o cárgala pronto
+VERY LOW	MUY BAJO
+charge the battery	carga la batería
+voltage estimate (5 min low load)	estimación por tensión (5 min con poca carga)
+last reading,	última lectura,
+not available	no disponible
+normal	normal
+lowish - a longer drive helps	algo baja - ayuda un trayecto más largo
+low - use a battery charger	baja - usa un cargador de baterías
+Voltage & current	Tensión y corriente
+CURRENT	CORRIENTE
+into the battery	hacia la batería
+out of the battery	desde la batería
+little current	poca corriente
+this DME gives no current	esta DME no da la corriente
+OUTSIDE TEMP	TEMP. EXTERIOR
+VS. ORIGINAL	VS. ORIGINAL
+Last hour	Última hora
+VOLTAGE  (V)	TENSIÓN  (V)
+no voltage readings yet	aún no hay lecturas de tensión
+STATE OF CHARGE  (%, FROM THE DME)	ESTADO DE CARGA  (%, DE LA DME)
+CURRENT  (A, + = INTO THE BATTERY)	CORRIENTE  (A, + = HACIA LA BATERÍA)
+no current from this DME	sin dato de corriente de esta DME
+Recorded by the car	Registrado por el coche
+STATE OF CHARGE, LAST 5	ESTADO DE CARGA, ÚLTIMOS 5
+older	antes
+TIME SPENT PER CHARGE BAND	TIEMPO POR FRANJA DE CARGA
+Apps	Apps
+Driver front door decor	Moldura puerta del. conductor
+Driver front door handle	Tirador puerta del. conductor
+Driver front door line	Línea puerta del. conductor
+Driver front door pocket	Bolsa puerta del. conductor
+Driver rear door decor	Moldura puerta tras. conductor
+Driver rear door handle	Tirador puerta tras. conductor
+Driver rear door line	Línea puerta tras. conductor
+Driver rear door pocket	Bolsa puerta tras. conductor
+Passenger front door decor	Moldura puerta del. acompañante
+Passenger front door handle	Tirador puerta del. acompañante
+Passenger front door line	Línea puerta del. acompañante
+Passenger front door pocket	Bolsa puerta del. acompañante
+Passenger rear door decor	Moldura puerta tras. acompañante
+Passenger rear door handle	Tirador puerta tras. acompañante
+Passenger rear door line	Línea puerta tras. acompañante
+Passenger rear door pocket	Bolsa puerta tras. acompañante
+B-pillar driver	Pilar B conductor
+Driver seat back	Respaldo conductor
+Console decor driver front	Moldura consola del. conductor
+Console line driver front	Línea consola del. conductor
+Footwell driver front	Zona de pies del. conductor
+Console decor driver rear	Moldura consola tras. conductor
+Console line driver rear	Línea consola tras. conductor
+Footwell driver rear	Zona de pies tras. conductor
+B-pillar passenger	Pilar B acompañante
+Passenger seat back	Respaldo acompañante
+Console decor passenger front	Moldura consola del. acompañante
+Console line passenger front	Línea consola del. acompañante
+Footwell passenger front	Zona de pies del. acompañante
+Console decor passenger rear	Moldura consola tras. acompañante
+Console line passenger rear	Línea consola tras. acompañante
+Footwell passenger rear	Zona de pies tras. acompañante
+Dash decor centre	Moldura salpicadero centro
+Dash line centre	Línea salpicadero centro
+Dash decor driver	Moldura salpicadero conductor
+Dash line driver	Línea salpicadero conductor
+Dash decor passenger	Moldura salpicadero acompañante
+Dash line passenger	Línea salpicadero acompañante
+Sunroof front left	Techo solar del. izq.
+Sunroof front left rear	Techo solar del. izq. detrás
+Sunroof front right	Techo solar del. dcha.
+Sunroof front right rear	Techo solar del. dcha. detrás
+Sunroof rear left	Techo solar tras. izq.
+Sunroof rear left rear	Techo solar tras. izq. detrás
+Sunroof rear right	Techo solar tras. dcha.
+Sunroof rear right rear	Techo solar tras. dcha. detrás
+Gear selector left	Selector de marchas izq.
+Light blade left	Lámina de luz izq.
+Gear selector right	Selector de marchas dcha.
+Light blade right	Lámina de luz dcha.
+Centre stack tray	Bandeja consola central
+Console backlit decor	Moldura retroiluminada consola
+Console tray	Bandeja consola
+Cupholder front	Portavasos delantero
+Cupholder rear	Portavasos trasero
+Colour rolling from side to side	Color que recorre de un lado a otro
+FLE headlights	Faros FLE
+Flashes a second	Destellos por segundo
+Learn high beam	Aprender luz larga
+Learn stopped	Aprendizaje detenido
+Light show	Show de luces
+Light show done	Show de luces terminado
+Light show on	Show de luces activo
+Light show starting...	Iniciando show de luces...
+Light show stopped	Show de luces detenido
+Light show stopped: refused (	Show de luces detenido: rechazado (
+Only for use on private property.	Solo para uso en propiedad privada.
+Passenger	Acompañante
+Pattern	Patrón
+Someone in the car	Alguien en el coche
+Start show	Iniciar show
+Start strobe	Iniciar estrobo
+Strobe done (	Estrobo terminado (
+Strobe starting...	Iniciando estrobo...
+Strobe stopped	Estrobo detenido
+Strobe stopped: refused (	Estrobo detenido: rechazado (
+Switched on in the settings	Activado en los ajustes
+L Both R	I Ambos D
+L R Both	I D Ambos
+Coolant temperature	Temperatura del refrigerante
+Engine oil temperature	Temperatura del aceite del motor
+Wheel speed	Velocidad de rueda
+Torque (actual)	Par (real)
+Reference torque	Par de referencia
+Injector correction	Corrección de inyectores
+Rough running	Funcionamiento irregular
+Scan units first	Escanea primero las unidades
+Make a screen in the app	Crea una pantalla en la app
+Remove this screen	Quitar esta pantalla
+Press again to remove this screen	Pulsa otra vez para quitar esta pantalla
+Not identified	Sin identificar
+Engine unit name	Nombre de la unidad del motor
+Calibration ID	ID de calibración
+Calibration verification number	Número de verificación de calibración
+Tyre pressure target	Presión de neumáticos objetivo
+Sport plus	Sport plus
+Comfort plus	Comfort plus
+Eco pro plus	Eco pro plus
+State of charge (SOC)	Estado de carga (SOC)
+State of health (SOH)	Estado de salud (SOH)
+Highest cell temperature	Temperatura máxima de celda
+Capacity SOH (separate estimate)	SOH de capacidad (estimación aparte)
+SOC estimate quality	Calidad de la estimación del SOC
+Active standby	Espera activa
+Passive standby	Espera pasiva
+Unsupported layout	Diseño no compatible
+Energy flow (converter mode)	Flujo de energía (modo del convertidor)
+AVERAGE EVERY	MEDIA CADA
+ENGINE TIME	TIEMPO DE MOTOR
+Exhaust emissions test	Prueba de emisiones de escape
+NOT RUNNING	INACTIVA
+LIKELY RUNNING	SEGURAMENTE ACTIVA
+No CBS records	Sin registros CBS
+No reply / timeout	Sin respuesta / tiempo agotado
+OIL ASH	CENIZA DE ACEITE
+PRESSURE ACROSS	PRESIÓN DIFERENCIAL
+REGENERATIONS	REGENERACIONES
+Regeneration	Regeneración
+Since the last one	Desde la última
+Previous	Anterior
+TEMPERATURE BEFORE	TEMP. ANTES DEL FILTRO
+From the temperature before the filter	Según la temperatura antes del filtro
+Substitute value	Valor sustitutivo
+Substitute value (modular)	Valor sustitutivo (modular)
+Manipulated data	Datos manipulados
+Unexpected UDS reply	Respuesta UDS inesperada
+TASU not available	TASU no disponible
+OK (modular)	OK (modular)
+Plug-in hybrid	Híbrido enchufable
+48 V mild hybrid	Microhíbrido de 48 V
+None (12 V only)	Ninguno (solo 12 V)
+48 V system	Sistema de 48 V
+48 V battery	Batería de 48 V
+DC/DC converter	Convertidor DC/DC
+12 V details	Detalles 12 V
+12 V SIDE	LADO 12 V
+48 V SIDE	LADO 48 V
+VOLTAGE	TENSIÓN
+HEALTH	SALUD
+ALTERNATOR	ALTERNADOR
+CURRENT · CHARGE	CORRIENTE · CARGA
+No hybrid system answered.	No ha respondido ningún sistema híbrido.
+Hybrid car? Settings > Hybrid system	¿Coche híbrido? Ajustes > Sistema híbrido
+no current reading	sin lectura de corriente
+Standby	En espera
+Error	Error
+Precharge	Precarga
+Charging 12 V	Cargando 12 V
+Charging 48 V	Cargando 48 V
+Emergency mode	Modo de emergencia
+Crash	Colisión
+since reset	desde la puesta a cero
+Torque gauge max	Escala máx. de par
+Advanced settings	Ajustes avanzados
+Tiles	Recuadros
+Over its life	Durante su vida útil
+Capacity and resistance	Capacidad y resistencia
+ENERGY THROUGHPUT	ENERGÍA INTERCAMBIADA
+CHARGED IN TOTAL	CARGADO EN TOTAL
+DISCHARGED IN TOTAL	DESCARGADO EN TOTAL
+PACK VOLTAGE	TENSIÓN DE BATERÍA
+NOMINAL CAPACITY	CAPACIDAD NOMINAL
+MEASURED CAPACITY	CAPACIDAD MEDIDA
+CURRENT CAPACITY	CAPACIDAD ACTUAL
+RESISTANCE NOW	RESISTENCIA ACTUAL
+RESISTANCE WHEN NEW	RESISTENCIA INICIAL
+CHARGE · HEALTH ESTIMATE QUALITY	CALIDAD DE ESTIMACIÓN CARGA · SALUD
+Spark plugs and engine	Bujías y motor
+LIFE BY ENGINE HOURS	VIDA POR HORAS MOTOR
+LIFE BY FUEL USED	VIDA POR COMBUSTIBLE
+ENGINE HOURS ON IT	HORAS MOTOR CON ÉL
+DISTANCE ON IT	DISTANCIA CON ÉL
+SPARK PLUGS: LEFT	BUJÍAS: QUEDAN
+SPARK PLUGS: DRIVEN	BUJÍAS: RECORRIDO
+ENGINE HOURS	HORAS MOTOR
+SOOT	HOLLÍN
+LOAD (ADAPTED)	CARGA (ADAPTADA)
+ASH (ADAPTED)	CENIZA (ADAPTADA)
+Reading the engine unit...	Leyendo la unidad del motor...
+orig.	orig.
+collecting...	recopilando...
+the car's signal	la señal del coche
+Confirm	Confirmar
+VOLTAGE, LAST 2 MIN	TENSIÓN, ÚLTIMOS 2 MIN
+engine off, car awake: well charged	motor parado, coche despierto: bien cargada
+engine off, car awake: about half charged or more	motor parado, coche despierto: cargada a la mitad o más
+LOW	BAJO
+engine off, car awake: low - drive or charge soon	motor parado, coche despierto: baja - conduce o carga pronto
+engine off, car awake: charge the battery	motor parado, coche despierto: carga la batería
+RESTING	EN REPOSO
+HEALTH (SOH)	SALUD (SOH)
+Drive mode	Modo conducción
+Hold Open / Close	Mantener Abrir / Cerrar
+On · sent again every 15 s	Activado · se reenvía cada 15 s
+Off · the car takes over after ~20 s	Desactivado · el coche retoma el control tras ~20 s
+Close: hand back above	Cerrar: ceder por encima de
+Never (not recommended)	Nunca (no recomendado)
+RPM signal lost · OEM requested · select CLOSE again	Sin señal de rpm · OEM solicitado · vuelve a elegir CERRAR
+RPM signal lost · Close paused · the car has the flap	Sin señal de rpm · cierre en pausa · el coche controla la válvula
+Close paused above {rpm} rpm · the car has the flap	Cierre en pausa por encima de {rpm} rpm · el coche controla la válvula
+Waiting for the driving mode	Esperando el modo de conducción
+holding	manteniendo
+Sport	Sport
+Sport+	Sport+
+Sport Individual	Sport Individual
+Comfort	Comfort
+Comfort+	Comfort+
+Comfort Individual	Comfort Individual
+Eco Pro	Eco Pro
+Eco Pro+	Eco Pro+
+Eco Pro Individual	Eco Pro Individual
+Adaptive	Adaptive
+ENGINE	MOTOR
+VOLTAGE FROM	TENSIÓN SEGÚN
+Reset learned	Borrar aprendido
+Learn from driving (redline, shift points, reaction time)	Aprender al conducir (línea roja, puntos de cambio, tiempo de reacción)
+Learn redline from the limiter	Aprender la línea roja del limitador
+Shift point	Punto de cambio
+Per gear, learned (experimental)	Por marcha, aprendido (experimental)
+Redline minus the setting below	Línea roja menos el ajuste de abajo
+Minimum shift point	Punto de cambio mínimo
+Shift lights early by (reaction time, experimental)	Adelantar el indicador de cambio (tiempo de reacción, experimental)
+Downshift cue (experimental)	Aviso para bajar marcha (experimental)
+While slowing down	Al reducir la velocidad
+Show on HUD (experimental)	Mostrar en el HUD (experimental)
+Test pattern	Patrón de prueba
+Minimal (lights and gear)	Mínimo (luces y marcha)
+Split wings	Alas separadas
+VFD glow (teal)	Brillo VFD (verde azulado)
+Vector arcade (outlines)	Arcade vectorial (contornos)
+Night amber	Night amber
+Ice white	Ice white
+Shift lights	Indicador de cambio
+GT3 (outside in, flash)	GT3 (de fuera a dentro, destello)
+Left to right	De izq. a dcha.
+Shift grade after each upshift	Nota del cambio tras cada subida de marcha
+Burst (pops, ring)	Estallido (chispas, anillo)
+Peak marker	Marca de pico
+Shake on the limiter	Sacudida en el limitador
+Unlit segments	Segmentos apagados
+Rev bar (the bar graph tach)	Barra de rpm (el cuentarrevoluciones de barras)
+RPM readout (a number; 7-segment digits in the digital and VFD layouts)	Indicador de rpm (un número; dígitos de 7 segmentos en los diseños digital y VFD)
+Gearbox mode (D / S / M) by the gear	Modo del cambio (D / S / M) junto a la marcha
+Boost unit	Unidad de turbo
+Power (from torque and rpm)	Potencia (según par y rpm)
+Throttle (accelerator pedal)	Acelerador (posición del pedal)
+G-force (sideways and braking / accelerating together)	Fuerza G (lateral y frenada / aceleración juntas)
+Oil temp	Temp. aceite
+Water temp	Temp. agua
+Gearbox temp	Temp. cambio
+Outside temp (blue at 3 °C and below)	Temp. exterior (azul a 3 °C o menos)
+Cold-engine shift limit	Límite de cambio en frío
+Only when cold or hot	Solo en frío o en caliente
+Position left / right	Posición izquierda / derecha
+Position up / down	Posición arriba / abajo
+Frame rate	Tasa de fotogramas
+In Comfort / Eco Pro	En Comfort / Eco Pro
+Show all	Mostrar todo
+Shift lights and gear only	Solo indicador de cambio y marcha
+Hide (BMW's own HUD)	Ocultar (HUD propio de BMW)
+RPM readout	Lectura de RPM
+Exact (to 10 rpm)	Exacto (cada 10 rpm)
+Steady (to 50 rpm)	Estable (cada 50 rpm)
+Thousands (4.5)	Miles (4.5)
+Readouts refresh (faster: more work for the head unit, experimental)	Refresco de indicadores (más rápido: más carga para la unidad principal, experimental)
+Readout labels	Etiquetas de lecturas
+Clearer (bigger, brighter)	Más claras (más grandes y brillantes)
+Outside temp (blue at 3 °C / 37 °F and below)	Temp. exterior (azul a 3 °C / 37 °F o menos)
+Ambient config	Luz ambiente
+Colour by driving mode	Color según el modo de conducción
+Look by driving mode	Aspecto por modo de conducción
+Welcome sweep at start	Bienvenida al arrancar
+Sport pulse	Pulso Sport
+Dimmer at night	Más tenue de noche
+My colour back at each start	Volver a mi color al arrancar
+Redline shift flash	Destello de cambio Redline
+Leave as is	Dejar como está
+Leave as is gives my own colour back	Dejar como está recupera mi propio color
+By driving mode	Por modo de conducción
+Following driving mode	Sigue el modo de conducción
+Not following	No sigue el modo
+Car type	Tipo de coche
+Petrol or diesel	Gasolina o diésel
+Hybrid Eco Pro	Hybrid Eco Pro
+Hybrid	Hybrid
+Electric	Electric
+Give the HUD back to Cluster functions at switch-off	Devolver el HUD a Cluster functions al apagar
+All HUD options here (else on the HUD looks page)	Todas las opciones del HUD aquí (si no, en la página Aspecto HUD)
+Arc (after the F80 / F82 M3 and M4)	Arco (estilo F80 / F82 M3 y M4)
+Arrows show	Las flechas indican
+Auto (Barlow on Arc, Ramp and Dial)	Auto (Barlow en Arco, Rampa y Esfera)
+Best gear (into the power band)	Mejor marcha (dentro de la banda de potencia)
+Comfort HUD setup	Configuración del HUD en Comfort
+In Hybrid / Electric	En Hybrid / Electric
+Hybrid HUD setup	Configuración del HUD en Hybrid
+Dial (after the E60 M5)	Esfera (estilo E60 M5)
+Pill (a sim-racing telemetry look)	Píldora (estilo de telemetría de simracing)
+Don't show (BMW's own HUD)	No mostrar (HUD original de BMW)
+Downshift arrows (experimental)	Flechas para bajar marcha (experimental)
+Every gear you can drop	Todas las marchas que puedes bajar
+Gear font	Fuente de la marcha
+Gearbox mode (D / S / M)	Modo del cambio (D / S / M)
+HUD colours	Colores del HUD
+HUD frame rate	Fotogramas del HUD
+HUD layout	Diseño del HUD
+HUD readouts refresh (faster: more work for the head unit)	Refresco de lecturas del HUD (más rápido: más carga para la unidad principal)
+Its own HUD (set up on HUD looks)	HUD propio (se ajusta en Aspecto HUD)
+Knock retard (degrees, only while it retards)	Retardo por picado (grados, solo mientras retrasa)
+Knock warning (KNOCK when the engine pulls timing, experimental)	Aviso de picado (KNOCK cuando el motor retrasa el encendido, experimental)
+Launch time (0-100 km/h or 0-60 mph after a standing start, against your best)	Tiempo de salida (0-100 km/h o 0-60 mph desde parado, frente a tu récord)
+Light colours	Colores de las luces
+Light fill	Relleno de las luces
+Outside (blue at 3 °C / 37 °F and below)	Exterior (azul a 3 °C / 37 °F o menos)
+RPM shows as	Mostrar RPM como
+Ramp (after the G80 / G82 M3 and M4)	Rampa (estilo G80 / G82 M3 y M4)
+Rev bar	Barra de rpm
+Same HUD as Sport	Mismo HUD que en Sport
+Directions on the HUD (experimental)	Indicaciones en el HUD (experimental)
+While a route runs	Con una ruta activa
+Near turns (under 1 km, and lanes)	Giros cercanos (a menos de 1 km, y carriles)
+Directions left / right	Indicaciones izquierda / derecha
+Directions up / down	Indicaciones arriba / abajo
+Fuel use unit	Unidad de consumo
+l/100 km	l/100 km
+mpg (UK)	mpg (R. Unido)
+mpg (US)	mpg (EE. UU.)
+Tyre pressure unit	Unidad de presión de neumáticos
+Fuel use (from the engine unit, experimental)	Consumo (de la unidad del motor, experimental)
+Tyres (the four pressures, coloured against their targets)	Neumáticos (las cuatro presiones, con colores según su objetivo)
+Hybrid battery charge (%)	Carga de la batería híbrida (%)
+Hybrid battery power (kW, + drive, - regen)	Potencia de la batería híbrida (kW, + propulsión, - regen.)
+Recovery / power bar (regen left, drive right)	Barra de recuperación / potencia (regen. a la izquierda, propulsión a la derecha)
+Hybrid battery temperature	Temperatura de la batería híbrida
+Hybrid battery voltage	Tensión de la batería híbrida
+This car has a hybrid battery (found by the app)	Este coche tiene batería híbrida (detectada por la app)
+Tyre widget (in the directions' corner; the directions come first)	Widget de neumáticos (en la esquina de las indicaciones; estas tienen prioridad)
+When a tyre is low	Si un neumático está bajo
+Low or warming up	Bajo o calentándose
+Tyre widget: the car	Widget de neumáticos: el coche
+Tyre widget: each tyre's target	Widget de neumáticos: objetivo de cada neumático
+Tyre widget: tyre temperatures	Widget de neumáticos: temperaturas
+This car sends tyre pressures (found by the app)	Este coche envía presiones de neumáticos (detectado por la app)
+Temperatures shown	Mostrar temperaturas
+80s digital dash	Cuadro digital años 80
+Advanced	Avanzado
+Bottom right corner	Esquina inferior derecha
+Auto (learns from your shifts)	Auto (aprende de tus cambios)
+Learning (experimental)	Aprendizaje (experimental)
+HUD: look	HUD: aspecto
+HUD: readouts	HUD: lecturas
+HUD: alerts	HUD: avisos
+HUD: place	HUD: posición
+HUD: tyres	HUD: neumáticos
+Colour	Color
+Dim	Tenue
+Simple	Simple
+Size	Tamaño
+Centre	Centro
+Screen	Pantalla
+HUD looks	Aspecto HUD
+Minimal	Mínimo
+VFD glow	Brillo VFD
+Vector arcade	Arcade vectorial
+Arc (F80 M3/M4)	Arco (F80 M3/M4)
+Ramp (G80 M3/M4)	Rampa (G80 M3/M4)
+Pill	Píldora
+Comfort / Eco	Comfort / Eco
+Comfort / Eco Pro	Comfort / Eco Pro
+SHOWS	MUESTRA
+Same as Sport	Igual que Sport
+Its own	Propio
+Don't show	No mostrar
+Play on HUD	Ver en el HUD
+Stop	Parar
+Playing on the HUD...	Reproduciendo en el HUD...
+Stop the car to play it on the HUD	Detén el coche para verlo en el HUD
+Show on HUD is off (Settings)	Mostrar en el HUD está desactivado (Ajustes)
+The HUD needs cluster-render: install Cluster renderer from the MGU Store	El HUD necesita cluster-render: instala Cluster renderer desde la MGU Store
+Redline's HUD is off in Comfort / Eco Pro	El HUD de Redline está desactivado en Comfort / Eco Pro
+Redline's HUD is off in Hybrid / Electric	El HUD de Redline está desactivado en Hybrid / Electric
+BMW's own HUD shows instead. Pick Same as Sport or Its own to bring it back	En su lugar se ve el HUD original de BMW. Elige Igual que Sport o Propio para recuperarlo
+Comfort / Eco Pro uses the Sport HUD. Change anything here to give it its own.	Comfort / Eco Pro usa el HUD de Sport. Cambia cualquier cosa aquí para darle uno propio.
+Hybrid / Electric uses the Sport HUD. Change anything here to give it its own.	Hybrid / Electric usa el HUD de Sport. Cambia cualquier cosa aquí para darle uno propio.
+Changes here only affect Comfort / Eco Pro, its size and place too.	Los cambios aquí solo afectan a Comfort / Eco Pro, también a su tamaño y posición.
+Changes here only affect Hybrid / Electric, its size and place too.	Los cambios aquí solo afectan a Hybrid / Electric, también a su tamaño y posición.
+LOOK	ASPECTO
+GAUGE	MEDIDOR
+READOUTS	LECTURAS
+ALERTS	AVISOS
+PLACE	POSICIÓN
+Colours, gear font, labels and how the rpm reads	Colores, fuente de la marcha, etiquetas y cómo se leen las rpm
+The shift lights and their colours (the screen uses them too); tap a part to show or hide it	El indicador de cambio y sus colores (también los usa la pantalla); toca una parte para mostrarla u ocultarla
+Up to four show, in this order; a cold or hot one keeps its place. Units: Settings	Se ven hasta cuatro, en este orden; una fría o caliente conserva su sitio. Unidades: Ajustes
+After an upshift, on knock, after a standing start; Shake: on the limiter. And the downshift arrows	Tras subir de marcha, con picado, tras salir desde parado; Sacudida: en el limitador. Y las flechas para bajar marcha
+Where the directions go, when they have no turn; it moves with them. Shown big here	Donde van las indicaciones, cuando no hay giro; se mueve con ellas. Aquí se ve en grande
+Where the HUD of this setup sits on the glass	Dónde se coloca en el cristal el HUD de esta configuración
+on: the first	activadas: se ven las primeras
+that have a value show	que tengan valor
+Partly outside the windshield	En parte fuera del parabrisas
+as measured on one car	medido en un solo coche
+LABELS	ETIQUETAS
+Clearer	Más claras
+RPM AS	RPM COMO
+Exact	Exacto
+Steady	Estable
+Thousands	Miles
+LIGHTS	LUCES
+COLOURS	COLORES
+Race	Carreras
+One colour	Un color
+Gear mode	Modo del cambio
+UNLIT	APAGADOS
+Power bar	Barra de potencia
+Knock	Picado
+TEMPS	TEMP.
+Cold limit	Límite en frío
+GRADE	NOTA
+Burst	Onda
+When braking	Al frenar
+ALSO	ADEMÁS
+Knock warning	Aviso de picado
+Launch time	Tiempo de salida
+Shake	Sacudida
+ARROWS	FLECHAS
+ARROWS TO	FLECHAS A
+Every gear	Todas las marchas
+Best gear	Mejor marcha
+When low	Si está bajo
+UNIT	UNIDAD
+PARTS	PARTES
+Car	Coche
+MOVE	MOVER
+SIZE	TAMAÑO
+Smaller	Más pequeño
+Bigger	Más grande
+corner	esquina
+centre	centro
+Off: not shown on the HUD	Desactivado: no se muestra en el HUD
+Your tyres now	Tus neumáticos ahora
+A sample	Un ejemplo
+Your tyres now; on the HUD only while a tyre is low	Tus neumáticos ahora; en el HUD solo si un neumático está bajo de presión
+A sample; on the HUD only while a tyre is low	Un ejemplo; en el HUD solo si un neumático está bajo de presión
+HV VOLTS	TENSIÓN HV
+PERFECT SHIFT	CAMBIO PERFECTO
+HUD: on	HUD: activado
+HUD: off after display errors	HUD: desactivado por errores de visualización
+HUD: giving way to BMW's directions	HUD: deja paso a las indicaciones de BMW
+HUD: giving way to BMW	HUD: cediendo el paso a BMW
+HUD: hidden in Comfort / Eco Pro	HUD: oculto en Comfort / Eco Pro
+HUD: cluster-render not running · install Cluster renderer from the MGU Store	HUD: cluster-render no está en marcha · instala Cluster renderer desde la MGU Store
+RESET	PUESTA A CERO
+NORMAL	NORMAL
+Torque curve (full load)	Curva de par (plena carga)
+Nothing yet: full-throttle pulls, a few from low rpm, fill it in	Aún nada: se rellena con aceleraciones a fondo, algunas desde pocas rpm
+Shift points	Puntos de cambio
+Reset all	Borrar todo
+RPM PER KM/H	RPM POR KM/H
+learning	aprendiendo
+Shift points need full-throttle pulls up to the redline	Los puntos de cambio necesitan aceleraciones a fondo hasta la línea roja
+1 of 2 limiter hits seen	1 de 2 toques al limitador detectados
+one more, held half a second, oil warm	uno más, de medio segundo, con el aceite caliente
+learns after two hits of the limiter, each held half a second, oil warm	aprende tras dos toques al limitador de medio segundo cada uno, con el aceite caliente
+REACTION	REACCIÓN
+manual	manual
+profile	perfil
+CAR	COCHE
+Petrol car	Coche de gasolina
+Diesel car	Coche diésel
+Petrol hybrid	Híbrido de gasolina
+Diesel hybrid	Híbrido diésel
+set by hand	ajustado a mano
+Tyre sensors	Con sensores de neumáticos
+No tyre sensors	Sin sensores de neumáticos
+Press Reset learned again to forget it all	Pulsa otra vez Borrar aprendido para olvidarlo todo
+Learning off: values kept	Aprendizaje desactivado: se conservan los valores
+graded	valorados
+vs shift point	respecto al punto de cambio
+CRUISE	CRUCERO
+The car standing still (light show)	El coche parado (show de luces)
+Animations	Animaciones
+Driving modes	Modos de conducción
+Favourites	Favoritos
+Red	Rojo
+Orange	Naranja
+Amber	Ámbar
+Yellow	Amarillo
+Green	Verde
+Cyan	Cian
+Blue	Azul
+Violet	Violeta
+Pink	Rosa
+White	Blanco
+Looking for the car's lights...	Buscando las luces del coche...
+The car's lights did not answer	Las luces del coche no han respondido
+Original colour (as set in BMW's menu)	Color original (el del menú de BMW)
+On in the car:	Encendidas en el coche:
+Colour for Sport	Color para Sport
+Colour for Comfort	Color para Comfort
+Colour for Eco Pro	Color para Eco Pro
+Colour for Adaptive	Color para Adaptive
+Colour for Hybrid	Color para Hybrid
+Colour for Electric	Color para Electric
+Animation for Sport	Animación para Sport
+Animation for Comfort	Animación para Comfort
+Animation for Eco Pro	Animación para Eco Pro
+Animation for Adaptive	Animación para Adaptive
+Animation for Hybrid	Animación para Hybrid
+Animation for Electric	Animación para Electric
+Sport will look	Sport se verá
+Comfort will look	Comfort se verá
+Eco Pro will look	Eco Pro se verá
+Adaptive will look	Adaptive se verá
+Hybrid will look	Hybrid se verá
+Electric will look	Electric se verá
+Changing Sport's look	Cambiando el aspecto de Sport
+Changing Comfort's look	Cambiando el aspecto de Comfort
+Changing Eco Pro's look	Cambiando el aspecto de Eco Pro
+Changing Adaptive's look	Cambiando el aspecto de Adaptive
+Changing Hybrid's look	Cambiando el aspecto de Hybrid
+Changing Electric's look	Cambiando el aspecto de Electric
+It shows whenever Sport is on.	Se muestra siempre que Sport está activo.
+It shows whenever Comfort is on.	Se muestra siempre que Comfort está activo.
+It shows whenever Eco Pro is on.	Se muestra siempre que Eco Pro está activo.
+It shows whenever Adaptive is on.	Se muestra siempre que Adaptive está activo.
+It shows whenever Hybrid is on.	Se muestra siempre que Hybrid está activo.
+It shows whenever Electric is on.	Se muestra siempre que Electric está activo.
+In the car	En el coche
+Whole car	Coche entero
+Upper lights	Luces arriba
+Lower lights	Luces abajo
+Colouring	Zona
+Brightness	Brillo
+Upper	Arriba
+Lower	Abajo
+Original colour	Color original
+Save favourite	Guardar favorito
+Any colour needs the body module, which did not answer.	Cualquier color necesita el módulo de carrocería, que no ha respondido.
+BMW's own colours meanwhile:	Mientras tanto, colores propios de BMW:
+Look again	Volver a buscar
+Animation	Animación
+No animation, a steady colour	Sin animación, color fijo
+Slowly brighter and dimmer	Sube y baja el brillo despacio
+Every colour in turn	Todos los colores por turnos
+Upper colour to lower colour and back	Del color de arriba al de abajo y vuelta
+Colour moving from the dash to the rear	Color que avanza del salpicadero hacia atrás
+Colours: on the Colour tab	Colores: en la pestaña Color
+writes a second	escrituras por segundo
+frames a second	fotogramas por segundo
+BMW's original colour	Color original de BMW
+The Colour tab's colour	El color de la pestaña Color
+Choose colour	Elegir color
+Nothing chosen: the Colour tab's colour. Tap Original colour again to undo it.	Nada elegido: el color de la pestaña Color. Toca otra vez Color original para deshacerlo.
+Empty	Vacío
+Tap to save the look on now	Toca para guardar la iluminación actual
+Delete	Borrar
+Solid	Fijo
+Breathing	Respiración
+Rainbow	Arcoíris
+Smooth fade	Fundido suave
+Colour wave	Onda de color
+Welcome sweep	Barrido de bienvenida
+the body module refused	el módulo de carrocería lo rechazó
+no answer from the body module	sin respuesta del módulo de carrocería
+refused (security access) · try diagnostic mode: press Start 3 times without the brake, then again	rechazado (acceso de seguridad) · prueba el modo diagnóstico: pulsa Start 3 veces sin pisar el freno y vuelve a intentarlo
+security access · try diagnostic mode (Start 3 times, no brake); else this VIP needs an unlock	acceso de seguridad · prueba el modo diagnóstico (Start 3 veces, sin freno); si no, este VIP necesita desbloqueo
+Logs	Registros
+Directions	Indicaciones
+Cluster renderer	Cluster renderer
+Refresh	Actualizar
+What Redline and the HUD did lately	Actividad reciente de Redline y el HUD
+Auto (Barlow on Arc and Dial, squared on Ramp)	Auto (Barlow en Arco y Esfera, cuadrada en Rampa)
+Speed (km/h or mph, as Speed unit; on Ramp under the gear)	Velocidad (km/h o mph, según Unidad de velocidad; en Rampa bajo la marcha)
+HUD: waits for the car to be switched on	HUD: esperando a que se encienda el coche
+HUD: off in the settings	HUD: desactivado en los ajustes
+Nothing to show	Nada que mostrar
+newest first	más recientes primero
+times UTC	horas en UTC
+Nothing important in the last	Nada importante en los últimos
+No log yet in	Aún no hay registro en
+Could not read	No se pudo leer
+Apps may not read	Las apps no pueden leer
+not a file	no es un archivo
+No cluster-render log here (not installed, or an older Cluster renderer)	No hay registro de cluster-render (no instalado, o Cluster renderer antiguo)
+cluster-render started	cluster-render iniciado
+Another ambient app	Otra app de luz ambiente
+IterioDev's Comfort tool is running. It changes the ambient lights too, so the colours jump between the two apps. Uninstall it in the Store (Installed, Head-unit tools, Comfort) and use one ambient app at a time.	La herramienta Comfort de IterioDev está en marcha. También cambia la luz ambiente, así que los colores saltan entre las dos apps. Desinstálala en la Store (Instalado, Herramientas de la unidad, Comfort) y usa una sola app de luz ambiente a la vez.
+Left	Izquierda
+Right	Derecha
+Hybrid Eco	Hybrid Eco
+Hybrid Comfort	Hybrid Comfort
+Electric Individual	Electric Individual
+Sport Boost	Sport Boost
+Turn signal glow	Brillo con intermitente
+Open door red	Puerta en rojo
+High beam strobe and light show (only for use on private property)	Estrobo de luz de carretera y show de luces (solo para uso en propiedad privada)
+Strobe lights	Luces de estrobo
+All lights	Todas las luces
+High beam	Luz de carretera
+Strobe flashes a second	Destellos por segundo
+Police flashes a burst	Policía: destellos por ráfaga
+Strobe flash length	Duración del destello
+Police order	Policía: orden
+Left, both, right	Izquierda, ambos, derecha
+Left, right, both	Izquierda, derecha, ambos
+Left, right	Izquierda, derecha
+Strobe pattern	Patrón de estrobo
+In turn	Alternado
+Strobe speed	Vel. del estrobo
+Light show speed	Vel. show de luces
+Battery power	Potencia de la batería
+Fast (the car's eDRIVE needle)	Rápida (la aguja eDRIVE del coche)
+Battery readings only	Solo lecturas de la batería
+Police	Policía
+Strobe	Estrobo
+Drive system	Sistema de propulsión
+Fully electric (BEV)	Eléctrico puro (BEV)
+Fully electric: usable battery when new	Eléctrico puro: capacidad útil de la batería nueva
+Fully electric: range counts down to	Eléctrico puro: autonomía calculada hasta
+0 % (empty)	0 % (vacía)
+Real range	Autonomía real
+down to	hasta
+cell charge	carga de celda
+lowest to highest cell	de celda mín. a máx.
+Cell voltage spread	Dispersión de tensión de celdas
+Cell charge spread	Dispersión de carga de celdas
+Cell voltages	Tensiones de celda
+Hybrid or electric car? Settings > Drive system	¿Coche híbrido o eléctrico? Ajustes > Sistema de propulsión
+Bank 2	Bancada 2
+SOOT, BANK 1	HOLLÍN, BANCADA 1
+SOOT, BANK 2	HOLLÍN, BANCADA 2
+Bank 1	Banco 1
+Telematics: Mobile network connection limited	Telemática: conexión a la red móvil limitada
+Assist sensors: Unexpected Ethernet communication/link	Sensores de asistencia: comunicación/enlace Ethernet inesperado
+Debug mode active (SSH open)	Modo de depuración activo (SSH abierto)
+HU-H: Reset	HU-H: reinicio
+Check engine oil level	Comprobar nivel de aceite del motor
+FA-CAN message missing: fuel tank level / range (0x373)	Falta mensaje FA-CAN: nivel del depósito / autonomía (0x373)
+Message (driver assistance, comfort, safety) missing, receiver ACC/FRSF, transmitter DSC/SAS	Falta mensaje (asistencia al conductor, confort, seguridad), receptor ACC/FRSF, emisor DSC/SAS
+Message (chassis, acceleration data) missing, receiver ACC/FRSF, transmitter DSC/VIP	Falta mensaje (chasis, datos de aceleración), receptor ACC/FRSF, emisor DSC/VIP
+ZGM: Test operation is active	ZGM: modo de prueba activo
+ZGM: Ethernet: Communication ended unexpectedly	ZGM: Ethernet: comunicación interrumpida inesperadamente
+Message (system time, 0x328) faulty, receiver ZGM, transmitter KOMBI	Mensaje (hora del sistema, 0x328) erróneo, receptor ZGM, emisor KOMBI
+Power window regulator, driver's side: LIN slave not present	Elevalunas, lado del conductor: esclavo LIN no presente
+Power window regulator on passenger's side: LIN slave	Elevalunas del lado del acompañante: esclavo LIN
+Rear driver's side power window regulator: LIN slave missing	Elevalunas trasero, lado del conductor: falta esclavo LIN
+Power window, passenger's side, rear: LIN slave missing	Elevalunas, lado del acompañante, trasero: falta esclavo LIN
+Steering column switch cluster (SZL): LIN slave missing	Centro de conmutación de la columna de dirección (SZL): falta esclavo LIN
+Multifunction steering wheel: LIN slave absent	Volante multifunción: esclavo LIN ausente
+Steering wheel module: LIN slave missing	Módulo del volante: falta esclavo LIN
+ELSV (LIN): LIN slave absent	ELSV (LIN): esclavo LIN ausente
+Brake light switch (BLS): wire break or short circuit to battery voltage	Interruptor de luz de freno (BLS): rotura de cable o cortocircuito a tensión de batería
+IBS wakeup: line disconnected or short circuit to battery voltage	Activación IBS: línea desconectada o cortocircuito a tensión de batería
+Centre lock rocker switch in the front passenger door: Line fault or malfunctioning	Pulsador basculante del cierre centralizado en la puerta del acompañante: fallo de línea o funcionamiento incorrecto
+Central locking drive for tailgate or split door, right: line break or short circuit to battery voltage	Accionamiento del cierre centralizado del portón trasero o puerta de dos hojas, derecha: rotura de línea o cortocircuito a tensión de batería
+Rocker switch of central locking system in driver's door: Wiring fault or defective	Pulsador basculante del cierre centralizado en la puerta del conductor: fallo de cableado o averiado
+Engine compartment lid contact switch: Line fault or defective	Contacto del capó del motor: fallo de línea o averiado
+Front passenger door contact Wiring broken or defective	Contacto de la puerta del acompañante: cableado roto o averiado
+Front passenger door door contact, rear / bottom: Wiring broken or defective	Contacto de la puerta del acompañante, trasero / inferior: cableado roto o averiado
+Driver's door contact: Line break or faulty	Contacto de la puerta del conductor: rotura de línea o averiado
+Door contact, driver's door rear / bottom: Line break or faulty	Contacto de puerta, puerta del conductor trasero / inferior: rotura de línea o averiado
+Headlight beam throw adjustment (LWR): System failure	Regulación del alcance de los faros (LWR): fallo del sistema
+Rain-light-solar-condensation sensor: Implausible signal from rain sensor or driving light sensor	Sensor de lluvia, luz, radiación solar y condensación: señal no plausible del sensor de lluvia o del sensor de luz de marcha
+Washer jet heating: Wiring break or short circuit to B+	Calefacción de los surtidores del lavaparabrisas: rotura de cable o cortocircuito a B+
+Auxiliary coolant pump: Short circuit to positive terminal or open line	Bomba adicional de refrigerante: cortocircuito a positivo o línea abierta
+compressor clutch: Open line or short circuit to B+	embrague del compresor: línea abierta o cortocircuito a B+
+control valve : Short circuit to positive terminal or circuit open	válvula de regulación : cortocircuito a positivo o circuito abierto
+Automatic air recirculation control (AUC) sensor: short circuit, interruption or defective pulse-width modulated signal	Sensor de recirculación automática de aire (AUC): cortocircuito, interrupción o señal de modulación por ancho de pulso defectuosa
+Fanfare: B+ short circuit or line break or relay stuck	Bocina: cortocircuito a B+, rotura de línea o relé agarrotado
+Shifting paddles: B+ short circuit or cable break	Levas de cambio: cortocircuito a B+ o rotura de cable
+Light sources on the LIN bus system for interior light: Incorrect number of light sources	Fuentes de luz del bus LIN de la luz interior: número incorrecto de fuentes de luz
+LIN master FAT-LIN: Communication absent	Maestro LIN FAT-LIN: sin comunicación
+LIN master K-LIN_1: Communication not present	Maestro LIN K-LIN_1: sin comunicación
+LIN master K-LIN_16: Communication not present	Maestro LIN K-LIN_16: sin comunicación
+LIN master K-LIN_21: Communication not present	Maestro LIN K-LIN_21: sin comunicación
+LIN master K-LIN_15: Communication not present	Maestro LIN K-LIN_15: sin comunicación
+LIN master BFT-LIN: Communication absent	Maestro LIN BFT-LIN: sin comunicación
+LIN master FI-LIN: Communication not present	Maestro LIN FI-LIN: sin comunicación
+LIN master SV-LIN: Communication not present	Maestro LIN SV-LIN: sin comunicación
+LIN master SV-LIN: Faulty communication	Maestro LIN SV-LIN: comunicación defectuosa
+Door switch centre operating facility (SZT), (LIN): No LIN slave present	Centro de mando de interruptores de puerta (SZT), (LIN): no hay esclavo LIN
+Exterior mirror, left (LIN): No LIN slave present	Retrovisor exterior izquierdo (LIN): no hay esclavo LIN
+Exterior mirror, right (LIN): No LIN slave present	Retrovisor exterior derecho (LIN): no hay esclavo LIN
+Evaluation electronics, non-contact tailgate opening (LIN): LIN components absent or communication not possible	Electrónica de evaluación de la apertura sin contacto del portón trasero (LIN): componentes LIN ausentes o comunicación imposible
+Windscreen wiper (LIN): No LIN-slave present	Limpiaparabrisas (LIN): no hay esclavo LIN
+Drivers side rear seat-heating electronics (LIN): LIN components missing or communication not possible	Electrónica de la calefacción del asiento trasero, lado del conductor (LIN): faltan componentes LIN o comunicación imposible
+Passengers side rear seat-heating electronics (LIN): LIN components missing or communication not possible	Electrónica de la calefacción del asiento trasero, lado del acompañante (LIN): faltan componentes LIN o comunicación imposible
+Switch block, seat functions driver's door (LIN): LIN components missing or communication not possible	Bloque de interruptores de funciones del asiento, puerta del conductor (LIN): faltan componentes LIN o comunicación imposible
+Switch block, seat functions front passenger door (LIN): LIN components missing or communication not possible	Bloque de interruptores de funciones del asiento, puerta del acompañante (LIN): faltan componentes LIN o comunicación imposible
+Centre console control panel: LIN slave missing	Panel de mandos de la consola central: falta esclavo LIN
+LIN power distribution box: LIN slave absent	Caja de distribución de corriente LIN: esclavo LIN ausente
+Message not received (torque crankshaft 1, 0xA5), receiver BDC, transmitter DME/DDE	Mensaje no recibido (par del cigüeñal 1, 0xA5), receptor BDC, emisor DME/DDE
+Message missing (status of DSC stabilisation, 0x173), recipient BDC, sender DSC	Falta mensaje (estado de la estabilización DSC, 0x173), receptor BDC, emisor DSC
+Missing message (centre of gravity longitudinal acceleration, 0x199), BDC is receiver, DSC is transmitter	Falta mensaje (aceleración longitudinal del centro de gravedad, 0x199), BDC es receptor, DSC es emisor
+Message not received (vehicle yaw rate, 0x19F), recipient BDC, sender DSC	Mensaje no recibido (velocidad de guiñada del vehículo, 0x19F), receptor BDC, emisor DSC
+Missing message (vehicle speed, 0x1A1), BDC is receiver, DSC is transmitter	Falta mensaje (velocidad del vehículo, 0x1A1), BDC es receptor, DSC es emisor
+Message missing (status, assistance system display, 0x1C0), BDC receiver, KOMBI transmitter	Falta mensaje (estado, indicación de sistemas de asistencia, 0x1C0), receptor BDC, emisor KOMBI
+Message missing (vehicle electrical system voltage value, 0x281), BDC receiver, DME/DDE transmitter	Falta mensaje (valor de tensión de la red de a bordo, 0x281), receptor BDC, emisor DME/DDE
+Message not received (Seat occupancy seat belt buckle contact status, 0x297), receiver is BDC, transmitter is ACSM	Mensaje no recibido (estado de ocupación del asiento y contacto del cierre del cinturón, 0x297), el receptor es BDC, el emisor es ACSM
+Message absent (actual driver steering angle, 0x301), receiver BDC, transmitter DSC	Falta mensaje (ángulo de dirección real del conductor, 0x301), receptor BDC, emisor DSC
+Missing message (steering angle, front axle, effective, 0x302), BDC receiver, DSC transmitter	Falta mensaje (ángulo de dirección, eje delantero, efectivo, 0x302), receptor BDC, emisor DSC
+Message absent (relative time, 0x328), BDC receiver, KOMBI transmitter	Falta mensaje (tiempo relativo, 0x328), receptor BDC, emisor KOMBI
+Message absent (data, drive train 2, 0x3F9), receiver is BDC, transmitter is DME/DDE	Falta mensaje (datos, tren motriz 2, 0x3F9), el receptor es BDC, el emisor es DME/DDE
+Missing message (vehicle ride height, 0x83) receiver BDC, transmitter VDP	Falta mensaje (altura del vehículo, 0x83) receptor BDC, emisor VDP
+Message not received (control, water valves, 0x2BF), receiver BDC, transmitter IHKA	Mensaje no recibido (control, válvulas de agua, 0x2BF), receptor BDC, emisor IHKA
+Missing message (exterior lighting front electronics 1 left status, 0x1E0), BDC is receiver, FLEL is transmitter	Falta mensaje (estado de la electrónica de luces exteriores delantera 1 izquierda, 0x1E0), BDC es receptor, FLEL es emisor
+Absent message (exterior light front electronics 1 right status, 0x1E6), BDC is receiver, FLER is transmitter	Falta mensaje (estado de la electrónica de luces exteriores delantera 1 derecha, 0x1E6), BDC es receptor, FLER es emisor
+Missing message (exterior lighting front electronics 2 left status, 0x1FB), BDC is receiver, FLEL is transmitter	Falta mensaje (estado de la electrónica de luces exteriores delantera 2 izquierda, 0x1FB), BDC es receptor, FLEL es emisor
+Absent message (exterior light front electronics 2 right status, 0x1FD), BDC is receiver, FLER is transmitter	Falta mensaje (estado de la electrónica de luces exteriores delantera 2 derecha, 0x1FD), BDC es receptor, FLER es emisor
+Message absent (target display, vibration, lane change warning, 0x1FC), receiver SAS, sender SWW	Falta mensaje (indicación nominal, vibración, aviso de cambio de carril, 0x1FC), receptor SAS, emisor SWW
+Message absent (nominal haptics warning, lane departure, 0x23F), BDC receiver, KAFAS transmitter	Falta mensaje (aviso háptico nominal, salida de carril, 0x23F), receptor BDC, emisor KAFAS
+Message absent (target answer-back warning of lateral control assistance, 0x240), receiver BDC, sender SAS	Falta mensaje (aviso de confirmación nominal del asistente de guiado lateral, 0x240), receptor BDC, emisor SAS
+Missing message (front climate control panel status, 0x246), receiver BDC, transmitter IHKA	Falta mensaje (estado del panel de climatización delantero, 0x246), receptor BDC, emisor IHKA
+Message absent (data, drive train 2, 230.0.2), receiver is BDC, transmitter is DME/DDE	Falta mensaje (datos, tren motriz 2, 230.0.2), el receptor es BDC, el emisor es DME/DDE
+FM/AM aerial: Line open between aerial amplifier and control unit	Antena FM/AM: línea abierta entre el amplificador de antena y la unidad de control
+FM2 aerial: Disconnection of line between aerial amplifier and control unit	Antena FM2: desconexión de la línea entre el amplificador de antena y la unidad de control
+RAM: Microphone 1: Wire break	RAM: micrófono 1: rotura de cable
+RAM: Microphone 2. Wire break in line	RAM: micrófono 2. Rotura de cable en la línea
+RAM, K-CAN4: Fault in line	RAM, K-CAN4: fallo en la línea
+HU-H: Fault in secure ethernet communication occurred	HU-H: se ha producido un fallo en la comunicación Ethernet segura
+Bluetooth aerial: Disconnected line	Antena Bluetooth: línea desconectada
+WLAN aerial: Disconnected line	Antena WLAN: línea desconectada
+HU-H: Theft-proofing initialisation was not started	HU-H: no se ha iniciado la inicialización de la protección antirrobo
+Hot film air mass meter: Intake air temp too high	Caudalímetro de película caliente: temperatura del aire de admisión demasiado alta
+Intake air temperature sensor: Short to B+	Sensor de temperatura del aire de admisión: cortocircuito a B+
+BDC: LED GEN2: Headlight temperature too high	BDC: LED GEN2: temperatura del faro demasiado alta
+Head unit: Bluetooth/Wi-Fi aerial 1: Disconnected line	Unidad principal: antena Bluetooth/Wi-Fi 1: línea desconectada
+KAFAS: camera calibration missing	KAFAS: falta la calibración de la cámara
+no reading	sin lectura
+shifts)	cambios)
+control unit(s) - press again within 5 s	unidad(es) de control - pulsa de nuevo en 5 s
+control unit(s) - scanning again	unidad(es) de control - volviendo a escanear
+From the engine unit (B58 / B48 / B38), read	De la unidad del motor (B58 / B48 / B38), leído a las
+From the engine unit	De la unidad del motor
+the engine unit has none of these values	la unidad del motor no tiene ninguno de estos valores
+Engine unit:	Unidad del motor:
+Details not available	Detalles no disponibles
+Read all done:	Lectura completa:
+All units	Todas las unidades
+FUEL PRICE	PRECIO DEL COMBUSTIBLE
+set the fuel price	indica el precio del combustible
+Knob: ±0.10  ·  press: keep  ·  this trip, and trips that had no price, follow it; the others keep theirs	Mando: ±0.10  ·  pulsar: guardar  ·  este trayecto y los que no tenían precio lo usan; los demás conservan el suyo
+under 1 km	menos de 1 km
+no fuel figure for	sin dato de combustible durante
+h (not counted)	h (sin contar)
+h driving,	h conduciendo,
+h standing, fuel from	h parado, combustible de
+Make a screen in the app first	Crea primero una pantalla en la app
+No Gauges	Sin medidores
+Layout:	Diseño:
+knob: choose  ·  press: open	mando: elegir  ·  pulsar: abrir
+knob: choose a gauge  ·  press: its value and the layout  ·  push up / down: page	mando: elegir medidor  ·  pulsar: su valor y el diseño  ·  empujar arriba / abajo: página
+knob: scroll  ·  push up / down: page	mando: desplazar  ·  empujar arriba / abajo: página
+Nothing to show (Settings: Unit pages show)	Nada que mostrar (Ajustes: Las páginas de unidad muestran)
+Nothing has come from the car yet	Aún no ha llegado nada del coche
+stopped answering (ignition on?)	ha dejado de responder (¿contacto puesto?)
+this unit has no such value	esta unidad no tiene ese valor
+not in this unit	no está en esta unidad
+not in this unit type	no está en este tipo de unidad
+not in this version	no está en esta versión
+not available now	no disponible ahora
+not supported	no compatible
+Asking control unit	Consultando unidad de control
+engine unit	unidad del motor
+transport busy	transporte ocupado
+stopped:	detenido:
+refused:	rechazado:
+Environment	Entorno
+Battery current (negative = charging)	Corriente de la batería (negativa = cargando)
+Comfort individual	Comfort individual
+Eco pro	Eco pro
+Eco pro individual	Eco pro individual
+Sport individual	Sport individual
+above full	por encima del máximo
+at minimum	en el mínimo
+below minimum	por debajo del mínimo
+front left	delantero izquierdo
+front right	delantero derecho
+rear left	trasero izquierdo
+rear right	trasero derecho
+Invalid	No válido
+12 V current	Corriente 12 V
+12 V power	Potencia 12 V
+12 V side voltage	Tensión lado 12 V
+48 V current	Corriente 48 V
+48 V power	Potencia 48 V
+48 V side voltage	Tensión lado 48 V
+48 V / 12 V converter	Convertidor 48 V / 12 V
+No battery or converter values are available	No hay valores de batería ni del convertidor
+48 V battery: scan required; absence is inconclusive	Batería de 48 V: hay que escanear; si no aparece, no es concluyente
+48 V converter: scan required	Convertidor de 48 V: hay que escanear
+48 V converter: PCU48_2	Convertidor de 48 V: PCU48_2
+xDrive on brings it back	vuelve con xDrive activado
+back after an ignition cycle	vuelve al quitar y poner el contacto
+Press again to switch xDrive back on	Pulsa otra vez para volver a activar xDrive
+xDrive is back · the transfer case reports it on	xDrive ha vuelto · la caja de transferencia lo indica activado
+Cleared; back at once (still present):	Borradas; reaparecen al instante (siguen presentes):
+12 V battery charge (%)	Carga de la batería de 12 V (%)
+Water	Agua
+Large	Grande
+Large: easiest to scan, more pages.	Grande: más fácil de escanear, más páginas.
+Small: more text per code, hold the phone steady.	Pequeño: más texto por código, sujeta el móvil firme.
+QR log	Registro QR
+The newest lines are on page 1.	Las líneas más recientes están en la página 1.
+Too hard to scan? Try Size: Large.	¿Cuesta escanearlo? Prueba Tamaño: Grande.
+Take a photo of every page and add	Haz una foto de cada página y añade
+the photos to your issue on GitHub.	las fotos a tu incidencia en GitHub.
+Size:	Tamaño:
+From	Desde
+Hazard red	Emergencia roja
+Lever start of the strobe also while driving (only for use on private property)	Inicio del estrobo con la palanca también en marcha (solo para uso en propiedad privada)
+Max	Máx.
+Open door: the car's own warning (G20 / G26)	Puerta abierta: el aviso propio del coche (G20 / G26)
+Start the strobe with the flasher lever	Iniciar el estrobo con la palanca de ráfagas
+PS	CV
+Driver front door line 2	Línea puerta del. conductor 2
+Driver rear door line 2	Línea puerta tras. conductor 2
+Passenger front door line 2	Línea puerta del. acompañante 2
+Passenger rear door line 2	Línea puerta tras. acompañante 2
+Lever start: Off	Palanca: Desactivado
+Lever start: On	Palanca: Activado
+Engine Map and Burbles PIN	PIN de Mapa motor y Petardeo
+PIN for Engine Map and Burbles	PIN para Mapa motor y Petardeo
+12 V battery voltage	Tensión de la batería de 12 V
+Small	Pequeño
+The app's log as codes to photograph	El registro de la app como códigos para fotografiar
+IterioDev's Comfort tool is running: it writes the ambient lights too, so the colours jump between the two apps	La herramienta Comfort de IterioDev está en marcha: también escribe en la luz ambiente, así que los colores saltan entre las dos apps
+IterioDev's Comfort tool is no longer running	La herramienta Comfort de IterioDev ya no está en marcha
