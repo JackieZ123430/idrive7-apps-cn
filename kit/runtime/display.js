@@ -447,6 +447,20 @@ class Display {
      */
     _touch(phase, x, y) {
         const inside = (r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+        // the app takes a whole gesture (ctx.onTouch: a dial or a slider under the finger): every move goes to it, and no
+        // tap, scroll or target follows from it
+        if (this.own() && this.onTouch && !this.sheet && (phase === 1 || this.touchTaken)) {
+            if (phase === 1) {
+                let took = false;
+                try { took = !!this.onTouch(1, x, y); } catch (e) { this.log.error('touch', e); }
+                this.touchTaken = took;
+                if (took) { this.ownDown = null; this.downAt = null; return; }
+            } else {
+                try { this.onTouch(phase, x, y); } catch (e) { this.log.error('touch', e); }
+                if (phase === 3) this.touchTaken = false;
+                return;
+            }
+        }
         if (this.own()) {
             const pl = this.place, sx = x * pl.scale + pl.ox, sy = y * pl.scale + pl.oy;
             const bar = sy >= pl.h - this.barH() ? this.buttons().find((b) => sx >= b.x - this.barOff - pl.x && sx < b.x - this.barOff - pl.x + b.w) : null;
