@@ -2,14 +2,6 @@
 
 원본: https://github.com/cauliflowermossgrape/idrive7-apps
 
-Translation by：jaimeen shim
-
-코딩나눔터(https://cafe.naver.com/codingbmw) : 서울||잼님
-
-네이버블로그(https://blog.naver.com/jaimeen77/224465347509)
-
-문의사항은 코딩나눔터나 네이버블로그를 통해 문의 주세요.
-
 
 [검증 기록](#검증-기록)
 
