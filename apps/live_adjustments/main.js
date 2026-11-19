@@ -29,6 +29,7 @@ const { Controller, REFRESH_KEYS } = require('./controller');
 const { TuneControl } = require('./tune');
 const { XDriveControl } = require('./xdrive');
 const { XDriveLive } = require('./xdrive_live');
+const { rescan, EVERY_MS: RESCAN_MS } = require('./rescan');
 const Car = require('./kit/car');
 const { AutoFlap } = require('./auto');
 const { PinLock } = require('./pin');
@@ -166,6 +167,8 @@ mgu.run({
         // (the car came up: the DME starts on its own strategy, so what is wanted - Drive mode's - goes again)
         if (controller.link) controller.link.onAvailable((on) => controller.refresh().then(() => tune.refresh())
             .then(() => xdrive.refresh()).then(() => (on ? auto.linkUp() : null)).then(repaint).catch((e) => log.error('link', e)));
+        // the engine unit (armed) or the DSC (xDrive on) not found at start-up: looked for again, ignition on (rescan.js)
+        setInterval(rescan({ car, dmeLost: lost, xdrive, controller, log, repaint }), RESCAN_MS);
         await render();
         log.info('exhaust_control ready (source=' + controller.source + ', adapter=' + controller.adapter.name + ')');
     },
