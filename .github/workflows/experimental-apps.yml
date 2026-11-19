@@ -16,6 +16,7 @@ on:
       - 'kit/tools/test_zf8hp.js'
       - 'kit/tools/test_live_adjustments.js'
       - 'kit/tools/test_live_adjustments_exhaust.js'
+      - 'kit/tools/test_live_adjustments_rescan.js'
       - 'kit/tools/test_diag_options.js'
       - 'kit/tools/test_diag_replies.js'
       - '.github/workflows/experimental-apps.yml'
@@ -34,6 +35,7 @@ on:
       - 'kit/tools/test_zf8hp.js'
       - 'kit/tools/test_live_adjustments.js'
       - 'kit/tools/test_live_adjustments_exhaust.js'
+      - 'kit/tools/test_live_adjustments_rescan.js'
       - 'kit/tools/test_diag_options.js'
       - 'kit/tools/test_diag_replies.js'
       - '.github/workflows/experimental-apps.yml'
@@ -53,6 +55,7 @@ jobs:
       - run: node kit/tools/test_zf8hp.js
       - run: node kit/tools/test_live_adjustments.js
       - run: node kit/tools/test_live_adjustments_exhaust.js
+      - run: node kit/tools/test_live_adjustments_rescan.js
       - run: node kit/tools/test_diag_options.js
       - run: node kit/tools/test_diag_replies.js
       - run: node kit/tools/test_live_data.js
