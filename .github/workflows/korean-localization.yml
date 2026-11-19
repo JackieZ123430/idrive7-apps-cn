@@ -31,3 +31,5 @@ jobs:
           git diff --exit-code -- kit/runtime/locales/ko.json
       - name: Check Korean menus, font coverage and runtime
         run: python3 kit/tools/test_ko.py
+      - name: Check Hangul reaches the GPU renderer in pieces
+        run: node kit/tools/test_atlas_pieces.js
