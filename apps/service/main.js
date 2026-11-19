@@ -71,6 +71,14 @@ function parseDue(s, now) {
         left: months > 0 ? n + '개월 후' : months === 0 ? '이번 달' : n + '개월 초과',
         months,
     };
+    if (getLanguage() === 'es') {
+        const name = translate(MONTHS[mo - 1]).toLowerCase(); // "15 de septiembre de 2027", "septiembre de 2027"
+        return {
+            text: (d ? d + ' de ' : '') + name + ' de ' + y,
+            left: months > 0 ? 'en ' + n + unit : months === 0 ? 'este mes' : n + unit + ' de retraso',
+            months,
+        };
+    }
     const month = d && getLanguage() === 'ru' ? MONTHS_RU_GENITIVE[mo - 1] : translate(MONTHS[mo - 1]);
     return {
         text: (d ? d + ' ' : '') + month + ' ' + y,

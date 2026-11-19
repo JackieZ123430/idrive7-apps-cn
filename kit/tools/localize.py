@@ -9,8 +9,9 @@ LOCALES = ROOT / 'kit/runtime/locales'
 
 
 def normalize_language(language):
-    """Accept regional Korean CLI tags while keeping one catalog/package identity."""
-    return 'ko' if language.lower().replace('_', '-') in ('ko', 'ko-kr') else language
+    """Accept regional Korean and Spanish CLI tags while keeping one catalog/package identity."""
+    tag = language.lower().replace('_', '-')
+    return 'ko' if tag in ('ko', 'ko-kr') else 'es' if tag in ('es', 'es-es') else language
 
 
 def credit(language):
