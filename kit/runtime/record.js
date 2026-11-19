@@ -252,27 +252,29 @@ class Recorder {
         const sc = size / f.size, sp = opts.spacing || 0;
         const w = fonts.measure(f, s) * sc + sp * Math.max(0, s.length - 1);
         let pen = opts.align === 'center' ? x - w / 2 : opts.align === 'right' ? x - w : x;
-        let cnt = 0;
-        const head = this.n;
-        this._grow(4 + s.length * 8);
-        const fl = this.f, u = this.u;
-        let i = head + 4;
+        // One GLYPHS op per run of glyphs from the same atlas: a tall atlas (Korean) goes to the
+        // renderer in pieces (fonts.piece), so one string can use several.
+        this._grow(s.length * 12);
+        const fl = this.f, u = this.u, colour = pack(c);
+        let i = this.n, head = -1, run = null, cnt = 0;
+        const close = () => {
+            const aid = atlasId(run, run.family || family); this.atlases.add(aid);
+            u[head] = OP.GLYPHS; u[head + 1] = aid; u[head + 2] = colour; u[head + 3] = cnt;
+        };
         for (const ch of s) {
-            const g = f.glyphs[ch.codePointAt(0)] || f.glyphs[63];
+            const cp = ch.codePointAt(0), g = f.glyphs[cp] || f.glyphs[63];
             if (!g) continue;
-            const gx = g[0], gy = g[1], gw = g[2], gh = g[3];
+            const gx = g[0], gw = g[2], gh = g[3];
             if (gw && gh) {
+                const p = fonts.piece(f, f.glyphs[cp] ? cp : 63), gy = g[1] - (p.y0 || 0);
+                if (p !== run) { if (run) close(); run = p; head = i; i += 4; cnt = 0; }
                 fl[i++] = pen + g[4] * sc; fl[i++] = y + g[5] * sc; fl[i++] = gw * sc; fl[i++] = gh * sc;
                 fl[i++] = gx; fl[i++] = gy; fl[i++] = gx + gw; fl[i++] = gy + gh;
                 cnt++;
             }
             pen += g[6] * sc + sp;
         }
-        if (cnt) {
-            const aid = atlasId(f, f.family || family); this.atlases.add(aid);
-            u[head] = OP.GLYPHS; u[head + 1] = aid; u[head + 2] = pack(c); u[head + 3] = cnt;
-            this.n = i;
-        }
+        if (run) { close(); this.n = i; }
         return w;
     }
     textWidth(str, size, opts) {
