@@ -151,6 +151,24 @@ test('not in front, then in front (not on screen yet) within 1.5 s: the app stay
     } finally { t.end(); }
 });
 
+test('ctx.onTouch: a gesture the app takes gets every move and no tap; one it does not take taps as before', async () => {
+    const t = await setup(), d = t.d;
+    try {
+        const seen = [], taps = [];
+        d.onTouch = (phase, x, y) => { seen.push([phase, x, y]); return phase === 1 ? x < 500 : true; };
+        d.onTap = (x, y) => { taps.push([x, y]); };
+        d._touch(1, 300, 300); d._touch(2, 320, 310); d._touch(2, 360, 330); d._touch(3, 360, 330);
+        await sleep(20);
+        assert.deepStrictEqual(seen, [[1, 300, 300], [2, 320, 310], [2, 360, 330], [3, 360, 330]], 'taken: every move to the app');
+        assert.strictEqual(taps.length, 0, 'taken: no tap');
+        seen.length = 0;
+        d._touch(1, 900, 300); d._touch(3, 900, 300);
+        await sleep(20);
+        assert.deepStrictEqual(seen, [[1, 900, 300]], 'not taken: only asked on the down');
+        assert.deepStrictEqual(taps, [[900, 300]], 'not taken: a tap as before');
+    } finally { t.end(); }
+});
+
 test('a connection cut in the middle of a message: the next connection\'s READY is read', async () => {
     let n = 0;
     onConn = (c) => {

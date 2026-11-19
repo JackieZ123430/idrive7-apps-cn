@@ -595,16 +595,46 @@ mgu.run({
             return dirty || due || page === 4 ? render() : null;
         };
 
-        if (ctx.onTap) {
+        // the colour ring and the brightness dial under a finger (Colour tab): 'ring' or 'dial', else null
+        const ringAt = (x, y) => { const dx = x - RING.cx, dy = y - RING.cy, d = Math.sqrt(dx * dx + dy * dy); return d >= RING.r - 12 && d <= RING.R + 12; };
+        const dialAt = (x, y) => {
+            const ex = x - DIAL.cx, ey = y - DIAL.cy, e = Math.sqrt(ex * ex + ey * ey), a = Math.atan2(ex, -ey) * 180 / Math.PI;
+            return e >= DIAL.r - 14 && e <= DIAL.R + 14 && a >= -140 && a <= 140;
+        };
+        const hueAt = (x, y) => S.snapHue((Math.atan2(x - RING.cx, -(y - RING.cy)) * 180 / Math.PI + 360) % 360);
+        const brightAt = (x, y) => (Math.max(-135, Math.min(135, Math.atan2(x - DIAL.cx, -(y - DIAL.cy)) * 180 / Math.PI)) + 135) / 270 * 100;
+        // a finger on the ring or the dial: the colour or the brightness follows it while it moves, sent to the lights at
+        // most every DRAG_MS and once more where it lets go (a tap: there at once)
+        const DRAG_MS = 120;
+        let drag = null;                                    // { what: 'ring' | 'dial', at, x, y, timer }
+        const dragApply = () => {
+            if (!drag) return null;
+            drag.at = Date.now(); clearTimeout(drag.timer); drag.timer = null;
+            return drag.what === 'ring' ? setRgb(S.hsv(hueAt(drag.x, drag.y), 1, 1)) : setBright(brightAt(drag.x, drag.y));
+        };
+        if (ctx.onTouch) {
+            ctx.onTouch((phase, x, y) => {
+                if (phase === 1) {
+                    drag = null;
+                    if (page !== 0) return false;
+                    const what = ringAt(x, y) ? 'ring' : dialAt(x, y) ? 'dial' : null;
+                    if (!what) return false;
+                    drag = { what, at: 0, x, y, timer: null };
+                    dragApply();
+                    return true;
+                }
+                if (!drag) return false;
+                drag.x = x; drag.y = y;
+                if (phase === 3) { dragApply(); drag = null; return true; }
+                const wait = drag.at + DRAG_MS - Date.now();
+                if (wait <= 0) dragApply(); else if (!drag.timer) drag.timer = setTimeout(dragApply, wait);
+                return true;
+            });
+        } else if (ctx.onTap) {
             ctx.onTap((x, y) => {
                 if (page !== 0) return null;
-                const dx = x - RING.cx, dy = y - RING.cy, d = Math.sqrt(dx * dx + dy * dy);
-                if (d >= RING.r - 12 && d <= RING.R + 12) return setRgb(S.hsv(S.snapHue((Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360), 1, 1));
-                const ex = x - DIAL.cx, ey = y - DIAL.cy, e = Math.sqrt(ex * ex + ey * ey);
-                if (e >= DIAL.r - 14 && e <= DIAL.R + 14) {
-                    const a = Math.atan2(ex, -ey) * 180 / Math.PI;
-                    if (a >= -140 && a <= 140) return setBright((Math.max(-135, Math.min(135, a)) + 135) / 270 * 100);
-                }
+                if (ringAt(x, y)) return setRgb(S.hsv(hueAt(x, y), 1, 1));
+                if (dialAt(x, y)) return setBright(brightAt(x, y));
                 return null;
             });
         }
