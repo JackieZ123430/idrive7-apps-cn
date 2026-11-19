@@ -86,6 +86,7 @@ function headUnit(stage, o) {
         onTab(fn) { display.onTab = fn; },
         // as kit/mgu.js: the kit's own screen (tabs, page buttons, sheets, scrolling) where the renderer has the app
         onTap(fn) { display.onTap = fn; },
+        onTouch(fn) { display.onTouch = fn; },
         sheet: (sh) => display.openSheet(sh),
         // as mgu.js: the app's own rows at the bottom of the drawn settings
         settingsRow(row) { if (row && row.label) hu.settingsRows.push(row); },

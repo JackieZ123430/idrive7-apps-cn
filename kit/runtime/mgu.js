@@ -663,6 +663,11 @@ async function runInner(impl) {
         /** onTap(fn): fn(x, y) for a tap on the page (app drawing px), where the kit runs the screen. */
         onTap(fn) { display.onTap = fn; },
         /**
+         * onTouch(fn): fn(phase, x, y) (1 down, 2 move, 3 up; app drawing px) where the kit runs the screen; true on the
+         * down takes the whole gesture (its moves and its up come to fn, no tap or scroll follows), else the kit has it.
+         */
+        onTouch(fn) { display.onTouch = fn; },
+        /**
          * settingsRow({ label, value, open }): a row of the app's own at the very bottom of Settings, where the kit
          * draws them (the GPU renderer); value: text or () => text; open(): a sheet (sheet.js) shown in the settings'
          * place, its Back ('close') back to them. The HMI's own settings screen has no such row.
