@@ -11,6 +11,13 @@ BMW's own `0x2F` job on DID `0x60FD` (Bosch MG1 / DME8): `2F 60FD 03 03E8` open,
 setting is the arm switch and ships **Disarmed** (simulated, nothing is sent). Tested on one
 car with an MG1 and on a G20 320i (B48).
 
+G-series V8s (DME8FF_R at `0x12`, DME8FF_L at `0x13`: N63TU2/3, S63TU4, e.g. M550i, M50i, M5 F90):
+each engine unit drives its bank's flap, so the command goes to both (the master's SGBD index
+says it is a V8, then `0x13` is probed). BMW's SGBD takes the same `60FD` values there (1000 /
+9000). A unit that refuses `60FD` but answers `22 631E` runs the controlled flap
+(`GER_EL_AGK`): `2F 611E 03 <% x 81.92>` (open 100 %, closed 0 %), `2F 611E 00` hands it back.
+Not yet tried on a V8 (#214).
+
 The tab shows the rear silencer (`muffler_img.js`: the picture as ~16k cells on the device
 pixel grid, drawn once into a cached layer; the software renderer gets it as pixels) with the
 flap's butterfly turning in the right tailpipe, and four buttons:
