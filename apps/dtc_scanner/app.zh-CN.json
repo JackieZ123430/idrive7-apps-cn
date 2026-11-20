@@ -1,0 +1,166 @@
+{
+  "id": "dtc_scanner",
+  "title": "故障检测",
+  "description": "读取和清除各控制单元的故障存储，并查看当前检查控制信息。",
+  "version": "2.9.801",
+  "vendor": "custom",
+  "loggingId": "OA95",
+  "iconGlyph": "engine",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
+  "signals": {
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.checkcontrol.CheckControlMaster": {
+      "basicList": "rs"
+    },
+    "de.bmw.infotainment.KombiInterface_2": {
+      "ccList": "rs",
+      "newCCMessage": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "故障检测",
+      "buttons": [
+        [
+          "BTN_SCAN",
+          "立即扫描"
+        ],
+        [
+          "BTN_CLEAR",
+          "清除全部"
+        ],
+        [
+          "BTN_PAGE",
+          "下一页"
+        ],
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "scope",
+      "label": "读取的故障范围",
+      "type": "choice",
+      "default": "current",
+      "options": [
+        [
+          "current",
+          "当前"
+        ],
+        [
+          "all",
+          "包含历史"
+        ]
+      ]
+    },
+    {
+      "key": "info",
+      "label": "同时读取信息存储器",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "autoScan",
+      "label": "打开时扫描",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "theme",
+      "label": "配色主题",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M 红色"
+        ],
+        [
+          "m_tricolour",
+          "M 三色"
+        ],
+        [
+          "ice",
+          "冰晶白"
+        ],
+        [
+          "amber",
+          "夜间琥珀"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "屏幕布局",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全屏"
+        ],
+        [
+          "standard",
+          "标准"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "渲染器",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 帧（默认）"
+        ],
+        [
+          "software",
+          "软件渲染"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "演示数据",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "始终"
+        ],
+        [
+          "off",
+          "从不"
+        ]
+      ]
+    }
+  ]
+}

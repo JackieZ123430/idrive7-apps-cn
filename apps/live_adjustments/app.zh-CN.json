@@ -1,0 +1,304 @@
+{
+  "id": "live_adjustments",
+  "title": "发动机配置",
+  "description": "发动机设置与排气阀门控制，提供原厂、打开、关闭及驾驶模式联动等选项。",
+  "version": "0.9.1001",
+  "vendor": "custom",
+  "loggingId": "OAA0",
+  "iconGlyph": "sliders",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
+  "signals": {
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "VehicleCondition": "s"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusFESVehicleDynamicSwitchHMI": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "_optional": "xDrive live: g and yaw rate",
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs",
+      "statusYawVelocityVehicle": "rs"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "xDrive live: the front / rear split",
+      "basicDataSet": "s"
+    },
+    "de.bmw.powertrain.Powertrain": {
+      "_optional": "xDrive live: wheel slip",
+      "ActualValueRPMWheel": "s"
+    },
+    "de.bmw.chassis.SteeringAngle": {
+      "_optional": "xDrive live: the steering wheel",
+      "ActualSteeringAngleDriver": "s",
+      "actualSteeringAngleDriverNoCRC": "s"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "发动机配置",
+      "buttons": [
+        [
+          "BTN_OPEN",
+          "打开"
+        ],
+        [
+          "BTN_CLOSE",
+          "关闭"
+        ],
+        [
+          "BTN_OEM",
+          "原厂控制"
+        ],
+        [
+          "BTN_DRIVE",
+          "驾驶模式"
+        ],
+        [
+          "BTN_PAGE",
+          "下一页"
+        ],
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "arm",
+      "label": "排气阀门",
+      "type": "choice",
+      "default": "off",
+      "options": [
+        [
+          "off",
+          "未启用：模拟模式（安全）"
+        ],
+        [
+          "on",
+          "已启用：控制实际阀门"
+        ]
+      ]
+    },
+    {
+      "key": "hold",
+      "label": "保持打开/关闭",
+      "type": "choice",
+      "default": "on",
+      "options": [
+        [
+          "on",
+          "开启：每 15 秒重新发送"
+        ],
+        [
+          "off",
+          "关闭：约 20 秒后由车辆控制"
+        ]
+      ]
+    },
+    {
+      "key": "closeLimit",
+      "label": "关闭解除转速",
+      "type": "choice",
+      "default": "4000",
+      "options": [
+        [
+          "2500",
+          "2,500 rpm"
+        ],
+        [
+          "3000",
+          "3,000 rpm"
+        ],
+        [
+          "3500",
+          "3,500 rpm"
+        ],
+        [
+          "4000",
+          "4,000 rpm"
+        ],
+        [
+          "4500",
+          "4,500 rpm"
+        ],
+        [
+          "5000",
+          "5,000 rpm"
+        ],
+        [
+          "5500",
+          "5,500 rpm"
+        ],
+        [
+          "off",
+          "从不（不建议）"
+        ]
+      ]
+    },
+    {
+      "key": "tuner",
+      "label": "调校软件",
+      "type": "choice",
+      "default": "off",
+      "options": [
+        [
+          "off",
+          "关闭：不向车辆发送指令（安全）"
+        ],
+        [
+          "bm3",
+          "BM3：发动机程序、回火声浪、主动声浪"
+        ],
+        [
+          "mhd",
+          "MHD：发动机程序、最大冷却"
+        ]
+      ]
+    },
+    {
+      "key": "mapPin",
+      "label": "发动机程序与排气回火的 PIN 码",
+      "type": "bool",
+      "default": false,
+      "when": {
+        "tuner": [
+          "bm3",
+          "mhd"
+        ]
+      }
+    },
+    {
+      "key": "mapPinCode",
+      "label": "发动机程序与排气回火 PIN 码",
+      "type": "object",
+      "default": {},
+      "hidden": true
+    },
+    {
+      "key": "xdrive",
+      "label": "xDrive（实验）",
+      "type": "choice",
+      "default": "off",
+      "options": [
+        [
+          "off",
+          "关闭 · 不发送任何指令（安全）"
+        ],
+        [
+          "on",
+          "开启 · 显示 xDrive 页，关闭 xDrive 直到熄火"
+        ]
+      ]
+    },
+    {
+      "key": "theme",
+      "label": "配色主题",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M 红色"
+        ],
+        [
+          "m_tricolour",
+          "M 三色"
+        ],
+        [
+          "ice",
+          "冰晶白"
+        ],
+        [
+          "amber",
+          "夜间琥珀"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "屏幕布局",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全屏"
+        ],
+        [
+          "standard",
+          "标准"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "渲染器",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 帧（默认）"
+        ],
+        [
+          "software",
+          "软件渲染"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "演示数据",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "始终"
+        ],
+        [
+          "off",
+          "从不"
+        ]
+      ]
+    }
+  ],
+  "config": {
+    "bm3MarkerAddress": "807FFE50"
+  }
+}

@@ -1,36 +1,468 @@
 {
   "schema": 1,
-  "apps": {
-    "path": "apps/*",
-    "manifest": "app.json",
-    "icon": "icon.png",
-    "build": {
-      "python": "kit/tools/build.py",
-      "args": ["{id}"],
-      "sdk": "oap-sdk",
-      "output": "dist/{id}@{version}.tgz",
-      "network": ["doom"],
-      "shared": ["kit/runtime", "kit/platform", "kit/localization", "kit/tools/build.py", "kit/tools/pack_data.py",
-        "kit/tools/localize.py", "kit/tools/locale-revisions.json", "kit/tools/oapgen", "oap-sdk"]
+  "components": [
+    {
+      "id": "ambient_config",
+      "kind": "app",
+      "path": "apps/ambient_config",
+      "manifest": "app.zh-CN.json",
+      "title": "氛围灯设置",
+      "description": "设置氛围灯颜色、驾驶模式配色和灯光效果；效果与可用功能取决于车型及控制单元。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "brake_test",
+      "kind": "app",
+      "path": "apps/brake_test",
+      "manifest": "app.zh-CN.json",
+      "title": "制动测试",
+      "description": "记录制动距离、峰值减速度和制动衰减，支持不同起始车速的测试。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "car_vitals",
+      "kind": "app",
+      "path": "apps/car_vitals",
+      "manifest": "app.zh-CN.json",
+      "title": "M 车辆仪表",
+      "description": "查看发动机、温度、进气、燃油、点火、轮胎和底盘实时仪表。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "doom",
+      "kind": "app",
+      "path": "apps/doom",
+      "manifest": "app.zh-CN.json",
+      "title": "毁灭战士",
+      "description": "在 iDrive 上运行 Freedoom，支持全屏画面、旋钮控制、设置和存档。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "draggy",
+      "kind": "app",
+      "path": "apps/draggy",
+      "manifest": "app.zh-CN.json",
+      "title": "加速计时",
+      "description": "记录加速、四分之一英里和最佳成绩。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "dtc_scanner",
+      "kind": "app",
+      "path": "apps/dtc_scanner",
+      "manifest": "app.zh-CN.json",
+      "title": "故障检测",
+      "description": "读取和清除各控制单元的故障存储，并查看当前检查控制信息。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "dyno",
+      "kind": "app",
+      "path": "apps/dyno",
+      "manifest": "app.zh-CN.json",
+      "title": "虚拟马力机",
+      "description": "根据加速采集功率与扭矩曲线，支持保存和对比测试结果。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "edrive",
+      "kind": "app",
+      "path": "apps/edrive",
+      "manifest": "app.zh-CN.json",
+      "title": "EDrive助手",
+      "description": "查看电动续航、高压与 12 伏电池、电芯、充电历史及相关用电信息，支持首页组件。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "mgu-deploy": "0.3.2",
+        "idrive7-renderd": "2.1.15"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "gforce",
+      "kind": "app",
+      "path": "apps/gforce",
+      "manifest": "app.zh-CN.json",
+      "title": "G 值仪表",
+      "description": "显示摩擦圆、各方向峰值 G 值和驾驶记录。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "live_adjustments",
+      "kind": "app",
+      "path": "apps/live_adjustments",
+      "manifest": "app.zh-CN.json",
+      "title": "发动机配置",
+      "description": "发动机设置与排气阀门控制，提供原厂、打开、关闭及驾驶模式联动等选项。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "live_data",
+      "kind": "app",
+      "path": "apps/live_data",
+      "manifest": "app.zh-CN.json",
+      "title": "实时数据",
+      "description": "只读查看车辆和控制单元的实时数据，支持自定义仪表、行程费用和首页组件。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "mgu-deploy": "0.3.2",
+        "idrive7-renderd": "2.1.18",
+        "mgu-inputgate": "1.1.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "redline",
+      "kind": "app",
+      "path": "apps/redline",
+      "manifest": "app.zh-CN.json",
+      "title": "换挡转速",
+      "description": "显示转速、挡位、换挡提示和评分，支持冷机保护提示、HUD 布局及车辆数据。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "service",
+      "kind": "app",
+      "path": "apps/service",
+      "manifest": "app.zh-CN.json",
+      "title": "保养信息",
+      "description": "查看仪表提供的机油、制动、制动液和车辆检查等保养要求、剩余距离与日期。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "warmup",
+      "kind": "app",
+      "path": "apps/warmup",
+      "manifest": "app.zh-CN.json",
+      "title": "暖机助手",
+      "description": "估算机油、冷却液与变速箱暖机状态，显示转速建议和涡轮冷却提示。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
+    },
+    {
+      "id": "zf8hp",
+      "kind": "app",
+      "path": "apps/zf8hp",
+      "manifest": "app.zh-CN.json",
+      "title": "变速箱配置",
+      "description": "实验性 ZF 8HP 监控，查看实时数据、离合器充油自适应、换挡映射和温度历史。",
+      "mguHmi": [
+        "ID7"
+      ],
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "icon": "icon.png",
+      "build": {
+        "python": "localization/build_zh_cn.py",
+        "args": [
+          "{id}"
+        ],
+        "sdk": "oap-sdk",
+        "output": "dist/{id}@{version}.tgz",
+        "shared": [
+          "kit",
+          "apps",
+          "localization"
+        ]
+      }
     }
-  },
+  ],
   "tools": [
     {
       "id": "idrive7-renderd",
       "path": "kit/renderd/prebuilt",
       "title": "GPU renderer",
       "description": "The apps' own GPU renderer (mgu-render): draws them at 60 fps, beside the MGU Store's Renderer; installed with the apps (iDrive 7 and iDrive 8)",
-      "mguHmi": ["ID7", "ID8"]
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
     },
     {
       "id": "mgu-inputgate",
       "path": "kit/renderd/inputgate/tool",
       "title": "Controller gate",
       "description": "Lets the apps have the iDrive controller (tabs, page buttons, settings, Doom); loads into the HMI at the next start (iDrive 7 and iDrive 8)",
-      "needs": ["renderer"],
+      "needs": [
+        "renderer"
+      ],
       "optional": false,
       "uninstallable": true,
-      "mguHmi": ["ID7", "ID8"]
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
     }
   ]
 }

@@ -1,0 +1,297 @@
+{
+  "id": "warmup",
+  "title": "暖机助手",
+  "description": "估算机油、冷却液与变速箱暖机状态，显示转速建议和涡轮冷却提示。",
+  "version": "1.9.1",
+  "vendor": "custom",
+  "loggingId": "OA9A",
+  "iconGlyph": "temp",
+  "autostart": true,
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.15"
+  },
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs",
+      "statusEngineTemperature": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs",
+      "statusVehiclePartType": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusActualValueTorque2": "rs"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "gearbox oil temperature (when the gearbox unit has none)",
+      "basicDataSet": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "暖机助手",
+      "buttons": [
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "warmOil",
+      "label": "机油暖机目标温度",
+      "type": "number",
+      "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": {
+        "f": {
+          "unit": "°F",
+          "mul": 1.8,
+          "add": 32
+        }
+      },
+      "default": 80,
+      "steps": [
+        60,
+        70,
+        75,
+        80,
+        85,
+        90,
+        100
+      ]
+    },
+    {
+      "key": "warmCoolant",
+      "label": "冷却液暖机目标温度",
+      "type": "number",
+      "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": {
+        "f": {
+          "unit": "°F",
+          "mul": 1.8,
+          "add": 32
+        }
+      },
+      "default": 80,
+      "steps": [
+        60,
+        70,
+        75,
+        80,
+        85,
+        90
+      ]
+    },
+    {
+      "key": "warmGearbox",
+      "label": "变速箱油暖机温度",
+      "type": "number",
+      "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": {
+        "f": {
+          "unit": "°F",
+          "mul": 1.8,
+          "add": 32
+        }
+      },
+      "default": 60,
+      "steps": [
+        40,
+        50,
+        60,
+        70,
+        80
+      ]
+    },
+    {
+      "key": "engine",
+      "label": "发动机",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动（读取车辆）"
+        ],
+        [
+          "diesel",
+          "柴油"
+        ],
+        [
+          "petrol",
+          "汽油"
+        ]
+      ]
+    },
+    {
+      "key": "coldLimit",
+      "label": "冷机转速上限",
+      "type": "number",
+      "unit": "rpm",
+      "default": 0,
+      "labels": {
+        "0": "Auto"
+      },
+      "reset": 1,
+      "steps": [
+        0,
+        2000,
+        2500,
+        3000,
+        3500,
+        4000,
+        4500,
+        5000,
+        5500
+      ]
+    },
+    {
+      "key": "redline",
+      "label": "换挡转速",
+      "type": "number",
+      "unit": "rpm",
+      "default": 0,
+      "labels": {
+        "0": "Auto"
+      },
+      "reset": 1,
+      "steps": [
+        0,
+        4000,
+        4500,
+        5000,
+        5500,
+        5800,
+        6000,
+        6200,
+        6500,
+        6800,
+        7000,
+        7200,
+        7500,
+        7800,
+        8000,
+        8500,
+        9000
+      ]
+    },
+    {
+      "key": "cooldown",
+      "label": "激烈驾驶后涡轮冷却",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "tempUnit",
+      "label": "温度单位",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "摄氏度"
+        ],
+        [
+          "f",
+          "华氏度"
+        ]
+      ]
+    },
+    {
+      "key": "theme",
+      "label": "配色主题",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M 红色"
+        ],
+        [
+          "m_tricolour",
+          "M 三色"
+        ],
+        [
+          "ice",
+          "冰晶白"
+        ],
+        [
+          "amber",
+          "夜间琥珀"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "屏幕布局",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全屏"
+        ],
+        [
+          "standard",
+          "标准"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "渲染器",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 帧（默认）"
+        ],
+        [
+          "software",
+          "软件渲染"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "演示数据",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "始终"
+        ],
+        [
+          "off",
+          "从不"
+        ]
+      ]
+    }
+  ]
+}

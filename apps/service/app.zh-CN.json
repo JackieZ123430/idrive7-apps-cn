@@ -1,0 +1,149 @@
+{
+  "id": "service",
+  "title": "保养信息",
+  "description": "查看仪表提供的机油、制动、制动液和车辆检查等保养要求、剩余距离与日期。",
+  "version": "1.6.301",
+  "vendor": "custom",
+  "loggingId": "OA96",
+  "iconGlyph": "wrench",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.15"
+  },
+  "signals": {
+    "de.bmw.infotainment.KombiInterface_2": {
+      "cbsDataServiceList": "rs",
+      "cbsDataSBA": "rs",
+      "_methods": [
+        "requestCBSServiceHint"
+      ]
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "保养信息",
+      "buttons": [
+        [
+          "BTN_SELECT",
+          "下一项"
+        ],
+        [
+          "BTN_DETAILS",
+          "详情"
+        ],
+        [
+          "BTN_RESET",
+          "重置保养项目"
+        ],
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "resetOn",
+      "label": "保养重置（制动液、车辆检查）",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "diagPage",
+      "label": "诊断页面",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "theme",
+      "label": "配色主题",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M 红色"
+        ],
+        [
+          "m_tricolour",
+          "M 三色"
+        ],
+        [
+          "ice",
+          "冰晶白"
+        ],
+        [
+          "amber",
+          "夜间琥珀"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "屏幕布局",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全屏"
+        ],
+        [
+          "standard",
+          "标准"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "渲染器",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 帧（默认）"
+        ],
+        [
+          "software",
+          "软件渲染"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "演示数据",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "始终"
+        ],
+        [
+          "off",
+          "从不"
+        ]
+      ]
+    }
+  ]
+}

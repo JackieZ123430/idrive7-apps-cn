@@ -1,0 +1,462 @@
+{
+  "id": "live_data",
+  "title": "实时数据",
+  "description": "只读查看车辆和控制单元的实时数据，支持自定义仪表、行程费用和首页组件。",
+  "version": "1.0.1801",
+  "vendor": "custom",
+  "loggingId": "OA9D",
+  "iconGlyph": "gauge",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
+  "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "the car's pressure unit: boost and tyre pressures come in it",
+      "statusNewCurrentUnitsStatusExt": "rs"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.controlelements.FrontCCU": {
+      "statusRotaryEncoderState": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs",
+      "statusEngineTemperature": "rs",
+      "statusEngineStatus": "rs",
+      "datenFahrdynamiksensorErweitert": "rs",
+      "statusHandBrake": "rs",
+      "statusBattery2": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusActualValueTorque2": "rs",
+      "statusVehicleDynamicEngine": "rs",
+      "statusVehicleDynamicEngineMaxValue": "rs",
+      "statusSwitchDriveDynamicSport2": "rs",
+      "statusFESVehicleDynamicSwitchHMI": "rs"
+    },
+    "de.bmw.powertrain.AcceleratorPedal": {
+      "AngleAcceleratorPedal": "s"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "statusInjectionVolume": "rs",
+      "statusPushButtonMSA2": "rs",
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs",
+      "statusYawVelocityVehicle": "rs"
+    },
+    "de.bmw.infotainment.KombiIF": {
+      "statusRangeTankStatus": "rs",
+      "statusBordcomputerAverage": "rs",
+      "statusBordcomputerTravelData": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "Range": "s",
+      "DataPowerTrain2": "s",
+      "statusGearboxDrive": "s"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs",
+      "statusOilDipstick2": "rs",
+      "statusVehicleMass": "rs"
+    },
+    "de.bmw.chassis.SteeringAngle": {
+      "ActualSteeringAngleDriver": "s",
+      "actualSteeringAngleDriverNoCRC": "s"
+    },
+    "de.bmw.infrastructure.EnvironmentalInformation": {
+      "ExteriorTemperature": "s"
+    },
+    "de.bmw.infotainment.vehicle.TPMS": {
+      "statusTyrePressure": "rs",
+      "statusTyreTemperature": "rs",
+      "statusTargetTyrePressure": "rs"
+    },
+    "de.bmw.powertrain.Powertrain": {
+      "ActualValueRPMWheel": "s"
+    },
+    "de.bmw.chassis.VehicleModel": {
+      "LaneSlope": "s",
+      "MassVehicle": "s"
+    },
+    "de.bmw.chassis.VehicleStabilizationManagement": {
+      "StabilizationManagement": "s"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "实时数据",
+      "buttons": [
+        [
+          "BTN_ACTION",
+          "布局"
+        ],
+        [
+          "BTN_PAGE",
+          "下一页"
+        ],
+        [
+          "BTN_BROWSE",
+          "浏览"
+        ],
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "startWidget": {
+    "comment": "Home-screen widget, as eDrive's: the layout and cell names of BMW's Drive Recorder widget on this firmware; the picture of the chosen screen goes into BackgroundImage1 (384 x 256). The HMI scales it up (about 2x on the G20) and crops it centred (safe: the share it cuts off each edge, measured on the G05 and on a G20 photo), and fades the edges, the top most: the setting widgetFit keeps the gauges further in (screens.js FIT).",
+    "name": "实时数据",
+    "layout": "LT_Table_OnlineApps_DriveRecorderWidget",
+    "image": "BackgroundImage1",
+    "scale": 2,
+    "size": [
+      384,
+      256
+    ],
+    "safe": [
+      0.09,
+      0.1
+    ],
+    "cells": {
+      "ErrorInfo": [
+        false,
+        "Bool"
+      ],
+      "background": [
+        true,
+        "Bool"
+      ],
+      "ProgressbarVisible": [
+        false,
+        "Bool"
+      ],
+      "TextRecordings": [
+        "",
+        "Text"
+      ]
+    }
+  },
+  "settings": [
+    {
+      "key": "show",
+      "label": "控制单元页面显示",
+      "type": "choice",
+      "default": "known",
+      "reset": 2,
+      "options": [
+        [
+          "known",
+          "该控制单元可能有的项目"
+        ],
+        [
+          "answering",
+          "仅显示已应答的项目"
+        ],
+        [
+          "all",
+          "全部列出的项目"
+        ]
+      ]
+    },
+    {
+      "key": "autoScan",
+      "label": "打开时扫描控制单元",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "widget",
+      "label": "主屏小组件显示",
+      "type": "choice",
+      "default": "1",
+      "options": [
+        [
+          "1",
+          "仪表 1"
+        ],
+        [
+          "2",
+          "仪表 2"
+        ],
+        [
+          "3",
+          "仪表 3"
+        ],
+        [
+          "4",
+          "仪表 4"
+        ],
+        [
+          "5",
+          "仪表 5"
+        ],
+        [
+          "6",
+          "仪表 6"
+        ]
+      ]
+    },
+    {
+      "key": "widgetFit",
+      "label": "主屏小组件：画面",
+      "type": "choice",
+      "default": "medium",
+      "options": [
+        [
+          "small",
+          "较小，避开边缘"
+        ],
+        [
+          "medium",
+          "中"
+        ],
+        [
+          "large",
+          "填满小组件"
+        ]
+      ]
+    },
+    {
+      "key": "widgetFps",
+      "label": "主页小组件：每秒刷新次数",
+      "type": "number",
+      "unit": "fps",
+      "default": 8,
+      "steps": [
+        2,
+        4,
+        8,
+        12
+      ],
+      "when": {
+        "advanced": true
+      }
+    },
+    {
+      "key": "trips",
+      "label": "行车电脑（统计每次驾驶）",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "currency",
+      "label": "货币",
+      "type": "choice",
+      "default": "EUR",
+      "options": [
+        [
+          "EUR",
+          "EUR"
+        ],
+        [
+          "USD",
+          "USD"
+        ],
+        [
+          "CAD",
+          "CAD"
+        ],
+        [
+          "GBP",
+          "GBP"
+        ],
+        [
+          "CHF",
+          "CHF"
+        ],
+        [
+          "PLN",
+          "PLN"
+        ],
+        [
+          "CZK",
+          "CZK"
+        ],
+        [
+          "SEK",
+          "SEK"
+        ],
+        [
+          "NOK",
+          "NOK"
+        ],
+        [
+          "DKK",
+          "DKK"
+        ],
+        [
+          "HUF",
+          "HUF"
+        ],
+        [
+          "UAH",
+          "UAH"
+        ],
+        [
+          "AUD",
+          "AUD"
+        ],
+        [
+          "NZD",
+          "NZD"
+        ],
+        [
+          "JPY",
+          "JPY"
+        ],
+        [
+          "CNY",
+          "CNY"
+        ],
+        [
+          "TRY",
+          "TRY"
+        ],
+        [
+          "RON",
+          "RON"
+        ],
+        [
+          "BGN",
+          "BGN"
+        ],
+        [
+          "ZAR",
+          "ZAR"
+        ],
+        [
+          "MXN",
+          "MXN"
+        ],
+        [
+          "BRL",
+          "BRL"
+        ],
+        [
+          "INR",
+          "INR"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "温度单位",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "摄氏度"
+        ],
+        [
+          "f",
+          "华氏度"
+        ]
+      ]
+    },
+    {
+      "key": "details",
+      "label": "显示来源和未验证的数值",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "advanced",
+      "label": "高级设置",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "theme",
+      "label": "配色主题",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M 红色"
+        ],
+        [
+          "m_tricolour",
+          "M 三色"
+        ],
+        [
+          "ice",
+          "冰晶白"
+        ],
+        [
+          "amber",
+          "夜间琥珀"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "屏幕布局",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全屏"
+        ],
+        [
+          "standard",
+          "标准"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "渲染器",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 帧（默认）"
+        ],
+        [
+          "software",
+          "软件渲染"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "演示数据",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "始终"
+        ],
+        [
+          "off",
+          "从不"
+        ]
+      ]
+    }
+  ]
+}

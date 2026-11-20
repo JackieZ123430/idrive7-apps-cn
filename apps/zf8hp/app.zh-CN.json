@@ -1,0 +1,237 @@
+{
+  "id": "zf8hp",
+  "title": "变速箱配置",
+  "description": "实验性 ZF 8HP 监控，查看实时数据、离合器充油自适应、换挡映射和温度历史。",
+  "version": "1.5.801",
+  "vendor": "custom",
+  "loggingId": "OAA2",
+  "iconGlyph": "8HP",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
+  "signals": {
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "变速箱配置",
+      "buttons": [
+        [
+          "BTN_PAGE",
+          "下一页"
+        ],
+        [
+          "BTN_SELECT",
+          "下一项"
+        ],
+        [
+          "BTN_ACTION",
+          "查看／刷新"
+        ],
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "variants",
+      "label": "EGS 控制单元版本",
+      "type": "choice",
+      "default": "verified",
+      "options": [
+        [
+          "verified",
+          "仅使用已验证版本（0F25D0）"
+        ],
+        [
+          "any",
+          "尝试所有版本（未经验证）"
+        ]
+      ]
+    },
+    {
+      "key": "autoRefresh",
+      "label": "页面显示时刷新",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "liveInterval",
+      "label": "实时刷新间隔",
+      "type": "number",
+      "unit": "s",
+      "default": 2,
+      "steps": [
+        1,
+        2,
+        3,
+        5,
+        10
+      ]
+    },
+    {
+      "key": "mapFamily",
+      "label": "换挡自适应图组",
+      "type": "choice",
+      "default": "1",
+      "options": [
+        [
+          "1",
+          "KF1"
+        ],
+        [
+          "2",
+          "KF2"
+        ],
+        [
+          "cold1",
+          "冷态 KF1"
+        ],
+        [
+          "cold2",
+          "冷态 KF2"
+        ]
+      ]
+    },
+    {
+      "key": "shiftGroup",
+      "label": "换挡表",
+      "type": "choice",
+      "default": "up",
+      "options": [
+        [
+          "up",
+          "升挡"
+        ],
+        [
+          "down",
+          "降挡"
+        ],
+        [
+          "skip",
+          "跳挡降挡"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "温度单位",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "摄氏度"
+        ],
+        [
+          "f",
+          "华氏度"
+        ]
+      ],
+      "aliases": {
+        "C": "c",
+        "F": "f"
+      }
+    },
+    {
+      "key": "theme",
+      "label": "配色主题",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_tricolour",
+          "M 三色"
+        ],
+        [
+          "ice",
+          "冰晶白"
+        ],
+        [
+          "amber",
+          "夜间琥珀"
+        ],
+        [
+          "m_red",
+          "M 红色"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "屏幕布局",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全屏"
+        ],
+        [
+          "standard",
+          "标准"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "渲染器",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 帧／秒"
+        ],
+        [
+          "software",
+          "软件渲染"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "演示数据",
+      "type": "choice",
+      "default": "auto",
+      "reset": 2,
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "始终"
+        ],
+        [
+          "off",
+          "从不"
+        ]
+      ]
+    }
+  ],
+  "config": {
+    "egsAddress": 24,
+    "expectedSgbdIndex": "0F25D0",
+    "readOnly": true
+  }
+}

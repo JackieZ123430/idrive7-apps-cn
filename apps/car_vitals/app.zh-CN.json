@@ -1,0 +1,1274 @@
+{
+  "id": "car_vitals",
+  "title": "M 车辆仪表",
+  "description": "查看发动机、温度、进气、燃油、点火、轮胎和底盘实时仪表。",
+  "version": "2.27.901",
+  "vendor": "custom",
+  "loggingId": "OA93",
+  "iconGlyph": "gauge",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs",
+      "statusEngineTemperature": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "the car's display units; tyre pressures / temperatures are then guessed from their values",
+      "statusNewCurrentUnitsStatusExt": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs",
+      "statusVehiclePartType": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusSwitchDriveDynamicSport2": "rs",
+      "statusVehicleDynamicEngine": "rs",
+      "statusActualValueTorque2": "rs"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "gearbox oil temperature; the xDrive split then comes from the transfer case or the drive mode",
+      "basicDataSet": "s"
+    },
+    "de.bmw.infrastructure.EnvironmentalInformation": {
+      "ExteriorTemperature": "s",
+      "UnitBN2020": "rs"
+    },
+    "de.bmw.infotainment.vehicle.TPMS": {
+      "statusTyreTemperature": "rs",
+      "statusTyrePressure": "rs",
+      "statusTargetTyrePressure": "rs"
+    },
+    "de.bmw.infotainment.misc.MDrive": {
+      "statusMSystem": "rs",
+      "dataDisplayGearbox": "s"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "M 车辆仪表",
+      "buttons": [
+        [
+          "BTN_PAGE",
+          "下一页"
+        ],
+        [
+          "BTN_PREV",
+          "上一页"
+        ],
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "page",
+      "label": "启动页面",
+      "type": "choice",
+      "default": "engine",
+      "options": [
+        [
+          "engine",
+          "发动机"
+        ],
+        [
+          "thermal",
+          "温度"
+        ],
+        [
+          "fuel",
+          "燃油与点火"
+        ],
+        [
+          "chassis",
+          "底盘"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "温度单位",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "摄氏度"
+        ],
+        [
+          "f",
+          "华氏度"
+        ]
+      ],
+      "aliases": {
+        "C": "c",
+        "F": "f"
+      }
+    },
+    {
+      "key": "pressUnit",
+      "label": "压力单位",
+      "type": "choice",
+      "default": "bar",
+      "options": [
+        [
+          "bar",
+          "bar"
+        ],
+        [
+          "psi",
+          "psi"
+        ],
+        [
+          "kpa",
+          "kPa"
+        ]
+      ]
+    },
+    {
+      "key": "boostMax",
+      "label": "增压表最大值",
+      "type": "choice",
+      "default": "2.5",
+      "options": [
+        [
+          "2.0",
+          "2.0 bar / 30 psi"
+        ],
+        [
+          "2.5",
+          "2.5 bar / 36 psi"
+        ],
+        [
+          "3.0",
+          "3.0 bar / 44 psi"
+        ],
+        [
+          "3.5",
+          "3.5 bar / 50 psi"
+        ]
+      ]
+    },
+    {
+      "key": "speedUnit",
+      "label": "速度单位",
+      "type": "choice",
+      "default": "kmh",
+      "options": [
+        [
+          "kmh",
+          "km/h"
+        ],
+        [
+          "mph",
+          "mph"
+        ]
+      ]
+    },
+    {
+      "key": "engine",
+      "label": "发动机",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动（读取车辆）"
+        ],
+        [
+          "diesel",
+          "柴油"
+        ],
+        [
+          "petrol",
+          "汽油"
+        ]
+      ]
+    },
+    {
+      "key": "redline",
+      "label": "换挡转速",
+      "type": "number",
+      "unit": "rpm",
+      "default": 0,
+      "labels": {
+        "0": "Auto"
+      },
+      "reset": 1,
+      "steps": [
+        0,
+        4000,
+        4500,
+        5000,
+        5500,
+        5800,
+        6000,
+        6200,
+        6500,
+        6800,
+        7000,
+        7200,
+        7500,
+        7800,
+        8000,
+        8500,
+        9000
+      ]
+    },
+    {
+      "key": "rpmScale",
+      "label": "转速刻度上限",
+      "type": "number",
+      "unit": "rpm",
+      "default": 0,
+      "labels": {
+        "0": "Auto"
+      },
+      "steps": [
+        0,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000
+      ]
+    },
+    {
+      "key": "maxPower",
+      "label": "最大功率（运动仪表的 100%）",
+      "type": "number",
+      "unit": "kW",
+      "unitBy": "powerUnit",
+      "units": {
+        "hp": {
+          "unit": "hp",
+          "mul": 1.34102
+        },
+        "ps": {
+          "unit": "PS",
+          "mul": 1.35962
+        }
+      },
+      "default": 215,
+      "steps": [
+        100,
+        120,
+        135,
+        140,
+        150,
+        160,
+        170,
+        185,
+        190,
+        200,
+        215,
+        230,
+        240,
+        250,
+        260,
+        275,
+        285,
+        300,
+        320,
+        340,
+        360,
+        375,
+        390,
+        405,
+        420,
+        450,
+        460,
+        480,
+        500,
+        530,
+        550,
+        600
+      ]
+    },
+    {
+      "key": "maxTorqueKgm",
+      "label": "扭矩表最大值",
+      "type": "number",
+      "unit": "kgm",
+      "default": 100,
+      "steps": [
+        20,
+        25,
+        30,
+        40,
+        50,
+        60,
+        80,
+        100
+      ],
+      "when": {
+        "torqueUnit": "kgm"
+      }
+    },
+    {
+      "key": "powerUnit",
+      "label": "功率单位",
+      "type": "choice",
+      "default": "kw",
+      "options": [
+        [
+          "kw",
+          "kW"
+        ],
+        [
+          "hp",
+          "hp"
+        ],
+        [
+          "ps",
+          "PS"
+        ]
+      ]
+    },
+    {
+      "key": "torqueUnit",
+      "label": "扭矩单位",
+      "type": "choice",
+      "default": "nm",
+      "options": [
+        [
+          "nm",
+          "Nm"
+        ],
+        [
+          "lbft",
+          "lb-ft"
+        ],
+        [
+          "kgm",
+          "kgm"
+        ]
+      ]
+    },
+    {
+      "key": "powerSource",
+      "label": "功率来源",
+      "type": "choice",
+      "default": "sport",
+      "options": [
+        [
+          "sport",
+          "运动仪表"
+        ],
+        [
+          "calc",
+          "扭矩 × 转速"
+        ]
+      ]
+    },
+    {
+      "key": "oilWarn",
+      "label": "机油温度警告",
+      "type": "number",
+      "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": {
+        "f": {
+          "unit": "°F",
+          "mul": 1.8,
+          "add": 32
+        }
+      },
+      "default": 125,
+      "steps": [
+        110,
+        115,
+        120,
+        125,
+        130,
+        135
+      ]
+    },
+    {
+      "key": "flipLong",
+      "label": "G 值圆圈：交换加速和制动（制动在上）",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "programSteady",
+      "label": "M-Track 等模块：S／M 闪烁时显示 S",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "peaks",
+      "label": "显示峰值标记",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "peakHold",
+      "label": "峰值保持",
+      "type": "number",
+      "unit": "s",
+      "default": 15,
+      "steps": [
+        5,
+        10,
+        15,
+        30,
+        60
+      ]
+    },
+    {
+      "key": "xdrive",
+      "label": "xDrive 面板",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏（后轮驱动）"
+        ]
+      ]
+    },
+    {
+      "key": "showBoost",
+      "label": "增压压力",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "boostSource",
+      "label": "增压压力来源",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动（首个可用来源）"
+        ],
+        [
+          "fes",
+          "运动仪表"
+        ],
+        [
+          "dme",
+          "发动机控制单元（OBD）"
+        ]
+      ]
+    },
+    {
+      "key": "showGearbox",
+      "label": "变速箱油温",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showEgs",
+      "label": "变速箱温度（EGS）",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showIat",
+      "label": "进气温度",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showHpfp",
+      "label": "高压燃油",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showLpfp",
+      "label": "低压燃油",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showTiming",
+      "label": "点火提前角",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showBoostCtl",
+      "label": "目标与实际增压压力",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showLoad",
+      "label": "请求与实际进气充量",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showMisfire",
+      "label": "失火计数",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showTyres",
+      "label": "轮胎面板",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "showTyreTemp",
+      "label": "轮胎温度",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "显示"
+        ],
+        [
+          "off",
+          "隐藏"
+        ]
+      ],
+      "group": "Tiles"
+    },
+    {
+      "key": "advanced",
+      "label": "高级设置",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "theme",
+      "label": "配色主题",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M 红色"
+        ],
+        [
+          "m_tricolour",
+          "M 三色"
+        ],
+        [
+          "ice",
+          "冰晶白"
+        ],
+        [
+          "amber",
+          "夜间琥珀"
+        ]
+      ]
+    },
+    {
+      "key": "speedRate",
+      "label": "速度刷新率",
+      "type": "number",
+      "unit": "fps",
+      "default": 10,
+      "reset": 1,
+      "markDefault": true,
+      "steps": [
+        3,
+        5,
+        10,
+        15,
+        30,
+        60
+      ],
+      "when": {
+        "advanced": true
+      }
+    },
+    {
+      "key": "layout",
+      "label": "屏幕布局",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全屏"
+        ],
+        [
+          "standard",
+          "标准"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "渲染器",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 帧（默认）"
+        ],
+        [
+          "software",
+          "软件渲染"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "演示数据",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "自动"
+        ],
+        [
+          "on",
+          "始终"
+        ],
+        [
+          "off",
+          "从不"
+        ]
+      ]
+    }
+  ],
+  "config": {
+    "comment": "raw -> value*factor + offset. CDS/CDS2/Vehicle2/ambient factors are BMW's own (M Laptimer's TypeConverters). FES boost and BasicDataSet scalings are best guesses: calibrate here against a known reading.",
+    "scaling": {
+      "rpm": {
+        "factor": 0.25,
+        "offset": 0,
+        "invalid": 65535
+      },
+      "speed": {
+        "factor": 0.015625,
+        "offset": 0,
+        "invalid": 65535
+      },
+      "accel": {
+        "factor": 0.002,
+        "offset": -65,
+        "invalid": 65535
+      },
+      "ambient": {
+        "factor": 0.5,
+        "offset": -40,
+        "invalid": 255
+      },
+      "engineTemp": {
+        "factor": 1,
+        "offset": -48,
+        "invalid": 255
+      },
+      "gearboxTemp": {
+        "factor": 1,
+        "offset": -48,
+        "invalid": 255,
+        "note": "a value that never changes is shown as no data (some cars don't fill this field); raw values go to the log ('raw gearbox oil')"
+      },
+      "boost": {
+        "factor": 0.01,
+        "offset": 0,
+        "invalid": 255,
+        "note": "sport display boost; raw values go to the log ('raw FES boost')"
+      },
+      "torque": {
+        "factor": 0.5,
+        "offset": -1023.5,
+        "invalid": 65535,
+        "invalidFrom": 4095,
+        "note": "12 bit, 0.5 Nm per bit, 0 Nm at raw 2047 (negative = engine braking), 4095 = no value. With factor 1 a running engine read as ~2047 Nm."
+      },
+      "tyreTemp": {
+        "factor": 1,
+        "offset": -40,
+        "invalid": 65535,
+        "note": "degrees + 40, in the car's temperature unit (deg F on a car set to Fahrenheit: main.js converts it): a G05 PHEV sent raw 53-57 on a ~10 deg C day (2.8.0 log), not deci-Kelvin. Values outside -40..150 deg C are shown as no data; the raw values go to the log ('raw tyre temperature')"
+      },
+      "torqueSplitRear": {
+        "factor": 0.01,
+        "offset": 0,
+        "invalid": 65535
+      },
+      "tyrePress": {
+        "factor": 0.1,
+        "offset": 0,
+        "invalidFrom": 65532,
+        "note": "0.1 per bit in the car's pressure unit (bar / kPa / psi, from Vehicle.statusNewCurrentUnitsStatusExt; main.js converts it to bar). BMW x_call: raw * 0.1, valid up to 530; a car in bar sent raw 22-25 = 2.2-2.5 bar, a car in psi about 410 = 41 psi. Read as 0.1 kPa before, every tyre came out at 0.02 bar and was hidden."
+      },
+      "sportPct": {
+        "factor": 1,
+        "offset": 0,
+        "invalid": 255,
+        "note": "sport display power / torque in % of the car maximum; calibrate if the raw value is not 0-100"
+      }
+    },
+    "xdrive": {
+      "comment": "xDrive split straight from the transfer case unit (LMV, address 0x19), read on the Chassis page when the car's own split signal has nothing. LMV_MOMENT (22 DB32): actual torque to the front axle, signed, Nm = raw / 4 (bytes 0-1); qualifier bytes 2-3, target torque 4-5 (layout from BMW's LMV_G11 description). Split % = front torque / (engine torque x gear ratio): an estimate (no converter multiplication, no losses).",
+      "front": [
+        {
+          "ecu": 25,
+          "did": "DB32",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.25,
+          "signed": true,
+          "min": -200,
+          "max": 2500,
+          "note": "LMV_MOMENT.ISTMOMENT, actual torque to the front axle"
+        }
+      ],
+      "gearRatios": [
+        5.0,
+        3.2,
+        2.143,
+        1.72,
+        1.313,
+        1.0,
+        0.823,
+        0.64
+      ],
+      "gearRatiosNote": "ZF 8HP, 1st..8th"
+    },
+    "dme": {
+      "comment": "Intake / fuel values from the engine unit (DME, ecu 18 = 0x12) with UDS 0x22. F4xx = the standard OBD PIDs (F40F = PID 0x0F); a candidate with \"obd\" instead of \"did\" asks for the same PID with OBD service 01 (some engine units refuse the F4xx identifiers with NRC 31). Candidates are tried in order; the first plausible one wins. value = raw * factor + offset (bar / deg C). If a tile says 'not available from this DME', add your engine's BMW-specific DID here. boost: tried in order when the sport display sends no boost (setting 'Boost from'); absolute pressure in kPa, the outside air pressure (baro) is subtracted. boostTarget / boostActual: boost pressure setpoint and actual (absolute kPa, baro subtracted), BMW DIDs first, then OBD PID 0x70; the tile only shows when the target answers. loadTarget / loadActual: requested and actual relative air charge in %. timing: OBD PID 0x0E, degrees before top dead centre. misfire: OBD service 06 monitor results (MID A2 = cylinder 1, A3 = cylinder 2 ...), tid 0C = misfires this driving cycle (0B = average of the last 10 cycles); engine units that only speak UDS are asked 0x22 F6A2... egs: gearbox temperature from the gearbox unit (EGS); give each candidate its \"ecu\".",
+      "ecu": 18,
+      "iat": [
+        {
+          "did": "F40F",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 150
+        },
+        {
+          "did": "F477",
+          "bytes": 1,
+          "at": 1,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 150,
+          "note": "charge air cooler temperature, bank 1 sensor 1"
+        },
+        {
+          "obd": "0F",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 150,
+          "note": "the same PID with OBD service 01, for engine units that refuse F40F with NRC 31"
+        }
+      ],
+      "hpfp": [
+        {
+          "did": "F423",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.1,
+          "offset": 0,
+          "min": 0,
+          "max": 500,
+          "note": "fuel rail gauge pressure (direct injection), 10 kPa per bit"
+        },
+        {
+          "did": "F459",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.1,
+          "offset": -1,
+          "min": 0,
+          "max": 500,
+          "note": "fuel rail absolute pressure, 10 kPa per bit"
+        },
+        {
+          "obd": "23",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.1,
+          "offset": 0,
+          "min": 0,
+          "max": 500,
+          "note": "OBD service 01 PID 0x23 (same as F423)"
+        }
+      ],
+      "lpfp": [
+        {
+          "did": "F40A",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.03,
+          "offset": 0,
+          "min": 0.5,
+          "max": 8,
+          "note": "fuel pressure (gauge), 3 kPa per bit"
+        },
+        {
+          "did": "F422",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.00079,
+          "offset": 0,
+          "min": 0.5,
+          "max": 15,
+          "note": "fuel rail pressure relative to manifold, 0.079 kPa per bit"
+        },
+        {
+          "obd": "0A",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.03,
+          "offset": 0,
+          "min": 0.5,
+          "max": 8,
+          "note": "OBD service 01 PID 0x0A (same as F40A)"
+        },
+        {
+          "obd": "22",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.00079,
+          "offset": 0,
+          "min": 0.5,
+          "max": 15,
+          "note": "OBD service 01 PID 0x22 (same as F422)"
+        }
+      ],
+      "oil": [
+        {
+          "obd": "5C",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 170,
+          "note": "engine oil temperature, OBD service 01 PID 0x5C - only read while the car's own signal (CDS) sends none"
+        },
+        {
+          "did": "F45C",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 170
+        }
+      ],
+      "boost": [
+        {
+          "did": "F470",
+          "bytes": 2,
+          "at": 3,
+          "factor": 0.03125,
+          "offset": 0,
+          "min": 20,
+          "max": 600,
+          "note": "OBD PID 0x70 boost pressure control: actual boost pressure sensor A (absolute), 1/32 kPa"
+        },
+        {
+          "did": "F487",
+          "bytes": 2,
+          "at": 1,
+          "factor": 0.03125,
+          "offset": 0,
+          "min": 20,
+          "max": 600,
+          "note": "OBD PID 0x87 intake manifold absolute pressure sensor A, 1/32 kPa"
+        },
+        {
+          "did": "F40B",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": 0,
+          "min": 20,
+          "max": 255,
+          "note": "OBD PID 0x0B intake manifold absolute pressure, kPa (max 255 = 1.5 bar boost)"
+        },
+        {
+          "obd": "0B",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": 0,
+          "min": 20,
+          "max": 255,
+          "note": "OBD service 01 PID 0x0B (same as F40B)"
+        }
+      ],
+      "baro": [
+        {
+          "did": "F433",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": 0,
+          "min": 50,
+          "max": 115,
+          "note": "OBD PID 0x33 barometric pressure, kPa (101.3 when not available)"
+        },
+        {
+          "obd": "33",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": 0,
+          "min": 50,
+          "max": 115,
+          "note": "OBD service 01 PID 0x33 (same as F433)"
+        }
+      ],
+      "boostTarget": [
+        {
+          "did": "4AB0",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.00390625,
+          "offset": 0,
+          "min": 20,
+          "max": 400,
+          "note": "BMW boost pressure setpoint (absolute), hPa = raw * 10 / 256"
+        },
+        {
+          "did": "F470",
+          "bytes": 2,
+          "at": 1,
+          "factor": 0.03125,
+          "offset": 0,
+          "min": 20,
+          "max": 600,
+          "note": "OBD PID 0x70: commanded boost pressure A (absolute), 1/32 kPa"
+        },
+        {
+          "obd": "70",
+          "bytes": 2,
+          "at": 1,
+          "factor": 0.03125,
+          "offset": 0,
+          "min": 20,
+          "max": 600,
+          "note": "OBD service 01 PID 0x70 (same as F470)"
+        }
+      ],
+      "boostActual": [
+        {
+          "did": "580B",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.00390625,
+          "offset": 0,
+          "min": 20,
+          "max": 400,
+          "note": "BMW boost pressure actual (absolute), hPa = raw * 10 / 256"
+        },
+        {
+          "did": "F470",
+          "bytes": 2,
+          "at": 3,
+          "factor": 0.03125,
+          "offset": 0,
+          "min": 20,
+          "max": 600,
+          "note": "OBD PID 0x70: boost pressure sensor A (absolute), 1/32 kPa"
+        },
+        {
+          "obd": "70",
+          "bytes": 2,
+          "at": 3,
+          "factor": 0.03125,
+          "offset": 0,
+          "min": 20,
+          "max": 600,
+          "note": "OBD service 01 PID 0x70 (same as F470)"
+        }
+      ],
+      "loadTarget": [
+        {
+          "did": "480C",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.0234375,
+          "offset": 0,
+          "min": 0,
+          "max": 250,
+          "note": "BMW requested relative air charge, % = raw * 0.75 / 32"
+        }
+      ],
+      "loadActual": [
+        {
+          "did": "5813",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.75,
+          "offset": 0,
+          "min": 0,
+          "max": 191.25,
+          "note": "BMW actual relative air charge, % = raw * 0.75"
+        }
+      ],
+      "timing": [
+        {
+          "obd": "0E",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.5,
+          "offset": -64,
+          "min": -64,
+          "max": 63.5,
+          "note": "OBD service 01 PID 0x0E timing advance, degrees before TDC (cylinder 1)"
+        },
+        {
+          "did": "F40E",
+          "bytes": 1,
+          "at": 0,
+          "factor": 0.5,
+          "offset": -64,
+          "min": -64,
+          "max": 63.5,
+          "note": "the same PID over UDS 0x22"
+        }
+      ],
+      "misfire": {
+        "tid": "0C",
+        "note": "set to {} to switch off; \"ecu\" to ask another unit"
+      },
+      "egs": [
+        {
+          "ecu": 24,
+          "did": "6000",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -40,
+          "min": -40,
+          "max": 160,
+          "note": "ZF 8HP (GSZFBCE) _GETRIEBEOELTEMPERATUR, deg C + 40 (idrive7-apps PR #29, read on a G22)"
+        },
+        {
+          "ecu": 24,
+          "did": "DA12",
+          "bytes": 1,
+          "at": 0,
+          "factor": 1,
+          "offset": -48,
+          "min": -40,
+          "max": 160,
+          "note": "gearbox unit (EGS, 0x18) transmission oil temperature, deg C + 48 (from a forum report, not confirmed on a car: only shown once it changes; the replies go to the log, \"raw EGS\")"
+        }
+      ]
+    }
+  }
+}

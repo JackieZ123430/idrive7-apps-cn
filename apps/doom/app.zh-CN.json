@@ -1,0 +1,237 @@
+{
+  "id": "doom",
+  "title": "毁灭战士",
+  "description": "在 iDrive 上运行 Freedoom，支持全屏画面、旋钮控制、设置和存档。",
+  "version": "1.7.2201",
+  "vendor": "custom",
+  "loggingId": "OA9F",
+  "maxDiskUsage": 104857600,
+  "iconGlyph": "doom",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
+  "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infotainment.controlelements.FrontCCU": {
+      "statusRotaryEncoderState": "rs",
+      "statusPushButtonsState": "rs"
+    }
+  },
+  "assets": [
+    {
+      "file": "freedoom1.wad",
+      "sha256": "7323bcc168c5a45ff10749b339960e98314740a734c30d4b9f3337001f9e703d",
+      "url": "https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip",
+      "zipSha256": "3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59",
+      "zipMember": "freedoom-0.13.0/freedoom1.wad"
+    }
+  ],
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "menu",
+      "title": "毁灭战士",
+      "settings": true,
+      "items": [
+        [
+          "button",
+          "BTN_PLAY",
+          "开始游戏"
+        ],
+        [
+          "button",
+          "BTN_NEW",
+          "新游戏"
+        ],
+        [
+          "text",
+          "MENU_INFO",
+          ""
+        ]
+      ]
+    },
+    {
+      "name": "GAME",
+      "kind": "canvas",
+      "title": "毁灭战士",
+      "chrome": false,
+      "buttons": [
+        [
+          "BTN_BACK",
+          "后退"
+        ],
+        [
+          "BTN_TL",
+          "向左转"
+        ],
+        [
+          "BTN_WL",
+          "向左平移"
+        ],
+        [
+          "BTN_STAND",
+          "停止移动"
+        ],
+        [
+          "BTN_WALK",
+          "行走"
+        ],
+        [
+          "BTN_WR",
+          "向右平移"
+        ],
+        [
+          "BTN_TR",
+          "向右转"
+        ],
+        [
+          "BTN_WEAPON",
+          "切换武器"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "parkedOnly",
+      "label": "仅停车时运行（行驶中暂停）",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "skill",
+      "label": "难度（新游戏）",
+      "type": "choice",
+      "default": "3",
+      "options": [
+        [
+          "1",
+          "入门"
+        ],
+        [
+          "2",
+          "简单"
+        ],
+        [
+          "3",
+          "普通"
+        ],
+        [
+          "4",
+          "困难"
+        ],
+        [
+          "5",
+          "噩梦！"
+        ]
+      ]
+    },
+    {
+      "key": "episode",
+      "label": "章节（新游戏）",
+      "type": "choice",
+      "default": "1",
+      "options": [
+        [
+          "1",
+          "1：前哨危机"
+        ],
+        [
+          "2",
+          "2：军事实验室"
+        ],
+        [
+          "3",
+          "3：事件视界"
+        ],
+        [
+          "4",
+          "4：双重冲击"
+        ]
+      ]
+    },
+    {
+      "key": "run",
+      "label": "移动速度",
+      "type": "choice",
+      "default": "slow",
+      "options": [
+        [
+          "slow",
+          "慢走（方便控制）"
+        ],
+        [
+          "walk",
+          "行走"
+        ],
+        [
+          "run",
+          "奔跑"
+        ]
+      ]
+    },
+    {
+      "key": "aim",
+      "label": "瞄准速度（旋转控制器）",
+      "type": "choice",
+      "default": "normal",
+      "options": [
+        [
+          "slow",
+          "慢"
+        ],
+        [
+          "normal",
+          "正常"
+        ],
+        [
+          "fast",
+          "快"
+        ]
+      ]
+    },
+    {
+      "key": "aimdir",
+      "label": "瞄准方向",
+      "type": "choice",
+      "default": "normal",
+      "options": [
+        [
+          "normal",
+          "正常"
+        ],
+        [
+          "reversed",
+          "反向"
+        ]
+      ]
+    },
+    {
+      "key": "detail",
+      "label": "渲染分辨率",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "全分辨率：1920 × 504"
+        ],
+        [
+          "medium",
+          "中：1440 × 378"
+        ],
+        [
+          "low",
+          "低：960 × 252"
+        ]
+      ]
+    }
+  ]
+}

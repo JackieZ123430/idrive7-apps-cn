@@ -1,0 +1,369 @@
+{
+  "id": "ambient_config",
+  "title": "氛围灯设置",
+  "description": "设置氛围灯颜色、驾驶模式配色和灯光效果；效果与可用功能取决于车型及控制单元。",
+  "version": "2.7.1301",
+  "vendor": "custom",
+  "loggingId": "OAA4",
+  "iconGlyph": "ambient",
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "idrive7-renderd": "2.1.18",
+    "mgu-inputgate": "1.1.0"
+  },
+  "autostart": true,
+  "signals": {
+    "de.bmw.infotainment.misc.ComfortFunctionIuK": {
+      "ambientLightInteriorColour": "w",
+      "statusAmbientLightInteriorColour": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "_optional": "the driving mode: colours by mode",
+      "statusFESVehicleDynamicSwitchHMI": "rs"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "day or night: dimmer at night",
+      "statusDayNightChangeOver": "rs"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "_optional": "the car locked and left: the car's own light",
+      "VehicleCondition": "s",
+      "vehicleConditionNoCrc": "s"
+    },
+    "de.bmw.body.Light": {
+      "_optional": "the turn signals: that side's lights breathe green",
+      "StatusFunctionsIndicators": "s"
+    },
+    "de.bmw.body.DoorsWindowsRoofMirrors": {
+      "_optional": "an open door: its lights red",
+      "CentralLockingSystemAndPanelStatus": "s"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "_optional": "the car's speed: driven (for a car that does not say it is locked and left), and the light show only standing still",
+      "statusCarSpeed2": "rs",
+      "statusLightStatus": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "氛围灯设置",
+      "buttons": [
+        [
+          "BTN_SETTINGS",
+          "设置"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "carKind",
+      "label": "车辆类型",
+      "type": "choice",
+      "default": "ice",
+      "hidden": true,
+      "options": [
+        [
+          "ice",
+          "汽油或柴油"
+        ],
+        [
+          "hybrid",
+          "插电混动"
+        ]
+      ]
+    },
+    {
+      "key": "follow",
+      "label": "按驾驶模式选择外观",
+      "type": "bool",
+      "default": true,
+      "hidden": true
+    },
+    {
+      "key": "welcome",
+      "label": "启动迎宾扫光",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "sportPulse",
+      "label": "运动模式脉冲",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "nightDim",
+      "label": "夜间调暗",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "keep",
+      "label": "每次启动恢复自定义颜色",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "flashAlerts",
+      "label": "换挡转速闪光",
+      "type": "bool",
+      "default": true,
+      "hidden": true
+    },
+    {
+      "key": "turnGlow",
+      "label": "转向灯联动光效",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "doorRed",
+      "label": "开门时显示红色",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "doorCar",
+      "label": "开门：使用原车警告（G20／G26）",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "hazardRed",
+      "label": "危险警示红色",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "strobe",
+      "label": "远光频闪和灯光秀（仅限私人场地使用）",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "strobeLeverDriving",
+      "label": "行驶时也允许拨杆启动频闪（仅限私人场地使用）",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "strobeLights",
+      "label": "频闪灯组",
+      "type": "choice",
+      "default": "all",
+      "hidden": true,
+      "options": [
+        [
+          "all",
+          "全部灯光"
+        ],
+        [
+          "high",
+          "远光灯"
+        ]
+      ]
+    },
+    {
+      "key": "strobeEvery",
+      "label": "每秒频闪次数",
+      "type": "choice",
+      "default": "0",
+      "hidden": true,
+      "options": [
+        [
+          "0",
+          "最大"
+        ],
+        [
+          "250",
+          "4"
+        ],
+        [
+          "333",
+          "3"
+        ],
+        [
+          "500",
+          "2"
+        ],
+        [
+          "1000",
+          "1"
+        ]
+      ]
+    },
+    {
+      "key": "policeBurst",
+      "label": "每组警示闪烁次数",
+      "type": "choice",
+      "default": "4",
+      "hidden": true,
+      "options": [
+        [
+          "1",
+          "1"
+        ],
+        [
+          "2",
+          "2"
+        ],
+        [
+          "3",
+          "3"
+        ],
+        [
+          "4",
+          "4"
+        ]
+      ]
+    },
+    {
+      "key": "strobeFlashMs",
+      "label": "单次频闪持续时间",
+      "type": "choice",
+      "default": "80",
+      "hidden": true,
+      "options": [
+        [
+          "50",
+          "50 ms"
+        ],
+        [
+          "80",
+          "80 ms"
+        ],
+        [
+          "100",
+          "100 ms"
+        ],
+        [
+          "150",
+          "150 ms"
+        ]
+      ]
+    },
+    {
+      "key": "policeOrder",
+      "label": "警示闪烁顺序",
+      "type": "choice",
+      "default": "lbr",
+      "hidden": true,
+      "options": [
+        [
+          "lbr",
+          "左侧、两侧、右侧"
+        ],
+        [
+          "lrb",
+          "左侧、右侧、两侧"
+        ],
+        [
+          "lr",
+          "左侧、右侧"
+        ]
+      ]
+    },
+    {
+      "key": "strobePattern",
+      "label": "频闪样式",
+      "type": "choice",
+      "default": "police",
+      "hidden": true,
+      "options": [
+        [
+          "police",
+          "警示灯模式"
+        ],
+        [
+          "both",
+          "频闪"
+        ],
+        [
+          "alternate",
+          "依次"
+        ]
+      ]
+    },
+    {
+      "key": "strobeLever",
+      "label": "使用远光拨杆启动频闪",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "strobeRate",
+      "label": "频闪速度",
+      "type": "choice",
+      "default": "normal",
+      "hidden": true,
+      "options": [
+        [
+          "fast",
+          "快"
+        ],
+        [
+          "normal",
+          "正常"
+        ],
+        [
+          "slow",
+          "慢"
+        ]
+      ]
+    },
+    {
+      "key": "showRate",
+      "label": "灯光秀速度",
+      "type": "choice",
+      "default": "normal",
+      "hidden": true,
+      "options": [
+        [
+          "fast",
+          "快"
+        ],
+        [
+          "normal",
+          "正常"
+        ]
+      ]
+    },
+    {
+      "key": "drive",
+      "label": "方向盘",
+      "type": "choice",
+      "default": "lhd",
+      "options": [
+        [
+          "lhd",
+          "左侧"
+        ],
+        [
+          "rhd",
+          "右侧"
+        ]
+      ]
+    }
+  ]
+}

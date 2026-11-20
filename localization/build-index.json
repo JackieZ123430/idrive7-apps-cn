@@ -1,0 +1,95 @@
+{
+  "source": "https://github.com/JackieZ123430/idrive7-apps-cn",
+  "apps": {
+    "ambient_config": {
+      "path": "apps/ambient_config",
+      "kitRoot": ".",
+      "version": "2.7.1301",
+      "upstreamVersion": "2.7.13"
+    },
+    "brake_test": {
+      "path": "apps/brake_test",
+      "kitRoot": ".",
+      "version": "1.5.2101",
+      "upstreamVersion": "1.5.21"
+    },
+    "car_vitals": {
+      "path": "apps/car_vitals",
+      "kitRoot": ".",
+      "version": "2.27.901",
+      "upstreamVersion": "2.27.9"
+    },
+    "doom": {
+      "path": "apps/doom",
+      "kitRoot": ".",
+      "version": "1.7.2201",
+      "upstreamVersion": "1.7.22"
+    },
+    "draggy": {
+      "path": "apps/draggy",
+      "kitRoot": ".",
+      "version": "2.6.1",
+      "upstreamVersion": "2.6.0"
+    },
+    "dtc_scanner": {
+      "path": "apps/dtc_scanner",
+      "kitRoot": ".",
+      "version": "2.9.801",
+      "upstreamVersion": "2.9.8"
+    },
+    "dyno": {
+      "path": "apps/dyno",
+      "kitRoot": ".",
+      "version": "1.6.301",
+      "upstreamVersion": "1.6.3"
+    },
+    "edrive": {
+      "path": "apps/edrive",
+      "kitRoot": ".",
+      "version": "2.11.1",
+      "upstreamVersion": "2.11.0"
+    },
+    "gforce": {
+      "path": "apps/gforce",
+      "kitRoot": ".",
+      "version": "1.6.2201",
+      "upstreamVersion": "1.6.22"
+    },
+    "live_adjustments": {
+      "path": "apps/live_adjustments",
+      "kitRoot": ".",
+      "version": "0.9.1001",
+      "upstreamVersion": "0.9.10"
+    },
+    "live_data": {
+      "path": "apps/live_data",
+      "kitRoot": ".",
+      "version": "1.0.1801",
+      "upstreamVersion": "1.0.18"
+    },
+    "redline": {
+      "path": "apps/redline",
+      "kitRoot": ".",
+      "version": "2.0.4501",
+      "upstreamVersion": "2.0.45"
+    },
+    "service": {
+      "path": "apps/service",
+      "kitRoot": ".",
+      "version": "1.6.301",
+      "upstreamVersion": "1.6.3"
+    },
+    "warmup": {
+      "path": "apps/warmup",
+      "kitRoot": ".",
+      "version": "1.9.1",
+      "upstreamVersion": "1.9.0"
+    },
+    "zf8hp": {
+      "path": "apps/zf8hp",
+      "kitRoot": ".",
+      "version": "1.5.801",
+      "upstreamVersion": "1.5.8"
+    }
+  }
+}
