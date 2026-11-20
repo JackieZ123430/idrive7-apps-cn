@@ -174,12 +174,12 @@
       "kind": "app",
       "title": "EDrive助手",
       "description": "查看电动续航、高压与 12 伏电池、电芯、充电历史及相关用电信息，支持首页组件。",
-      "version": "2.11.1",
+      "version": "2.11.2",
       "artifact": {
-        "name": "edrive@2.11.1.tgz",
-        "size": 1148333,
-        "sha256": "d434eb49acafd168f401b506266e748de089e8d70a629225b37107ce5eb2c2a2",
-        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/edrive%402.11.1.tgz"
+        "name": "edrive@2.11.2.tgz",
+        "size": 1150096,
+        "sha256": "e491e65866e6aea58b5942542473f97dd311714b1a5c7b8a54f00bcf7d4fb254",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/widget-chinese-r2-2026-11-20/edrive%402.11.2.tgz"
       },
       "requires": {
         "mgu-deploy": "0.3.2",
@@ -246,12 +246,12 @@
       "kind": "app",
       "title": "实时数据",
       "description": "只读查看车辆和控制单元的实时数据，支持自定义仪表、行程费用和首页组件。",
-      "version": "1.0.1801",
+      "version": "1.0.1802",
       "artifact": {
-        "name": "live_data@1.0.1801.tgz",
-        "size": 1134842,
-        "sha256": "e1798b71a8070d3f5b50f66b3d2d4d7c6c186d77ded7f25a4d42f18a056f35b3",
-        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/live_data%401.0.1801.tgz"
+        "name": "live_data@1.0.1802.tgz",
+        "size": 1136384,
+        "sha256": "b612c5e5b539c6074d274cd334e11ff2d3a2268ed1a5ebd64d70c1430be43905",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/widget-chinese-r2-2026-11-20/live_data%401.0.1802.tgz"
       },
       "requires": {
         "mgu-deploy": "0.3.2",
