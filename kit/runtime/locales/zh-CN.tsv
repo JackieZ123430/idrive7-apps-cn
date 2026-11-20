@@ -276,7 +276,7 @@ car sends no torque split	车辆未提供扭矩分配
 transfer case	分动箱
 transfer case, estimated	分动箱估算
 transfer case: clutch open	分动箱离合器断开
- (transfer case)	（分动箱）
+(transfer case)	（分动箱）
 target	目标
 max	最大
 min	分钟
@@ -571,7 +571,6 @@ Assist sensors: Unexpected Ethernet communication/link	辅助传感器：以太�
 Service requirements	保养需求
 Next service	下次保养
 Service due	保养到期
-Engine oil	发动机机油
 Front brakes	前制动器
 Rear brakes	后制动器
 Brake fluid	制动液
@@ -637,7 +636,6 @@ in	剩余
 by	到期
 or	或
 of	共
-Fault Scanner	故障检测
 Scan	扫描
 Reading	读取中
 Fault	故障
@@ -756,8 +754,6 @@ Intake air temperature sensor: Short to B+	进气温度传感器：对 B+ 短路
 BDC: LED GEN2: Headlight temperature too high	BDC：第二代 LED 前照灯温度过高
 Head unit: Bluetooth/Wi-Fi aerial 1: Disconnected line	主机：蓝牙 / Wi-Fi 天线 1 线路断路
 KAFAS: camera calibration missing	KAFAS：摄像头缺少标定
-
-# Updated app and home-screen widget labels (2026-10-31).
 The car standing still (light show)	车辆静止（灯光表演）
 EDrive	eDrive助手
 Battery power now	当前电池功率
@@ -1169,11 +1165,8 @@ ago	前
 Max Cooling ON	最大冷却 开启
 Max Cooling OFF	最大冷却 关闭
 up	升挡
-down	降挡
-skip	跳挡降挡
 m ago	分钟前
 Boost gauge max	增压表最大值
-# eDrive: the 48 V mild hybrid page and the 12 V details
 Plug-in hybrid	插电混动
 48 V mild hybrid	48 V 轻混
 None (12 V only)	无（仅 12 V 电池）
@@ -1228,7 +1221,6 @@ SOOT	碳烟
 LOAD (ADAPTED)	碳载量（自适应）
 ASH (ADAPTED)	灰分（自适应）
 Reading the engine unit...	正在读取发动机控制单元...
-# Service: the CBS read states and the Engine page.
 From the engine unit (B58 / B48 / B38), read	来自发动机控制单元（B58 / B48 / B38），读取于
 From the engine unit	来自发动机控制单元
 the engine unit has none of these values	发动机控制单元没有这些数据
@@ -1257,7 +1249,6 @@ Not read / unavailable	未读取 / 不可用
 Diagnostics - read-only CBS	诊断 - 只读 CBS
 UDS candidate fields - validate for this car	UDS 候选字段，请结合本车核对
 UDS only - not a native service requirement	仅 UDS，不是车辆原生保养项目
-# Settings pages.
 Auto (from the car)	自动（读取车辆）
 Diesel	柴油
 Petrol	汽油
@@ -1286,7 +1277,6 @@ Off · nothing is sent (safe)	关闭 · 不发送任何指令（安全）
 On · xDrive tab, xDrive off until ignition off	开启 · 显示 xDrive 页，关闭 xDrive 直到熄火
 xDrive (experimental)	xDrive（实验）
 Reset is off - turn on "Service reset" in Settings	保养重置已关闭，请在设置中打开“保养重置”
-# Live Data: trip computer, Gauges, signal names and prompts.
 Live Data	实时数据
 Gauges	仪表
 Trips	行程
@@ -1588,13 +1578,11 @@ Open loop (load)	开环（负荷）
 page	页
 values read	项已读取
 with a value	项有数值
-# Sentences where "back" is not the Back button, so the short row must not reach them.
 xDrive on brings it back	打开 xDrive 可恢复
 back after an ignition cycle	点火关闭再打开后恢复
 Press again to switch xDrive back on	再按一次重新打开 xDrive
 xDrive is back · the transfer case reports it on	xDrive 已恢复 · 分动箱报告已开启
 Cleared; back at once (still present):	已清除，但立即再次出现（故障仍存在）：
-# eDrive 12 V battery (battery12.js)
 orig.	原装
 collecting...	正在收集...
 the car's signal	车辆信号
@@ -1641,7 +1629,6 @@ Last hour	最近 1 小时
 Recorded by the car	车辆记录
 CURRENT  (A, + = INTO THE BATTERY)	电流  （A，+ = 流入电池）
 HEALTH (SOH)	健康度 (SOH)
-# Engine Config: Exhaust Flap - Drive mode, hold, the Close rpm guard (auto.js)
 Drive mode	驾驶模式
 Hold Open / Close	保持打开/关闭
 On · sent again every 15 s	开启：每 15 秒重新发送
@@ -1700,3 +1687,142 @@ Bank 2	气缸列 2
 SOOT, BANK 1	碳烟，气缸列 1
 SOOT, BANK 2	碳烟，气缸列 2
 Bank 1	气缸列 1
+All lights	全部灯光
+Dimmer at night	夜间调暗
+Hazard red	危险警示红色
+High beam	远光灯
+High beam strobe and light show (only for use on private property)	远光频闪和灯光秀（仅限私人场地使用）
+In turn	依次
+Left	左侧
+Right	右侧
+Left, both, right	左侧、两侧、右侧
+Left, right	左侧、右侧
+Left, right, both	左侧、右侧、两侧
+Lever start of the strobe also while driving (only for use on private property)	行驶时也允许拨杆启动频闪（仅限私人场地使用）
+Light show speed	灯光秀速度
+Look by driving mode	按驾驶模式选择外观
+Max	最大
+My colour back at each start	每次启动恢复自定义颜色
+Open door red	开门时显示红色
+Open door: the car's own warning (G20 / G26)	开门：使用原车警告（G20／G26）
+Police	警示灯模式
+Police flashes a burst	每组警示闪烁次数
+Police order	警示闪烁顺序
+Redline shift flash	换挡转速闪光
+Sport pulse	运动模式脉冲
+Start the strobe with the flasher lever	使用远光拨杆启动频闪
+Strobe	频闪
+Strobe flash length	单次频闪持续时间
+Strobe flashes a second	每秒频闪次数
+Strobe lights	频闪灯组
+Strobe pattern	频闪样式
+Strobe speed	频闪速度
+Turn signal glow	转向灯联动光效
+Welcome sweep at start	启动迎宾扫光
+M-Track (or similar) module: S while S / M flickers	M-Track 等模块：S／M 闪烁时显示 S
+Engine Map and Burbles PIN	发动机程序与排气回火 PIN 码
+PIN for Engine Map and Burbles	发动机程序与排气回火的 PIN 码
+Layout	布局
+12 V battery charge (%)	12 伏蓄电池电量（%）
+12 V battery voltage	12 伏蓄电池电压
+80s digital dash	80 年代数字仪表
+All HUD options here (else on the HUD looks page)	在此显示全部 HUD 选项（否则在 HUD 外观页设置）
+Arc (after the F80 / F82 M3 and M4)	弧形（参考 F80／F82 M3 和 M4）
+Arrows show	箭头显示内容
+Auto (Barlow on Arc and Dial, squared on Ramp)	自动（弧形和表盘用 Barlow，斜坡用方形字体）
+Best gear (into the power band)	最佳挡位（进入动力区间）
+Boost unit	增压压力单位
+Burst (pops, ring)	爆发（弹出、圆环）
+Clearer (bigger, brighter)	更清晰（更大、更亮）
+Cold-engine shift limit	冷机换挡转速限制
+Colour	颜色
+Comfort HUD setup	舒适模式 HUD 设置
+Dial (after the E60 M5)	表盘（参考 E60 M5）
+Dim	调暗
+Directions left / right	导航提示左右位置
+Directions on the HUD (experimental)	HUD 导航提示（实验性）
+Directions up / down	导航提示上下位置
+Don't show (BMW's own HUD)	不显示（使用原车 HUD）
+Downshift arrows (experimental)	降挡箭头（实验性）
+Every gear you can drop	所有可降入的挡位
+Exact (to 10 rpm)	精确（每 10 转/分）
+From	起始值
+Fuel use (from the engine unit, experimental)	燃油消耗（发动机控制单元数据，实验性）
+Fuel use unit	油耗单位
+G-force (sideways and braking / accelerating together)	G 值（横向与制动／加速合力）
+GT3 (outside in, flash)	GT3（由外向内、闪烁）
+Gear font	挡位字体
+Gearbox mode (D / S / M)	变速箱模式（D／S／M）
+HUD colours	HUD 配色
+HUD frame rate	HUD 帧率
+HUD layout	HUD 布局
+HUD readouts refresh (faster: more work for the head unit)	HUD 数据刷新率（越快，车机负载越高）
+Hidden	隐藏
+Hybrid HUD setup	混合动力模式 HUD 设置
+Hybrid battery charge (%)	混合动力电池电量（%）
+Hybrid battery power (kW, + drive, - regen)	混合动力电池功率（千瓦，正值驱动、负值回收）
+Hybrid battery temperature	混合动力电池温度
+Hybrid battery voltage	混合动力电池电压
+Ice white	冰白色
+In Comfort / Eco Pro	舒适／节能模式下
+In Hybrid / Electric	混合动力／纯电模式下
+Its own HUD (set up on HUD looks)	独立 HUD（在 HUD 外观中设置）
+Knock retard (degrees, only while it retards)	爆震点火退角（度，仅退角时显示）
+Knock warning (KNOCK when the engine pulls timing, experimental)	爆震警告（发动机退角时提示，实验性）
+Launch time (0-100 km/h or 0-60 mph after a standing start, against your best)	起步加速时间（静止起步至 100 公里/小时或 60 英里/小时，与最佳成绩比较）
+Learn from driving (redline, shift points, reaction time)	从驾驶中学习（最高转速、换挡点、反应时间）
+Learn redline from the limiter	根据断油限制学习最高转速
+Left to right	从左到右
+Light colours	灯光配色
+Light fill	灯光填充
+Low or warming up	温度过低或暖机中
+Minimal (lights and gear)	精简（灯光与挡位）
+Minimum shift point	最低换挡转速
+Near turns (under 1 km, and lanes)	接近转弯时（1 公里以内，含车道提示）
+Night amber	夜间琥珀色
+Only when cold or hot	仅冷机或过热时
+Outside (blue at 3 °C / 37 °F and below)	外部温度（3℃／37℉及以下显示蓝色）
+Peak marker	峰值标记
+Per gear, learned (experimental)	按挡位学习（实验性）
+Pill (a sim-racing telemetry look)	胶囊形（模拟赛车遥测风格）
+Position left / right	左右位置
+Position up / down	上下位置
+Power (from torque and rpm)	功率（根据扭矩与转速计算）
+RPM shows as	转速显示方式
+Ramp (after the G80 / G82 M3 and M4)	斜坡形（参考 G80／G82 M3 和 M4）
+Readout labels	数据显示标签
+Recovery / power bar (regen left, drive right)	回收／功率条（左侧回收，右侧驱动）
+Redline minus the setting below	最高转速减去下方设置值
+Reset learned	重置学习结果
+Rev bar	转速条
+Same HUD as Sport	与运动模式使用相同 HUD
+Shake on the limiter	触及转速限制时抖动
+Shift grade after each upshift	每次升挡后显示换挡评分
+Shift lights	换挡提示灯
+Shift lights early by (reaction time, experimental)	换挡提示提前量（反应时间，实验性）
+Shift point	换挡点
+Show on HUD (experimental)	在 HUD 显示（实验性）
+Simple	简洁
+Size	尺寸
+Speed (km/h or mph, as Speed unit; on Ramp under the gear)	车速（按所选单位显示，斜坡布局中位于挡位下方）
+Split wings	分体翼形
+Steady (to 50 rpm)	平稳（每 50 转/分）
+Temperatures shown	显示的温度项目
+Test pattern	测试图案
+This car has a hybrid battery (found by the app)	本车配备混合动力电池（应用检测结果）
+This car sends tyre pressures (found by the app)	本车提供轮胎压力数据（应用检测结果）
+Thousands (4.5)	以千转显示（4.5）
+Tyre pressure unit	胎压单位
+Tyre widget (in the directions' corner; the directions come first)	轮胎组件（位于导航提示角落，导航提示优先）
+Tyre widget: each tyre's target	轮胎组件：各轮胎目标压力
+Tyre widget: the car	轮胎组件：车辆图示
+Tyre widget: tyre temperatures	轮胎组件：轮胎温度
+Tyres (the four pressures, coloured against their targets)	轮胎（四轮压力，按目标压力着色）
+Unlit segments	未点亮的灯段
+VFD glow (teal)	VFD 荧光效果（蓝绿色）
+Vector arcade (outlines)	矢量街机（轮廓）
+Water	冷却液温度
+When a tyre is low	轮胎压力偏低时
+While a route runs	导航路线引导期间
+While slowing down	减速时
+Gearbox oil is warm at	变速箱油暖机温度
