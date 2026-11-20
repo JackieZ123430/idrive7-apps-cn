@@ -1,0 +1,557 @@
+{
+  "schema": 2,
+  "components": [
+    {
+      "id": "ambient_config",
+      "kind": "app",
+      "title": "氛围灯设置",
+      "description": "设置氛围灯颜色、驾驶模式配色和灯光效果；效果与可用功能取决于车型及控制单元。",
+      "version": "2.7.1301",
+      "artifact": {
+        "name": "ambient_config@2.7.1301.tgz",
+        "size": 1091079,
+        "sha256": "4449a9a9004ce69f5b92f5561bc1951b9b027fcd6a792b902ac56a949654030e",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/ambient_config%402.7.1301.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/ambient_config.png",
+      "iconSha256": "bda3296b0077c8d9dc0b79fc06f9eac0de516f5b9fa2fe02afb4feede865830e",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "brake_test",
+      "kind": "app",
+      "title": "制动测试",
+      "description": "记录制动距离、峰值减速度和制动衰减，支持不同起始车速的测试。",
+      "version": "1.5.2101",
+      "artifact": {
+        "name": "brake_test@1.5.2101.tgz",
+        "size": 1059207,
+        "sha256": "0cab3d5ef6ed0a117ed140a9c03862aa70495b19252f3eb31853510fd39cb7d7",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/brake_test%401.5.2101.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/brake_test.png",
+      "iconSha256": "c0d9bd3d5ec1b16c99ba947e5568a1867d50720aff80e2eefafab21a481b7e7f",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "car_vitals",
+      "kind": "app",
+      "title": "M 车辆仪表",
+      "description": "查看发动机、温度、进气、燃油、点火、轮胎和底盘实时仪表。",
+      "version": "2.27.901",
+      "artifact": {
+        "name": "car_vitals@2.27.901.tgz",
+        "size": 1091418,
+        "sha256": "d3d31fc222ddec38fe0fa35c7ceeb6f760189127bafa6af1398668769e70a0f8",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/car_vitals%402.27.901.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/car_vitals.png",
+      "iconSha256": "f4ed2c2cf8f3c7dce5929aadeade8989449e8e5389568e05c0c4f42f1daef37d",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "doom",
+      "kind": "app",
+      "title": "毁灭战士",
+      "description": "在 iDrive 上运行 Freedoom，支持全屏画面、旋钮控制、设置和存档。",
+      "version": "1.7.2201",
+      "artifact": {
+        "name": "doom@1.7.2201.tgz",
+        "size": 12044205,
+        "sha256": "f04c2abf9ef78b17b81c28eead25e39e38311eaa66f58b7f509bc202db49cf23",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/doom%401.7.2201.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/doom.png",
+      "iconSha256": "4e1059afa6ca3023f873d2d2c7c44843d959b9bd16d4c905da2a3dd05f2a37f2",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "draggy",
+      "kind": "app",
+      "title": "加速计时",
+      "description": "记录加速、四分之一英里和最佳成绩。",
+      "version": "2.6.1",
+      "artifact": {
+        "name": "draggy@2.6.1.tgz",
+        "size": 1060221,
+        "sha256": "14d86c18022d38f2e2b66abb6009121600a728ae9da6696a130b2fee591add6d",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/draggy%402.6.1.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/draggy.png",
+      "iconSha256": "4d57c4caa4dff86649f7395796c8fbd05eeac035efba6df067f95dd0cf6f160b",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "dtc_scanner",
+      "kind": "app",
+      "title": "故障检测",
+      "description": "读取和清除各控制单元的故障存储，并查看当前检查控制信息。",
+      "version": "2.9.801",
+      "artifact": {
+        "name": "dtc_scanner@2.9.801.tgz",
+        "size": 6615253,
+        "sha256": "c1de4ef76c952418002f6dac1c7d9e7a042e900c1f6d460026b3b6afce48da4e",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/dtc_scanner%402.9.801.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/dtc_scanner.png",
+      "iconSha256": "e32af9aae088f38d40d312aaff61f7e51b14835924b01328039b461d84192171",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "dyno",
+      "kind": "app",
+      "title": "虚拟马力机",
+      "description": "根据加速采集功率与扭矩曲线，支持保存和对比测试结果。",
+      "version": "1.6.301",
+      "artifact": {
+        "name": "dyno@1.6.301.tgz",
+        "size": 1055665,
+        "sha256": "a7d2a4da07110115de1fd1b4d72434fec9cfc7f93e03e07a5102af143b00868c",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/dyno%401.6.301.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/dyno.png",
+      "iconSha256": "18ba9e4356b444f2362ce1dc137cec038cfcfeb17f099f203acc4106401f74eb",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "edrive",
+      "kind": "app",
+      "title": "EDrive助手",
+      "description": "查看电动续航、高压与 12 伏电池、电芯、充电历史及相关用电信息，支持首页组件。",
+      "version": "2.11.1",
+      "artifact": {
+        "name": "edrive@2.11.1.tgz",
+        "size": 1148333,
+        "sha256": "d434eb49acafd168f401b506266e748de089e8d70a629225b37107ce5eb2c2a2",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/edrive%402.11.1.tgz"
+      },
+      "requires": {
+        "mgu-deploy": "0.3.2",
+        "idrive7-renderd": "2.1.15"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/edrive.png",
+      "iconSha256": "5869ea41c3c995e8f085e2761277db3e5f5040b6042ad50ad185d9b3b52a824a",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "gforce",
+      "kind": "app",
+      "title": "G 值仪表",
+      "description": "显示摩擦圆、各方向峰值 G 值和驾驶记录。",
+      "version": "1.6.2201",
+      "artifact": {
+        "name": "gforce@1.6.2201.tgz",
+        "size": 1058509,
+        "sha256": "bdd21bc91b586f22d10bdfff6e5080f625c7750dee8de3f1d3364bf41eacc2f7",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/gforce%401.6.2201.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/gforce.png",
+      "iconSha256": "89e9e46537580ac2ae0048720e39ac9a175c1c44f286c4f1d7fc1e1828e79318",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "live_adjustments",
+      "kind": "app",
+      "title": "发动机配置",
+      "description": "发动机设置与排气阀门控制，提供原厂、打开、关闭及驾驶模式联动等选项。",
+      "version": "0.9.1001",
+      "artifact": {
+        "name": "live_adjustments@0.9.1001.tgz",
+        "size": 1241799,
+        "sha256": "67643c9c54e8d6380ee71c1d4cee179676ed1f1dced3770f39bbff309fb5d141",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/live_adjustments%400.9.1001.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/live_adjustments.png",
+      "iconSha256": "a274ebbeb1cda6ed3e5af20cccaa6c4877ebd2e515880d20f81fa874606400c5",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "live_data",
+      "kind": "app",
+      "title": "实时数据",
+      "description": "只读查看车辆和控制单元的实时数据，支持自定义仪表、行程费用和首页组件。",
+      "version": "1.0.1801",
+      "artifact": {
+        "name": "live_data@1.0.1801.tgz",
+        "size": 1134842,
+        "sha256": "e1798b71a8070d3f5b50f66b3d2d4d7c6c186d77ded7f25a4d42f18a056f35b3",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/live_data%401.0.1801.tgz"
+      },
+      "requires": {
+        "mgu-deploy": "0.3.2",
+        "idrive7-renderd": "2.1.18",
+        "mgu-inputgate": "1.1.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/live_data.png",
+      "iconSha256": "27a70f2f4fd94b447938d83ee479ec8060c0d4d5d9ac65e978f14fe273b17c7d",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "redline",
+      "kind": "app",
+      "title": "换挡转速",
+      "description": "显示转速、挡位、换挡提示和评分，支持冷机保护提示、HUD 布局及车辆数据。",
+      "version": "2.0.4501",
+      "artifact": {
+        "name": "redline@2.0.4501.tgz",
+        "size": 1268853,
+        "sha256": "e1a0d682ffc21377008be66fca309c39b8adcc71fba10f3f98e2f82e5b870dce",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/redline%402.0.4501.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/redline.png",
+      "iconSha256": "9c2a029af517d3542604f40a56189c0ecb59d580ba9968ee63fddde35c02cf1d",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "service",
+      "kind": "app",
+      "title": "保养信息",
+      "description": "查看仪表提供的机油、制动、制动液和车辆检查等保养要求、剩余距离与日期。",
+      "version": "1.6.301",
+      "artifact": {
+        "name": "service@1.6.301.tgz",
+        "size": 1058055,
+        "sha256": "84ddbdea54f0873ac5dc89f264500cdc940f48b02ee9a6d47732853d0f1484b5",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/service%401.6.301.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/service.png",
+      "iconSha256": "606928ba45bd2f212eb81d87a5ae8ff4fc9d0129c6973e0d70a51ef861179ee9",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "warmup",
+      "kind": "app",
+      "title": "暖机助手",
+      "description": "估算机油、冷却液与变速箱暖机状态，显示转速建议和涡轮冷却提示。",
+      "version": "1.9.1",
+      "artifact": {
+        "name": "warmup@1.9.1.tgz",
+        "size": 1053873,
+        "sha256": "3e55bc08e288ba5d730aeaa3f298f41acfef5c7642967fab501137e39233eb51",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/warmup%401.9.1.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/warmup.png",
+      "iconSha256": "712aa342b103c39b3be8879ba071d0d0294620bd3e5abbc8e5bbc7ea67ee15e5",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "zf8hp",
+      "kind": "app",
+      "title": "变速箱配置",
+      "description": "实验性 ZF 8HP 监控，查看实时数据、离合器充油自适应、换挡映射和温度历史。",
+      "version": "1.5.801",
+      "artifact": {
+        "name": "zf8hp@1.5.801.tgz",
+        "size": 1049326,
+        "sha256": "d29b25c53a13a1296abd51fc7a41a17fb2a807ed73ac9cbfa0354b9ca729270a",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/zf8hp%401.5.801.tgz"
+      },
+      "requires": {
+        "idrive7-renderd": "2.1.7",
+        "mgu-inputgate": "1.0.0"
+      },
+      "uninstallable": true,
+      "mguHmi": [
+        "ID7"
+      ],
+      "icon": "https://raw.githubusercontent.com/JackieZ123430/MGU-CN-XIAOBAI/refs/heads/main/zf8hp.png",
+      "iconSha256": "5bdfb5f5579ee5f14be0120e06e9c8feafd0db6a3940421bf7ab44d0005aa1b0",
+      "author": "汉化 小白151"
+    },
+    {
+      "id": "idrive7-renderd",
+      "kind": "tool",
+      "version": "2.1.19",
+      "title": "应用 GPU 渲染器",
+      "description": "应用 GPU 渲染组件，为应用页面提供图形绘制和显示。",
+      "requires": {
+        "mgu-deploy": "0.6.1"
+      },
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ],
+      "mguNeeds": null,
+      "mguProvides": "renderer",
+      "optional": true,
+      "uninstallable": true,
+      "artifact": {
+        "name": "idrive7-renderd@2.1.19.tgz",
+        "size": 96247,
+        "sha256": "49a7095cf26718e58ab73ed002cb5bce5bc58e7f1741a30204c0a4604995c866",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/idrive7-renderd%402.1.19.tgz"
+      }
+    },
+    {
+      "id": "mgu-inputgate",
+      "kind": "tool",
+      "version": "1.2.1",
+      "title": "旋钮输入组件",
+      "description": "将 iDrive 旋钮输入交给当前应用，支持标签、页面、设置和游戏操作。",
+      "requires": {},
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ],
+      "mguNeeds": [
+        "renderer"
+      ],
+      "mguProvides": null,
+      "optional": false,
+      "uninstallable": true,
+      "artifact": {
+        "name": "mgu-inputgate@1.2.1.tgz",
+        "size": 8554,
+        "sha256": "d424e6e7b63351579be3abe675886420f71cbad497c994ab0e6b2aa9583b224a",
+        "url": "https://github.com/JackieZ123430/MGU-CN-XIAOBAI/releases/download/source-refresh-2026-11-20/mgu-inputgate%401.2.1.tgz"
+      }
+    },
+    {
+      "id": "mgu-deploy",
+      "kind": "tool",
+      "title": "安装部署组件",
+      "description": "车机安装部署组件，提供安装、更新、回退和卸载，并保存修改前的快照。",
+      "version": "0.8.27",
+      "artifact": {
+        "name": "mgu-deploy@0.8.27.tgz",
+        "size": 168362,
+        "sha256": "57797407580d4f0c4be234e226d4f51972002adeb1ad718e3cf2ffcd00ea36b6",
+        "url": "https://github.com/robertnisipeanu/mgu-store/releases/download/mgu-deploy%400.8.27/mgu-deploy%400.8.27.tgz"
+      },
+      "texts": {
+        "ar": {
+          "title": "أداة النشر",
+          "description": "تثبّت أدواتنا وتطبيقاتنا على الوحدة الرئيسية وتحدّثها وتستعيد إصداراتها السابقة وتزيلها، مع لقطة قبل كل تغيير"
+        },
+        "cs": {
+          "title": "Nástroj nasazení",
+          "description": "Instaluje, aktualizuje, vrací zpět a odebírá naše nástroje a aplikace na hlavní jednotce a před každou změnou pořizuje snímek"
+        },
+        "da": {
+          "title": "Installationsværktøj",
+          "description": "Installerer, opdaterer, ruller tilbage og fjerner vores værktøjer og apps på hovedenheden, med et snapshot før hver ændring"
+        },
+        "de": {
+          "title": "Deploy-Tool",
+          "description": "Installiert, aktualisiert, setzt zurück und entfernt unsere Tools und Apps auf der Headunit, mit einem Snapshot vor jeder Änderung"
+        },
+        "el": {
+          "title": "Εργαλείο εγκατάστασης",
+          "description": "Εγκαθιστά, ενημερώνει, επαναφέρει και καταργεί τα εργαλεία και τις εφαρμογές μας στην κεντρική μονάδα, με στιγμιότυπο πριν από κάθε αλλαγή"
+        },
+        "es-US": {
+          "title": "Herramienta de implementación",
+          "description": "Instala, actualiza, revierte y elimina nuestras herramientas y apps en la unidad principal, con una instantánea antes de cada cambio"
+        },
+        "es": {
+          "title": "Herramienta de despliegue",
+          "description": "Instala, actualiza, revierte y elimina nuestras herramientas y apps en la unidad principal, con una instantánea antes de cada cambio"
+        },
+        "fi": {
+          "title": "Asennustyökalu",
+          "description": "Asentaa, päivittää, palauttaa ja poistaa työkalumme ja sovelluksemme pääyksikössä ja ottaa tilannevedoksen ennen jokaista muutosta"
+        },
+        "fr-CA": {
+          "title": "Outil de déploiement",
+          "description": "Installe, met à jour, restaure et supprime nos outils et applis sur le système, avec un instantané avant chaque modification"
+        },
+        "fr": {
+          "title": "Outil de déploiement",
+          "description": "Installe, met à jour, restaure et supprime nos outils et apps sur le système, avec un instantané avant chaque modification"
+        },
+        "he": {
+          "title": "כלי הפריסה",
+          "description": "מתקין, מעדכן, משחזר גרסה קודמת ומסיר את הכלים והאפליקציות שלנו במערכת, עם תמונת מצב לפני כל שינוי"
+        },
+        "hu": {
+          "title": "Telepítőeszköz",
+          "description": "Telepíti, frissíti, visszaállítja és eltávolítja eszközeinket és alkalmazásainkat a fejegységen, minden változtatás előtt pillanatképet készítve"
+        },
+        "id": {
+          "title": "Alat deploy",
+          "description": "Menginstal, memperbarui, mengembalikan, dan menghapus alat serta aplikasi kami di head unit, dengan snapshot sebelum setiap perubahan"
+        },
+        "it": {
+          "title": "Strumento di distribuzione",
+          "description": "Installa, aggiorna, ripristina e rimuove i nostri strumenti e app sul sistema, con uno snapshot prima di ogni modifica"
+        },
+        "ja": {
+          "title": "デプロイツール",
+          "description": "ヘッドユニット上の当方のツールとアプリをインストール、アップデート、ロールバック、削除し、変更のたびに事前にスナップショットを作成します"
+        },
+        "ko": {
+          "title": "배포 도구",
+          "description": "헤드 유닛에서 자체 도구와 앱을 설치, 업데이트, 롤백, 제거하며 변경할 때마다 먼저 스냅샷을 만듭니다"
+        },
+        "nb": {
+          "title": "Installasjonsverktøy",
+          "description": "Installerer, oppdaterer, ruller tilbake og fjerner verktøyene og appene våre på hovedenheten, med et øyeblikksbilde før hver endring"
+        },
+        "nl": {
+          "title": "Deploy-tool",
+          "description": "Installeert, werkt bij, zet terug en verwijdert onze tools en apps op de headunit, met een snapshot vóór elke wijziging"
+        },
+        "pl": {
+          "title": "Narzędzie wdrażania",
+          "description": "Instaluje, aktualizuje, przywraca i usuwa nasze narzędzia i aplikacje na jednostce głównej, tworząc migawkę przed każdą zmianą"
+        },
+        "pt-BR": {
+          "title": "Ferramenta de implantação",
+          "description": "Instala, atualiza, reverte e remove nossas ferramentas e apps na unidade principal, com um snapshot antes de cada alteração"
+        },
+        "pt": {
+          "title": "Ferramenta de implementação",
+          "description": "Instala, atualiza, reverte e remove as nossas ferramentas e apps na unidade principal, com um instantâneo antes de cada alteração"
+        },
+        "ro": {
+          "title": "Instrument de implementare",
+          "description": "Instalează, actualizează, readuce la versiunea anterioară și elimină instrumentele și aplicațiile noastre de pe unitatea principală, cu un snapshot înaintea fiecărei modificări"
+        },
+        "ru": {
+          "title": "Инструмент установки",
+          "description": "Устанавливает, обновляет, откатывает и удаляет наши утилиты и приложения на головном устройстве, создавая снимок перед каждым изменением"
+        },
+        "sk": {
+          "title": "Nástroj nasadenia",
+          "description": "Inštaluje, aktualizuje, vracia späť a odstraňuje naše nástroje a aplikácie na hlavnej jednotke, pred každou zmenou so snímkou stavu"
+        },
+        "sl": {
+          "title": "Orodje za namestitev",
+          "description": "Namešča, posodablja, povrača in odstranjuje naša orodja in aplikacije na glavni enoti, pred vsako spremembo s posnetkom stanja"
+        },
+        "sv": {
+          "title": "Installationsverktyg",
+          "description": "Installerar, uppdaterar, återställer och tar bort våra verktyg och appar på huvudenheten, med en ögonblicksbild före varje ändring"
+        },
+        "th": {
+          "title": "เครื่องมือติดตั้ง",
+          "description": "ติดตั้ง อัปเดต ย้อนกลับ และลบเครื่องมือและแอปของเราบนเฮดยูนิต พร้อมสแนปช็อตก่อนทุกการเปลี่ยนแปลง"
+        },
+        "tr": {
+          "title": "Dağıtım aracı",
+          "description": "Araçlarımızı ve uygulamalarımızı ana ünitede yükler, günceller, geri alır ve kaldırır; her değişiklikten önce anlık görüntü alır"
+        },
+        "uk": {
+          "title": "Інструмент встановлення",
+          "description": "Встановлює, оновлює, відкочує та видаляє наші утиліти й програми на головному пристрої, створюючи знімок перед кожною зміною"
+        },
+        "vi": {
+          "title": "Công cụ triển khai",
+          "description": "Cài đặt, cập nhật, khôi phục bản trước và gỡ bỏ các công cụ và ứng dụng của chúng tôi trên hệ thống, kèm bản chụp nhanh trước mỗi thay đổi"
+        },
+        "zh-CN": {
+          "title": "部署工具",
+          "description": "在主机上安装、更新、回滚和移除我们的工具和应用，每次更改前都会创建快照"
+        },
+        "zh-TW": {
+          "title": "部署工具",
+          "description": "在主機上安裝、更新、回復及移除我們的工具與應用程式，每次變更前都會建立快照"
+        }
+      }
+    }
+  ]
+}
