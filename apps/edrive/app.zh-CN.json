@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "EDrive助手",
   "description": "查看电动续航、高压与 12 伏电池、电芯、充电历史及相关用电信息，支持首页组件。",
-  "version": "2.11.1",
+  "version": "2.11.2",
   "autostart": true,
   "vendor": "custom",
   "loggingId": "OA9C",

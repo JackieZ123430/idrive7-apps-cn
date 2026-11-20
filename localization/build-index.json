@@ -46,7 +46,7 @@
     "edrive": {
       "path": "apps/edrive",
       "kitRoot": ".",
-      "version": "2.11.1",
+      "version": "2.11.2",
       "upstreamVersion": "2.11.0"
     },
     "gforce": {
@@ -64,7 +64,7 @@
     "live_data": {
       "path": "apps/live_data",
       "kitRoot": ".",
-      "version": "1.0.1801",
+      "version": "1.0.1802",
       "upstreamVersion": "1.0.18"
     },
     "redline": {

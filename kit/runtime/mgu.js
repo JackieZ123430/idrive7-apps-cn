@@ -418,6 +418,7 @@ function patchStartWidgetEvents(app) {
 class Widget {
     constructor(spec) {
         this.spec = spec || {};
+        this._widgetText = new HmiText();
         this.comp = null;
         this.vis = Object.create(null);      // spawnId -> visible (unknown = true)
         this._img = Object.create(null);
@@ -471,9 +472,12 @@ class Widget {
             this.set(spawnId, k, value, type);
         });
     }
-    set(spawnId, cell, value, type) {
+    set(spawnId, cell, value, type, literal) {
         if (!this.comp) return Promise.resolve();
-        if ((type || 'Text') === 'Text') value = widgetText(value);
+        if ((type || 'Text') === 'Text') {
+            return Promise.resolve(this._widgetText.set(this.comp, 'widget', Number(spawnId), cell, value, literal))
+                .catch((e) => log.warn('widget ' + cell + ': ' + e));
+        }
         return Promise.resolve(this.comp.setValue(Number(spawnId), cell, value, type || 'Text'))
             .catch((e) => log.warn('widget ' + cell + ': ' + e));
     }
@@ -578,12 +582,6 @@ function wireSettings(ctx) {
         });
     }
     return refresh();
-}
-
-// widget text cells: ASCII only, as before the Chinese text support. A widget has its own string
-// bundle, without the app's SID_CN_DYNAMIC slots, so non-ASCII text can't go through StringIds there.
-function widgetText(s) {
-    return String(s).replace(/°/g, '').replace(/[^\x20-\x7e]/g, '');
 }
 
 /* ---------------- run ---------------- */

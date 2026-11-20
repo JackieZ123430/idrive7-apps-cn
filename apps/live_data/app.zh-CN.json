@@ -2,7 +2,7 @@
   "id": "live_data",
   "title": "实时数据",
   "description": "只读查看车辆和控制单元的实时数据，支持自定义仪表、行程费用和首页组件。",
-  "version": "1.0.1801",
+  "version": "1.0.1802",
   "vendor": "custom",
   "loggingId": "OA9D",
   "iconGlyph": "gauge",
