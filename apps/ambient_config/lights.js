@@ -213,6 +213,8 @@ class Lights extends EventEmitter {
     _ownRelease() { return this._own.size ? this.lights.filter((l) => this._last.has(l) && this.carOwns(l)).map((l) => ({ light: l })) : []; }
 
     dim(f) { if (f !== this._dim) { this._dim = f; this._frame = null; this._kick(); } }
+    /** The lights' colours worked out again (a light changed zone: setting decorWith). */
+    redraw() { this._frame = null; this._kick(); }
     /**
      * A one-off write to the body module (2E <data>), sent in turn with the lights' writes (the gateway takes one at a
      * time) -> its reply, or null (no answer, or the lights not writing: none found, held, stopped).

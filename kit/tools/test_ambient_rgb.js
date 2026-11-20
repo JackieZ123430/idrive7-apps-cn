@@ -429,6 +429,21 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
         await sleep(50);
     }
 
+    // decorWith (#140): the decor lights with the upper colour (default) or the lower one, as BMW groups them
+    {
+        const sc = { kind: 'solid', upper: { rgb: [255, 0, 0], bright: 80 }, lower: { rgb: [0, 0, 255], bright: 40 } };
+        const decor = { name: 'Driver front door decor', part: 'upper' }, line = { name: 'Driver front door line', part: 'upper' };
+        const dash = { name: 'Dash decor passenger', part: 'upper' }, foot = { name: 'Footwell driver front', part: 'lower' };
+        ok(S.lightAt(sc, decor, 0).rgb[0] === 255, 'decor: upper by default');
+        S.setDecor('lower');
+        ok(S.lightAt(sc, decor, 0).rgb[2] === 255 && S.lightAt(sc, decor, 0).bright === 40, 'decorWith lower: door decor takes the lower colour');
+        ok(S.lightAt(sc, dash, 0).rgb[2] === 255, 'decorWith lower: dash decor too');
+        ok(S.lightAt(sc, line, 0).rgb[0] === 255, 'decorWith lower: the door line stays upper');
+        ok(S.lightAt(sc, foot, 0).rgb[2] === 255, 'a footwell stays lower');
+        S.setDecor('upper');
+        ok(S.lightAt(sc, decor, 0).rgb[0] === 255, 'decorWith upper: back to upper');
+    }
+
     fs.unlinkSync(process.env.MGU_AMBIENT_FLASH); fs.rmdirSync(TMP);
     console.log('ambient rgb: ' + checks + ' checks, ' + fails + ' failed');
     process.exit(fails ? 1 : 0);
