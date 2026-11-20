@@ -4,14 +4,14 @@
     "path": "apps/*",
     "manifest": "app.json",
     "icon": "icon.png",
-    "mguHmi": ["ID7"],
-    "requires": { "idrive7-renderd": "2.1.5", "mgu-inputgate": "1.0.0" },
     "build": {
       "python": "kit/tools/build.py",
       "args": ["{id}"],
       "sdk": "oap-sdk",
       "output": "dist/{id}@{version}.tgz",
-      "network": ["doom"]
+      "network": ["doom"],
+      "shared": ["kit/runtime", "kit/platform", "kit/localization", "kit/tools/build.py", "kit/tools/pack_data.py",
+        "kit/tools/localize.py", "kit/tools/locale-revisions.json", "kit/tools/oapgen", "oap-sdk"]
     }
   },
   "tools": [
@@ -19,27 +19,18 @@
       "id": "idrive7-renderd",
       "path": "kit/renderd/prebuilt",
       "title": "GPU renderer",
-      "description": "The apps' own GPU renderer (mgu-render): draws them at 60 fps, beside the MGU Store's Renderer; installed with the apps",
-      "provides": "renderer",
-      "mguHmi": ["ID7"]
+      "description": "The apps' own GPU renderer (mgu-render): draws them at 60 fps, beside the MGU Store's Renderer; installed with the apps (iDrive 7 and iDrive 8)",
+      "mguHmi": ["ID7", "ID8"]
     },
     {
       "id": "mgu-inputgate",
-      "path": "kit/renderd/prebuilt",
-      "version": "1.0.0",
+      "path": "kit/renderd/inputgate/tool",
       "title": "Controller gate",
-      "description": "Lets the apps have the iDrive controller (tabs, page buttons, settings, Doom); loads into the HMI at the next start",
+      "description": "Lets the apps have the iDrive controller (tabs, page buttons, settings, Doom); loads into the HMI at the next start (iDrive 7 and iDrive 8)",
       "needs": ["renderer"],
       "optional": false,
-      "mguHmi": ["ID7"],
-      "preload": {
-        "library": "mgu-inputgate.so",
-        "unit": "hmi.service",
-        "process": "HmiMain3D",
-        "strikes": 2,
-        "checkAfterSeconds": 120,
-        "healthySeconds": 60
-      }
+      "uninstallable": true,
+      "mguHmi": ["ID7", "ID8"]
     }
   ]
 }

@@ -1,21 +1,34 @@
 {
   "id": "warmup",
   "title": "Warm-Up",
-  "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit and turbo cool-down",
-  "version": "1.6.12",
+  "description": "Oil and coolant warm-up calculator (time to ready), safe rev limit, turbo cool-down and a cold start counter",
+  "version": "1.9.0",
   "vendor": "custom",
   "loggingId": "OA9A",
   "iconGlyph": "temp",
+  "autostart": true,
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.15" },
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs",
       "statusEngineTemperature": "rs"
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
-      "statusCarSpeed2": "rs"
+      "statusCarSpeed2": "rs",
+      "statusVehiclePartType": "rs"
     },
     "de.bmw.infotainment.drivingexcitement.FES": {
       "statusActualValueTorque2": "rs"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "gearbox oil temperature (when the gearbox unit has none)",
+      "basicDataSet": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": ["sendTasuRequest"],
+      "_broadcasts": ["sendTasuResponse"]
     }
   },
   "screens": [
@@ -37,6 +50,8 @@
       "label": "Oil is warm at",
       "type": "number",
       "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": { "f": { "unit": "°F", "mul": 1.8, "add": 32 } },
       "default": 80,
       "steps": [
         60,
@@ -53,6 +68,8 @@
       "label": "Coolant is warm at",
       "type": "number",
       "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": { "f": { "unit": "°F", "mul": 1.8, "add": 32 } },
       "default": 80,
       "steps": [
         60,
@@ -64,17 +81,44 @@
       ]
     },
     {
+      "key": "warmGearbox",
+      "label": "Gearbox oil is warm at",
+      "type": "number",
+      "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": { "f": { "unit": "°F", "mul": 1.8, "add": 32 } },
+      "default": 60,
+      "steps": [40, 50, 60, 70, 80]
+    },
+    {
+      "key": "engine",
+      "label": "Engine",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        ["auto", "Auto (from the car)"],
+        ["diesel", "Diesel"],
+        ["petrol", "Petrol"]
+      ]
+    },
+    {
       "key": "coldLimit",
       "label": "Rev limit when cold",
       "type": "number",
       "unit": "rpm",
-      "default": 3500,
+      "default": 0,
+      "labels": {"0": "Auto"},
+      "reset": 1,
       "steps": [
+        0,
+        2000,
         2500,
         3000,
         3500,
         4000,
-        4500
+        4500,
+        5000,
+        5500
       ]
     },
     {
@@ -82,16 +126,24 @@
       "label": "Redline",
       "type": "number",
       "unit": "rpm",
-      "default": 7000,
+      "default": 0,
+      "labels": {"0": "Auto"},
+      "reset": 1,
       "steps": [
+        0,
+        4000,
         4500,
         5000,
         5500,
+        5800,
         6000,
+        6200,
         6500,
+        6800,
         7000,
         7200,
         7500,
+        7800,
         8000,
         8500,
         9000

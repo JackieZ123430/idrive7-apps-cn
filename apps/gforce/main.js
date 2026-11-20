@@ -16,6 +16,7 @@ const path = require('path');
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
+const { t: translate } = require('./kit/i18n');
 const Car = require('./kit/car');
 
 const W = 1600, H = 520;
@@ -33,7 +34,10 @@ mgu.run({
         try { rec = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { /* first start */ }
         const demoRec = {};
         let saveTimer = null;
-        const saveSoon = () => { if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; try { fs.writeFileSync(FILE, JSON.stringify(rec)); } catch (e) { log.warn('save: ' + e); } }, 5000); };
+        const saveNow = () => { clearTimeout(saveTimer); saveTimer = null; try { fs.writeFileSync(FILE, JSON.stringify(rec)); } catch (e) { log.warn('save: ' + e); } };
+        const saveSoon = () => { if (!saveTimer) saveTimer = setTimeout(saveNow, 5000); };
+        // shutdown exits 200 ms after MainApp asks (kit mgu.js): a record still waiting for its 5 s goes now
+        process.on('exit', () => { if (saveTimer) saveNow(); });
 
         /* ---------- session ---------- */
         let S;
@@ -92,7 +96,9 @@ mgu.run({
             }
             cv.line(cx - r, cy, cx + r, cy, 2, withAlpha(t.tick, 0.5));
             cv.line(cx, cy - r, cx, cy + r, 2, withAlpha(t.tick, 0.5));
-            const P = (lat, lon) => [cx - G.clamp(lat / max, -1.08, 1.08) * r, cy - G.clamp(lon / max, -1.08, 1.08) * r];
+            const flipLong = settings.get('flipLong');      // brake on top, accel at the bottom (issue #62)
+            const ySign = flipLong ? 1 : -1;
+            const P = (lat, lon) => [cx - G.clamp(lat / max, -1.08, 1.08) * r, cy + ySign * G.clamp(lon / max, -1.08, 1.08) * r];
             // grip envelope (left = positive lat drawn to the left)
             const pts = S.env.map((g, i) => {
                 const a = (i + 0.5) * (360 / SECT) * Math.PI / 180;
@@ -110,8 +116,9 @@ mgu.run({
                 cv.circle(x, y, 12, t.accent);
                 cv.circle(x, y, 5, t.text);
             }
-            cv.text('ACCEL', cx, cy - r - 20, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
-            cv.text('BRAKE', cx, cy + r + 38, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+            const [topLbl, botLbl] = flipLong ? ['BRAKE', 'ACCEL'] : ['ACCEL', 'BRAKE'];
+            cv.text(topLbl, cx, cy - r - 20, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+            cv.text(botLbl, cx, cy + r + 38, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
             cv.text('L', cx - r - 30, cy + 8, 22, t.dim, { align: 'center', font: 'bold' });
             cv.text('R', cx + r + 30, cy + 8, 22, t.dim, { align: 'center', font: 'bold' });
         }
@@ -160,7 +167,7 @@ mgu.run({
             cv.text('COMBINED  ' + (S.peak.comb ? S.peak.comb.toFixed(2) + ' g' : '--'), 1116, 421 + e2, 22, t.accent2, { font: 'bold', spacing: 1 });
             cv.text('> 0.5 g  ' + S.over05.toFixed(0) + ' s', 1552, 421 + e2, 22, t.text, { align: 'right', font: 'bold' });
             const mins = Math.floor((Date.now() - S.start) / 60000);
-            cv.text('TOP ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' MIN', 1116, 474 + G.toMargin(ex, 34), 22, t.dim, { font: 'bold', spacing: 0.5 });
+            cv.text(translate('TOP') + ' ' + Math.round(V(S.vmax)) + (mph() ? ' MPH' : ' KM/H') + '  ·  ' + Math.round(S.rpmMax) + ' RPM  ·  ' + mins + ' ' + translate('MIN'), 1116, 474 + G.toMargin(ex, 34), 22, t.dim, { font: 'bold', spacing: 0.5 });
         }
 
         function drawRecords(cv, t) {

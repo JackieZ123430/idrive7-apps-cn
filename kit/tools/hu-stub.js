@@ -79,13 +79,17 @@ function headUnit(stage, o) {
     }
     const WIDGETS = hu.WIDGETS = [{ spawnId: 1, big: false, size: 1, visible: true }, { spawnId: 2, big: true, size: 2, visible: true }];
     hu.widgetFn = null;
+    hu.settingsRows = [];
     const ctx = hu.ctx = {
         ui, settings, spec, dataDir: out, log, display,
         canvas: (w, h) => display.canvas(w, h),
         onTab(fn) { display.onTab = fn; },
         // as kit/mgu.js: the kit's own screen (tabs, page buttons, sheets, scrolling) where the renderer has the app
         onTap(fn) { display.onTap = fn; },
+        onTouch(fn) { display.onTouch = fn; },
         sheet: (sh) => display.openSheet(sh),
+        // as mgu.js: the app's own rows at the bottom of the drawn settings
+        settingsRow(row) { if (row && row.label) hu.settingsRows.push(row); },
         hideButton(id) { display.hideButton(id); },
         onScroll(fn) { display.onScroll = fn; },
         onLayout(fn) { display.onLayout(fn); },
@@ -106,7 +110,7 @@ function headUnit(stage, o) {
         const realLoad = Module._load;
         const run = live ? async (impl) => {
             // as mgu.js: the settings screen / sheet, the app, then its entry state opened
-            try { await wireSettings(src, kitDir, spec)(ctx); } catch (e) { log.error('settings screen', e); }
+            try { await wireSettings(src, kitDir, spec, hu.settingsRows)(ctx); } catch (e) { log.error('settings screen', e); }
             try { await impl.start(ctx); } catch (e) { log.error('app start', e); }
             log.info('initialized');
             if (!o.closed) ui.open(main);           // (closed: started in the background, as after the user left it)
@@ -122,10 +126,12 @@ function headUnit(stage, o) {
 }
 
 /** mgu.js's wireSettings (the Settings button: the drawn sheet, else the HMI's screen), taken from the app's kit. */
-function wireSettings(src, kitDir, spec) {
+function wireSettings(src, kitDir, spec, rows) {
     const m = src.match(/function wireSettings[\s\S]*?\n}\n/);
     if (!m) return () => {};
-    return new Function('listSheet', 'SPEC', m[0] + '\nreturn wireSettings;')(require(path.join(kitDir, 'sheet')).listSheet, spec);
+    // (its QR log row: the app's log as mgu.js keeps it, in the data folder, the emulator's working folder)
+    return new Function('listSheet', 'SPEC', 'settingsRows', 'qrLogSheet', 'LOG_FILE', m[0] + '\nreturn wireSettings;')(
+        require(path.join(kitDir, 'sheet')).listSheet, spec, rows || [], require(path.join(kitDir, 'qrlog')).qrLogSheet, path.join(process.cwd(), spec.id + '.log'));
 }
 
 /**

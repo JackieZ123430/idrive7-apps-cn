@@ -1,0 +1,449 @@
+{
+  "id": "live_data",
+  "title": "Live Data",
+  "description": "Read-only live values from the car and its control units, a trip computer with fuel cost, and gauge screens of your own, one of them as the home-screen widget",
+  "version": "1.0.18",
+  "vendor": "custom",
+  "loggingId": "OA9D",
+  "iconGlyph": "gauge",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
+  "signals": {
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "the car's pressure unit: boost and tyre pressures come in it",
+      "statusNewCurrentUnitsStatusExt": "rs"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.controlelements.FrontCCU": {
+      "statusRotaryEncoderState": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS": {
+      "statusEngineSpeed2": "rs",
+      "statusEngineTemperature": "rs",
+      "statusEngineStatus": "rs",
+      "datenFahrdynamiksensorErweitert": "rs",
+      "statusHandBrake": "rs",
+      "statusBattery2": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusActualValueTorque2": "rs",
+      "statusVehicleDynamicEngine": "rs",
+      "statusVehicleDynamicEngineMaxValue": "rs",
+      "statusSwitchDriveDynamicSport2": "rs",
+      "statusFESVehicleDynamicSwitchHMI": "rs"
+    },
+    "de.bmw.powertrain.AcceleratorPedal": {
+      "AngleAcceleratorPedal": "s"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "statusInjectionVolume": "rs",
+      "statusPushButtonMSA2": "rs",
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs",
+      "statusYawVelocityVehicle": "rs"
+    },
+    "de.bmw.infotainment.KombiIF": {
+      "statusRangeTankStatus": "rs",
+      "statusBordcomputerAverage": "rs",
+      "statusBordcomputerTravelData": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "Range": "s",
+      "DataPowerTrain2": "s",
+      "statusGearboxDrive": "s"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs",
+      "statusOilDipstick2": "rs",
+      "statusVehicleMass": "rs"
+    },
+    "de.bmw.chassis.SteeringAngle": {
+      "ActualSteeringAngleDriver": "s",
+      "actualSteeringAngleDriverNoCRC": "s"
+    },
+    "de.bmw.infrastructure.EnvironmentalInformation": {
+      "ExteriorTemperature": "s"
+    },
+    "de.bmw.infotainment.vehicle.TPMS": {
+      "statusTyrePressure": "rs",
+      "statusTyreTemperature": "rs",
+      "statusTargetTyrePressure": "rs"
+    },
+    "de.bmw.powertrain.Powertrain": {
+      "ActualValueRPMWheel": "s"
+    },
+    "de.bmw.chassis.VehicleModel": {
+      "LaneSlope": "s",
+      "MassVehicle": "s"
+    },
+    "de.bmw.chassis.VehicleStabilizationManagement": {
+      "StabilizationManagement": "s"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Live Data",
+      "buttons": [
+        [
+          "BTN_ACTION",
+          "Layout"
+        ],
+        [
+          "BTN_PAGE",
+          "Next page"
+        ],
+        [
+          "BTN_BROWSE",
+          "Browse"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "startWidget": {
+    "comment": "Home-screen widget, as eDrive's: the layout and cell names of BMW's Drive Recorder widget on this firmware; the picture of the chosen screen goes into BackgroundImage1 (384 x 256). The HMI scales it up (about 2x on the G20) and crops it centred (safe: the share it cuts off each edge, measured on the G05 and on a G20 photo), and fades the edges, the top most: the setting widgetFit keeps the gauges further in (screens.js FIT).",
+    "name": "Live Data",
+    "layout": "LT_Table_OnlineApps_DriveRecorderWidget",
+    "image": "BackgroundImage1",
+    "scale": 2,
+    "size": [
+      384,
+      256
+    ],
+    "safe": [
+      0.09,
+      0.1
+    ],
+    "cells": {
+      "ErrorInfo": [
+        false,
+        "Bool"
+      ],
+      "background": [
+        true,
+        "Bool"
+      ],
+      "ProgressbarVisible": [
+        false,
+        "Bool"
+      ],
+      "TextRecordings": [
+        "",
+        "Text"
+      ]
+    }
+  },
+  "settings": [
+    {
+      "key": "show",
+      "label": "Unit pages show",
+      "type": "choice",
+      "default": "known",
+      "reset": 2,
+      "options": [
+        [
+          "known",
+          "What the unit may have"
+        ],
+        [
+          "answering",
+          "Only what answered"
+        ],
+        [
+          "all",
+          "Everything it lists"
+        ]
+      ]
+    },
+    {
+      "key": "autoScan",
+      "label": "Scan units when opened",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "widget",
+      "label": "Home-screen widget shows",
+      "type": "choice",
+      "default": "1",
+      "options": [
+        [
+          "1",
+          "Gauges 1"
+        ],
+        [
+          "2",
+          "Gauges 2"
+        ],
+        [
+          "3",
+          "Gauges 3"
+        ],
+        [
+          "4",
+          "Gauges 4"
+        ],
+        [
+          "5",
+          "Gauges 5"
+        ],
+        [
+          "6",
+          "Gauges 6"
+        ]
+      ]
+    },
+    {
+      "key": "widgetFit",
+      "label": "Home-screen widget: picture",
+      "type": "choice",
+      "default": "medium",
+      "options": [
+        [
+          "small",
+          "Small, clear of the edges"
+        ],
+        [
+          "medium",
+          "Medium"
+        ],
+        [
+          "large",
+          "Fill the widget"
+        ]
+      ]
+    },
+    {
+      "key": "widgetFps",
+      "label": "Home-screen widget: redraw per second",
+      "type": "number",
+      "unit": "fps",
+      "default": 8,
+      "steps": [
+        2,
+        4,
+        8,
+        12
+      ],
+      "when": {"advanced": true}
+    },
+    {
+      "key": "trips",
+      "label": "Trip computer (counts every drive)",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "currency",
+      "label": "Currency",
+      "type": "choice",
+      "default": "EUR",
+      "options": [
+        [
+          "EUR",
+          "EUR"
+        ],
+        [
+          "USD",
+          "USD"
+        ],
+        [
+          "CAD",
+          "CAD"
+        ],
+        [
+          "GBP",
+          "GBP"
+        ],
+        [
+          "CHF",
+          "CHF"
+        ],
+        [
+          "PLN",
+          "PLN"
+        ],
+        [
+          "CZK",
+          "CZK"
+        ],
+        [
+          "SEK",
+          "SEK"
+        ],
+        [
+          "NOK",
+          "NOK"
+        ],
+        [
+          "DKK",
+          "DKK"
+        ],
+        [
+          "HUF",
+          "HUF"
+        ],
+        [
+          "UAH",
+          "UAH"
+        ],
+        [
+          "AUD",
+          "AUD"
+        ],
+        [
+          "NZD",
+          "NZD"
+        ],
+        [
+          "JPY",
+          "JPY"
+        ],
+        [
+          "CNY",
+          "CNY"
+        ],
+        [
+          "TRY",
+          "TRY"
+        ],
+        [
+          "RON",
+          "RON"
+        ],
+        [
+          "BGN",
+          "BGN"
+        ],
+        [
+          "ZAR",
+          "ZAR"
+        ],
+        [
+          "MXN",
+          "MXN"
+        ],
+        [
+          "BRL",
+          "BRL"
+        ],
+        [
+          "INR",
+          "INR"
+        ]
+      ]
+    },
+    {
+      "key": "tempUnit",
+      "label": "Temperature unit",
+      "type": "choice",
+      "default": "c",
+      "options": [
+        [
+          "c",
+          "Celsius"
+        ],
+        [
+          "f",
+          "Fahrenheit"
+        ]
+      ]
+    },
+    {
+      "key": "details",
+      "label": "Show sources and unverified values",
+      "type": "bool",
+      "default": false
+    },
+    {"key": "advanced", "label": "Advanced settings", "type": "bool", "default": false},
+    {
+      "key": "theme",
+      "label": "Colour theme",
+      "type": "choice",
+      "default": "m_tricolour",
+      "options": [
+        [
+          "m_red",
+          "M Red"
+        ],
+        [
+          "m_tricolour",
+          "M Tricolour"
+        ],
+        [
+          "ice",
+          "Ice White"
+        ],
+        [
+          "amber",
+          "Night Amber"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "Screen layout",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "Full screen"
+        ],
+        [
+          "standard",
+          "Standard"
+        ]
+      ]
+    },
+    {
+      "key": "renderer",
+      "label": "Renderer",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "GPU 60 fps (default)"
+        ],
+        [
+          "software",
+          "Software"
+        ]
+      ]
+    },
+    {
+      "key": "demo",
+      "label": "Demo data",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        [
+          "auto",
+          "Auto"
+        ],
+        [
+          "on",
+          "Always"
+        ],
+        [
+          "off",
+          "Never"
+        ]
+      ]
+    }
+  ]
+}

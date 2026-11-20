@@ -44,6 +44,23 @@ mgu.run({
 
         /* ---------- measurement ---------- */
         let state = 'arm', prev = null, run = null, last = null, msg = null, msgUntil = 0;
+        // the speed lost since the last speed sample (or since the braking began; till then the held speed was
+        // still true), by the measured deceleration: [t, km/h]. Speed comes at ~10 Hz, accel at ~50 Hz: this
+        // places the 100 km/h crossing between speed samples, also while the brake pressure still builds.
+        let curve = [];
+        const KMH_PER_G = 9.80665 * 3.6;      // km/h per second at 1 g
+        /** When the speed had dropped by need: on the curve scaled to the drop measured by t (lost); without
+         * a deceleration on it, straight from its start. */
+        function crossAt(need, lost, t) {
+            const t1 = curve.length ? curve[0][0] : prev.t, end = curve.length ? curve[curve.length - 1][1] : 0;
+            if (!(end > 0)) return t1 + need / lost * (t - t1);
+            const k = lost / end;
+            for (let i = 1; i < curve.length; i++) {
+                const [ta, a] = curve[i - 1], [tb, b] = curve[i];
+                if (k * b >= need) return ta + (need - k * a) / (k * (b - a)) * (tb - ta);
+            }
+            return t;
+        }
         // run: { t0, dist, cross: {key: {t, d}}, trace: [[d, v, g]], peakG, released }
 
         function finish(t) {
@@ -70,19 +87,26 @@ mgu.run({
             if (!G.isNum(v)) return;
             store = d.demo ? demoStore : saved;
             const top = tests()[0], low = mainTest();
+            // accel samples come in between with the last speed held (speed is sent on change): prev is the
+            // last speed sample, distance and crossings go from speed sample to speed sample only
+            const fresh = !prev || v !== prev.v, braking = G.isNum(g) && -g >= 0.1;
+            const c = curve[curve.length - 1];
+            if (c && t > c[0]) curve.push([t, c[1] + (braking ? -g * KMH_PER_G * (t - c[0]) / 1000 : 0)]);
             if (state === 'braking') {
                 const dt = (t - prev.t) / 1000;
                 if (dt <= 0) return;
-                run.dist += (prev.v + v) / 2 / 3.6 * dt;
                 if (G.isNum(g)) run.peakG = Math.max(run.peakG, -g);
-                // later (lower) test speeds crossed during the same stop
-                tests().forEach((x) => {
-                    if (!run.cross[x.key] && prev.v >= x.v && v < x.v) {
-                        const f = (prev.v - x.v) / (prev.v - v);
-                        run.cross[x.key] = { t: prev.t + f * (t - prev.t), d: run.dist - (1 - f) * (prev.v + v) / 2 / 3.6 * dt };
-                    }
-                });
-                run.trace.push([run.dist, v, G.isNum(g) ? -g : null]);
+                if (fresh) {
+                    run.dist += (prev.v + v) / 2 / 3.6 * dt;
+                    // later (lower) test speeds crossed during the same stop
+                    tests().forEach((x) => {
+                        if (!run.cross[x.key] && prev.v >= x.v && v < x.v) {
+                            const f = (prev.v - x.v) / (prev.v - v);
+                            run.cross[x.key] = { t: prev.t + f * (t - prev.t), d: run.dist - (1 - f) * (prev.v + v) / 2 / 3.6 * dt };
+                        }
+                    });
+                    run.trace.push([run.dist, v, G.isNum(g) ? -g : null]);
+                }
                 if (G.isNum(g) && -g < 0.1) { run.released = run.released || t; } else run.released = 0;
                 if (v < 0.5) finish(t);
                 else if (run.released && t - run.released > 1200) { state = 'arm'; run = null; msg = 'Brake released - stop not counted'; msgUntil = Date.now() + 4000; }
@@ -92,15 +116,16 @@ mgu.run({
                 if (state === 'ready' && prev && G.isNum(g) && -g >= settings.get('trigger')) {
                     const hit = [top, low].find((x) => prev.v >= x.v && v < x.v);
                     if (hit) {
-                        const f = (prev.v - hit.v) / (prev.v - v), dt = (t - prev.t) / 1000;
-                        const t0 = prev.t + f * (t - prev.t), d0 = (1 - f) * (hit.v + v) / 2 / 3.6 * dt;
+                        // on the deceleration since the speed was last known (a steady cruise sends none: prev.t is old)
+                        const t0 = crossAt(prev.v - hit.v, prev.v - v, t), d0 = (hit.v + v) / 2 / 3.6 * (t - t0) / 1000;
                         run = { t0, dist: d0, cross: { [hit.key]: { t: t0, d: 0 } }, trace: [[0, hit.v, -g], [d0, v, -g]], peakG: -g, vStart: hit.v };
                         state = 'braking'; last = null;
                     }
                 }
                 if (state === 'done' && v > 5) state = v > low.v + 3 ? 'ready' : 'arm';
             }
-            prev = { t, v };
+            if (fresh || !braking) curve = [[t, 0]];
+            if (fresh) prev = { t, v };
         }, () => { state = 'arm'; run = null; prev = null; });
 
         /* ---------- format ---------- */
@@ -143,7 +168,7 @@ mgu.run({
             } else if (run) {
                 cv.text(G.fmt(V(G.hold('speed', d.speed, SPEED_MS)), 0) + (mph() ? ' mph' : ' km/h') + '  ·  ' + G.fmt(-d.gLong, 2) + ' g', 48, 295, 30, t.text, { font: 'bold' });
             }
-            const st = state === 'arm' ? STATE.arm + Math.round(V(low.v) + 3) + (mph() ? ' MPH' : ' KM/H') : STATE[state];
+            const st = state === 'arm' ? STATE.arm + Math.ceil(V(low.v + 3)) + (mph() ? ' MPH' : ' KM/H') : STATE[state];
             const col = state === 'ready' ? GO : state === 'braking' ? t.crit : t.dim;
             cv.roundRect(48, 412 + dl, 422, 44, 8, withAlpha(col, state === 'ready' ? 0.25 + 0.2 * Math.sin(now / 160) : 0.18));
             cv.text(msg && now < msgUntil ? msg.toUpperCase() : st, 259, 445 + dl, msg && now < msgUntil ? 18 : 24, col, { align: 'center', font: 'bold', spacing: 2 });

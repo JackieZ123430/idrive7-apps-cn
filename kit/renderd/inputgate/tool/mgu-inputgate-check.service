@@ -1,0 +1,10 @@
+# Controller gate (mgu-inputgate): the HMI came up healthy with mgu-inputgate.so: reset the guard
+[Unit]
+Description=mgu-inputgate check
+After=hmi.service hmi8.service
+RequiresMountsFor=/var/opt/mgu-inputgate
+
+[Service]
+# runs on after the check (never exits): a service that stops makes the head unit reboot
+Type=simple
+ExecStart=/bin/sh /var/opt/mgu-inputgate/current/guard.sh check

@@ -16,7 +16,9 @@
  * ours has its own table and ports, so neither removes the other's rule or takes
  * the other's port. Each diverts only while one of its own apps is shown with claims, so they take turns. Were
  * both in at once, the first chain to see a PDU takes it; on lo our rule lets IterioDev's re-injections (from
- * 30569) through as well as ours, and his catches ours, so a PDU passes each renderer at most once.
+ * 30569) through as well as ours, and his catches ours, so a PDU passes each renderer at most once. On the car
+ * our rule also takes what the other two hand on to the HMI over lo (from 30569 and 30571): the Store's
+ * renderer keeps its rule in while an overlay of its stays on screen, and without that our apps got no touch.
  * A gesture that goes to the HMI while apps claim closes them (E_CLOSED): the user tapped the HMI, e.g. its home
  * button - with no claim left the rule goes, and the rest of that gesture reaches the HMI directly.
  *
@@ -44,6 +46,12 @@
 /* re-injections of the other renderers: IterioDev's (30569), the Store's mgu-render (30571), the kit's (30573) */
 enum { PORT_HMI = 30567, PORT_OTHER_OUT = 30569, PORT_STORE_OUT = 30571, PORT_KIT_OUT = 30573, GUARD_MS = 1500 };
 static int port_in = 30572, port_out = 30573;
+/* one after the other renderers' -300 (still before conntrack's -200, so notrack holds): with both rules in, theirs
+ * see a touch first. The Store's overlays are drawn over our apps, so a touch on one is its own; what it doesn't
+ * want it hands on over lo, where ours takes it (issue #152: at the same priority the order was the tables', and a
+ * tap on an overlay closed our app). */
+enum { PRIORITY = -299 };
+static int from_port;                          /* the PDU's sender: the display, or another renderer handing it on */
 static char table[48] = "ip idrive7_render";
 #define PORT_IN port_in
 #define PORT_OUT port_out
@@ -61,20 +69,29 @@ static int ax, ay, aw, ah;                     /* area apps may claim; aw 0 = wh
 static unsigned be16(const unsigned char *p) { return p[0] << 8 | p[1]; }
 static unsigned be32(const unsigned char *p) { return (unsigned)p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]; }
 
+/* the script goes to nft in a file: the nft of some units (MainApp 6.5.5 cars) cannot read one from "-" */
 static int nft(const char *script)
 {
-    FILE *f = popen("nft -f - 2>&1", "w");
-    if (!f) return -1;
-    fputs(script, f);
-    return pclose(f) == 0 ? 0 : -1;
+    char path[] = "/tmp/mgu-render-nft-XXXXXX", cmd[64];
+    int fd = mkstemp(path);
+    if (fd < 0) return -1;
+    size_t n = strlen(script);
+    int ok = write(fd, script, n) == (ssize_t)n;
+    close(fd);
+    snprintf(cmd, sizeof cmd, "nft -f %s 2>&1", path);
+    ok = ok && system(cmd) == 0;
+    unlink(path);
+    return ok ? 0 : -1;
 }
+/* in, and there: a load nft reports done without the table is a failure */
 static int rule_in(void)
 {
     if (open_fw[0] && system(open_fw) != 0) fprintf(stderr, "[mgu-render] touch: opening the firewall for %d failed\n", PORT_IN);
-    char s[768];
+    char s[768], check[96];
     snprintf(s, sizeof s, "table %s\ndelete table %s\ntable %s {\n"
-        "chain pre {\ntype filter hook prerouting priority -300; policy accept;\n%s\n}\n}\n", table, table, table, rule);
-    return nft(s);
+        "chain pre {\ntype filter hook prerouting priority %d; policy accept;\n%s\n}\n}\n", table, table, table, PRIORITY, rule);
+    snprintf(check, sizeof check, "nft list table %s >/dev/null 2>&1", table);
+    return nft(s) == 0 && system(check) == 0 ? 0 : -1;
 }
 static void rule_out(void) { char s[160]; snprintf(s, sizeof s, "table %s\ndelete table %s\n", table, table); nft(s); }
 
@@ -127,7 +144,14 @@ static int touch_rules(const char *iface, const char *saddr)
     } else {
         char src[64] = "";
         if (saddr && *saddr) snprintf(src, sizeof src, "ip saddr %s ", saddr);
-        snprintf(rule, sizeof rule, "iifname \"%s\" %sudp dport %d notrack udp dport set %d", iface, src, PORT_HMI, PORT_IN);
+        /* and what the other renderers hand on to the HMI (IterioDev's from PORT_OTHER_OUT, the Store's mgu-render's
+         * from PORT_STORE_OUT): a renderer whose rule is in all the time (the Store's, for an overlay that stays on
+         * screen) sees every PDU first and passes the ones outside its claims to the HMI over lo, past the display
+         * rule; without this our apps get no touch while it runs (iDrive 8 car, issue #152). Ours (PORT_OUT) are
+         * not caught: nothing loops. */
+        snprintf(rule, sizeof rule, "iifname \"%s\" %sudp dport %d notrack udp dport set %d\n"
+                 "iifname \"lo\" udp sport { %d, %d } udp dport %d notrack udp dport set %d",
+                 iface, src, PORT_HMI, PORT_IN, PORT_OTHER_OUT, PORT_STORE_OUT, PORT_HMI, PORT_IN);
         snprintf(open_fw, sizeof open_fw, "nft list chain ip filter input 2>/dev/null | grep -q 'udp dport %d accept' || "
                  "nft insert rule ip filter input iifname %s %sudp dport %d accept", PORT_IN, iface, src, PORT_IN);
     }
@@ -191,12 +215,17 @@ void touch_stop(void) { if (loaded) rule_out(); loaded = 0; }
 static int route_finger(const unsigned char *p)
 {
     int x = be16(p + 38), y = be16(p + 44), ev = (p[47] >> 4) & 3;
+    touch_unmap(&x, &y);                         /* where the HMI shows smaller or larger than its design size */
     /* every DOWN starts a gesture (one finger): an UP we never saw - the rule went (HMI touched, app gone) or a
      * lost datagram - must not hand the next gesture to the last owner */
     if (ev == DOWN) {
         int slot = aw && (x < ax || y < ay || x >= ax + aw || y >= ay + ah) ? -1 : touch_owner_at(x, y);
         owner = slot >= 0 ? slot : HMI;
-        if (owner == HMI) touch_outside();       /* e.g. the HMI's home button: the shown app is left */
+        if (owner == HMI) {                      /* e.g. the HMI's home button: the shown app is left */
+            fprintf(stderr, "[mgu-render] touch: %d,%d is outside the apps' claims (from %s): to the HMI\n", x, y,
+                    from_port == PORT_STORE_OUT ? "the Store's renderer" : from_port == PORT_OTHER_OUT ? "IterioDev's renderer" : "the display");
+            touch_outside();
+        }
     }
     int app = owner >= 0 || owner == GONE;
     if (owner >= 0 && ev >= DOWN && ev <= UP) touch_send(owner, ev, x, y);
@@ -208,8 +237,12 @@ void touch_read(void)
 {
     unsigned char b[2048], f[2048];
     struct sockaddr_in hmi = { .sin_family = AF_INET, .sin_port = htons(PORT_HMI), .sin_addr.s_addr = htonl(INADDR_LOOPBACK) };
+    struct sockaddr_in src;
+    socklen_t sl = sizeof src;
     ssize_t len;
-    while ((len = recv(in, b, sizeof b, 0)) > 0) {
+    while ((len = recvfrom(in, b, sizeof b, 0, (struct sockaddr *)&src, &sl)) > 0) {
+        from_port = sl >= sizeof src ? ntohs(src.sin_port) : 0;
+        sl = sizeof src;
         size_t fn = 0, at = 0;                    /* walk the PDUs; copy the ones that go on to the HMI */
         while (at + 16 <= (size_t)len) {
             size_t plen = be32(b + at + 4), end = at + 16 + plen;

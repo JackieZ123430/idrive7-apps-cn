@@ -137,6 +137,9 @@ Daemon to client:
 Pixmaps share the id space of IMAGE pictures. Pictures, upstream images and
 pixmaps count towards 64 per app and 96 MiB for all apps; pictures also
 towards 32 MiB per app. An upload past them gets an ERROR and draws nothing.
+Ramps (RAMP) share one texture of 256 rows across all apps, and an app holds at
+most 64; a new size (PLACE) or a disconnect frees the app's rows. A ramp past
+either limit gets an ERROR and draws nothing; one already held takes new colours.
 Videos have limits of their own (below).
 
 ## Video

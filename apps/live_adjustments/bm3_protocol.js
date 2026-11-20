@@ -17,11 +17,55 @@ function positive(reply, sid, prefix) {
     return reply;
 }
 
+// Where "~|~" may end the binary block: 68 (64-byte block, G22 and others), 84 (80-byte block, G05 B58 with
+// R4C9F4P03, 2026-11: "BM3_" + 80 bytes + "~|~" + 14 "_" + "#R4C9F4P03KISY0" + NUL, the "#" at byte 101).
+const BINARY_DELIMITERS = [68, 84];
+
+function binaryMarkerTag(data) {
+    // MG1 markers put a binary block between BM3_ and ~|~, then "_"s, "#" and the ROM token.
+    if (data.length !== MARKER_SIZE || data.subarray(0, 4).toString('latin1') !== 'BM3_') return null;
+    for (const at of BINARY_DELIMITERS) {
+        if (data.subarray(at, at + 3).toString('latin1') !== '~|~') continue;
+        const match = /^_+#([A-Z0-9]+)\x00/.exec(data.subarray(at + 3).toString('latin1'));
+        if (match) return match[1];
+    }
+    return null;
+}
+
+function hashMarkerTag(data) {
+    // S58 marker (G87 M2, issue #175): "BM3_" and a binary block, then "#" + ROM (9) + build (5) + "_" + the car's
+    // chassis / drive / market, ended by a NUL. The "#" sits at byte 101 and is the marker's only one.
+    const text = data.toString('latin1'), hash = text.indexOf('#');
+    if (data.length !== MARKER_SIZE || !text.startsWith('BM3_') || hash !== 101 || text.lastIndexOf('#') !== hash) return null;
+    const nul = text.indexOf('\0', hash);
+    const tag = nul < 0 ? null : text.slice(hash + 1, nul);
+    if (!tag || tag.length < 15 || tag[14] !== '_' || !/^[A-Z0-9_]+$/.test(tag) || tag.slice(0, 14).indexOf('_') >= 0) return null;
+    return tag.slice(0, 9);
+}
+
 function markerRom(reply, profiles) {
     positive(reply, 0x22, [0xF3, 0x01]);
-    const data = Buffer.from(reply.slice(3));
-    if (data.indexOf(Buffer.from('BM3_R')) < 0) throw new Error('BM3 CustomROM marker absent');
+    return markerDataRom(Buffer.from(reply.slice(3)), profiles);
+}
+
+/** The ROM key in the marker's 255 bytes, however they were read. */
+function markerDataRom(data, profiles) {
+    if (data.length !== MARKER_SIZE) throw new Error('marker length ' + data.length + '/' + MARKER_SIZE);
     const text = data.toString('latin1');
+    const tag = binaryMarkerTag(data);
+    if (tag) {
+        // The captured MG1 token appends five build characters: R4C9H5V02OKLX0.
+        const keys = Object.keys(profiles || {}).filter((key) => tag.indexOf(key) === 0 &&
+            /^[A-Z0-9]{5}$/.test(tag.slice(key.length)));
+        if (keys.length !== 1) throw new Error('BM3 ROM key not uniquely matched in binary marker');
+        return keys[0];
+    }
+    const rom = hashMarkerTag(data);
+    if (rom) {
+        if (!Object.prototype.hasOwnProperty.call(profiles || {}, rom)) throw new Error('BM3 ROM ' + rom + ' has no profile');
+        return rom;
+    }
+    if (data.indexOf(Buffer.from('BM3_R')) < 0) throw new Error('BM3 CustomROM marker absent');
     const keys = Object.keys(profiles || {}).filter((key) => text.includes('#' + key));
     if (keys.length !== 1) throw new Error('BM3 ROM key not uniquely matched in marker');
     return keys[0];
@@ -34,9 +78,18 @@ class Bm3Protocol {
         this.config = config || {};
         this.rom = null;
         this.profile = null;
+        this._last = Promise.resolve();
     }
 
-    async request(sid, data, prefix, timeoutMs) {
+    /** One request at a time: a 0x63 reply carries no address, so two 0x23 reads in flight could
+     * take each other's answers. */
+    request(sid, data, prefix, timeoutMs) {
+        const r = this._last.then(() => this._request(sid, data, prefix, timeoutMs));
+        this._last = r.catch(() => {});
+        return r;
+    }
+
+    async _request(sid, data, prefix, timeoutMs) {
         if (!this.diag.available) throw new Error('MGU diagnostic transport unavailable');
         const reply = await this.diag.physical(DME, sid, data, timeoutMs || 4500,
             (u) => (u[0] === sid + 0x40 && (prefix || []).every((b, i) => u[i + 1] === b))
@@ -48,9 +101,20 @@ class Bm3Protocol {
         this.profile = null;
         this.rom = null;
         const addr = addressBytes(this.config.bm3MarkerAddress);
-        await this.request(0x2C, [0x02, 0xF3, 0x01, 0x24].concat(addr, [0, MARKER_SIZE]), [0x02, 0xF3, 0x01]);
-        const marker = await this.request(0x22, [0xF3, 0x01], [0xF3, 0x01]);
-        const rom = markerRom(marker, this.profiles);
+        let rom;
+        try {
+            // Defining an existing dynamic DID appends entries; clear F301 before replacing it.
+            await this.request(0x2C, [0x03, 0xF3, 0x01], [0x03, 0xF3, 0x01]);
+            await this.request(0x2C, [0x02, 0xF3, 0x01, 0x24].concat(addr, [0, MARKER_SIZE]), [0x02, 0xF3, 0x01]);
+            const marker = await this.request(0x22, [0xF3, 0x01], [0xF3, 0x01]);
+            rom = markerRom(marker, this.profiles);
+        } catch (e) {
+            // a DME that refuses the dynamic DID (NRC): the marker read straight from its address (0x23).
+            // Only a refusal: no answer, or a marker without a known ROM, stays an error.
+            if (!/^DME rejected (2C|22)/.test(e.message)) throw e;
+            const direct = await this.request(0x23, [0x14].concat(addr, [MARKER_SIZE]), []);
+            rom = markerDataRom(Buffer.from(direct.slice(1)), this.profiles);
+        }
         const profile = this.profiles[rom];
         if (!profile || !profile.mapSwActAddr || profile.rom !== rom) throw new Error('BM3 profile unavailable');
         this.rom = rom;

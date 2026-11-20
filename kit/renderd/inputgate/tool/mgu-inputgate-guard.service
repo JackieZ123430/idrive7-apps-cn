@@ -1,0 +1,13 @@
+# Controller gate (mgu-inputgate): decides at boot whether the HMI (hmi.service, hmi8.service on iDrive 8) loads mgu-inputgate.so
+[Unit]
+Description=mgu-inputgate boot guard
+DefaultDependencies=no
+RequiresMountsFor=/var/opt/mgu-inputgate
+Before=hmi.service hmi8.service
+
+[Service]
+Type=oneshot
+# stays "active" after it ran: a service that stops makes the head unit's lifecycle reboot the unit
+RemainAfterExit=yes
+TimeoutStartSec=10
+ExecStart=/bin/sh /var/opt/mgu-inputgate/current/guard.sh boot

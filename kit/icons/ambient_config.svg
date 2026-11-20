@@ -1,0 +1,39 @@
+<!-- accent: #8a5cff -->
+<defs>
+  <linearGradient id="a-rim" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#f4f7fa"/><stop offset="0.25" stop-color="#b9c1ca"/><stop offset="0.55" stop-color="#58616b"/>
+    <stop offset="0.8" stop-color="#2a2f35"/><stop offset="1" stop-color="#9aa4ae"/></linearGradient>
+  <linearGradient id="a-screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1d2e"/><stop offset="0.6" stop-color="#0a0b14"/><stop offset="1" stop-color="#05060a"/></linearGradient>
+  <linearGradient id="a-light" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22a6ff"/><stop offset="0.5" stop-color="#8a5cff"/><stop offset="1" stop-color="#ff2d6f"/></linearGradient>
+  <radialGradient id="a-wash" cx="0.5" cy="0.3" r="0.7"><stop offset="0" stop-color="#8a5cff" stop-opacity="0.35"/><stop offset="1" stop-color="#8a5cff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="a-pool" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ff2d6f" stop-opacity="0.75"/><stop offset="1" stop-color="#ff2d6f" stop-opacity="0"/></radialGradient>
+  <radialGradient id="a-pool2" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#22a6ff" stop-opacity="0.75"/><stop offset="1" stop-color="#22a6ff" stop-opacity="0"/></radialGradient>
+  <linearGradient id="a-glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+  <filter id="a-glow" x="-30%" y="-100%" width="160%" height="300%"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+<rect x="16" y="24" width="108" height="92" rx="14" fill="url(#a-rim)"/>
+<rect x="20" y="28" width="100" height="84" rx="11" fill="#07090c"/>
+<rect x="22" y="30" width="96" height="80" rx="10" fill="url(#a-screen)"/>
+<rect x="22" y="30" width="96" height="80" rx="10" fill="url(#a-wash)"/>
+<!-- the dashboard's light line, with its glow -->
+<path d="M28 60 C44 46 58 43 70 43 C82 43 96 46 112 60" fill="none" stroke="url(#a-light)" stroke-width="10" stroke-linecap="round" filter="url(#a-glow)"/>
+<path d="M28 60 C44 46 58 43 70 43 C82 43 96 46 112 60" fill="none" stroke="url(#a-light)" stroke-width="5" stroke-linecap="round"/>
+<path d="M32 58 C46 47 59 45.5 70 45.5 C81 45.5 94 47 108 58" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" opacity="0.75"/>
+<!-- door lines -->
+<path d="M29 70 L29 96" stroke="#22a6ff" stroke-width="7" stroke-linecap="round" filter="url(#a-glow)"/>
+<path d="M29 70 L29 96" stroke="#8fd3ff" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M111 70 L111 96" stroke="#ff2d6f" stroke-width="7" stroke-linecap="round" filter="url(#a-glow)"/>
+<path d="M111 70 L111 96" stroke="#ff9cbb" stroke-width="3.6" stroke-linecap="round"/>
+<!-- the colour ring -->
+<g transform="translate(70 84)">
+  <circle r="17" fill="none" stroke="#000" stroke-opacity="0.5" stroke-width="9"/>
+  <path d="M0 -15 A15 15 0 0 1 13 -7.5" stroke="#ff2d2d" stroke-width="7" fill="none"/>
+  <path d="M13 -7.5 A15 15 0 0 1 13 7.5" stroke="#ffd21f" stroke-width="7" fill="none"/>
+  <path d="M13 7.5 A15 15 0 0 1 0 15" stroke="#2bea6a" stroke-width="7" fill="none"/>
+  <path d="M0 15 A15 15 0 0 1 -13 7.5" stroke="#1fd8ff" stroke-width="7" fill="none"/>
+  <path d="M-13 7.5 A15 15 0 0 1 -13 -7.5" stroke="#2a6bff" stroke-width="7" fill="none"/>
+  <path d="M-13 -7.5 A15 15 0 0 1 0 -15" stroke="#c43cff" stroke-width="7" fill="none"/>
+  <circle r="8.5" fill="#8a5cff"/>
+  <circle r="8.5" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="1"/>
+  <circle cx="0" cy="-15" r="4.2" fill="#ffffff"/>
+</g>
+<path d="M22 40 Q22 30 32 30 H108 Q118 30 118 40 V52 Q70 42 22 58 Z" fill="url(#a-glass)"/>

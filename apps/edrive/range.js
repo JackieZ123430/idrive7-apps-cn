@@ -68,6 +68,10 @@ const ENGINE_MAX_PCT_KM = 3;
 class RangeModel {
     constructor(st) {
         this.st = st; this.stoodH = Infinity;
+        // the % per km limits below are for a plug-in hybrid's battery (~12 kWh, ~0.12 kWh per %): a bigger battery
+        // uses fewer % per km for the same driving, so main.js sets scale = 0.12 / kWh per % on a fully electric car
+        // (74 kWh: 0.16). 1 = the limits as they are.
+        this.scale = 1;
         // learned before 2.1: stretches of standing with the engine charging counted too (e.g. +18 %/km)
         const A = st.engineAll;
         if (A && A.km > 0 && Math.abs(A.pct / A.km) > ENGINE_MAX_PCT_KM) { delete st.engineAll; delete st.engineUse; }
@@ -78,14 +82,14 @@ class RangeModel {
      * speed (km/h): that speed band's own value, leaning on the overall one while it has little driving.
      */
     drivePctPerKm(kmh) {
-        const L = this.st.learn;
-        if (!L || L.km < 5 || L.pct < 2) return null;
+        const L = this.st.learn, s = this.scale;
+        if (!L || L.km < 5 || L.pct < 2 * s) return null;
         const a = L.pct / L.km;
-        if (!(a > 0.2 && a < 10)) return null;
+        if (!(a > 0.2 * s && a < 10 * s)) return null;
         const b = isNum(kmh) && kmh > 3 && this.st.drive && this.st.drive[speedBandOf(kmh)];
         if (!b || !(b.km > 0.5)) return a;
         const own = b.pct / b.km;
-        if (!(own > 0.1 && own < 15)) return a;
+        if (!(own > 0.1 * s && own < 15 * s)) return a;
         const w = b.km / (b.km + BAND_PRIOR_KM);
         return own * w + a * (1 - w);
     }
@@ -95,7 +99,7 @@ class RangeModel {
         const b = this.st.driveOff && this.st.driveOff[speedBandOf(kmh)];
         if (!b || b.km < 3) return null;
         const a = b.pct / b.km;
-        return a > 0.1 && a < 15 ? a : null;
+        return a > 0.1 * this.scale && a < 15 * this.scale ? a : null;
     }
 
     /**
@@ -245,4 +249,4 @@ class RangeModel {
     }
 }
 
-module.exports = { RangeModel, auxKwTypical, acKwTypical, bandOf, speedBandOf, LEARN_KM, AUX_KW, BASE_KW, AC_KW, SPEED_BANDS };
+module.exports = { RangeModel, curve, auxKwTypical, acKwTypical, bandOf, speedBandOf, LEARN_KM, AUX_KW, BASE_KW, AC_KW, SPEED_BANDS };

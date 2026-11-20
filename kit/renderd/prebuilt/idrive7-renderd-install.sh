@@ -9,12 +9,15 @@ S=${IDR_SYSTEMD:-/etc/systemd/system}
 D=${IDR_OLD:-/var/opt/mgu-renderd}
 cd "$(dirname "$0")" || exit 1
 old=""
-if [ ! -e "$D/current" ]; then
+# only the kit installer's own (its marker line): IterioDev's renderer has a unit of the same name (his App Manager's,
+# started with --socket), which stays; this renderer stands down while it is there
+if [ ! -e "$D/current" ] && grep -q 'added by mgu-app-install.sh' "$S/mgu-renderd.service" 2>/dev/null; then
     for f in "$S/mgu-renderd.service" "$S/oapcontroller.service.wants/mgu-renderd.service" "$S/multi-user.target.wants/mgu-renderd.service"; do
         { [ -e "$f" ] || [ -L "$f" ]; } && old="$old $f"
     done
-    [ -f "$D/mgu-renderd" ] && old="$old $D/mgu-renderd"
 fi
+# its program (IterioDev's lives under his App Manager, or in $D/current from the Store)
+[ ! -e "$D/current" ] && [ -f "$D/mgu-renderd" ] && old="$old $D/mgu-renderd"
 [ -d "$D/retired" ] && old="$old $D/retired"
 if [ -n "$old" ]; then
     RW=0

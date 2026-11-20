@@ -11,10 +11,12 @@
  *
  * Nothing here actuates the flap. Actuation lives in adapters.js and is gated there.
  */
-const { Diag, hex, NRC } = require('./kit/diag');
+const { Diag, hex, NRC, replyTo } = require('./kit/diag');
 
 const DME = 0x12;                 // DME engine (BMW diagnostic address)
-const DME2 = 0x13;                // second DME on some engines, kept for future use
+const DME2 = 0x13;                // a V8's second engine unit (bank 2): its own exhaust flap
+// a V8's master index (22 F1 50) -> it has a second unit at 0x13 (kit/twin_dme.js, BMW's SGBD index)
+const TWIN = ['0F1A10', '0F1A20', '0F242C', '0F242E', '0F2460', '0F26B8', '0F26BC', '0F2E00'];
 
 // Read-only identity DIDs (UDS 0x22). These only READ; they never change the car.
 const DID_SGBD_INDEX = [0xF1, 0x50];   // SGBD index - what BMW tools identify a unit by
@@ -28,6 +30,9 @@ const DID_SW = [0xF1, 0x95];
 const DID_ASW_EL_AGK = [0x62, 0xFD];
 const DID_ASG_EL_AGK = [0x64, 0xFD];
 const DID_ISAGK = [0x4A, 0x65];
+// the controlled electric flap (DME8FF, the G-series N63 / S63: GER_EL_AGK, 2F 611E, when St_Akr == 8):
+// ASW_GER_EL_AGK = what a tester commanded
+const DID_ASW_GER_EL_AGK = [0x63, 0x1E];
 
 function bytesToHex(b) { return (b || []).map((x) => hex(x)).join(' '); }
 
@@ -55,10 +60,10 @@ class DiagLink {
     }
 
     /** Read a UDS 0x22 DID from the DME. Resolves {ok, data[]} or {ok:false, nrc}. */
-    async readDid(did, timeoutMs) {
+    async readDid(did, timeoutMs, addr) {
         if (!this.available) return { ok: false, nrc: null, reason: 'no diagnostic link' };
         try {
-            const reply = await this.diag.physical(this.dme, 0x22, did, timeoutMs || 2000);
+            const reply = await this.diag.physical(addr || this.dme, 0x22, did, timeoutMs || 2000, replyTo(0x22, did));
             if (!reply || !reply.length) return { ok: false, nrc: null, reason: 'timeout' };
             if (reply[0] === 0x7F) return { ok: false, nrc: reply[2], reason: NRC[reply[2]] || ('NRC ' + hex(reply[2])) };
             // positive: 0x62 <did hi> <did lo> <data...>
@@ -88,10 +93,22 @@ class DiagLink {
         // read-only capability probe: does this DME expose the electric flap (0x60FD)?
         const asw = await this.readDid(DID_ASW_EL_AGK);
         const asg = await this.readDid(DID_ASG_EL_AGK);
+        // the units with a flap: the master, and a V8's second unit (each drives its bank's flap)
+        const units = [];
+        const probe = async (addr, el) => {
+            const ger = (await this.readDid(DID_ASW_GER_EL_AGK, 1500, addr)).ok;
+            if (addr !== this.dme && !el) el = (await this.readDid(DID_ASW_EL_AGK, 1500, addr)).ok || (await this.readDid(DID_ASG_EL_AGK, 1500, addr)).ok;
+            if (el || ger) units.push({ addr: addr, el: !!el, ger: ger });
+        };
+        await probe(this.dme, asw.ok || asg.ok);
+        ident.twin = TWIN.indexOf(String(ident.sgbdIndex || '').replace(/\s+/g, '').toUpperCase()) >= 0;
+        if (ident.twin) await probe(DME2, false);
+        this.flapUnits = units;
         ident.elAgk = {
-            supported: asw.ok || asg.ok,
+            supported: units.length > 0,
             commandedPct: asw.ok && asw.data.length >= 2 ? ((asw.data[0] << 8) | asw.data[1]) / 100 : null,
             positionRaw: asg.ok ? bytesToHex(asg.data) : null,
+            units: units.map((u) => hex(u.addr) + (u.el ? ' el' : '') + (u.ger ? ' ger' : '')),
         };
         this.log.info('DME ident: ' + JSON.stringify(ident));
         return ident;
@@ -114,10 +131,13 @@ class DiagLink {
      * called by an adapter that is BOTH matched and armed (see adapters.js); on its
      * own it just forwards bytes and reads the answer — it does not decide to send.
      */
-    async sendToDme(sid, data, timeoutMs) {
+    async sendToDme(sid, data, timeoutMs) { return this.sendTo(this.dme, sid, data, timeoutMs); }
+
+    /** sendToDme to a given engine unit (a V8's second unit, 0x13, drives its own flap). */
+    async sendTo(addr, sid, data, timeoutMs) {
         if (!this.available) return { ok: false, reason: 'no diagnostic link' };
-        this.log.info('UDS -> DME ' + hex(sid) + ' ' + bytesToHex(data));
-        const reply = await this.diag.physical(this.dme, sid, data, timeoutMs || 3000);
+        this.log.info('UDS -> ' + (addr === this.dme ? 'DME ' : 'DME ' + hex(addr) + ' ') + hex(sid) + ' ' + bytesToHex(data));
+        const reply = await this.diag.physical(addr, sid, data, timeoutMs || 3000, replyTo(sid, data));
         if (!reply || !reply.length) return { ok: false, reason: 'timeout' };
         if (reply[0] === 0x7F) return { ok: false, nrc: reply[2], reason: NRC[reply[2]] || ('NRC ' + hex(reply[2])) };
         return { ok: true, sid: reply[0], data: reply.slice(1) };

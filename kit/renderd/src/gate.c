@@ -16,7 +16,7 @@
 #define MAX_FRONT 16
 
 static pid_t pid;
-static int out = -1, in = -1, reported;
+static int out = -1, in = -1, reported, unavailable;
 static uint32_t front[MAX_FRONT];
 static int nfront;
 static char line[256];
@@ -25,13 +25,25 @@ static size_t len;
 int gate_start(const char *command)
 {
     int o[2], i[2];
-    if (pipe2(o, O_CLOEXEC) || pipe2(i, O_CLOEXEC)) {
+    if (pipe2(o, O_CLOEXEC)) {
         log_error("foreground gate: pipe: %s", strerror(errno));
+        return -1;
+    }
+    if (pipe2(i, O_CLOEXEC)) {
+        log_error("foreground gate: pipe: %s", strerror(errno));
+        close(o[0]);
+        close(o[1]);
         return -1;
     }
     pid = fork();
     if (pid < 0) {
+        /* no child: gate_stop() must not signal pid -1 (every process) */
         log_error("foreground gate: fork: %s", strerror(errno));
+        pid = 0;
+        close(o[0]);
+        close(o[1]);
+        close(i[0]);
+        close(i[1]);
         return -1;
     }
     if (pid == 0) {
@@ -61,6 +73,7 @@ int gate_start(const char *command)
 
 int gate_fd(void) { return out; }
 int gate_reported(void) { return reported; }
+int gate_unavailable(void) { return unavailable; }
 
 int gate_any_front(void) { return nfront > 0; }
 
@@ -76,6 +89,11 @@ static void report(const char *l)
 {
     nfront = 0;
     reported = 1;
+    unavailable = !strcmp(l, "foreground unavailable");
+    if (unavailable) {
+        log_warn("foreground gate: it cannot tell which app is in front on this unit; apps show as without it");
+        return;
+    }
     if (strncmp(l, "foreground", 10)) {
         log_warn("foreground gate: unexpected line '%s': no app in front", l);
         return;
@@ -102,6 +120,7 @@ int gate_read(void)
             gate_stop();
             nfront = 0;
             reported = 0;
+            unavailable = 0;
             len = 0;
             return -1;
         }
@@ -125,7 +144,7 @@ int gate_read(void)
 
 void gate_stop(void)
 {
-    if (!pid)
+    if (pid <= 0)
         return;
     if (in >= 0)
         close(in);

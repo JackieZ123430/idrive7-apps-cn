@@ -1,5 +1,7 @@
 'use strict';
 /**
+ * run_timer.js - shared by Drag Timer (its runs and splits) and Redline (the launch score on the HUD).
+ *
  * Run timer: feed it (time ms, speed km/h) samples, it finds the launch and
  * the moments each split was reached. Crossing times are interpolated between
  * samples, so the result does not depend on how often the car sends speed.
@@ -9,9 +11,11 @@
  *         run   - timing
  * A run ends when the car slows down, every split is done, or after 40 s; it then goes straight
  * back to arming (wait / ready) and keeps its results and time on screen until the next launch.
+ * Back below LAUNCH_KMH before any split: a creep, not a launch - thrown away, armed again at once.
  */
 const LAUNCH_KMH = 0.5;      // speed that counts as "moving"
 const ROLLOUT_M = 0.3048;    // one-foot rollout (drag strip staging beam)
+const CREEP_KMH = 5;         // a 'run' that never got faster is a creep (the slow-down end needs vmax - 5)
 const MAX_RUN_MS = 40000;    // a run stops counting after 40 s
 
 /** splits: [{ key, label, from, to } speeds in km/h]  or  { key, label, dist } metres */
@@ -20,6 +24,7 @@ class RunTimer {
         this.splits = splits;
         this.rollout = !!(opts && opts.rollout);
         this.onDone = (opts && opts.onDone) || (() => {});
+        this.onLaunch = (opts && opts.onLaunch) || (() => {});
         this.state = 'wait';
         this.stopSince = null;
         this.prev = null;
@@ -56,7 +61,12 @@ class RunTimer {
             }
             return;
         }
-        if (this.state === 'run' && p) this._step(p, { t, v });
+        if (this.state !== 'run' || !p) return;
+        // stopped again with no split, never faster than a creep (a faster run that slows down ends in _step,
+        // so a lone 0 sample at speed is no new launch): timing on would time the next launch from it; it
+        // began from 'ready', so armed again at once (a launch right after a dip or rollback still counts)
+        if (v < LAUNCH_KMH && this.vmax < CREEP_KMH && !Object.keys(this.result).length) { this.reset(); this.state = 'ready'; this.stopSince = t; return; }
+        this._step(p, { t, v });
     }
 
     /**
@@ -70,7 +80,8 @@ class RunTimer {
         // the 40 s limit by the clock too: at a steady speed (or stopped) the car sends no new samples,
         // so a check only in _step never fired and the run counted on
         if (this.state === 'run') {
-            if (this.t0 !== null && now - this.t0 > MAX_RUN_MS) this._finish(now);
+            // (from the launch while the rollout foot isn't done: a creep shorter than it timed forever)
+            if (now - (this.t0 !== null ? this.t0 : this.tLaunch) > MAX_RUN_MS) this._finish(now);
             return;
         }
         if (!p || typeof p.v !== 'number' || !isFinite(p.v) || p.v >= LAUNCH_KMH || now <= p.t) return;
@@ -87,6 +98,7 @@ class RunTimer {
         this.tLaunch = p.t + Math.max(0, Math.min(1, f)) * (c.t - p.t);
         this.launchDist = 0;
         if (!this.rollout) this.t0 = this.tLaunch;
+        this.onLaunch();
         this._step({ t: this.tLaunch, v: LAUNCH_KMH }, c);
     }
 
@@ -140,7 +152,7 @@ class RunTimer {
         // straight back to arming: 'wait' until the car stands, then 'ready' (see feed / idle)
         this.state = 'wait';
         this.stopSince = null;
-        this.endAt = Math.min(MAX_RUN_MS, t - this.t0) / 1000;
+        this.endAt = this.t0 === null ? undefined : Math.min(MAX_RUN_MS, t - this.t0) / 1000;
         if (Object.keys(this.result).length) this.onDone({ at: Date.now(), result: Object.assign({}, this.result), trap: Object.assign({}, this.trapSpeed), vmax: this.vmax, rollout: this.rollout });
     }
 }

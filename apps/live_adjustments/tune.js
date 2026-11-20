@@ -42,6 +42,11 @@ class TuneControl {
         this.log = ctx.log;
         this.link = null;
         this.bm3 = null;
+        this._ops = 0;               // commands and refreshes queued or running (busy while any)
+        this._queue = Promise.resolve();
+        this._refreshing = null;     // a refresh queued but not started yet
+        this._refreshRuns = false;   // a refresh running
+        this._waitNote = false;      // pressed during a refresh: the page says why nothing happened, until it ends
         this._reset();
         this.targetAgg = 1.5;        // burble aggression picked with -/+ (sent on Apply)
     }
@@ -53,7 +58,6 @@ class TuneControl {
         this.cooling = null;         // 'ON' | 'OFF' | null (accepted by the DME)
         this.burbles = null;         // DME state: 'off' | 'custom' | '4.5' | null (unknown)
         this.asd = null;             // true | false | null (last accepted)
-        this.busy = false;
         this.note = null;            // the status line under the page
         this.noteType = 'dim';       // dim | go | warn
     }
@@ -64,6 +68,7 @@ class TuneControl {
         return TUNERS.indexOf(v) >= 0 ? v : 'off';
     }
     get armed() { return this.tuner !== 'off'; }
+    get busy() { return this._ops > 0; }
 
     /** Which pages this car gets: the picked tune's. */
     features() { return Object.assign({}, FEATURES[this.tuner]); }
@@ -74,9 +79,31 @@ class TuneControl {
         await this.refresh();
     }
 
+    /** One DME conversation at a time: a refresh waits for the command in flight and the other way
+     * round (BM3's 0x63 replies carry no address, so two reads in flight could swap answers). */
+    _serial(fn) {
+        this._ops++;
+        const done = () => { this._ops--; };
+        const p = this._queue.then(fn).then((v) => { done(); return v; }, (e) => { done(); throw e; });   // (no Promise.finally on the car's Node 8)
+        this._queue = p.catch(() => {});
+        return p;
+    }
+
     /** The tune changed or the diagnostic link came up: start over. BM3 is identified (memory
-     * reads only); MHD has nothing to identify; Off sends nothing. */
-    async refresh() {
+     * reads only); MHD has nothing to identify; Off sends nothing. A refresh already waiting
+     * reads the settings when it starts, so a second one joins it. */
+    refresh() {
+        if (!this._refreshing) {
+            this._refreshing = this._serial(() => {
+                this._refreshing = null; this._refreshRuns = true;
+                const end = () => { this._refreshRuns = this._waitNote = false; };
+                return this._refresh().then((v) => { end(); return v; }, (e) => { end(); throw e; });
+            });
+        }
+        return this._refreshing;
+    }
+
+    async _refresh() {
         const target = this.targetAgg;
         this._reset();
         this.targetAgg = target;
@@ -118,21 +145,21 @@ class TuneControl {
     /** The one place a command leaves: a tune picked, the feature is that tune's, the link is up
      * and nothing else is running. */
     async _run(feature, label, fn) {
-        if (this.busy) return;
+        // one at a time: a press while a command runs is not sent (its note says so); during a refresh, say why
+        if (this.busy) { if (this._refreshing || this._refreshRuns) this._waitNote = true; return; }
         if (!this.armed || !FEATURES[this.tuner][feature]) { this.note = 'Not available for this tune'; this.noteType = 'warn'; return; }
         if (!this.link || !this.link.available) { this.note = 'Waiting for the diagnostic link'; this.noteType = 'warn'; return; }
-        this.busy = true;
         this.note = 'Sending ' + label + '…'; this.noteType = 'dim';
-        try {
-            this.note = await fn();
-            this.noteType = 'go';
-        } catch (e) {
-            this.note = String(e && e.message || e);
-            this.noteType = 'warn';
-            this.log.warn('tune ' + label + ': ' + this.note);
-        } finally {
-            this.busy = false;
-        }
+        return this._serial(async () => {
+            try {
+                this.note = await fn();
+                this.noteType = 'go';
+            } catch (e) {
+                this.note = String(e && e.message || e);
+                this.noteType = 'warn';
+                this.log.warn('tune ' + label + ': ' + this.note);
+            }
+        });
     }
 
     /** Map 1..4: one press switches (no confirm step, the user's choice). */
@@ -225,8 +252,8 @@ class TuneControl {
             minCoolingRpm: MIN_COOLING_RPM,
             targetAgg: this.targetAgg,
             busy: this.busy,
-            note: this.note,
-            noteType: this.noteType,
+            note: this._waitNote ? 'Reading the DME - press again in a moment' : this.note,
+            noteType: this._waitNote ? 'warn' : this.noteType,
         };
     }
 }

@@ -296,7 +296,8 @@ function rampSlab(cv, x0, x1, y, h, sl, stops, spanX, spanW) {
  * on it; below it in g.negColor. g.head: false leaves out the label / value row (the bar at y).
  * g.track: the empty track's colour. g.ticks: the values marked on the scale line; g.labels:
  * [{ value, text, color, align }] in place of its numbers. g.text / g.valueColor: the value row's text and colour
- * in place of the formatted value.
+ * in place of the formatted value. g.peakText: the peak as a number too ("PEAK 312"), small, after the label
+ * (left out where the label and the value leave no room for it).
  */
 function bar(cv, t, x, y, w, h, g) {
     const min = g.min || 0, v = g.value;
@@ -305,10 +306,16 @@ function bar(cv, t, x, y, w, h, g) {
     if (g.niceMax) max = min + Math.ceil((max - min) / step - 1e-9) * step;
     const sv = sm(g, 'bar|' + x + '|' + y, v), head = g.head !== false;
     if (head) {
-        cv.text(upperText(g.label || ''), x, y + 26, 22, t.dim, { font: 'bold', spacing: 2 });
-        const uw = g.unit ? cv.textWidth(' ' + g.unit, 26) : 0;
-        cv.text(g.text != null ? g.text : fmt(v, g.decimals), x + w - uw, y + 30, 44, g.valueColor ? t[g.valueColor] || g.valueColor : isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
+        const label = upperText(g.label || '');
+        cv.text(label, x, y + 26, 22, t.dim, { font: 'bold', spacing: 2 });
+        const uw = g.unit ? cv.textWidth(' ' + g.unit, 26) : 0, vs = g.text != null ? g.text : fmt(v, g.decimals);
+        cv.text(vs, x + w - uw, y + 30, 44, g.valueColor ? t[g.valueColor] || g.valueColor : isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
         if (g.unit) cv.text(' ' + g.unit, x + w, y + 30, 26, t.dim, { align: 'right' });
+        if (g.peakText && isNum(g.peak)) {
+            const ps = localizeLabel('PEAK') + ' ' + fmt(g.peak, g.decimals), po = { font: 'label', spacing: 1, literal: true };
+            const px = x + cv.textWidth(label, 22, { font: 'bold', spacing: 2 }) + 22;
+            if (px + cv.textWidth(ps, 20, po) <= x + w - uw - cv.textWidth(vs, 44, { font: 'num' }) - 18) cv.text(ps, px, y + 26, 20, t.hang || t.accent2 || t.dim, po);
+        }
     }
     const bh = 22, by = y + (head ? 44 : 0), SL = 18, bw = w - SL;
     const X = (val) => x + clamp((val - min) / (max - min), 0, 1) * bw;
@@ -538,7 +545,9 @@ function chart(cv, t, x, y, w, h, g) {
 
 /**
  * Table: cols = [{ label, w, align, color, font, size }], rows = [[cell, ...], ...] where a cell
- * is text or { text, color }. g = { rowH (40), headerSize (16), size (24), empty, stripe }.
+ * is text or { text, color }. g = { rowH (40), headerSize (16), size (24), empty, stripe, middle }.
+ * A row's text sits at 0.68 of its height (level with the kit's 40 px rows); with middle, in its
+ * middle, for taller rows.
  */
 function table(cv, t, x, y, w, cols, rows, g) {
     g = g || {};
@@ -559,7 +568,7 @@ function table(cv, t, x, y, w, cols, rows, g) {
             if (cell == null) return;
             const txt = typeof cell === 'object' ? cell.text : cell, cc = typeof cell === 'object' && cell.color ? col(t, cell.color, t.text) : col(t, c.color, t.text);
             const al = c.align || 'left', tx = al === 'right' ? xs[i] + c.w - 8 : al === 'center' ? xs[i] + c.w / 2 : xs[i];
-            cv.text(String(txt), tx, ry + rh * 0.68, c.size || sz, cc, { align: al, font: (typeof cell === 'object' && cell.font) || c.font || 'label' });
+            cv.text(String(txt), tx, ry + (g.middle ? rh / 2 + (c.size || sz) * 0.36 : rh * 0.68), c.size || sz, cc, { align: al, font: (typeof cell === 'object' && cell.font) || c.font || 'label' });
         });
     });
 }
@@ -615,7 +624,8 @@ function tyres(cv, t, x, y, w, h, g) {
  */
 function gmeter(cv, t, cx, cy, r, g) {
     const max = g.max || 1.5;
-    const key = ['gmeter', r, max, t.name].join('|'), S = Math.ceil(r + 4);
+    const flip = !!g.flipLong;                  // brake on top, accel at the bottom (issue #72)
+    const key = ['gmeter', r, max, t.name, flip].join('|'), S = Math.ceil(r + 4);
     cv.blit(layer(key, 2 * S + 80, 2 * S, (c) => {
         const x = S, y = S;
         for (let ring_ = 0.5; ring_ <= max + 1e-6; ring_ += 0.5) {
@@ -625,10 +635,10 @@ function gmeter(cv, t, cx, cy, r, g) {
         }
         c.line(x - r, y, x + r, y, 2, withAlpha(t.tick, 0.6));
         c.line(x, y - r, x, y + r, 2, withAlpha(t.tick, 0.6));
-        c.text('BRAKE', x, y + r - 14, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
-        c.text('ACCEL', x, y - r + 32, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+        c.text(flip ? 'ACCEL' : 'BRAKE', x, y + r - 14, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
+        c.text(flip ? 'BRAKE' : 'ACCEL', x, y - r + 32, 22, t.dim, { align: 'center', font: 'bold', spacing: 1.5 });
     }, cv.textScale), Math.round(cx) - S, Math.round(cy) - S);
-    const P = (lat, lon) => [cx + clamp(lat / max, -1.1, 1.1) * r, cy - clamp(lon / max, -1.1, 1.1) * r];
+    const P = (lat, lon) => [cx + clamp(lat / max, -1.1, 1.1) * r, cy + (flip ? 1 : -1) * clamp(lon / max, -1.1, 1.1) * r];
     const tr = g.trail || [];
     tr.forEach((p, i) => {
         if (!isNum(p[0]) || !isNum(p[1])) return;
@@ -759,7 +769,8 @@ function headerCompact(cv, t, x, y, w, h, title, tabs, sel, badges) {
     const room = w - 20 - (badgesW ? badgesW + 12 : 0);
     const tw = tabWidths(cv, names, 18, opt, 132, 44, room - 20, 20);
     const tabsW = tw.reduce((a, b) => a + b, 0);
-    const showTitle = title && titleW + 32 + tabsW <= room;
+    // the tabs start 20 px in: the name shows only where every tab still fits after it (else the last tab, Settings, drops)
+    const showTitle = title && 20 + titleW + 32 + tabsW <= room;
     // only as wide as the content: the rest of the strip stays the HMI's
     let end = x + 20 + (showTitle ? titleW + 32 : 0);
     names.forEach((n, i) => { if (end + tw[i] <= x + room) end += tw[i]; });

@@ -141,6 +141,7 @@ class RenderClient extends EventEmitter {
         s.on('connect', () => {
             this.connected = true;
             this._reset();
+            this.inbuf = Buffer.alloc(0);   // (a message cut off with the last connection)
             s.setNoDelay(true);
             this._write(hello);
         });
@@ -252,7 +253,10 @@ class RenderClient extends EventEmitter {
         if (this.placement && !resize && ['x', 'y', 'scale', 'ox', 'oy'].every((k) => pl[k] === this.placement[k])) return;
         const scaleChanged = this.placement && this.placement.scale !== pl.scale;
         this.placement = Object.assign({}, pl);
-        if (resize || scaleChanged) this._reset();
+        // as the renderer: a new size drops all the app's resources, a new scale keeps them but the layers drawn at
+        // the old one (sent again, they replace those)
+        if (resize) this._reset();
+        else if (scaleChanged) { this.sent.layer.clear(); this.waiting = false; }
         if (!this.ready || !this.native) return;
         this._sendPlace();
         if (resize) { this._sendPixmaps(); this._sendVideos(); }      // the renderer dropped them with the old size

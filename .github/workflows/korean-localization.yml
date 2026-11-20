@@ -1,0 +1,35 @@
+name: Korean localization
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: korean-localization-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  korean-tests:
+    name: Korean translations and fonts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Korean catalog matches editable TSV
+        run: |
+          python3 kit/tools/sync_locales.py ko
+          git diff --exit-code -- kit/runtime/locales/ko.json
+      - name: Check Korean menus, font coverage and runtime
+        run: python3 kit/tools/test_ko.py
+      - name: Check Hangul reaches the GPU renderer in pieces
+        run: node kit/tools/test_atlas_pieces.js

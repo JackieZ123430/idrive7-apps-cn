@@ -8,9 +8,26 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 LOCALES = ROOT / 'kit/runtime/locales'
 
 
+def normalize_language(language):
+    """Accept regional Korean and Spanish CLI tags while keeping one catalog/package identity."""
+    tag = language.lower().replace('_', '-')
+    return 'ko' if tag in ('ko', 'ko-kr') else 'es' if tag in ('es', 'es-es') else language
+
+
+def credit(language):
+    """A translation's credit (corner, settings rows, entry comment), shipped only in that language's
+    builds: kit/localization/credit.<language>.json. None when the language has no credit file."""
+    path = ROOT / 'kit/localization' / ('credit.%s.json' % language)
+    return json.loads(path.read_text(encoding='utf-8')) if language != 'en' and path.exists() else None
+
+
+def credit_name(language):
+    """Settings-row name of a translation credit; Chinese keeps its original CN_CREDITS."""
+    return 'CN_CREDITS' if language == 'zh-CN' else language.split('-')[0].upper() + '_CREDITS'
+
+
 def zh_credit():
-    """The translation credit (corner, settings rows, entry comment): Chinese (zh-CN) builds only."""
-    return json.loads((ROOT / 'kit/localization/credit.zh-CN.json').read_text(encoding='utf-8'))
+    return credit('zh-CN')
 
 
 def languages():
@@ -34,10 +51,13 @@ def package_version(version, language):
 
 
 def localize_spec(spec, language):
+    language = normalize_language(language)
     words = load_locale(language)
     s = copy.deepcopy(spec)
     s['version'] = package_version(s['version'], language)
     s['title'] = text(s['title'], words)
+    if isinstance(s.get('startWidget'), dict) and 'name' in s['startWidget']:
+        s['startWidget']['name'] = text(s['startWidget']['name'], words)
     for screen in s.get('screens', []):
         if 'title' in screen:
             screen['title'] = text(screen['title'], words)
@@ -53,8 +73,8 @@ def localize_spec(spec, language):
     return s
 
 
-def unicode_resources(ui, strings, language='en'):
-    """Localize static resources; give initial Text cells stable Unicode StringIds."""
+def unicode_resources(ui, strings, language='en', prefix='SID_CN_STATIC_'):
+    """Localize static resources; give initial Text cells stable Unicode StringIds (prefix + a number)."""
     words = load_locale(language)
     counter = [0]
 
@@ -62,7 +82,7 @@ def unicode_resources(ui, strings, language='en'):
         if isinstance(obj, dict):
             value = obj.get('value')
             if obj.get('type') == 'Text' and isinstance(value, str) and value:
-                sid = 'SID_CN_STATIC_%04d' % counter[0]
+                sid = prefix + '%04d' % counter[0]
                 counter[0] += 1
                 strings[sid] = value
                 obj.update(value=sid, type='StringId')
@@ -76,8 +96,8 @@ def unicode_resources(ui, strings, language='en'):
     visit(ui)
     for key in strings:
         strings[key] = text(strings[key], words)
-        if language == 'zh-CN' and key.endswith('_CN_CREDITS_TITLE'):
-            strings[key] = zh_credit()['settingsTitle']
+        if credit(language) and key.endswith('_' + credit_name(language) + '_TITLE'):
+            strings[key] = credit(language)['settingsTitle']
     for n in range(256):
         strings['SID_CN_DYNAMIC_%04d' % n] = ''
     if len(strings) > 1024:

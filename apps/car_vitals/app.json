@@ -2,10 +2,12 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.21.0",
+  "version": "2.27.9",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs",
@@ -20,7 +22,8 @@
       "statusNewCurrentUnitsStatusExt": "rs"
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
-      "statusCarSpeed2": "rs"
+      "statusCarSpeed2": "rs",
+      "statusVehiclePartType": "rs"
     },
     "de.bmw.infotainment.drivingexcitement.FES": {
       "statusSwitchDriveDynamicSport2": "rs",
@@ -106,19 +109,11 @@
     },
     {
       "key": "tempUnit",
-      "label": "Temperature",
+      "label": "Temperature unit",
       "type": "choice",
-      "default": "C",
-      "options": [
-        [
-          "C",
-          "Celsius"
-        ],
-        [
-          "F",
-          "Fahrenheit"
-        ]
-      ]
+      "default": "c",
+      "options": [["c", "Celsius"], ["f", "Fahrenheit"]],
+      "aliases": {"C": "c", "F": "f"}
     },
     {
       "key": "pressUnit",
@@ -133,12 +128,28 @@
         [
           "psi",
           "psi"
+        ],
+        [
+          "kpa",
+          "kPa"
         ]
       ]
     },
     {
+      "key": "boostMax",
+      "label": "Boost gauge max",
+      "type": "choice",
+      "default": "2.5",
+      "options": [
+        ["2.0", "2.0 bar / 30 psi"],
+        ["2.5", "2.5 bar / 36 psi"],
+        ["3.0", "3.0 bar / 44 psi"],
+        ["3.5", "3.5 bar / 50 psi"]
+      ]
+    },
+    {
       "key": "speedUnit",
-      "label": "Speed",
+      "label": "Speed unit",
       "type": "choice",
       "default": "kmh",
       "options": [
@@ -153,21 +164,59 @@
       ]
     },
     {
+      "key": "engine",
+      "label": "Engine",
+      "type": "choice",
+      "default": "auto",
+      "options": [
+        ["auto", "Auto (from the car)"],
+        ["diesel", "Diesel"],
+        ["petrol", "Petrol"]
+      ]
+    },
+    {
       "key": "redline",
       "label": "Redline",
       "type": "number",
       "unit": "rpm",
-      "default": 7000,
+      "default": 0,
+      "labels": {"0": "Auto"},
+      "reset": 1,
       "steps": [
+        0,
+        4000,
         4500,
         5000,
         5500,
+        5800,
         6000,
+        6200,
         6500,
+        6800,
         7000,
         7200,
         7500,
-        8000
+        7800,
+        8000,
+        8500,
+        9000
+      ]
+    },
+    {
+      "key": "rpmScale",
+      "label": "Rev scale up to",
+      "type": "number",
+      "unit": "rpm",
+      "default": 0,
+      "labels": {"0": "Auto"},
+      "steps": [
+        0,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000
       ]
     },
     {
@@ -175,6 +224,8 @@
       "label": "Max power (100% on sport display)",
       "type": "number",
       "unit": "kW",
+      "unitBy": "powerUnit",
+      "units": { "hp": { "unit": "hp", "mul": 1.34102 }, "ps": { "unit": "PS", "mul": 1.35962 } },
       "default": 215,
       "steps": [
         100,
@@ -212,6 +263,15 @@
       ]
     },
     {
+      "key": "maxTorqueKgm",
+      "label": "Torque gauge max",
+      "type": "number",
+      "unit": "kgm",
+      "default": 100,
+      "steps": [20, 25, 30, 40, 50, 60, 80, 100],
+      "when": {"torqueUnit": "kgm"}
+    },
+    {
       "key": "powerUnit",
       "label": "Power unit",
       "type": "choice",
@@ -244,6 +304,10 @@
         [
           "lbft",
           "lb-ft"
+        ],
+        [
+          "kgm",
+          "kgm"
         ]
       ]
     },
@@ -268,6 +332,8 @@
       "label": "Oil temp warning",
       "type": "number",
       "unit": "°C",
+      "unitBy": "tempUnit",
+      "units": { "f": { "unit": "°F", "mul": 1.8, "add": 32 } },
       "default": 125,
       "steps": [
         110,
@@ -277,6 +343,18 @@
         130,
         135
       ]
+    },
+    {
+      "key": "flipLong",
+      "label": "G-force circle: swap accel / brake (brake on top)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "programSteady",
+      "label": "M-Track (or similar) module: S while S / M flickers",
+      "type": "bool",
+      "default": false
     },
     {
       "key": "peaks",
@@ -336,7 +414,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "boostSource",
@@ -376,7 +455,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showEgs",
@@ -396,7 +476,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showIat",
@@ -416,7 +497,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showHpfp",
@@ -436,7 +518,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showLpfp",
@@ -456,7 +539,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showTiming",
@@ -476,7 +560,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showBoostCtl",
@@ -496,7 +581,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showLoad",
@@ -516,7 +602,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showMisfire",
@@ -536,7 +623,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showTyres",
@@ -556,7 +644,8 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
     {
       "key": "showTyreTemp",
@@ -576,8 +665,10 @@
           "off",
           "Hide"
         ]
-      ]
+      ],
+      "group": "Tiles"
     },
+    {"key": "advanced", "label": "Advanced settings", "type": "bool", "default": false},
     {
       "key": "theme",
       "label": "Colour theme",
@@ -602,7 +693,7 @@
         ]
       ]
     },
-    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [5, 10, 15, 30, 60]},
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [3, 5, 10, 15, 30, 60], "when": {"advanced": true}},
     {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
      "options": [["full", "Full screen"], ["standard", "Standard"]]},
     {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",

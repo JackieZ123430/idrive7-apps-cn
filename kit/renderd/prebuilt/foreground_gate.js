@@ -15,7 +15,8 @@
  * entry while the app's screen is in front. Installed apps live in
  * <apps>/oap_<uid>/, which only the app manager creates, with the RHMI uuid in
  * rhmiData/application.json. The app may rewrite that file, so a uuid that
- * more than one app claims is ignored, and the file is read only if it is a
+ * more than one folder claims goes to the one the app manager has registered
+ * and is ignored without exactly one, and the file is read only if it is a
  * regular file of at most 64 KiB. Each change prints one line:
  *
  *   foreground [uid ...]
@@ -39,11 +40,100 @@ const INTERFACES = [
 ];
 const DEFAULTS = {
     someip: '/usr/lib/someip.node',
-    interface: INTERFACES.find((f) => fs.existsSync(f)) || INTERFACES[0],
+    interface: null,
     apps: '/var/opt/public/oap'
 };
 
-/* RHMI uuid -> uid of the installed apps, leaving out uuids claimed twice. */
+/* The interface description: where the app manager keeps it, else (another app manager build, MainApp
+ * 6.5.5's single bundle has no src-gen of its own) the first such file in a src-gen folder of a package
+ * under /usr/lib, two levels deep at most; null without one. */
+function findInterface(root) {
+    const known = INTERFACES.find((f) => fs.existsSync(f));
+    if (known) {
+        return known;
+    }
+    const want = /^de_bmw_infotainment_hmi_remote2?_RemoteHmiApplication2?\.json$/;
+    const look = (dir, depth) => {
+        let names = [];
+        try {
+            names = fs.readdirSync(dir);
+        } catch (e) {
+            return null;
+        }
+        const hit = names.find((n) => want.test(n));
+        if (hit) {
+            return path.join(dir, hit);
+        }
+        if (depth === 0) {
+            return null;
+        }
+        for (const n of names) {
+            const found = look(path.join(dir, n), depth - 1);
+            if (found) {
+                return found;
+            }
+        }
+        return null;
+    };
+    let pkgs = [];
+    try {
+        pkgs = fs.readdirSync(root || '/usr/lib');
+    } catch (e) {
+        return null;
+    }
+    for (const p of pkgs) {
+        const found = look(path.join(root || '/usr/lib', p, 'src-gen'), 2);
+        if (found) {
+            return found;
+        }
+    }
+    return null;
+}
+
+/* The JSON in file when it is a regular file of at most max bytes, else null. */
+function readJson(file, max) {
+    let fd = -1;
+    try {
+        fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+        const st = fs.fstatSync(fd);
+        if (st.isFile() && st.size <= max) {
+            const buf = Buffer.alloc(st.size);
+            fs.readSync(fd, buf, 0, st.size, 0);
+            return JSON.parse(buf.toString('utf8'));
+        }
+    } catch (e) {
+        // missing or not JSON
+    } finally {
+        if (fd >= 0) {
+            fs.closeSync(fd);
+        }
+    }
+    return null;
+}
+
+/* The uids the app manager has registered: its registry, <apps>/oap_12201/data/apps/<appId>.json
+ * (its own folder: an app cannot write there), each with the app's userId. */
+function registeredUids(dir) {
+    const out = new Set();
+    let names = [];
+    try {
+        names = fs.readdirSync(path.join(dir, 'oap_12201', 'data', 'apps'));
+    } catch (e) {
+        return out;
+    }
+    names.filter((n) => /\.json$/.test(n)).forEach((n) => {
+        const entry = readJson(path.join(dir, 'oap_12201', 'data', 'apps', n), MAX_APP_JSON);
+        const uid = entry && entry.userId;
+        if (typeof uid === 'number' && uid % 1 === 0) {
+            out.add(uid);
+        }
+    });
+    return out;
+}
+
+/* RHMI uuid -> uid of the installed apps. A uuid more than one folder claims (an earlier
+ * install's folder left behind) goes to the one the app manager has registered, when exactly
+ * one of them is; else it is left out. */
 function readApps(dir, log) {
     const claims = new Map();
     let names = [];
@@ -57,31 +147,19 @@ function readApps(dir, log) {
         if (!m) {
             return;
         }
-        let uuid;
-        let fd = -1;
-        try {
-            fd = fs.openSync(path.join(dir, name, 'rhmiData', 'application.json'),
-                fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
-            const st = fs.fstatSync(fd);
-            if (st.isFile() && st.size <= MAX_APP_JSON) {
-                const buf = Buffer.alloc(st.size);
-                fs.readSync(fd, buf, 0, st.size, 0);
-                uuid = JSON.parse(buf.toString('utf8')).application.uuid;
-            }
-        } catch (e) {
-            // not a readable app description: no claim
-        }
-        if (fd >= 0) {
-            fs.closeSync(fd);
-        }
+        const desc = readJson(path.join(dir, name, 'rhmiData', 'application.json'), MAX_APP_JSON);
+        const uuid = desc && desc.application && desc.application.uuid;
         if (typeof uuid === 'string') {
             claims.set(uuid, (claims.get(uuid) || []).concat(Number(m[1])));
         }
     });
     const apps = new Map();
+    let registered = null;
     claims.forEach((uids, uuid) => {
-        if (uids.length === 1) {
-            apps.set(uuid, uids[0]);
+        registered = uids.length > 1 ? registered || registeredUids(dir) : registered;
+        const live = uids.length > 1 ? uids.filter((uid) => registered.has(uid)) : uids;
+        if (live.length === 1) {
+            apps.set(uuid, live[0]);
         } else {
             log(`uuid ${uuid} is claimed by uids ${uids.join(', ')}; none of them is shown in front`);
         }
@@ -162,13 +240,26 @@ if (require.main === module) {
     const reportFd = Number(process.env.MGU_RENDER_REPORT_FD) || 1;
     process.stdin.on('end', () => process.exit(0));
     process.stdin.resume();
-    startGate({
-        someip: require(opt.someip),
-        interfaceConfig: JSON.parse(fs.readFileSync(opt.interface, 'utf8')),
-        appsDir: opt.apps,
-        write: (s) => fs.writeSync(reportFd, s),
-        log: (s) => process.stderr.write(`foreground gate: ${s}\n`)
-    });
+    const log = (s) => process.stderr.write(`foreground gate: ${s}\n`);
+    const iface = opt.interface || findInterface();
+    let interfaceConfig = null;
+    try {
+        interfaceConfig = JSON.parse(fs.readFileSync(iface, 'utf8'));
+    } catch (e) {
+        // this unit's app manager has no description of the RHMI interface: the gate cannot tell which
+        // app is in front, and says so once (the renderer then shows the apps as without a gate)
+        log(`no RemoteHmiApplication interface description (${iface || 'none found'}): ${e.message}`);
+        fs.writeSync(reportFd, 'foreground unavailable\n');
+    }
+    if (interfaceConfig) {
+        startGate({
+            someip: require(opt.someip),
+            interfaceConfig,
+            appsDir: opt.apps,
+            write: (s) => fs.writeSync(reportFd, s),
+            log
+        });
+    }
 }
 
-module.exports = { startGate, readApps, hasRootApp };
+module.exports = { startGate, readApps, hasRootApp, findInterface };

@@ -2,11 +2,13 @@
   "id": "doom",
   "title": "Doom",
   "description": "Doom (Freedoom: Phase 1) on the iDrive. Main menu with all settings; the game drawn in full resolution across the whole screen, on the controller; BACK returns to the menu and saves",
-  "version": "1.7.12",
+  "version": "1.7.22",
   "vendor": "custom",
   "loggingId": "OA9F",
   "maxDiskUsage": 104857600,
   "iconGlyph": "doom",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
   "signals": {
     "de.bmw.infotainment.vehicle.Vehicle2": {
       "statusCarSpeed2": "rs"

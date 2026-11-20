@@ -1,0 +1,22 @@
+<!-- accent: #20d8a0 -->
+<defs>
+  <linearGradient id="l-rim" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#f4f7fa"/><stop offset="0.25" stop-color="#b9c1ca"/><stop offset="0.55" stop-color="#58616b"/>
+    <stop offset="0.8" stop-color="#2a2f35"/><stop offset="1" stop-color="#9aa4ae"/></linearGradient>
+  <linearGradient id="l-screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2731"/><stop offset="0.6" stop-color="#0b1016"/><stop offset="1" stop-color="#05080b"/></linearGradient>
+  <linearGradient id="l-bar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0a8f68"/><stop offset="0.7" stop-color="#20d8a0"/><stop offset="1" stop-color="#b6ffe6"/></linearGradient>
+  <linearGradient id="l-glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+  <filter id="l-blur" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="2.2"/></filter>
+</defs>
+<rect x="16" y="24" width="108" height="92" rx="14" fill="url(#l-rim)"/>
+<rect x="20" y="28" width="100" height="84" rx="11" fill="#07090c"/>
+<rect x="22" y="30" width="96" height="80" rx="10" fill="url(#l-screen)"/>
+<rect x="30" y="40" width="26" height="6" rx="3" fill="#7d8894"/>
+<rect x="62" y="40" width="48" height="6" rx="3" fill="url(#l-bar)"/>
+<rect x="30" y="54" width="20" height="6" rx="3" fill="#7d8894"/>
+<rect x="56" y="54" width="34" height="6" rx="3" fill="url(#l-bar)"/>
+<rect x="30" y="68" width="30" height="6" rx="3" fill="#7d8894"/>
+<rect x="66" y="68" width="40" height="6" rx="3" fill="url(#l-bar)"/>
+<polyline points="30,98 40,98 46,88 52,102 58,84 64,96 70,92 78,92 84,80 90,98 96,94 110,94" fill="none" stroke="#20d8a0" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" filter="url(#l-blur)" opacity="0.9"/>
+<polyline points="30,98 40,98 46,88 52,102 58,84 64,96 70,92 78,92 84,80 90,98 96,94 110,94" fill="none" stroke="#c8fff0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="110" cy="94" r="3.4" fill="#ffffff"/>
+<path d="M22 40 Q22 30 32 30 H108 Q118 30 118 40 V56 Q70 46 22 62 Z" fill="url(#l-glass)"/>

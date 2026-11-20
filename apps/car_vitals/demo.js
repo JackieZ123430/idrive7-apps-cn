@@ -1,13 +1,15 @@
 'use strict';
 /** Synthetic drive for demo mode: a loop of pulls, braking and cornering. */
 class Demo {
-    constructor() { this.t0 = Date.now(); }
+    constructor() { this.t0 = Date.now(); this.red = 7000; }
+    /** The redline the pulls rev to (7000 = the petrol drive). */
+    setRedline(rpm) { this.red = rpm; }
     sample() {
         const t = (Date.now() - this.t0) / 1000;
         const cyc = t % 24;                                   // 24 s lap
         const pull = cyc < 9 ? cyc / 9 : cyc < 12 ? 1 - (cyc - 9) / 3 : 0.25 + 0.15 * Math.sin(cyc);
         const gear = Math.floor((cyc < 9 ? cyc : 9) / 2.2) % 4;
-        const rpm = 1500 + ((pull * 4 + gear * 0.7) % 1) * 5600 * Math.max(0.4, pull);
+        const rpm = 1500 + ((pull * 4 + gear * 0.7) % 1) * (this.red - 1400) * Math.max(0.4, pull);
         const corner = Math.sin(t / 3.1);
         const warm = Math.min(1, t / 240);
         const torque = Math.round(120 + pull * 640);

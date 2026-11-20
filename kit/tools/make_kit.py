@@ -14,7 +14,7 @@ kit takes kit/renderd/prebuilt/mgu-renderd, which is committed to the repository
 with a fingerprint of the source it was built from. A Docker build of changed source updates
 the prebuilt copy (commit it). If no renderer matching the source can be had, it asks.
 """
-import hashlib, io, json, os, shutil, subprocess, sys, tarfile
+import gzip, hashlib, io, json, os, shutil, subprocess, sys, tarfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEPLOY = os.path.join(ROOT, 'deploy')
@@ -35,10 +35,10 @@ CAR_FILES = [('car/deploy-car.sh', 'deploy-car.sh'), ('mgu-app-install.sh', 'mgu
              ('mainapp-patch.js', 'mainapp-patch.js'), ('car/README.txt', 'README.txt')]
 
 
-def source_hash():
+def source_hash(parts=(('src', None), ('inputgate', ('.cpp',)), ('protocol', ('.xml',)), ('docker', None), ('', ('Makefile',)))):
     """Fingerprint of everything the renderer binary is built from (line endings ignored)."""
     files = []
-    for sub, exts in (('src', None), ('inputgate', ('.cpp',)), ('protocol', ('.xml',)), ('docker', None), ('', ('Makefile',))):
+    for sub, exts in parts:
         d = os.path.join(RENDERD, sub)
         for n in sorted(os.listdir(d)):
             p = os.path.join(d, n)
@@ -57,7 +57,8 @@ def prebuilt_hash():
 
 
 def docker_build():
-    """Compile kit/renderd in Docker (x86-64 like the head unit). Returns (ok, output)."""
+    """Compile kit/renderd in Docker (x86-64 like the head unit). Returns (ok, output, stale): stale = built in an
+    image that could not be made again from this docker/."""
     plat = ['--platform', 'linux/amd64']
     user = ['-u', '%d:%d' % (os.getuid(), os.getgid())] if hasattr(os, 'getuid') else []
     log = []
@@ -65,10 +66,20 @@ def docker_build():
         p = subprocess.run(cmd, cwd=RENDERD, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         log.append(p.stdout.decode('utf-8', 'replace'))
         return p.returncode == 0
-    ok = (run(['docker', 'image', 'inspect', 'mgu-renderd-build'])
-          or run(['docker', 'build'] + plat + ['-t', 'mgu-renderd-build', 'docker']))
+    # the image is made again when docker/ changed: its label holds the docker/ it was built from
+    tag = source_hash((('docker', None),))
+    p = subprocess.run(['docker', 'image', 'inspect', '-f', '{{index .Config.Labels "mgu-renderd.docker"}}', 'mgu-renderd-build'],
+                       cwd=RENDERD, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    have = p.stdout.decode('utf-8', 'replace').strip()
+    ok = have == tag or run(['docker', 'build'] + plat + ['--label', 'mgu-renderd.docker=' + tag, '-t', 'mgu-renderd-build', 'docker'])
+    stale = False
+    if not ok and p.returncode == 0:
+        # offline, or the base image gone: the image there still builds the renderer (one without the label
+        # predates it, its docker/ may well be the same)
+        print('   (could not rebuild the build image; using the existing one, made from an older or unknown docker/)')
+        ok = stale = True
     ok = ok and run(['docker', 'run', '--rm'] + plat + user + ['-v', RENDERD + ':/src', 'mgu-renderd-build', 'make'])
-    return ok and os.path.isfile(BUILT), ''.join(log)
+    return ok and os.path.isfile(BUILT), ''.join(log), stale
 
 
 def ask(why, fallback):
@@ -89,9 +100,14 @@ def pick_renderer():
     pre_ok = os.path.isfile(PRE) and have == want
     older = PRE if os.path.isfile(PRE) else None
     if shutil.which('docker'):
-        ok, log = docker_build()
+        ok, log, stale = docker_build()
         if ok:
-            if not pre_ok:
+            if not pre_ok and stale:
+                # prebuilt/ would claim this docker/ (SOURCE_SHA256) and no later run would make it again
+                print('\n'.join(log.strip().splitlines()[-15:]))
+                print('renderer: built in the older build image - kit/renderd/prebuilt/ NOT updated '
+                      '(fix the image build above, then run again)')
+            elif not pre_ok:
                 os.makedirs(PRE_DIR, exist_ok=True)
                 shutil.copyfile(BUILT, PRE)
                 shutil.copyfile(gate_of(BUILT), gate_of(PRE))
@@ -140,9 +156,10 @@ def md5(p):
 
 def main():
     import argparse
-    from localize import languages, package_version
+    from localize import languages, package_version, normalize_language
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--language', choices=languages(), default='en')
+    parser.add_argument('--language', type=normalize_language, choices=languages(), default='en',
+                        help='UI language; Korean also accepts ko-KR, ko-kr and ko_KR, Spanish es-ES and es_ES')
     parser.add_argument('apps', nargs='*')
     args = parser.parse_args()
     # English (the default) keeps the usual dist/mgu-custom-apps(.tar.gz); other languages get a suffix
@@ -158,9 +175,11 @@ def main():
     for app in apps:
         r = subprocess.run([sys.executable, os.path.join(ROOT, 'kit', 'tools', 'build.py'), '--language', args.language, app], cwd=ROOT)
         if r.returncode: sys.exit('build of %s failed' % app)
-        ver = json.load(open(os.path.join(ROOT, 'apps', app, 'app.json'), encoding='utf-8'))['version']
+        spec = json.load(open(os.path.join(ROOT, 'apps', app, 'app.json'), encoding='utf-8'))
+        app_id = spec.get('id', app)
+        ver = spec['version']
         ver = package_version(ver, args.language)
-        shutil.copyfile(os.path.join(DIST, '%s@%s.mgu' % (app, ver)), os.path.join(OUT, 'apps', '%s@%s.mgu' % (app, ver)))
+        shutil.copyfile(os.path.join(DIST, '%s@%s.mgu' % (app_id, ver)), os.path.join(OUT, 'apps', '%s@%s.mgu' % (app_id, ver)))
     for src, dst in CAR_FILES:
         data = open(os.path.join(DEPLOY, src), 'rb').read().replace(b'\r\n', b'\n')
         open(os.path.join(OUT, dst), 'wb').write(data)
@@ -183,7 +202,8 @@ def main():
         ti.uid = ti.gid = 0; ti.uname = ti.gname = 'root'
         ti.mode = 0o755 if ti.isdir() or ti.name.endswith(('.sh', '/mgu-renderd', '.so')) else 0o644
         return ti
-    with tarfile.open(archive, 'w:gz') as tf:
+    # no clock in the gzip header: it holds 32 bits, past 2106 it fails (see build.py gz_header_free)
+    with gzip.GzipFile(archive, 'wb', mtime=0) as gz, tarfile.open(fileobj=gz, mode='w') as tf:
         tf.add(OUT, arcname='mgu-custom-apps', filter=mode)
     if hasattr(os, 'chmod'):
         for n in ('deploy-car.sh', 'mgu-app-install.sh') + (('mgu-renderd',) if rd else ()):

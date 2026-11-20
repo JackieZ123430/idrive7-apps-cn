@@ -4,9 +4,10 @@
 #   docker run --rm -v $PWD:/src mgu-renderd-build make   head-unit binaries in build/ (Ubuntu 18.04, glibc 2.27, like
 #                                                          the unit; kit/tools/make_kit.py runs this)
 #   make check-target    the renderer's loader, libraries and glibc versions (inside the same image)
-#   make test            protocol, touch-routing, community-socket, video, page-template-script and embed-buffer unit
-#                        tests, and recorded sessions of both legacy kits replayed through the original daemons and
-#                        this one, frames compared (Docker, Ubuntu 24.04 with Mesa)
+#   make test            protocol, touch-routing, community-socket, video, ramp, foreground-gate, app-input, JS-client
+#                        placement, page-template-script and embed-buffer unit tests, and recorded sessions of both
+#                        legacy kits replayed through the original daemons and this one, frames compared (Docker,
+#                        Ubuntu 24.04 with Mesa)
 #   make check-protocol IVI_LIB_DIR=<dir>   protocol/*.xml against the unit's libivi-*.so
 
 DOCKER  ?= docker
@@ -72,6 +73,15 @@ in-test: build/$(OUT)/mgu-render
 	build/$(OUT)/test_share
 	$(CC) $(CFLAGS) -o build/$(OUT)/test_video test/test_video.c src/gfx.c src/log.c -lEGL -lGLESv2 -lm
 	LIBGL_ALWAYS_SOFTWARE=1 EGL_PLATFORM=surfaceless build/$(OUT)/test_video
+	$(CC) $(CFLAGS) -o build/$(OUT)/test_ramp test/test_ramp.c src/gfx.c src/log.c -lEGL -lGLESv2 -lm
+	LIBGL_ALWAYS_SOFTWARE=1 EGL_PLATFORM=surfaceless build/$(OUT)/test_ramp
+	$(CC) $(CFLAGS) -Wl,--wrap=pipe2,--wrap=fork,--wrap=kill,--wrap=waitpid -o build/$(OUT)/test_gate test/test_gate.c src/gate.c src/log.c
+	build/$(OUT)/test_gate
+	$(CC) $(CFLAGS) -o build/$(OUT)/test_client_read test/test_client_read.c $(filter-out src/main.c,$(SRC)) $(GEN_C) $(LIBS)
+	build/$(OUT)/test_client_read
+	node test/test_gate_apps.js
+	node test/test_client_place.js
+	node test/test_client_reconnect.js
 	sh test/test_hmi.sh
 	for x in ivi-application wayland-drm; do wayland-scanner server-header protocol/$$x.xml $(GEN_DIR)/$$x-server-protocol.h; done
 	$(CC) $(CFLAGS) -o build/$(OUT)/mock_hmi test/mock_hmi.c $(GEN_DIR)/ivi-application-protocol.c $(GEN_DIR)/wayland-drm-protocol.c -lwayland-server

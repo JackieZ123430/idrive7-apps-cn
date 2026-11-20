@@ -1,11 +1,13 @@
 {
   "id": "live_adjustments",
   "title": "Engine Config",
-  "description": "Engine Config for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link. With BM3 or MHD picked in Settings: engine map switching, burbles, ASD and Max Cooling",
-  "version": "0.6.0",
+  "description": "Engine Config for BMW MGU ID7. Exhaust Flap: OEM, OPEN and CLOSE over the car's own diagnostic link, or following the driving mode (Sport open, Eco Pro closed); held against the DME's timeout, Close handed back above a set engine speed. With BM3 or MHD picked in Settings: engine map switching, burbles, ASD and Max Cooling. Experimental: xDrive off until the ignition cycle (DSC LMV_FUNKTION), behind its own setting",
+  "version": "0.9.10",
   "vendor": "custom",
   "loggingId": "OAA0",
   "iconGlyph": "sliders",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
@@ -18,6 +20,38 @@
     },
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "VehicleCondition": "s"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "statusFESVehicleDynamicSwitchHMI": "rs"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "_optional": "xDrive live: g and yaw rate",
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs",
+      "statusYawVelocityVehicle": "rs"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "xDrive live: the front / rear split",
+      "basicDataSet": "s"
+    },
+    "de.bmw.powertrain.Powertrain": {
+      "_optional": "xDrive live: wheel slip",
+      "ActualValueRPMWheel": "s"
+    },
+    "de.bmw.chassis.SteeringAngle": {
+      "_optional": "xDrive live: the steering wheel",
+      "ActualSteeringAngleDriver": "s",
+      "actualSteeringAngleDriverNoCRC": "s"
     }
   },
   "screens": [
@@ -37,6 +71,10 @@
         [
           "BTN_OEM",
           "OEM"
+        ],
+        [
+          "BTN_DRIVE",
+          "Drive mode"
         ],
         [
           "BTN_PAGE",
@@ -67,6 +105,62 @@
       ]
     },
     {
+      "key": "hold",
+      "label": "Hold Open / Close",
+      "type": "choice",
+      "default": "on",
+      "options": [
+        [
+          "on",
+          "On · sent again every 15 s"
+        ],
+        [
+          "off",
+          "Off · the car takes over after ~20 s"
+        ]
+      ]
+    },
+    {
+      "key": "closeLimit",
+      "label": "Close: hand back above",
+      "type": "choice",
+      "default": "4000",
+      "options": [
+        [
+          "2500",
+          "2,500 rpm"
+        ],
+        [
+          "3000",
+          "3,000 rpm"
+        ],
+        [
+          "3500",
+          "3,500 rpm"
+        ],
+        [
+          "4000",
+          "4,000 rpm"
+        ],
+        [
+          "4500",
+          "4,500 rpm"
+        ],
+        [
+          "5000",
+          "5,000 rpm"
+        ],
+        [
+          "5500",
+          "5,500 rpm"
+        ],
+        [
+          "off",
+          "Never (not recommended)"
+        ]
+      ]
+    },
+    {
       "key": "tuner",
       "label": "Tuning software",
       "type": "choice",
@@ -83,6 +177,41 @@
         [
           "mhd",
           "MHD · engine map, Max Cooling"
+        ]
+      ]
+    },
+    {
+      "key": "mapPin",
+      "label": "PIN for Engine Map and Burbles",
+      "type": "bool",
+      "default": false,
+      "when": {
+        "tuner": [
+          "bm3",
+          "mhd"
+        ]
+      }
+    },
+    {
+      "key": "mapPinCode",
+      "label": "Engine Map and Burbles PIN",
+      "type": "object",
+      "default": {},
+      "hidden": true
+    },
+    {
+      "key": "xdrive",
+      "label": "xDrive (experimental)",
+      "type": "choice",
+      "default": "off",
+      "options": [
+        [
+          "off",
+          "Off · nothing is sent (safe)"
+        ],
+        [
+          "on",
+          "On · xDrive tab, xDrive off until ignition off"
         ]
       ]
     },
@@ -107,6 +236,22 @@
         [
           "amber",
           "Night Amber"
+        ]
+      ]
+    },
+    {
+      "key": "layout",
+      "label": "Screen layout",
+      "type": "choice",
+      "default": "full",
+      "options": [
+        [
+          "full",
+          "Full screen"
+        ],
+        [
+          "standard",
+          "Standard"
         ]
       ]
     },

@@ -17,6 +17,7 @@ const adapters = require('./adapters');
 const { MHD, mhdSend } = require('./real_adapters');
 
 const MODES = ['OEM', 'OPEN', 'CLOSED'];
+const REFRESH_KEYS = ['arm'];                   // the settings (app.json) refresh() depends on
 
 class Controller {
     constructor(ctx) {
@@ -39,7 +40,8 @@ class Controller {
         // took it ('read' = read back from the DME at the unlock check)
         this.tune = { map: null, mapAccepted: null, cooling: null, coolingAccepted: null, burbles: null, burblesAccepted: null,
             asd: null, asdAccepted: null, busy: false, error: null };
-        this._busyToken = 0;
+        this._oemQueued = false;    // OEM pressed while a command was in flight: sent right after it
+        this._flight = null;        // the flap command in flight (with the OEM queued behind it)
     }
 
     /** The "Car control" setting is the arm switch: Armed = talk to the car DME;
@@ -77,6 +79,9 @@ class Controller {
     /** Re-detect the DME, re-pick the adapter and read the current state (read-only). Disarmed
      * sends nothing to the car, not even the identity reads. */
     async refresh() {
+        // a disarm waits for the flap command in flight and an OEM pressed meanwhile (pressed while armed, the
+        // hand-back to the car still goes); from then on nothing goes to the car
+        if (!this.armedSetting && this.state.busy && this._flight) await this._flight;
         adapters.armReal(this.armedSetting);        // arm/disarm from the setting before picking
         if (this.link && this.link.available && this.source === 'car') {
             try { this.ident = await this.link.identifyDme(this.platform); } catch (e) { this.ident = { present: false, platform: this.platform }; }
@@ -116,7 +121,20 @@ class Controller {
      */
     async setMode(mode) {
         if (MODES.indexOf(mode) < 0) return this.state;
-        const token = ++this._busyToken;
+        // one flap command at a time (a second would share its reply); OEM hands the flap back to the
+        // car, so it is never dropped: it goes right after the command in flight
+        if (this.state.busy) {
+            // OEM shows as picked at once (the screen says it was taken) and goes right after; pressed after a
+            // disarm it is not queued (the disarm waits for this command only: then nothing goes to the car)
+            if (mode === 'OEM' && this.armedSetting) { this._oemQueued = true; this.state.requested = 'OEM'; this.state.error = null; }
+            return this.state;
+        }
+        let landed;
+        this._flight = new Promise((r) => { landed = r; });
+        try { return await this._send(mode); } finally { landed(); }
+    }
+
+    async _send(mode) {
         this.state.requested = mode;
         this.state.accepted = null;
         this.state.error = null;
@@ -126,13 +144,11 @@ class Controller {
             const action = mode === 'OEM' ? 'oem' : (mode === 'CLOSED' ? 'closed' : 'open');
             const fn = this.adapter[action] || this.adapter.oem;
             const r = await fn.call(this.adapter, this.link);
-            if (token !== this._busyToken) return this.state;   // superseded by a newer press
             this.state.accepted = !!(r && r.accepted);
             this.state.confirmed = (r && r.confirmed) || 'UNKNOWN';
             if (!this.state.accepted) this.state.error = (r && r.detail) || null;   // no generic nag on screen
             this.log.info('mode ' + mode + ' -> accepted=' + this.state.accepted + ' confirmed=' + this.state.confirmed + ' (' + ((r && r.detail) || '') + ')');
         } catch (e) {
-            if (token !== this._busyToken) return this.state;
             this.state.accepted = false;
             // A real safety *block* is worth showing; anything else (timeout / no answer /
             // car asleep / ignition off) stays SILENT — the button may still move, but NO
@@ -141,8 +157,9 @@ class Controller {
             if (!(e && e.blocked)) this.state.comm = 'NONE';
             this.log.warn('setMode ' + mode + ': ' + String(e && e.message || e));
         } finally {
-            if (token === this._busyToken) this.state.busy = false;
+            this.state.busy = false;
         }
+        if (this._oemQueued) { this._oemQueued = false; return this.setMode('OEM'); }
         // a real adapter that can read back: confirm a moment later (no assumption)
         if (this.real && this.adapter.read) { try { await this._readBack(); } catch (e) { /* ignore */ } }
         return this.state;
@@ -222,4 +239,4 @@ class Controller {
     }
 }
 
-module.exports = { Controller, MODES };
+module.exports = { Controller, MODES, REFRESH_KEYS };

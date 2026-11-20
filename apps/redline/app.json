@@ -1,22 +1,134 @@
 {
   "id": "redline",
   "title": "Redline",
-  "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard",
-  "version": "1.10.12",
+  "description": "Full-screen rev tach with shift lights, gear, shift scoring and cold-engine rev guard; HUD by @biscotit",
+  "version": "2.0.45",
   "vendor": "custom",
   "loggingId": "OA97",
   "iconGlyph": "rpm",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.15" },
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
       "statusEngineSpeed2": "rs",
-      "statusEngineTemperature": "rs"
+      "statusEngineTemperature": "rs",
+      "statusBattery2": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "_optional": "engine torque (per-gear shift points), boost and the driving mode (HUD)",
+      "statusActualValueTorque2": "rs",
+      "statusSwitchDriveDynamicSport2": "rs",
+      "statusFESVehicleDynamicSwitchHMI": "rs"
     },
     "de.bmw.infotainment.vehicle.Vehicle2": {
-      "statusCarSpeed2": "rs"
+      "statusCarSpeed2": "rs",
+      "statusVehiclePartType": "rs"
     },
     "de.bmw.infrastructure.VehicleInformation": {
       "statusGearboxDrive": "s",
       "DataPowerTrain2": "s"
+    },
+    "de.bmw.infotainment.vehicle.CDS2": {
+      "_optional": "g-force on the HUD",
+      "statusLongitudinalAccelerationMassCenter": "rs",
+      "statusLateralAccelerationMassCenter": "rs"
+    },
+    "de.bmw.infrastructure.EnvironmentalInformation": {
+      "_optional": "outside temperature on the HUD",
+      "ExteriorTemperature": "s"
+    },
+    "de.bmw.infotainment.connectivity.telephony.ConnectivityAggregator": {
+      "_optional": "a call ringing: the HUD tach steps aside for BMW's call card",
+      "aggregatedCallState": "rs"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "_optional": "the car switched off: the HUD back to Cluster functions",
+      "VehicleCondition": "s"
+    },
+    "de.bmw.infotainment.misc.MDrive": {
+      "_optional": "the gearbox programme (D / S / M): shift grades and learning only from shifts made by hand",
+      "dataDisplayGearbox": "s"
+    },
+    "de.bmw.infrastructure.analytics.BasicDataSet": {
+      "_optional": "gearbox oil temperature on the HUD when the gearbox unit doesn't answer",
+      "basicDataSet": "s"
+    },
+    "de.bmw.infotainment.drivingexcitement.Efficiencytainment2": {
+      "_optional": "hybrid battery temperature on the HUD (plug-in hybrids); the car's power meter logged raw (scale learning)",
+      "statusBatteryTemperature": "rs",
+      "statusPowerRelativHybrid": "rs",
+      "statusChargeOfBatteryHybrid": "rs",
+      "displayPowerDrive": "s",
+      "displayPowerDrive2": "s"
+    },
+    "de.bmw.infotainment.drivingexcitement.Efficiencytainment": {
+      "_optional": "the car's recuperation display, logged raw (scale learning)",
+      "statusPowerRelativRecuperation": "rs"
+    },
+    "de.bmw.infotainment.resetlogic.ResetLogic": {
+      "_optional": "the car's own fuel use, logged raw (scale learning)",
+      "currentConsumption": "rs",
+      "averageConsumption": "rs"
+    },
+    "de.bmw.infotainment.KombiIF": {
+      "_optional": "the car's power distribution display, logged raw (scale learning)",
+      "statusDisplayElectricalPowerDistribution": "rs"
+    },
+    "de.bmw.infotainment.lsc.LSCDataSink": {
+      "_optional": "hybrid battery voltage on the HUD (plug-in hybrids)",
+      "statusHighVoltageStorage": "s"
+    },
+    "de.bmw.infotainment.vehicle.TPMS": {
+      "_optional": "tyre pressures, targets and temperatures on the HUD",
+      "statusTyrePressure": "rs",
+      "statusTargetTyrePressure": "rs",
+      "statusTyreTemperature": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "the car's pressure and temperature units for the tyres; else told from the values",
+      "statusNewCurrentUnitsStatusExt": "rs"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.navigation.guiding.Guidance": {
+      "_optional": "directions on the HUD (route state, BMW navigation's turns, lanes) and the navigation probe (redline-nav.log)",
+      "_instances": "Main_Instance",
+      "guidanceState": "rs",
+      "guidingProvider": "rs",
+      "conclusiveDart": "rs",
+      "currentLaneGuiding": "rs",
+      "nextIntersection": "rs"
+    },
+    "de.bmw.infotainment.navigation.guiding.GuidanceEventList": {
+      "_optional": "directions on the HUD: the phone's turns (CarPlay, Android Auto)",
+      "_instances": "Main_Instance",
+      "_methods": [
+        "queryContent"
+      ]
+    },
+    "de.bmw.infotainment.navigation.projectedmodeguiding.ProjectedModeGuiding": {
+      "_optional": "directions on the HUD: the phone's lanes",
+      "_instances": "Main_Instance",
+      "currentLaneGuiding": "rs"
+    },
+    "de.bmw.infotainment.a4a.carplay.CarPlayManager": {
+      "_optional": "directions on the HUD: whether CarPlay is guiding",
+      "_instances": "CarPlayManagerInst1",
+      "projectedGuidanceActive": "rs",
+      "projectedGuidanceMetadataAvailable": "rs"
+    },
+    "de.bmw.infotainment.sdi.aap.androidautoprojectedmanager.AndroidAutoProjectedManager": {
+      "_optional": "directions on the HUD: whether Android Auto is guiding",
+      "_instances": "AndroidAutoProjectedManagerInst1",
+      "projectedGuidanceActive": "rs",
+      "projectedGuidanceMetadataAvailable": "rs"
     }
   },
   "screens": [
@@ -26,6 +138,7 @@
       "title": "Redline",
       "buttons": [
         ["BTN_RESET", "Reset max"],
+        ["BTN_RESET_LEARNED", "Reset learned"],
         ["BTN_PAGE", "Next page"],
         ["BTN_PREV", "Previous page"],
         ["BTN_SETTINGS", "Settings"]
@@ -33,30 +146,95 @@
     }
   ],
   "settings": [
-    {"key": "redline", "label": "Redline", "type": "number", "unit": "rpm", "default": 7000,
-     "steps": [4500, 5000, 5500, 6000, 6500, 7000, 7200, 7500, 7800, 8000, 8500, 9000]},
-    {"key": "shiftBefore", "label": "Shift point before redline", "type": "number", "unit": "rpm", "default": 300,
-     "steps": [0, 100, 200, 300, 500, 800, 1000]},
-    {"key": "lights", "label": "Shift light style", "type": "choice", "default": "m",
-     "options": [["m", "M (green-yellow-red)"], ["f1", "Race (green-red-blue)"], ["mono", "Theme colour"]]},
-    {"key": "flash", "label": "Blink and flash at shift point", "type": "bool", "default": false, "reset": 1},
-    {"key": "coldGuard", "label": "Cold-engine rev guard", "type": "bool", "default": true},
-    {"key": "coldLimit", "label": "Cold rev limit", "type": "number", "unit": "rpm", "default": 4500,
-     "steps": [2500, 3000, 3500, 4000, 4500, 5000, 5500]},
-    {"key": "warmOil", "label": "Oil warm at", "type": "number", "unit": "°C", "default": 80,
-     "steps": [60, 70, 80, 90]},
-    {"key": "speedUnit", "label": "Units", "type": "choice", "default": "kmh",
-     "options": [["kmh", "km/h"], ["mph", "mph"]]},
-    {"key": "peakHold", "label": "Peak hold (0 = until reset)", "type": "number", "unit": "s", "default": 15,
-     "steps": [0, 5, 10, 15, 30, 60]},
-    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour",
-     "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]]},
-    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [5, 10, 15, 30, 60]},
-    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full",
-     "options": [["full", "Full screen"], ["standard", "Standard"]]},
-    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto",
-     "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]]},
-    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto",
-     "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]}
+    {"key": "hud", "label": "Show on HUD (experimental)", "type": "choice", "default": "off", "options": [["off", "Off"], ["on", "On"], ["test", "Test pattern"]]},
+    {"key": "hudStyle", "label": "HUD layout", "type": "choice", "default": "standard", "when": {"hud": ["on", "test"]}, "options": [["standard", "Standard"], ["minimal", "Minimal (lights and gear)"], ["wings", "Split wings"], ["digital", "80s digital dash"], ["vfd", "VFD glow (teal)"], ["vector", "Vector arcade (outlines)"], ["arc", "Arc (after the F80 / F82 M3 and M4)"], ["ramp", "Ramp (after the G80 / G82 M3 and M4)"], ["dial", "Dial (after the E60 M5)"], ["pill", "Pill (a sim-racing telemetry look)"]]},
+    {"key": "hudComfortMode", "label": "In Comfort / Eco Pro", "type": "choice", "default": "hide", "reset": 1, "when": {"hud": ["on", "test"]}, "options": [["same", "Same HUD as Sport"], ["own", "Its own HUD (set up on HUD looks)"], ["hide", "Don't show (BMW's own HUD)"]]},
+    {"key": "hudComfortSetup", "label": "Comfort HUD setup", "type": "object", "default": {}, "hidden": true},
+    {"key": "hudHybridMode", "label": "In Hybrid / Electric", "type": "choice", "default": "same", "when": {"hud": ["on", "test"], "hudHybridSeen": [true]}, "options": [["same", "Same HUD as Sport"], ["own", "Its own HUD (set up on HUD looks)"], ["hide", "Don't show (BMW's own HUD)"]]},
+    {"key": "hudHybridSetup", "label": "Hybrid HUD setup", "type": "object", "default": {}, "hidden": true},
+    {"key": "hudNav", "label": "Directions on the HUD (experimental)", "type": "choice", "default": "route", "when": {"hud": ["on", "test"]}, "options": [["route", "While a route runs"], ["near", "Near turns (under 1 km, and lanes)"], ["off", "Off"]]},
+    {"key": "hudNavX", "label": "Directions left / right", "type": "number", "unit": "px", "default": 0, "labels": {"0": "Bottom right corner"}, "when": {"hud": ["on", "test"], "hudNav": ["route", "near"], "advanced": [true]}, "steps": [-240, -200, -160, -120, -80, -40, -20, 0, 20], "group": "Advanced"},
+    {"key": "hudNavY", "label": "Directions up / down", "type": "number", "unit": "px", "default": 0, "labels": {"0": "Bottom right corner"}, "when": {"hud": ["on", "test"], "hudNav": ["route", "near"], "advanced": [true]}, "steps": [-120, -80, -40, -20, -10, 0, 10, 20], "group": "Advanced"},
+    {"key": "hudAll", "label": "All HUD options here (else on the HUD looks page)", "type": "bool", "default": false, "when": {"hud": ["on", "test"]}},
+    {"key": "shiftMode", "label": "Shift point", "type": "choice", "default": "learned", "options": [["learned", "Per gear, learned (experimental)"], ["fixed", "Redline minus the setting below"]], "group": "Shift point"},
+    {"key": "minShift", "label": "Minimum shift point", "type": "number", "unit": "rpm", "default": 0, "labels": {"0": "None"}, "steps": [0, 4000, 4500, 5000, 5500, 5800, 6000, 6200, 6500], "group": "Shift point"},
+    {"key": "shiftBefore", "label": "Shift point before redline", "type": "number", "unit": "rpm", "default": 300, "steps": [0, 100, 200, 300, 500, 800, 1000], "group": "Shift point"},
+    {"key": "hudLead", "label": "Shift lights early by (reaction time, experimental)", "type": "number", "unit": "ms", "default": -1, "reset": 1, "labels": {"-1": "Auto (learns from your shifts)"}, "steps": [-1, 0, 100, 150, 200, 250, 300, 400], "group": "Shift point"},
+    {"key": "lights", "label": "Light colours", "type": "choice", "default": "m", "options": [["m", "M (green-yellow-red)"], ["f1", "Race (green-red-blue)"], ["mono", "Theme colour"]], "group": "Shift point"},
+    {"key": "lightMode", "label": "Shift lights", "type": "choice", "default": "shift", "options": [["shift", "Shift point"], ["rev", "Rev bar"]], "group": "Shift point"},
+    {"key": "lightStart", "label": "From", "type": "number", "unit": "rpm", "default": 4000, "steps": [2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000], "when": {"lightMode": ["rev"]}, "group": "Shift point"},
+    {"key": "flash", "label": "Blink and flash at shift point", "type": "bool", "default": false, "reset": 1, "group": "Shift point"},
+    {"key": "downCue", "label": "Downshift arrows (experimental)", "type": "choice", "default": "slowing", "options": [["slowing", "While slowing down"], ["always", "Always"], ["off", "Off"]], "group": "Shift point"},
+    {"key": "downTarget", "label": "Arrows show", "type": "choice", "default": "all", "when": {"downCue": ["slowing", "always"]}, "options": [["all", "Every gear you can drop"], ["best", "Best gear (into the power band)"]], "group": "Shift point"},
+    {"key": "engine", "label": "Engine", "type": "choice", "default": "auto", "options": [["auto", "Auto (from the car)"], ["diesel", "Diesel"], ["petrol", "Petrol"]], "group": "Engine"},
+    {"key": "redline", "label": "Redline", "type": "number", "unit": "rpm", "default": 0, "labels": {"0": "Auto"}, "reset": 1, "steps": [0, 4000, 4500, 5000, 5500, 5800, 6000, 6200, 6500, 6800, 7000, 7200, 7500, 7800, 8000, 8500, 9000], "group": "Engine"},
+    {"key": "rpmScale", "label": "Rev scale up to", "type": "number", "unit": "rpm", "default": 0, "labels": {"0": "Auto"}, "steps": [0, 5000, 6000, 7000, 8000, 9000, 10000], "group": "Engine"},
+    {"key": "coldGuard", "label": "Cold-engine rev guard", "type": "bool", "default": true, "group": "Engine"},
+    {"key": "coldLimit", "label": "Cold rev limit", "type": "number", "unit": "rpm", "default": 0, "labels": {"0": "Auto"}, "reset": 1, "steps": [0, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500], "group": "Engine"},
+    {"key": "warmOil", "label": "Oil warm at", "type": "number", "unit": "°C", "default": 80, "labels": {"60": "60 °C (140 °F)", "70": "70 °C (158 °F)", "80": "80 °C (176 °F)", "90": "90 °C (194 °F)"}, "steps": [60, 70, 80, 90], "group": "Engine"},
+    {"key": "peakHold", "label": "Peak hold (0 = until reset)", "type": "number", "unit": "s", "default": 15, "steps": [0, 5, 10, 15, 30, 60], "group": "Engine"},
+    {"key": "learn", "label": "Learn from driving (redline, shift points, reaction time)", "type": "bool", "default": true, "group": "Learning (experimental)"},
+    {"key": "learnRedline", "label": "Learn redline from the limiter", "type": "bool", "default": true, "when": {"learn": true}, "group": "Learning (experimental)"},
+    {"key": "speedUnit", "label": "Speed unit", "type": "choice", "default": "kmh", "options": [["kmh", "km/h"], ["mph", "mph"]], "group": "Units"},
+    {"key": "hudTempUnit", "label": "Temperature unit", "type": "choice", "default": "c", "options": [["c", "°C"], ["f", "°F"]], "group": "Units"},
+    {"key": "hudTorqueUnit", "label": "Torque unit", "type": "choice", "default": "nm", "options": [["nm", "Nm"], ["lbft", "lb-ft"], ["kgm", "kgm"]], "group": "Units"},
+    {"key": "hudPowerUnit", "label": "Power unit", "type": "choice", "default": "hp", "options": [["hp", "hp"], ["ps", "PS"], ["kw", "kW"]], "group": "Units"},
+    {"key": "hudBoostUnit", "label": "Boost unit", "type": "choice", "default": "bar", "options": [["bar", "bar"], ["psi", "psi"], ["kpa", "kPa"]], "group": "Units"},
+    {"key": "hudFuelUnit", "label": "Fuel use unit", "type": "choice", "default": "l100", "options": [["l100", "l/100 km"], ["mpguk", "mpg (UK)"], ["mpgus", "mpg (US)"], ["kml", "km/l"]], "group": "Units"},
+    {"key": "hudTyreUnit", "label": "Tyre pressure unit", "type": "choice", "default": "bar", "options": [["bar", "bar"], ["psi", "psi"], ["kpa", "kPa"]], "when": {"hudTyresSeen": [true]}, "group": "Units"},
+    {"key": "hudPalette", "label": "HUD colours", "type": "choice", "default": "colour", "when": {"hud": ["on", "test"], "hudStyle": ["standard", "minimal", "wings", "digital", "vector", "pill"], "hudAll": [true]}, "options": [["colour", "Colour"], ["amber", "Night amber"], ["ice", "Ice white"]], "group": "HUD: look"},
+    {"key": "hudGearFont", "label": "Gear font", "type": "choice", "default": "auto", "when": {"hud": ["on", "test"], "hudStyle": ["standard", "minimal", "wings", "arc", "ramp", "dial", "pill"], "hudAll": [true]}, "options": [["auto", "Auto (Barlow on Arc and Dial, squared on Ramp)"], ["ubuntu", "Ubuntu"], ["barlow", "Barlow"]], "group": "HUD: look"},
+    {"key": "hudLabels", "label": "Readout labels", "type": "choice", "default": "normal", "when": {"hud": ["on", "test"], "hudAll": [true]}, "options": [["normal", "Normal"], ["clear", "Clearer (bigger, brighter)"]], "group": "HUD: look"},
+    {"key": "hudRpmFormat", "label": "RPM shows as", "type": "choice", "default": "10", "when": {"hud": ["on", "test"], "hudAll": [true]}, "options": [["10", "Exact (to 10 rpm)"], ["50", "Steady (to 50 rpm)"], ["k", "Thousands (4.5)"]], "group": "HUD: look"},
+    {"key": "hudUnlit", "label": "Unlit segments", "type": "choice", "default": "dim", "when": {"hud": ["on", "test"], "hudStyle": ["standard", "minimal", "wings", "digital", "vector", "arc", "ramp", "dial", "pill"], "hudAll": [true]}, "options": [["dim", "Dim"], ["hidden", "Hidden"]], "group": "HUD: look"},
+    {"key": "hudLightStyle", "label": "Light fill", "type": "choice", "default": "gt3", "when": {"hud": ["on", "test"], "hudAll": [true]}, "options": [["gt3", "GT3 (outside in, flash)"], ["bar", "Left to right"], ["off", "Off"]], "group": "HUD: gauge"},
+    {"key": "hudShowBar", "label": "Rev bar", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: gauge"},
+    {"key": "hudShowGear", "label": "Gear", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: gauge"},
+    {"key": "hudShowMode", "label": "Gearbox mode (D / S / M)", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: gauge"},
+    {"key": "hudShowSpeed", "label": "Speed (km/h or mph, as Speed unit; on Ramp under the gear)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowRpm", "label": "RPM", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudBoost", "label": "Boost", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowTorque", "label": "Torque", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowPower", "label": "Power (from torque and rpm)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowG", "label": "G-force (sideways and braking / accelerating together)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowKnock", "label": "Knock retard (degrees, only while it retards)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowFuel", "label": "Fuel use (from the engine unit, experimental)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowOil", "label": "Oil", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowWater", "label": "Water", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowGearbox", "label": "Gearbox", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowOutside", "label": "Outside (blue at 3 °C / 37 °F and below)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowTyres", "label": "Tyres (the four pressures, coloured against their targets)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true], "hudTyresSeen": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowLimit", "label": "Cold-engine shift limit", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudTempsMode", "label": "Temperatures shown", "type": "choice", "default": "smart", "when": {"hud": ["on", "test"], "hudAll": [true]}, "options": [["smart", "Only when cold or hot"], ["always", "Always"]], "group": "HUD: readouts"},
+    {"key": "hudShowBattSoc", "label": "12 V battery charge (%)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowBattVolt", "label": "12 V battery voltage", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowHvSoc", "label": "Hybrid battery charge (%)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true], "hudHybridSeen": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowHvPower", "label": "Hybrid battery power (kW, + drive, - regen)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true], "hudHybridSeen": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowHvBar", "label": "Recovery / power bar (regen left, drive right)", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true], "hudHybridSeen": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowHvTemp", "label": "Hybrid battery temperature", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true], "hudHybridSeen": [true]}, "group": "HUD: readouts"},
+    {"key": "hudShowHvVolt", "label": "Hybrid battery voltage", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true], "hudHybridSeen": [true]}, "group": "HUD: readouts"},
+    {"key": "hudHybridSeen", "label": "This car has a hybrid battery (found by the app)", "type": "bool", "default": false, "reset": 1, "hidden": true},
+    {"key": "hudChip", "label": "Shift grade after each upshift", "type": "choice", "default": "burst", "when": {"hud": ["on", "test"], "hudAll": [true]}, "aliases": {"true": "burst", "false": "off"}, "options": [["burst", "Burst (pops, ring)"], ["simple", "Simple"], ["off", "Off"]], "group": "HUD: alerts"},
+    {"key": "hudKnockWarn", "label": "Knock warning (KNOCK when the engine pulls timing, experimental)", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: alerts"},
+    {"key": "hudLaunch", "label": "Launch time (0-100 km/h or 0-60 mph after a standing start, against your best)", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: alerts"},
+    {"key": "hudPeak", "label": "Peak marker", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: alerts"},
+    {"key": "hudShake", "label": "Shake on the limiter", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true]}, "group": "HUD: alerts"},
+    {"key": "hudTyreWidget", "label": "Tyre widget (in the directions' corner; the directions come first)", "type": "choice", "default": "low", "when": {"hud": ["on", "test"], "hudAll": [true], "hudTyresSeen": [true]}, "options": [["low", "When a tyre is low"], ["warm", "Low or warming up"], ["always", "Always"], ["off", "Off"]], "group": "HUD: tyres"},
+    {"key": "hudTyreCar", "label": "Tyre widget: the car", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true], "hudTyresSeen": [true]}, "group": "HUD: tyres"},
+    {"key": "hudTyreTarget", "label": "Tyre widget: each tyre's target", "type": "bool", "default": false, "when": {"hud": ["on", "test"], "hudAll": [true], "hudTyresSeen": [true]}, "group": "HUD: tyres"},
+    {"key": "hudTyreTemp", "label": "Tyre widget: tyre temperatures", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "hudAll": [true], "hudTyresSeen": [true]}, "group": "HUD: tyres"},
+    {"key": "hudTyresSeen", "label": "This car sends tyre pressures (found by the app)", "type": "bool", "default": false, "hidden": true},
+    {"key": "hudSize", "label": "Size", "type": "number", "unit": "%", "default": 100, "when": {"hud": ["on", "test"], "hudAll": [true]}, "steps": [40, 50, 60, 70, 80, 90, 100, 110, 120, 130], "group": "HUD: place"},
+    {"key": "hudX", "label": "Position left / right", "type": "number", "unit": "px", "default": 0, "labels": {"0": "Centre"}, "when": {"hud": ["on", "test"], "hudAll": [true]}, "steps": [-120, -100, -80, -60, -40, -20, 0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280], "group": "HUD: place"},
+    {"key": "hudY", "label": "Position up / down", "type": "number", "unit": "px", "default": 0, "labels": {"0": "Default"}, "when": {"hud": ["on", "test"], "hudAll": [true]}, "steps": [-120, -100, -80, -60, -50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 80, 100, 120, 140, 160, 180, 200, 220], "group": "HUD: place"},
+    {"key": "theme", "label": "Colour theme", "type": "choice", "default": "m_tricolour", "options": [["m_red", "M Red"], ["m_tricolour", "M Tricolour"], ["ice", "Ice White"], ["amber", "Night Amber"]], "group": "Screen"},
+    {"key": "layout", "label": "Screen layout", "type": "choice", "default": "full", "options": [["full", "Full screen"], ["standard", "Standard"]], "group": "Screen"},
+    {"key": "demo", "label": "Demo data", "type": "choice", "default": "auto", "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]], "group": "Screen"},
+    {"key": "advanced", "label": "Advanced settings", "type": "bool", "default": false},
+    {"key": "renderer", "label": "Renderer", "type": "choice", "default": "auto", "options": [["auto", "GPU 60 fps (default)"], ["software", "Software"]], "group": "Advanced", "when": {"advanced": [true]}},
+    {"key": "speedRate", "label": "Speed display rate", "type": "number", "unit": "fps", "default": 10, "reset": 1, "markDefault": true, "steps": [5, 10, 15, 30, 60], "when": {"advanced": [true]}, "group": "Advanced"},
+    {"key": "hudFps", "label": "HUD frame rate", "type": "number", "unit": "fps", "default": 20, "when": {"hud": ["on", "test"], "advanced": [true]}, "steps": [10, 20, 30], "group": "Advanced"},
+    {"key": "hudReadoutRate", "label": "HUD readouts refresh (faster: more work for the head unit)", "type": "number", "unit": "/s", "default": 4, "when": {"hud": ["on", "test"], "advanced": [true]}, "steps": [4, 10, 20], "group": "Advanced"},
+    {"key": "hudHandBack", "label": "Give the HUD back to Cluster functions at switch-off", "type": "bool", "default": true, "when": {"hud": ["on", "test"], "advanced": [true]}, "group": "Advanced"}
   ]
 }

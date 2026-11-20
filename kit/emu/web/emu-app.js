@@ -39,7 +39,7 @@ try { gfxMod = await import('./gfx/mgu-gfx.js'); await newGfx(null); } catch (e)
 /* ---------------- WebSocket ---------------- */
 let ws = null;
 const send = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
-const S = { app: null, spec: null, values: {}, stack: [], closed: false, status: 'connecting', conn: { on: false }, focus: null, sig: null, srv: {} };
+const S = { app: null, spec: null, values: {}, stack: [], closed: false, status: 'connecting', conn: { on: false }, focus: null, sig: null };
 // what arrived from the app (for the stats and "renderer not built")
 const rx = { frames: 0, msgs: 0, bytes: 0, types: {}, sawFrame: false, feedErr: null };
 const NAMES = { 1: 'HELLO', 2: 'PLACE', 3: 'SHOW', 4: 'ATLAS', 5: 'RAMP', 6: 'LAYER', 7: 'FRAME', 8: 'DROP_LAYER', 9: 'IMAGE/CLAIM', 10: 'GRAB/IMAGE', 11: 'DROP_IMAGE', 12: 'FPS', 13: 'VIDEO', 14: 'DROP_VIDEO',
@@ -60,16 +60,19 @@ function connect() {
 
 function onBinary(u8) {
   const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let show = false;
   for (let o = 0; o + 8 <= u8.length;) {
     const t = dv.getUint32(o, true), len = dv.getUint32(o + 4, true);
     rx.types[t] = (rx.types[t] || 0) + 1; rx.msgs++;
     if (t === 7) { rx.frames++; rx.sawFrame = true; }
+    if (t === 3) show = true;
     o += 8 + len;
   }
   rx.bytes += u8.length;
   if (!gfx) return;
   let r = 0;
   try { r = gfx.feed(u8); } catch (e) { r = -1; rx.feedErr = e; }
+  if (r === 1) { const ms = gfx.stats().lastMs; draws.n++; draws.sum += ms; if (ms > draws.max) draws.max = ms; }
   if (r < 0 && gfx.stats().lost) return;      // (onLost makes a new renderer)
   // a malformed message: the car's daemon ends the connection ("bad message"); the app reconnects
   if (r < 0 && !rx.dropped) {
@@ -78,6 +81,8 @@ function onBinary(u8) {
     addLog([['error', 'renderer: client dropped: ' + why]]);
     send({ t: 'drop', why });
   }
+  // the surface shown or hidden (SHOW, or the first frame after it): the menu hint may come or go, painted or not
+  if (show || (r === 1 && !$('#overlay').hidden)) overlay();
 }
 
 function onText(m) {
@@ -105,7 +110,6 @@ function onText(m) {
   case 'focus': S.focus = m.id; renderHmi(); break;
   case 'soft': { const s = $('#soft'); if (m.png) { s.src = 'data:image/png;base64,' + m.png; s.hidden = false; } else { s.hidden = true; s.removeAttribute('src'); } break; }
   case 'sigmode': S.sig = m; syncSignals(); break;
-  case 'stats': S.srv = m; break;
   case 'touchmode': $('#touchroute').checked = !!m.on; break;
   case 'note': toast(m.s, true); break;
   default: break;
@@ -114,33 +118,37 @@ function onText(m) {
 }
 
 /* ---------------- frames: tick after each drawn one, stats ---------------- */
-let shown = 0, lastStat = performance.now(), maxMs = 0, statFrames = 0;
+// every figure in the panel is this page's, over one window (about a second): frames shown, what came in, the draws
+let shown = 0, lastStat = performance.now(), rx0 = { frames: 0, msgs: 0, bytes: 0 };
+// each draw (gfx.feed draws on arrival, between two refreshes too): the CPU time of its draw calls, not the GPU's
+const draws = { n: 0, sum: 0, max: 0 };
 function raf(now) {
   // the frames received were drawn on arrival (gfx.feed); this refresh shows them: the app may send the next
   if (rx.sawFrame) { rx.sawFrame = false; shown++; send({ t: 'tick' }); }
-  let st = null;
-  try { st = gfx ? gfx.stats() : null; } catch (e) { /* destroyed */ }
-  if (st && st.lastMs > maxMs) maxMs = st.lastMs;
   if (now - lastStat >= 1000) {
+    let st = null;
+    try { st = gfx ? gfx.stats() : null; } catch (e) { /* destroyed */ }
     if (st) {
       // errors the car's renderer sends the app (ERROR): logged here and passed on
       if (st.errors.count > errSeen) st.errors.last.slice(0, Math.min(4, st.errors.count - errSeen)).reverse().forEach((s) => { addLog([['warn', 'renderer error: ' + s]]); send({ t: 'rerror', s }); });
       errSeen = st.errors.count;
       if (st.atlasFull && !pending) renew('glyph atlas full');
     }
-    const dt = (now - lastStat) / 1000, fps = Math.round(shown / dt);
-    if (st) send({ t: 'gstats', fps, avgMs: st.avgMs || 0, maxMs });
-    const c = S.conn, srv = S.srv;
-    $('#rstats').textContent = `${fps} fps  ` + (st ? `gfx ${fmt(st.avgMs)} ms avg, ${fmt(maxMs)} max` : 'renderer not built') +
-      `\n${srv.ticks || 0} ticks/s  ${srv.msgs || 0} msgs/s  ${kb(srv.bytes || 0)}/s`;
+    const dt = (now - lastStat) / 1000, per = (x) => Math.round(x / dt), fps = per(shown);
+    const avg = draws.n ? draws.sum / draws.n : null, max = draws.n ? draws.max : null;
+    if (st) send({ t: 'gstats', fps, avgMs: avg || 0, maxMs: max || 0 });
+    const c = S.conn;
+    // (not cross-origin isolated, e.g. another host's page: performance.now() in 0.1 ms steps)
+    $('#rstats').textContent = `${fps} fps  ` + (st ? `draw (CPU${self.crossOriginIsolated ? '' : ', 0.1 ms steps'}) ${fmt(avg)} ms avg, ${fmt(max)} max` : 'renderer not built') +
+      `\n${per(rx.frames - rx0.frames)} frames/s  ${per(rx.msgs - rx0.msgs)} msgs/s  ${kb((rx.bytes - rx0.bytes) / dt)}/s`;
     $('#rconn').textContent = c.on ? `${c.app} · ${c.dialect}${c.shown ? ' · shown' : ' · hidden'}${c.grab ? ' · controller held' : ''}${c.claims ? ' · ' + c.claims + ' claims' : ''}${c.fps ? ' · app cap ' + c.fps : ''}` +
       (c.place ? `\nplace ${c.place.x},${c.place.y} ${c.place.w}x${c.place.h} ×${(+c.place.s).toFixed(3)}` : '') : 'no app connected';
-    shown = 0; maxMs = 0; lastStat = now; statFrames = rx.frames;
+    shown = 0; draws.n = draws.sum = draws.max = 0; lastStat = now; rx0 = { frames: rx.frames, msgs: rx.msgs, bytes: rx.bytes };
     overlay();
   }
   requestAnimationFrame(raf);
 }
-const fmt = (x) => (x == null ? '-' : (+x).toFixed(2));
+const fmt = (x) => (x == null ? '-' : (+x).toFixed(3));
 const kb = (b) => (b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.round(b / 1e3) + ' kB');
 
 /* ---------------- what covers the screen ---------------- */
@@ -154,6 +162,11 @@ function overlay() {
     const top = Object.entries(rx.types).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, n]) => `${NAMES[t] || t} ${n}`).join(' · ');
     html = '<div>Renderer not built</div><div class="mono">kit/emu/web/gfx/mgu-gfx.js: ' + esc(gfxErr ? String(gfxErr.message || gfxErr).slice(0, 140) : '') +
       '</div><div class="mono">received ' + rx.msgs + ' messages, ' + rx.frames + ' frames, ' + kb(rx.bytes) + (top ? '<br>' + top : '') + '</div>';
+  } else if (menuOnly()) {
+    // an HMI-native screen (a menu): the HMI draws it on the car, the emulator does not
+    const m = topScreen(), btns = (m.items || []).filter((i) => i[0] === 'button').map((i) => i[2] || i[1]);
+    html = '<div>' + esc(m.title || m.name) + ': the HMI\'s own menu screen, not drawn here</div><div class="mono">use the buttons under HMI in the panel' +
+      (btns.length ? ': ' + esc(btns.join(' · ')) : '') + '</div>';
   }
   o.hidden = html === null;
   if (html !== null && o.dataset.html !== html) {
@@ -161,6 +174,14 @@ function overlay() {
     const b = $('#reopen');
     if (b) b.onclick = () => send({ t: 'hmi', a: 'open' });
   }
+}
+/** the shown screen (the top of the app's stack) from the app's spec */
+const topScreen = () => ((S.spec && S.spec.screens) || []).find((s) => s.name === S.stack[S.stack.length - 1]);
+/** a menu screen on top and no surface of the app's shown (#soft, the HMI's image of a canvas screen, is not the menu) */
+function menuOnly() {
+  const m = topScreen();
+  if (!m || m.kind !== 'menu') return false;
+  try { return !gfx.stats().visible; } catch (e) { return false; }
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -288,7 +309,7 @@ function renderHmi() {
   const screens = (S.spec && S.spec.screens) || [];
   $('#screens').replaceChildren(...(screens.length > 1 ? screens.map((s) => el('button', { textContent: 'Open ' + s.name, title: s.kind, on: { click: () => send({ t: 'hmi', a: 'open', screen: s.name }) } })) : []));
   // the shown screen's HMI buttons (the bar of a canvas screen, a menu's entries): pressed as the HMI would
-  const top = screens.find((s) => s.name === S.stack[S.stack.length - 1]);
+  const top = topScreen();
   const btns = !top ? [] : top.kind === 'canvas' ? (top.buttons || []).map((b) => [b[0], b[1]]) : (top.items || []).filter((i) => i[0] === 'button').map((i) => [i[1], i[2]]);
   $('#hmibtns').replaceChildren(...btns.map(([id, label]) => el('button', { textContent: label || id, title: id, className: id === S.focus ? 'focus' : '', on: { click: () => send({ t: 'click', id }) } })));
 }

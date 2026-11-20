@@ -1,0 +1,14 @@
+<!-- accent: #4aa3ff -->
+<defs><linearGradient id="c3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdfefe"/><stop offset="0.28" stop-color="#cfd6dd"/><stop offset="0.52" stop-color="#6f7984"/><stop offset="0.74" stop-color="#e9edf0"/><stop offset="1" stop-color="#8a949e"/></linearGradient><clipPath id="lens3"><circle cx="58" cy="58" r="33"/></clipPath><linearGradient id="t4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdfefe"/><stop offset="0.3" stop-color="#cfd6dd"/><stop offset="0.55" stop-color="#6f7984"/><stop offset="0.78" stop-color="#e9edf0"/><stop offset="1" stop-color="#8a949e"/></linearGradient></defs>
+<g transform="translate(10 1) scale(0.80)">
+<line x1="86" y1="86" x2="120" y2="120" stroke="#1f252b" stroke-width="19" stroke-linecap="round" stroke-opacity="0.7"/>
+<line x1="86" y1="86" x2="120" y2="120" stroke="url(#c3)" stroke-width="14" stroke-linecap="round"/>
+<circle cx="58" cy="58" r="38" fill="#0b1626" stroke="#1f252b" stroke-width="12" stroke-opacity="0.7"/>
+<circle cx="58" cy="58" r="38" fill="#0b1626" stroke="url(#c3)" stroke-width="9"/>
+<g clip-path="url(#lens3)"><path d="M20 82 L100 38" stroke="#3a4a60" stroke-width="6" fill="none"/><path d="M40 20 L66 100" stroke="#3a4a60" stroke-width="6" fill="none"/><path d="M84 22 L74 100" stroke="#33445a" stroke-width="5" fill="none"/>
+<path d="M60 100 L62 74 L80 60 L100 52" stroke="#4aa3ff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="30" y="28" width="56" height="17" rx="5" fill="#2b6b3f"/><rect x="39" y="35" width="38" height="4.5" rx="2" fill="#fff" opacity="0.85"/></g>
+<circle cx="62" cy="76" r="6.5" fill="#fff"/><circle cx="62" cy="76" r="4" fill="#4aa3ff"/>
+<path d="M30 46 A32 32 0 0 1 52 28" stroke="#fff" stroke-opacity="0.45" stroke-width="4" fill="none" stroke-linecap="round"/>
+</g>
+<text x="60" y="126" font-family="Helvetica Neue, Arial, sans-serif" font-weight="800" text-anchor="middle" font-size="30" letter-spacing="0.5" fill="url(#t4)" stroke="#1f252b" stroke-width="2" stroke-opacity="0.7" paint-order="stroke">AA</text>

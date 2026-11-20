@@ -1,0 +1,12 @@
+{
+  "DSC control unit: internal, valve actuation of terminal 31": "Блок управления DSC: внутренняя неисправность, активизация клапана, соединение с массой (клемма 31)",
+  "High-voltage battery unit: Insufficient battery condition": "Блок высоковольтной батареи: недостаточное состояние батареи",
+  "EGS, PT-CAN2: fault in communication": "EGS, PT-CAN2: ошибка связи",
+  "High-voltage system": "Высоковольтная система",
+  "Charging not possible": "Зарядка невозможна",
+  "Brake system": "Тормозная система",
+  "Steering malfunction": "Неисправность рулевого управления",
+  "Air conditioning restricted": "Кондиционер ограничен",
+  "Transmission": "Коробка передач",
+  "Low washer fluid": "Низкий уровень омывающей жидкости"
+}

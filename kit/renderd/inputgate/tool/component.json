@@ -1,0 +1,23 @@
+{
+  "id": "mgu-inputgate",
+  "kind": "tool",
+  "version": "1.2.1",
+  "title": "Controller gate",
+  "description": "Lets the apps have the iDrive controller (tabs, page buttons, settings, Doom); loads into the HMI at the next start (iDrive 7 and iDrive 8)",
+  "mguHmi": ["ID7", "ID8"],
+  "files": [
+    { "path": "mgu-inputgate.so", "mode": "0755" },
+    { "path": "guard.sh", "mode": "0755" }
+  ],
+  "units": [
+    { "name": "mgu-inputgate-guard.service" },
+    { "name": "mgu-inputgate-check.service" }
+  ],
+  "dropins": [
+    { "unit": "hmi.service", "name": "zz-mgu-inputgate.conf" },
+    { "unit": "hmi8.service", "name": "zz-mgu-inputgate.conf" }
+  ],
+  "enable": [],
+  "recmgr": [],
+  "restart": []
+}

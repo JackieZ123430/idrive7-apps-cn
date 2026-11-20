@@ -38,7 +38,7 @@ static GLuint atlas_tex, ramp_tex;
 #define RAMP_W 256
 #define RAMP_H 256
 static int atlas_shelf_x[2], atlas_shelf_y[2];          /* two 1024-wide columns, filled top-down */
-static int ramp_rows;
+static uint8_t ramp_used[RAMP_H];                        /* rows an app's ramp holds (freed with the app's resources) */
 static char err[256];
 
 static vert *vb; static size_t nv, cap;                  /* current batch */
@@ -210,23 +210,29 @@ int gfx_atlas(gfx_client *c, uint32_t id, int w, int h, const uint8_t *alpha) {
 }
 
 int gfx_ramp(gfx_client *c, uint32_t id, int n, const uint32_t *cols) {
-    int row = -1;
+    int row = -1, fresh = 0;
     for (int i = 0; i < c->nramp; i++) if (c->ramp[i].id == id) row = c->ramp[i].row;
     if (row < 0) {
-        if (c->nramp >= 64) { snprintf(err, sizeof err, "too many ramps"); return -1; }
-        row = ramp_rows++ % RAMP_H;                     /* rows wrap: old clients' ramps get reused */
+        if (c->nramp >= 64) { snprintf(err, sizeof err, "ramp %u: an app has at most 64 ramps", id); return -1; }
+        for (int r = 0; r < RAMP_H && row < 0; r++) if (!ramp_used[r]) row = r;
+        if (row < 0) { snprintf(err, sizeof err, "ramp %u: all apps' ramps use the %d rows already", id, RAMP_H); return -1; }
+        ramp_used[row] = 1; fresh = 1;
         c->ramp[c->nramp].id = id; c->ramp[c->nramp].row = row; c->nramp++;
     }
-    if (n < 1) return 0;
     uint8_t px[RAMP_W * 4];
-    for (int i = 0; i < RAMP_W; i++) {
-        float f = n == 1 ? 0 : (i / (float)(RAMP_W - 1)) * (n - 1);
-        int a = (int)f; if (a > n - 2) a = n - 2; if (a < 0) a = 0;
-        float t = n == 1 ? 0 : f - a;
-        uint32_t c0 = cols[a], c1 = cols[n == 1 ? 0 : a + 1];
-        for (int k = 0; k < 4; k++) {
-            float v0 = (c0 >> (24 - 8 * k)) & 255, v1 = (c1 >> (24 - 8 * k)) & 255;
-            px[i * 4 + k] = (uint8_t)lrintf(v0 + (v1 - v0) * t);
+    if (n < 1) {
+        if (!fresh) return 0;
+        memset(px, 0, sizeof px);                       /* not the colours of the app that had the row before */
+    } else {
+        for (int i = 0; i < RAMP_W; i++) {
+            float f = n == 1 ? 0 : (i / (float)(RAMP_W - 1)) * (n - 1);
+            int a = (int)f; if (a > n - 2) a = n - 2; if (a < 0) a = 0;
+            float t = n == 1 ? 0 : f - a;
+            uint32_t c0 = cols[a], c1 = cols[n == 1 ? 0 : a + 1];
+            for (int k = 0; k < 4; k++) {
+                float v0 = (c0 >> (24 - 8 * k)) & 255, v1 = (c1 >> (24 - 8 * k)) & 255;
+                px[i * 4 + k] = (uint8_t)lrintf(v0 + (v1 - v0) * t);
+            }
         }
     }
     glBindTexture(GL_TEXTURE_2D, ramp_tex);
@@ -563,6 +569,7 @@ void gfx_client_free(gfx_client *c) {
     while (c->layers) gfx_layer_drop(c, c->layers->id);
     while (c->images) gfx_image_drop(c, c->images->id);
     while (c->videos) gfx_video_drop(c, c->videos->id);
+    for (int i = 0; i < c->nramp; i++) ramp_used[c->ramp[i].row] = 0;
     c->natlas = c->nramp = 0;
 }
 

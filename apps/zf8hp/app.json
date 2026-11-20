@@ -2,10 +2,12 @@
   "id": "zf8hp",
   "title": "Transmission Config",
   "description": "Transmission Config, experimental ZF 8HP monitor: live data, clutch fill adaptations, shift maps and temperature history",
-  "version": "1.4.0",
+  "version": "1.5.8",
   "vendor": "custom",
   "loggingId": "OAA2",
   "iconGlyph": "8HP",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
@@ -125,19 +127,11 @@
     },
     {
       "key": "tempUnit",
-      "label": "Temperature",
+      "label": "Temperature unit",
       "type": "choice",
-      "default": "C",
-      "options": [
-        [
-          "C",
-          "Celsius"
-        ],
-        [
-          "F",
-          "Fahrenheit"
-        ]
-      ]
+      "default": "c",
+      "options": [["c", "Celsius"], ["f", "Fahrenheit"]],
+      "aliases": {"C": "c", "F": "f"}
     },
     {
       "key": "theme",
@@ -199,18 +193,9 @@
       "key": "demo",
       "label": "Demo data",
       "type": "choice",
-      "default": "off",
-      "reset": 1,
-      "options": [
-        [
-          "off",
-          "Never"
-        ],
-        [
-          "on",
-          "Always"
-        ]
-      ]
+      "default": "auto",
+      "reset": 2,
+      "options": [["auto", "Auto"], ["on", "Always"], ["off", "Never"]]
     }
   ],
   "config": {

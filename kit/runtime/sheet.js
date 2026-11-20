@@ -11,11 +11,15 @@
  *   top()       (optional) the controller is at the sheet's top: pushed up, it goes to the header's tabs
  *   title       the header's text
  *
- *   listSheet(settings)     the app's settings: a row per setting, a list of values to pick from
+ *   listSheet(settings)     the app's settings: a row per setting, a list of values to pick from; opts.extra: the
+ *                           app's own rows at the very bottom ({ label, value, open() -> a sheet shown in its place,
+ *                           its Back / 'close' back to the settings })
  *   cardSheet(spec)         a card: title, rows of label and value, action buttons
+ *   list(), pill()          the settings' scrolling rows and round buttons, for an app's own sheets
  */
 const { withAlpha } = require('./canvas');
 const G = require('./gauges');
+const { t: translate } = require('./i18n');
 
 const W = 1600, TOP = 46, BOTTOM = 512;
 const ROW_H = 66, GAP = 8;
@@ -38,7 +42,7 @@ function chevron(r, t, x, y, c) {
     r.line(x + 9, y, x, y + 9, 3, c);
 }
 function fit(r, s, size, w, font) {
-    s = String(s);
+    s = translate(String(s));
     if (r.textWidth(s, size, { font }) <= w) return s;
     while (s.length > 1 && r.textWidth(s + '...', size, { font }) > w) s = s.slice(0, -1);
     return s + '...';
@@ -95,74 +99,113 @@ function list(r, t, key, rows, focus, y0, controller) {
 list.scroll = {};
 
 /* ---------------- settings ---------------- */
-function values(s) {
+function values(s, settings) {
     if (s.type === 'choice') return (s.options || []).map((o) => [o[0], o[1]]);
-    if (s.type === 'number') return (s.steps || []).map((v) => [v, String(v) + (s.unit ? ' ' + s.unit : '') + (s.markDefault && v === s.default ? ' (default)' : '')]);
+    if (s.type === 'number') {
+        // a value's text in the unit chosen (mgu.js Settings.numberText: "labels", "unitBy")
+        const text = (v) => (settings && settings.numberText ? settings.numberText(s, v)
+            : s.labels && s.labels[String(v)] !== undefined ? s.labels[String(v)] : String(v) + (s.unit ? ' ' + s.unit : ''));
+        return (s.steps || []).map((v) => [v, text(v) + (s.markDefault && v === s.default ? ' (default)' : '')]);
+    }
     return null;
 }
 
-/** opts: { version } (the app's, shown at the settings' top) */
+/** opts: { version (the app's, shown at the settings' top), extra (() => the app's own rows at the bottom) } */
 function listSheet(settings, title, opts) {
     const version = opts && opts.version;
-    const schema = settings.schema.filter((s) => !s.hidden);
+    // the app's own rows after its settings (top level only): [{ label, value (text or () => text), open() }]
+    const extra = () => { try { return (opts && opts.extra && opts.extra()) || []; } catch (e) { return []; } };
+    const valueOf = (x) => (typeof x.value === 'function' ? x.value() : x.value);
+    // the settings offered now (settings.shown: "hidden", "when"); those with one "group" are one row that
+    // opens their own list ({ group, items })
+    const offered = () => (settings.shown ? settings.schema.filter((s) => settings.shown(s)) : settings.schema.filter((s) => !s.hidden));
+    const entries = (group) => {
+        const out = [];
+        offered().forEach((s) => {
+            if (group) { if (s.group === group) out.push(s); return; }
+            if (!s.group) { out.push(s); return; }
+            if (!out.some((e) => e.group === s.group)) out.push({ group: s.group, items: [] });
+        });
+        if (!group) extra().forEach((x) => out.push({ extra: x }));
+        return out;
+    };
     const sh = {
         title: title || 'Settings',
         focus: 0, open: null, sub: 0,        // open: the setting whose values are listed
+        group: null, gfocus: 0,              // group: the group whose settings are listed (focus kept in gfocus)
         controller: false,                  // the controller was used: show where it is
+        child: null,                         // an extra row's own sheet, shown in the settings' place
         rows() {
             if (this.open) {
                 const cur = settings.get(this.open.key);
-                return values(this.open).map((v) => ({ label: v[1], kind: 'radio', on: v[0] === cur }));
+                return values(this.open, settings).map((v) => ({ label: v[1], kind: 'radio', on: v[0] === cur }));
             }
-            return schema.map((s) => (s.type === 'bool'
-                ? { label: s.label, kind: 'toggle', on: !!settings.get(s.key) }
-                : { label: s.label, value: settings.display(s.key), kind: values(s) ? 'more' : null }));
+            return entries(this.group).map((s) => (s.extra ? { label: s.extra.label, value: valueOf(s.extra), kind: 'more' }
+                : s.group && !s.key ? { label: s.group, kind: 'more' }
+                : s.type === 'bool' ? { label: s.label, kind: 'toggle', on: !!settings.get(s.key) }
+                    : { label: s.label, value: settings.display(s.key), kind: values(s) ? 'more' : null }));
         },
         draw(r, t) {
+            // (its taps through fromChild too, so its Back / 'close' comes back here)
+            // (a child that fails to draw is dropped, and the error goes to display.js's log: the settings come
+            // back on the next frame rather than a blank sheet)
+            if (this.child) {
+                try { return (this.child.draw(r, t) || []).map((q) => Object.assign({}, q, { act: () => this.fromChild(q.act && q.act()) })); } catch (e) { this.child = null; throw e; }
+            }
             r.clear(t.bg);
             const rows = this.rows();
+            // a switch that hid settings below the focus ("when"): the focus stays on the list
+            if (!this.open) this.focus = Math.min(this.focus, rows.length - 1);
             // the header's tab names the sheet; a value list names its setting here
-            if (this.open) r.text(this.open.label, 44, TOP + 40, 32, t.text, { font: 'bold' });
+            if (this.open || this.group) r.text(this.open ? this.open.label : this.group, 44, TOP + 40, 32, t.text, { font: 'bold' });
             else if (version) r.text('Version ' + version, 44, TOP + 38, 24, t.dim);
             const targets = [];
             // Back (a value list) / Done (the settings): top right
             const bw = 150, bx = W - 40 - bw, by = TOP + 8;
             // (the controller reaches it turning up from the first row: place -1)
-            pill(r, t, bx, by, bw, 46, this.open ? 'Back' : 'Done', this.controller && (this.open ? this.sub : this.focus) === -1);
+            pill(r, t, bx, by, bw, 46, this.open || this.group ? 'Back' : 'Done', this.controller && (this.open ? this.sub : this.focus) === -1);
             targets.push({ x: bx - 10, y: by - 6, w: bw + 20, h: 58, act: () => this.back() });
             const rects = list(r, t, this.key(), rows, this.open ? this.sub : this.focus, TOP + 74, this.controller);
             rects.forEach((q) => targets.push(Object.assign(q, { act: () => { if (this.open) this.sub = q.i; else this.focus = q.i; return this.choose(); } })));
             return targets;
         },
-        key() { return this.open ? 'v_' + this.open.key : 'settings'; },
+        key() { return this.open ? 'v_' + this.open.key : this.group ? 'g_' + this.group : 'settings'; },
         /** the controller is on Done / Back: pushed up from here it goes to the header's tabs */
-        top() { return (this.open ? this.sub : this.focus) === -1; },
+        top() { if (this.child) return this.child.top ? this.child.top() : false; return (this.open ? this.sub : this.focus) === -1; },
         /** touch: the list moved by dy (px, + = further down the list) while the finger is on it */
         scroll(dy) {
+            if (this.child) { if (this.child.scroll) this.child.scroll(dy); return; }
             const st = list.scroll[this.key()];
             if (st) { st.y += dy; st.drag = true; }
         },
-        release() { const st = list.scroll[this.key()]; if (st) st.drag = false; },
+        release() { if (this.child) { if (this.child.release) this.child.release(); return; } const st = list.scroll[this.key()]; if (st) st.drag = false; },
+        /** what the child sheet's press / back / tap returned: its 'close' brings the settings back */
+        fromChild(res) { return Promise.resolve(res).then((v) => { if (v === 'close') this.child = null; return null; }); },
         move(d) {
+            if (this.child) { this.child.move(d); return; }
             this.controller = true;
             const n = this.rows().length;
             if (this.open) this.sub = Math.max(-1, Math.min(n - 1, this.sub + d));
             else this.focus = Math.max(-1, Math.min(n - 1, this.focus + d));
         },
         press() {
+            if (this.child) return this.fromChild(this.child.press());
             this.controller = true;
             if ((this.open ? this.sub : this.focus) === -1) { const r = this.back(); if (this.open === null) this.focus = Math.max(0, this.focus); return r; }
             return this.choose();
         },
         choose() {
             if (this.open) {
-                const v = values(this.open)[this.sub];
+                const v = values(this.open, settings)[this.sub];
                 if (v && v[0] !== settings.get(this.open.key)) settings.set(this.open.key, v[0]);
                 this.open = null;
                 return null;
             }
-            const s = schema[this.focus];
+            const s = entries(this.group)[this.focus];
             if (!s) return null;
+            // (an open() that throws leaves the settings as they are; display.js logs it)
+            if (s.extra) { const c = s.extra.open && s.extra.open(); if (c) this.child = c; return null; }
+            if (s.group && !s.key) { this.group = s.group; this.gfocus = this.focus; this.focus = 0; return null; }
             if (s.type === 'bool') settings.set(s.key, !settings.get(s.key));
             else if (values(s)) {
                 this.open = s;
@@ -171,7 +214,9 @@ function listSheet(settings, title, opts) {
             return null;
         },
         back() {
+            if (this.child) return this.fromChild(this.child.back());
             if (this.open) { this.open = null; return null; }
+            if (this.group) { this.group = null; this.focus = this.gfocus; return null; }
             return 'close';
         },
     };
@@ -246,4 +291,4 @@ function cardSheet(spec) {
     return sh;
 }
 
-module.exports = { listSheet, cardSheet };
+module.exports = { listSheet, cardSheet, list, pill, TOP };

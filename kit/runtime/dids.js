@@ -9,6 +9,7 @@
  *     raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID),
  *     value = raw * factor + offset, outside min..max = not plausible; signed: true = raw is
  *     two's complement (e.g. a torque that can be negative)
+ *     bit: k = only bit k of raw (0 or 1), before factor / offset (a status flag)
  *   or { ecu, obd: '0F', ... }: the same PID with OBD service 01 instead of 0x22 F4xx
  *     (for engine units that refuse the F4xx identifiers with NRC 31); 'at' counts from the
  *     first data byte after the PID
@@ -43,7 +44,7 @@ class DidReader {
         const sid = obd === null ? 0x22 : 0x01;
         const accept = (u) => (obd === null ? u[0] === 0x62 && ((u[1] << 8) | u[2]) === did : u[0] === 0x41 && u[1] === obd) || (u[0] === 0x7F && u[1] === sid);
         let uds;
-        try { uds = await this.diag.physical(ecu, sid, obd === null ? [did >> 8, did & 0xFF] : [obd], c.timeoutMs || 4000, accept); } catch (e) { r.why = String(e.message || e); return null; }
+        try { uds = await this.diag.physical(ecu, sid, obd === null ? [did >> 8, did & 0xFF] : [obd], c.timeoutMs || 4000, accept, c.diagOpts); } catch (e) { r.why = String(e.message || e); return null; }
         if (!uds) { r.why = 'no reply'; return null; }
         r.bytes = uds.map((x) => hex(x)).join(' ');
         if (uds[0] === 0x7F) { r.why = 'NRC ' + hex(uds[2]) + (NRC[uds[2]] ? ' ' + NRC[uds[2]] : ''); return null; }
@@ -52,6 +53,7 @@ class DidReader {
         let raw = 0;
         for (let i = 0; i < n; i++) raw = raw * 256 + uds[at + i];
         if (c.signed && raw >= Math.pow(2, 8 * n - 1)) raw -= Math.pow(2, 8 * n);      // two's complement
+        if (c.bit != null) raw = (raw >> c.bit) & 1;                                    // one flag of the value
         const v = raw * (c.factor == null ? 1 : c.factor) + (c.offset || 0);
         r.value = v;
         if ((c.min != null && v < c.min) || (c.max != null && v > c.max)) { r.why = 'out of range'; return null; }
@@ -81,15 +83,21 @@ class DidReader {
     async monitor(ecu, mid, did) {
         const uds = await this.ask06(ecu, mid, did), r = this.raws[this.monitorKey(ecu, mid, did)];
         if (!uds) return null;
+        const out = DidReader.records06(uds, mid, did);
+        if (!out) { r.why = 'no test results'; return null; }
+        r.ok = true;
+        return out;
+    }
+
+    /** The test results in a positive service 06 (or 22 F6xx) reply, as monitor() returns them, or null. */
+    static records06(uds, mid, did) {
         const out = [], size = did ? 8 : 9;
         for (let i = did ? 3 : 1; i + size <= uds.length; i += size) {
             const o = did ? i : i + 1;                      // skip the repeated MID in service 06 records
             if (!did && uds[i] !== mid) break;
             out.push({ tid: uds[o], unit: uds[o + 1], value: (uds[o + 2] << 8) | uds[o + 3], min: (uds[o + 4] << 8) | uds[o + 5], max: (uds[o + 6] << 8) | uds[o + 7] });
         }
-        if (!out.length) { r.why = 'no test results'; return null; }
-        r.ok = true;
-        return out;
+        return out.length ? out : null;
     }
 
     /**

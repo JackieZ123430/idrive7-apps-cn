@@ -1,0 +1,50 @@
+name: Feature or app idea
+description: Something you'd like an app to do, or a new app
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: app
+    attributes:
+      label: App
+      options:
+        - A new app
+        - Ambient config
+        - Brake Test
+        - Doom
+        - Drag Timer
+        - eDrive
+        - Engine Config
+        - Fault Scanner
+        - G-Force
+        - Live Data
+        - M Vitals
+        - Redline
+        - Service
+        - Transmission Config
+        - Virtual Dyno
+        - Warm-Up
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What it should do, and when you'd use it (parked, driving, at the track...).
+    validations:
+      required: true
+  - type: input
+    id: car
+    attributes:
+      label: Your car
+      description: Model, engine and year. Many features depend on what the car's control units offer.
+      placeholder: "G80 M3, S58, 2022"
+  - type: textarea
+    id: data
+    attributes:
+      label: The data it needs, if you know
+      description: Signals, control units or diagnostic values it would read, or another app or tool that already shows it.
+  - type: textarea
+    id: pictures
+    attributes:
+      label: Pictures or sketches
+      description: A photo, screenshot or sketch of how it could look.

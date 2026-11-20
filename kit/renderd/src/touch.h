@@ -7,7 +7,7 @@
  */
 
 /* iface: where the display's PDUs arrive (the car: "vlan73", from saddr 160.48.199.115; "lo": a local sender, as in
- * the emulator); saddr may be empty. area x,y,w,h (screen px) apps may claim, w 0 = all. Forks the guard: call
+ * the emulator); saddr may be empty. area x,y,w,h (design px, as apps are told) apps may claim, w 0 = all. Forks the guard: call
  * before the compositor connection. -1 = off. */
 int touch_init(const char *iface, const char *saddr, const int area[4]);
 /* the divert's table (ip <name>) and ports (in_port, in_port + 1) in place of the defaults; before touch_init.
@@ -20,8 +20,9 @@ void touch_forget(int slot);         /* that app is gone: the rest of its gestur
 void touch_stop(void);               /* rule out */
 
 /* provided by main.c */
-int touch_owner_at(int x, int y);                   /* the client slot claiming screen pixel x, y, or -1 */
-void touch_send(int slot, int phase, int x, int y); /* E_TOUCH to it (phase 1 down, 2 move, 3 up; screen px) */
+int touch_owner_at(int x, int y);                   /* the client slot claiming design pixel x, y, or -1 */
+void touch_send(int slot, int phase, int x, int y); /* E_TOUCH to it (phase 1 down, 2 move, 3 up; design px) */
 void touch_outside(void);                           /* a gesture went to the HMI: the claiming apps close */
+void touch_unmap(int *x, int *y);                   /* screen px -> the design px apps and claims are in */
 
 #endif

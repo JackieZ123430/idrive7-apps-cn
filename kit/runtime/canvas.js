@@ -272,7 +272,8 @@ class Canvas {
      * opts.ramp = [c0, c1, ...] colours the ring by angle instead of c, spread
      * over opts.rampFrom..opts.rampTo (default a0..a1; rampTo < rampFrom runs it
      * anticlockwise), so a value arc keeps the
-     * colour of its position on the scale.
+     * colour of its position on the scale. opts.skip(py) = [[xa, xb], ...] (in order) or null: row py's pixels
+     * xa..xb-1 left untouched (for a caller that copied them in already).
      */
     arc(cx, cy, r0, r1, a0, a1, c, opts) {
         c = rgba(c);
@@ -304,9 +305,15 @@ class Canvas {
         const x0 = Math.max(0, Math.floor(bx0 - 1)), x1 = Math.min(this.w, Math.ceil(bx1 + 1));
         const y0 = Math.max(0, Math.floor(by0 - 1)), y1 = Math.min(this.h, Math.ceil(by1 + 1));
         const mid = ((a0 + a1) / 2) * RAD, half = ((a1 - a0) / 2) * RAD;
+        const skipOf = opts && opts.skip;
         for (let py = y0; py < y1; py++) {
-            const dy = py + 0.5 - cy;
+            const dy = py + 0.5 - cy, sk = skipOf ? skipOf(py) : null;
+            let si = 0;
             for (let px = x0; px < x1; px++) {
+                if (sk) {
+                    while (si < sk.length && sk[si][1] <= px) si++;
+                    if (si < sk.length && px >= sk[si][0]) { px = sk[si][1] - 1; continue; }
+                }
                 const dx = px + 0.5 - cx;
                 const dd = Math.sqrt(dx * dx + dy * dy);
                 if (dd > r1 + 1 || dd < r0 - 1) continue;
@@ -392,6 +399,77 @@ class Canvas {
     quad(pts, c) { return this.convex(pts, c); }
     triangle(pts, c) { return this.convex(pts, c); }
 
+    /**
+     * Any simple polygon (concave too), filled in one pass, anti-aliased: 4 sub-rows a pixel, each span's ends covered
+     * by their exact share of a pixel. One shape where pieces drawn side by side would leave hairline seams between
+     * them. pts = [[x,y],...] (even-odd).
+     */
+    fill(pts, c) { return this.fillPolys([pts], c); }
+    /**
+     * Several polygons as one shape, even-odd over all their edges: polygons side by side (a shape cut into triangles)
+     * fill with no seam where they meet. polys = [[[x,y],...],...]
+     */
+    fillPolys(polys, c) {
+        polys = (polys || []).filter((q) => q && q.length >= 3);
+        if (!polys.length) return this;
+        c = rgba(c);
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        polys.forEach((q) => q.forEach((p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }));
+        const X0 = Math.max(0, Math.floor(x0)), X1 = Math.min(this.w, Math.ceil(x1)), Y0 = Math.max(0, Math.floor(y0)), Y1 = Math.min(this.h, Math.ceil(y1));
+        if (X1 <= X0 || Y1 <= Y0) return this;
+        const S = 4, acc = new Float32Array(X1 - X0), xs = [];
+        const span = (l, r) => {
+            l = Math.max(l, X0); r = Math.min(r, X1);
+            for (let px = Math.floor(l); px < r; px++) acc[px - X0] += Math.min(r, px + 1) - Math.max(l, px);
+        };
+        for (let py = Y0; py < Y1; py++) {
+            acc.fill(0);
+            for (let k = 0; k < S; k++) {
+                const sy = py + (k + 0.5) / S;
+                xs.length = 0;
+                for (const pts of polys) {
+                    const n = pts.length;
+                    for (let i = 0; i < n; i++) {
+                        const a = pts[i], b = pts[(i + 1) % n];
+                        if ((a[1] <= sy) !== (b[1] <= sy)) xs.push(a[0] + (sy - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+                    }
+                }
+                xs.sort((p, q) => p - q);
+                for (let j = 0; j + 1 < xs.length; j += 2) span(xs[j], xs[j + 1]);
+            }
+            for (let px = X0; px < X1; px++) { const cov = acc[px - X0] / S; if (cov > 0.002) this._blend(px, py, c, Math.min(1, cov)); }
+        }
+        return this;
+    }
+
+    /**
+     * A thick path with round joins and ends, anti-aliased once over the whole path: where its pieces overlap (at a
+     * bend) the edge isn't blended twice, so a bend has no bump. pts = [[x,y],...]
+     */
+    stroke(pts, width, c) {
+        if (!pts || pts.length < 2) return this;
+        c = rgba(c);
+        const hw = width / 2;
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        pts.forEach((p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+        x0 = Math.max(0, Math.floor(x0 - hw - 1)); x1 = Math.min(this.w, Math.ceil(x1 + hw + 1));
+        y0 = Math.max(0, Math.floor(y0 - hw - 1)); y1 = Math.min(this.h, Math.ceil(y1 + hw + 1));
+        for (let py = y0; py < y1; py++) {
+            for (let px = x0; px < x1; px++) {
+                let d2 = Infinity;
+                for (let i = 1; i < pts.length; i++) {
+                    const xa = pts[i - 1][0], ya = pts[i - 1][1], vx = pts[i][0] - xa, vy = pts[i][1] - ya;
+                    const qx = px + 0.5 - xa, qy = py + 0.5 - ya, t = clamp01((qx * vx + qy * vy) / (vx * vx + vy * vy || 1));
+                    const ex = qx - vx * t, ey = qy - vy * t;
+                    d2 = Math.min(d2, ex * ex + ey * ey);
+                }
+                const cov = clamp01(hw - Math.sqrt(d2) + 0.5);
+                if (cov > 0) this._blend(px, py, c, cov);
+            }
+        }
+        return this;
+    }
+
     /** Polyline (e.g. a history trace). pts = [[x,y],...] */
     polyline(pts, width, c) {
         for (let i = 1; i < pts.length; i++) this.line(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], width, c);
@@ -443,18 +521,31 @@ class Canvas {
 
     /** Blit an alpha glyph from the atlas, scaled (bilinear) and tinted. */
     _blit(f, gx, gy, gw, gh, dx, dy, scale, c) {
+        // the same sums as a per-pixel lookup helper, with what only changes per row worked out once per row and no
+        // function made per pixel (about a fifth of a frame; the pixels are the same)
         const A = f.alpha, AW = f.atlasW;
         const tw = gw * scale, th = gh * scale;
         const x0 = Math.floor(dx), y0 = Math.floor(dy);
+        const pxA = Math.max(0, x0), pxB = Math.min(this.w, Math.ceil(dx + tw));
         for (let py = Math.max(0, y0); py < Math.min(this.h, Math.ceil(dy + th)); py++) {
             const sy = (py + 0.5 - dy) / scale - 0.5;
-            for (let px = Math.max(0, x0); px < Math.min(this.w, Math.ceil(dx + tw)); px++) {
+            if (scale === 1) {
+                const ry = Math.round(sy), rowOk = ry >= 0 && ry < gh, rb = (gy + ry) * AW + gx;
+                for (let px = pxA; px < pxB; px++) {
+                    const rx = Math.round((px + 0.5 - dx) / scale - 0.5);
+                    const v = rowOk && rx >= 0 && rx < gw ? A[rb + rx] : 0;
+                    if (v > 0) this._blend(px, py, c, v / 255);
+                }
+                continue;
+            }
+            const iy = Math.floor(sy), fy = sy - iy;
+            const r0 = iy >= 0 && iy < gh, r1 = iy + 1 >= 0 && iy + 1 < gh, b0 = (gy + iy) * AW + gx, b1 = b0 + AW;
+            for (let px = pxA; px < pxB; px++) {
                 const sx = (px + 0.5 - dx) / scale - 0.5;
-                const ix = Math.floor(sx), iy = Math.floor(sy), fx = sx - ix, fy = sy - iy;
-                const at = (xx, yy) => (xx < 0 || yy < 0 || xx >= gw || yy >= gh) ? 0 : A[(gy + yy) * AW + gx + xx];
-                const v = scale === 1
-                    ? at(Math.round(sx), Math.round(sy))
-                    : at(ix, iy) * (1 - fx) * (1 - fy) + at(ix + 1, iy) * fx * (1 - fy) + at(ix, iy + 1) * (1 - fx) * fy + at(ix + 1, iy + 1) * fx * fy;
+                const ix = Math.floor(sx), fx = sx - ix;
+                const c0 = ix >= 0 && ix < gw, c1 = ix + 1 >= 0 && ix + 1 < gw;
+                const v = (r0 && c0 ? A[b0 + ix] : 0) * (1 - fx) * (1 - fy) + (r0 && c1 ? A[b0 + ix + 1] : 0) * fx * (1 - fy)
+                    + (r1 && c0 ? A[b1 + ix] : 0) * (1 - fx) * fy + (r1 && c1 ? A[b1 + ix + 1] : 0) * fx * fy;
                 if (v > 0) this._blend(px, py, c, v / 255);
             }
         }
@@ -505,4 +596,46 @@ function crc32(buf) {
     return c ^ -1;
 }
 
-module.exports = { Canvas, rgba, mix, ramp, withAlpha, RAD };
+/**
+ * A Canvas of k times the pixels, drawn on in the coordinates of w x h: for a picture the HMI scales
+ * up (the home-screen widget), so it stays sharp. Push .canvas.
+ */
+class ScaledCanvas {
+    constructor(w, h, k) { this.w = w; this.h = h; this.k = k; this.canvas = new Canvas(Math.round(w * k), Math.round(h * k)); }
+    _pts(pts) { return pts.map((p) => [p[0] * this.k, p[1] * this.k]); }
+    clear(c) { this.canvas.clear(c); return this; }
+    fillRect(x, y, w, h, c) { const k = this.k; this.canvas.fillRect(x * k, y * k, w * k, h * k, c); return this; }
+    gradientRect(x, y, w, h, stops) { const k = this.k; this.canvas.gradientRect(x * k, y * k, w * k, h * k, stops); return this; }
+    roundRect(x, y, w, h, r, c) { const k = this.k; this.canvas.roundRect(x * k, y * k, w * k, h * k, r * k, c); return this; }
+    strokeRoundRect(x, y, w, h, r, width, c) { const k = this.k; this.canvas.strokeRoundRect(x * k, y * k, w * k, h * k, r * k, width * k, c); return this; }
+    card(x, y, w, h, r, stops) { const k = this.k; this.canvas.card(x * k, y * k, w * k, h * k, r * k, stops); return this; }
+    rampRect(x, y, w, h, r, stops, spanX, spanW) {
+        const k = this.k;
+        this.canvas.rampRect(x * k, y * k, w * k, h * k, r * k, stops, spanX === undefined ? spanX : spanX * k, spanW === undefined ? spanW : spanW * k);
+        return this;
+    }
+    circle(cx, cy, r, c) { return this.arc(cx, cy, 0, r, 0, 360, c); }
+    arc(cx, cy, r0, r1, a0, a1, c, opts) { const k = this.k; this.canvas.arc(cx * k, cy * k, r0 * k, r1 * k, a0, a1, c, opts); return this; }
+    line(xa, ya, xb, yb, width, c) { const k = this.k; this.canvas.line(xa * k, ya * k, xb * k, yb * k, width * k, c); return this; }
+    convex(pts, c) { this.canvas.convex(this._pts(pts), c); return this; }
+    quad(pts, c) { return this.convex(pts, c); }
+    triangle(pts, c) { return this.convex(pts, c); }
+    fill(pts, c) { this.canvas.fill(this._pts(pts), c); return this; }
+    fillPolys(polys, c) { this.canvas.fillPolys(polys.map((q) => this._pts(q)), c); return this; }
+    polyline(pts, width, c) { this.canvas.polyline(this._pts(pts), width * this.k, c); return this; }
+    stroke(pts, width, c) { this.canvas.stroke(this._pts(pts), width * this.k, c); return this; }
+    fillUnder(pts, baseY, c) { this.canvas.fillUnder(this._pts(pts), baseY * this.k, c); return this; }
+    drawImage(src, sw, sh, x, y, w, h) { const k = this.k; this.canvas.drawImage(src, sw, sh, x * k, y * k, w * k, h * k); return this; }
+    blit(src, x, y) { return this.drawImage(src.d, src.w, src.h, x, y, src.w, src.h); }
+    text(str, x, y, size, c, opts) {
+        const k = this.k, o = opts && opts.spacing ? Object.assign({}, opts, { spacing: opts.spacing * k }) : opts;
+        return this.canvas.text(str, x * k, y * k, size * k, c, o) / k;
+    }
+    textWidth(str, size, opts) {
+        const k = this.k, o = opts && opts.spacing ? Object.assign({}, opts, { spacing: opts.spacing * k }) : opts;
+        return this.canvas.textWidth(str, size * k, o) / k;
+    }
+    _blit(f, gx, gy, gw, gh, dx, dy, scale, c) { const k = this.k; this.canvas._blit(f, gx, gy, gw, gh, dx * k, dy * k, scale * k, c); }
+}
+
+module.exports = { Canvas, ScaledCanvas, rgba, mix, ramp, withAlpha, RAD };

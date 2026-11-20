@@ -6,8 +6,13 @@ const { fitText } = require(path.join(stage, 'kit/text-layout'));
 const { Canvas } = require(path.join(stage, 'kit/canvas'));
 const { Recorder } = require(path.join(stage, 'kit/record'));
 const fonts = require(path.join(stage, 'kit/fonts'));
-const { getLanguage } = require(path.join(stage, 'kit/i18n'));
-const language = getLanguage();
+const i18n = require(path.join(stage, 'kit/i18n'));
+const language = i18n.getLanguage();
+assert.strictEqual(i18n.setLanguage, undefined, 'No runtime language switching');
+if (language === 'ru') {
+    console.log('SKIP ru: Chinese diagnostic checks do not apply to a fixed Russian package');
+    process.exit(0); // Test process only; never installed as application code.
+}
 if (language === 'en') {
     const complete = require('../localization/diagnostic-full.zh-CN.json');
     for (const source of Object.keys(complete)) assert.strictEqual(diagnosticText(source),source);

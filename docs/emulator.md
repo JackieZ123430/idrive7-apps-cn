@@ -46,7 +46,10 @@ head unit:
 - **The app** gets READY, TICK, touch and the controller as `mgu-render` gives them on the car,
   so the kit runs the screen itself: header tabs, page buttons, the settings sheet, scrolling.
 - **Ticks** come when the page has drawn a frame, so the app runs exactly as fast as the page
-  shows it, as on the car. The panel's FPS cap limits it (60, 30, 20, 10, none).
+  shows it, as on the car. The panel's FPS cap limits it (60, 30, 20, 10, none). A page that is
+  not painted (a background tab, a hidden pane, a minimised window) draws no frames: after 200 ms
+  without a tick, the emulator ticks the app itself at the FPS cap, until the page paints again.
+  With no page open, the app gets 10 ticks a second.
 - **Live reload:** a save under `apps/<id>/` or `kit/runtime/` builds the app and restarts it;
   the page stays open and keeps the app's screen. A build that fails shows its output on the page,
   and the last good build keeps running.
@@ -87,8 +90,10 @@ The panel docks at the bottom, left or right (its own control at the top, or
   (the HMI around the app and the app itself) as a 1920 x 720 PNG.
 - **HMI:** the app's HMI screen, and buttons for what the HMI would do: Back, Home, Open app,
   and the screen's own bar buttons (the menus and buttons of Doom, for example).
-- **Renderer:** frames per second, the draw time, ticks and bytes per second, the app's
-  placement; the FPS cap; the touch routing switch.
+- **Renderer:** the page's own figures, all over the same second: frames shown per second; the
+  draw time, average and maximum of every draw, "draw (CPU)" (the draw calls' CPU time, not the
+  GPU's work); frames, messages and bytes from the app per second. Then the app's placement, the
+  FPS cap and the touch routing switch.
 - **Vehicle signals:** *Demo drive*, the kit's simulated drive (`sim.js`: a full-throttle pull, a
   hard stop, corners, the engine warming up), or *Manual* sliders for engine speed, speed,
   coolant, oil, torque, longitudinal and lateral g, and the gear. Manual values go to the app as

@@ -67,6 +67,7 @@ class RenderClient extends EventEmitter {
         this.claimed = null;         // the claims sent on this connection (JSON), null: none yet
         this.native = false;         // this connection speaks mgu-render/1 (X_READY came)
         this.info = null;            // X_READY: { touch, controller, frontGate }
+        this.area = null;            // X_READY: the app area { x, y, w, h } (screen px), null: not told
         this.onScreen = null;        // X_STATE: the renderer shows us (null: not told)
     }
 
@@ -77,6 +78,11 @@ class RenderClient extends EventEmitter {
         if (this.opts.file) {
             this.fd = fs.openSync(this.opts.file, 'w');
             this.connected = this.ready = true;
+            // testing: the screen another head unit's renderer tells (MGU_RENDERD_SCREEN=2880x960: iDrive 8)
+            const m = /^(\d+)x(\d+)$/.exec(process.env.MGU_RENDERD_SCREEN || '');
+            if (m) this.screen = { w: Number(m[1]), h: Number(m[2]) };
+            // as the car's renderer: touch routing on, so the kit runs the screen (tabs, no button bar)
+            this.touch = process.env.MGU_RENDERD_TOUCH !== '0';
             this._write(msg(M.HELLO, this._hello()));
             if (this.opts.native) { this.native = true; this._write(this._u32msg(X.MODE, [X_MODE_LAYER])); }
             setImmediate(() => this.emit('ready', this.screen));
@@ -92,8 +98,9 @@ class RenderClient extends EventEmitter {
         s.on('connect', () => {
             this.connected = true;
             this._reset();
+            this.inbuf = Buffer.alloc(0);   // (a message cut off with the last connection)
             s.setNoDelay && s.setNoDelay(true);
-            this.native = false; this.info = null; this.onScreen = null;
+            this.native = false; this.info = null; this.area = null; this.onScreen = null;
             this.claimed = null;
             this._write(msg(M.HELLO, this._hello()));
             // upstream renderers take these before READY; they are sent again once READY came
@@ -110,9 +117,18 @@ class RenderClient extends EventEmitter {
             const was = this.ready;
             this.connected = this.ready = this.native = false; this.sock = null; this.waiting = false; this.onScreen = null;
             if (was) { this.log.warn('renderd: connection closed'); this.emit('close'); }
-            if (!this.closed) this.retry = setTimeout(() => { this.retry = null; this.connect(); }, 3000);
+            if (!this.closed) this.retry = setTimeout(() => { this.retry = null; this.connect(); }, this.soon ? 0 : 3000);
+            this.soon = false;
         });
         return this;
+    }
+    /** A fresh connection at once: the renderer's READY again, with what it offers now (its capabilities are
+     * those of the moment it answered HELLO). */
+    reconnect() {
+        if (this.closed || !this.sock || !this.ready) return false;
+        this.soon = true;
+        this.sock.destroy();
+        return true;
     }
     /**
      * Have the iDrive controller to ourselves (the HMI ignores the knob, press and tilt while it
@@ -166,6 +182,22 @@ class RenderClient extends EventEmitter {
         if (this.fd !== null) { fs.writeSync(this.fd, b); return true; }
         return this.sock && this.connected ? this.sock.write(b) : false;
     }
+    /* A buffer for one IMAGE message of `size` bytes: the one kept for that size once the socket has passed
+     * it on (a big picture every frame - DOOM's 1920 x 504 view - would otherwise leave two new copies of
+     * several MB a frame, which Node 8 frees late: the app's memory grows until the app manager stops it). */
+    _imageBuf(size) {
+        const pool = this.imgPool || (this.imgPool = new Map());
+        const free = this.fd !== null || !this.sock || this.sock.bufferSize === 0;
+        let b = free ? pool.get(size) : null;
+        if (!b) {
+            b = Buffer.allocUnsafe(size);
+            if (size >= 65536) {
+                if (pool.size >= 4) pool.delete(pool.keys().next().value);
+                pool.set(size, b);
+            }
+        }
+        return b;
+    }
     _u32msg(type, arr) { const u = new Uint32Array(arr); return msg(type, words(u)); }
 
     _data(d) {
@@ -179,6 +211,8 @@ class RenderClient extends EventEmitter {
                 const caps = p.readUInt32LE(8);
                 this.native = true;
                 this.info = { touch: !!(caps & 1), controller: !!(caps & 2), frontGate: !!(caps & 4) };
+                // the app area (where the HMI leaves room for apps, in screen px): after the embed box
+                this.area = p.length >= 44 ? { x: p.readInt32LE(28), y: p.readInt32LE(32), w: p.readInt32LE(36), h: p.readInt32LE(40) } : null;
             } else if (type === E.READY) {
                 this.ready = true; this.errLogged = false;
                 this.screen = { w: p.readUInt32LE(4), h: p.readUInt32LE(8) };
@@ -235,7 +269,10 @@ class RenderClient extends EventEmitter {
         if (this.placement && !resize && ['x', 'y', 'scale', 'ox', 'oy'].every((k) => pl[k] === this.placement[k])) return;
         const scaleChanged = this.placement && this.placement.scale !== pl.scale;
         this.placement = Object.assign({}, pl);
-        if (resize || scaleChanged) this._reset();     // the renderer dropped our resources
+        // as the renderer: a new size drops all the app's resources, a new scale keeps them but the layers drawn at
+        // the old one (sent again, they replace those)
+        if (resize) this._reset();
+        else if (scaleChanged) { this.sent.layer.clear(); this.waiting = false; }
         if (this.ready) this._sendPlace();
     }
     _sendPlace() {
@@ -282,10 +319,11 @@ class RenderClient extends EventEmitter {
         const im = rec.imageById.get(id);
         if (!im || !im.data) return;
         if (this.sent.image.get(id) === im.ver) return;
-        const head = Buffer.alloc(12);
-        head.writeUInt32LE(id, 0); head.writeUInt32LE(im.w, 4); head.writeUInt32LE(im.h, 8);
-        const px = Buffer.from(im.data.buffer, im.data.byteOffset, im.w * im.h * 4);
-        this._write(msg(M.IMAGE, Buffer.concat([head, px])));
+        const n = im.w * im.h * 4, b = this._imageBuf(8 + 12 + n);
+        b.writeUInt32LE(M.IMAGE, 0); b.writeUInt32LE(12 + n, 4);
+        b.writeUInt32LE(id, 8); b.writeUInt32LE(im.w, 12); b.writeUInt32LE(im.h, 16);
+        Buffer.from(im.data.buffer, im.data.byteOffset, n).copy(b, 20);
+        this._write(b);
         this.sent.image.set(id, im.ver);
     }
     _ensureLayer(id) {

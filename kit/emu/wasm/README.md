@@ -44,8 +44,10 @@ As on the car:
   goes missing: `destroy()` and `createGfx()` again.
 - A lost WebGL context does not come back: `feed()` returns -1, `readPixels()` throws,
   `stats().lost` and `error: 'context lost'`, and `onLost` is called once. Make a new renderer.
-- `lastMs` / `avgMs` are the CPU time of the draw calls (the GPU runs after); the browser rounds
-  `performance.now()` to 0.1 ms.
+- `lastMs` / `avgMs` are the CPU time of the draw calls (the GPU runs after); `avgMs` is since
+  the renderer was made. The browser rounds `performance.now()` to 0.1 ms unless the page is
+  cross-origin isolated (`kit/tools/emu.js` sends COOP and COEP: µs steps). The emulator's panel
+  takes `lastMs` after each `feed()` that drew, for the average and maximum of each second.
 
 Parsed and ignored: GRAB, CLAIM, FPS, VIDEO / DROP_VIDEO (op 19 draws nothing: no `/dev/shm`).
 Nothing goes back to the app: READY, TICK and STATS are the host's to send.

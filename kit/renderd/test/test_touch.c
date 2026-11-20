@@ -13,6 +13,7 @@ static int sent[16][4], nsent, outside;
 int touch_owner_at(int x, int y) { return x >= 1000 ? 0 : -1; }     /* slot 0 claims x >= 1000 */
 void touch_send(int slot, int phase, int x, int y) { if (nsent < 16) { int *s = sent[nsent++]; s[0] = slot; s[1] = phase; s[2] = x; s[3] = y; } }
 void touch_outside(void) { outside++; }
+void touch_unmap(int *x, int *y) { (void)x, (void)y; }             /* the HMI at its design size */
 
 /* one touchscreen PDU: word type, finger count, first finger x/y, event (bits 4-5) with touch type (bits 6-7) */
 static size_t pdu(unsigned char *b, int word, int fingers, int x, int y, int ev, int ttype)
@@ -64,14 +65,16 @@ int main(void)
     snprintf(nft_log, sizeof nft_log, "%s/nft.log", dir);
     snprintf(nft_path, sizeof nft_path, "%s/nft", dir);
     FILE *f = fopen(nft_path, "w");
-    fprintf(f, "#!/bin/sh\n{ echo \"nft $*\"; [ \"$1\" = -f ] && cat; } >> %s\n", nft_log);
+    fprintf(f, "#!/bin/sh\n{ echo \"nft $*\"; [ \"$1\" = -f ] && cat \"$2\"; } >> %s; true\n", nft_log);
     fclose(f); chmod(nft_path, 0755);
     snprintf(path, sizeof path, "%s:%s", dir, getenv("PATH") ? getenv("PATH") : "/usr/bin:/bin");
     setenv("PATH", path, 1);
 
-    /* the car's rule and firewall line: our ports, the display's address */
+    /* the car's rule and firewall line: our ports, the display's address; and what the other renderers hand on to
+     * the HMI over lo (the Store's keeps its rule in for an overlay: issue #152), not our own (no loop) */
     CHECK(touch_rules("vlan73", "160.48.199.115") == 0 &&
-          !strcmp(rule, "iifname \"vlan73\" ip saddr 160.48.199.115 udp dport 30567 notrack udp dport set 30572") &&
+          !strcmp(rule, "iifname \"vlan73\" ip saddr 160.48.199.115 udp dport 30567 notrack udp dport set 30572\n"
+                  "iifname \"lo\" udp sport { 30569, 30571 } udp dport 30567 notrack udp dport set 30572") &&
           strstr(open_fw, "nft insert rule ip filter input iifname vlan73 ip saddr 160.48.199.115 udp dport 30572 accept"),
           "car rule: %s / %s", rule, open_fw);
 
@@ -83,6 +86,8 @@ int main(void)
     CHECK(outs() == 1 && loads() == 0, "start: a leftover of ours is not removed");
     touch_tick(1);
     CHECK(loads() == 1 && strstr(slurp(), "udp dport set 30572"), "claimed: rule not in");
+    /* after the other renderers' -300: their overlays (drawn over our apps) see a touch first (issue #152) */
+    CHECK(strstr(slurp(), "priority -299;") != NULL, "rule not after the other renderers': %s", slurp());
     touch_tick(1);
     CHECK(loads() == 1, "claimed twice: loaded twice");
     touch_tick(0);

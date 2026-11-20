@@ -106,6 +106,11 @@ if (glyph === 'gauge') {
     c.convex([[96, 56], [74, 64], [78, 78], [94, 74]], A);
     c.convex([[70, 82], [64, 94], [76, 94]], '#000000');     // nose
     for (let i = 0; i < 4; i++) c.fillRect(52 + i * 11, 104, 3, 16, '#000000');   // teeth
+} else if (glyph === 'ambient') {
+    // a door panel's light line in three colours, and the glow under it
+    c.strokeRoundRect(14, 30, 112, 80, 16, 6, W);
+    [[26, '#2a8cff'], [56, '#2fd27a'], [86, A]].forEach(([x, col]) => c.roundRect(x, 58, 28, 10, 5, col));
+    c.fillRect(40, 84, 60, 5, W);
 } else {
     c.strokeRoundRect(14, 14, 112, 112, 22, 6, W);
     c.text(glyph, 70, 88, 56, W, { font: 'bold', align: 'center' });

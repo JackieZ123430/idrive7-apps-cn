@@ -216,7 +216,8 @@ find_backup() {   # $1 = name|stock|latest -> echo dir
     return 1
 }
 
-rootfs_rw() { touch /etc/.mgu-rw-test 2>/dev/null && { rm -f /etc/.mgu-rw-test; RW_DONE=0; return 0; }; mount -o remount,rw / && RW_DONE=1; }
+# RW_DONE: set only by the call that remounted (later calls find / writable and leave it set)
+rootfs_rw() { touch /etc/.mgu-rw-test 2>/dev/null && { rm -f /etc/.mgu-rw-test; return 0; }; mount -o remount,rw / && RW_DONE=1; }
 rootfs_ro() { [ "${RW_DONE:-0}" = 1 ] && { sync; mount -o remount,ro / 2>/dev/null; }; RW_DONE=0; }
 
 cmd_check() {

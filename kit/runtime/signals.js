@@ -27,12 +27,30 @@ const DIRS = [path.join(APP_ROOT, 'someipInterfaces'), path.join(__dirname, '..'
 // init run inline inside the app's promise chains next to the SDK's own SOME/IP
 // traffic. The SDK always calls them from a fresh setImmediate tick, one at a
 // time - do the same.
-let chain = Promise.resolve();
-function nativeTick(fn) {
-    const run = () => new Promise((resolve, reject) => setImmediate(() => { try { Promise.resolve(fn()).then(resolve, reject); } catch (e) { reject(e); } }));
-    const p = chain.then(run, run);
-    chain = p.catch(() => {});
-    return p;
+// Two queues, still one call at a time: method calls and the set-up of a proxy for them (proxy, on, onAvailable:
+// the diagnostic link) go before the watch() set-ups waiting. An app that watches ten interfaces queues ~40 of
+// those at start, and every UDS request used to wait behind all of them. After URGENT_RUN urgent calls in a row a
+// set-up waiting goes next: an app with several UDS readers going at once (Live Data's engine page, Redline's
+// knock, gearbox and 12 V) can keep the urgent lane busy without a break, and its signals (rpm, gear) would start
+// late or never.
+const lanes = [[], []];         // [urgent, set-up]
+const URGENT_RUN = 4;
+let running = false, urgentRun = 0;
+function pump() {
+    if (running) return;
+    const setup = lanes[1].length > 0 && (!lanes[0].length || urgentRun >= URGENT_RUN);
+    const job = setup ? lanes[1].shift() : lanes[0].shift();
+    if (!job) return;
+    urgentRun = setup ? 0 : urgentRun + 1;
+    running = true;
+    setImmediate(() => {
+        let p;
+        try { p = Promise.resolve(job.fn()); } catch (e) { p = Promise.reject(e); }
+        p.then(job.resolve, job.reject).then(() => { running = false; pump(); });
+    });
+}
+function nativeTick(fn, urgent) {
+    return new Promise((resolve, reject) => { lanes[urgent ? 0 : 1].push({ fn, resolve, reject }); pump(); });
 }
 
 function loadConfig(iface) {
@@ -87,12 +105,12 @@ async function watch(iface, instance, handlers, log, opts) {
 async function proxy(iface, instance) {
     if (!someip) throw new Error('someip native module not available');
     const cfg = loadConfig(iface);
-    return nativeTick(() => someip.buildProxy(cfg, String(instance)).then((p) => p.init().then(() => p)));
+    return nativeTick(() => someip.buildProxy(cfg, String(instance)).then((p) => p.init().then(() => p)), true);
 }
 
 /** Call a method on a proxy from proxy(); params = the method's argument struct. */
 function call(p, method, params, timeoutMs) {
-    return nativeTick(() => p.callMethod(method, params || {}, timeoutMs || 5000));
+    return nativeTick(() => p.callMethod(method, params || {}, timeoutMs || 5000), true);
 }
 
 /**
@@ -107,12 +125,12 @@ function set(p, field, value, timeoutMs) {
 
 /** Subscribe to a broadcast/event or field on a proxy from proxy(). */
 function on(p, name, fn, log) {
-    return nativeTick(() => p.subscribe({ name, onReceive: (v) => { try { fn(v); } catch (e) { if (log) log.warn(name + ': ' + e); } } }));
+    return nativeTick(() => p.subscribe({ name, onReceive: (v) => { try { fn(v); } catch (e) { if (log) log.warn(name + ': ' + e); } } }), true);
 }
 
 /** Availability of a proxy's provider; fn(bool) on every change. */
 function onAvailable(p, fn) {
-    return nativeTick(() => { try { return p.subscribeToAvailability((a) => fn(!!a)); } catch (e) { return null; } })
+    return nativeTick(() => { try { return p.subscribeToAvailability((a) => fn(!!a)); } catch (e) { return null; } }, true)
         .then(() => { if (p.isAvailable && p.isAvailable()) fn(true); });
 }
 

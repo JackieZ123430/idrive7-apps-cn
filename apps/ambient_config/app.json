@@ -1,0 +1,251 @@
+{
+  "id": "ambient_config",
+  "title": "Ambient config",
+  "description": "Any colour on the ambient light, animations, and a look for each driving mode",
+  "version": "2.7.13",
+  "vendor": "custom",
+  "loggingId": "OAA4",
+  "iconGlyph": "ambient",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
+  "autostart": true,
+  "signals": {
+    "de.bmw.infotainment.misc.ComfortFunctionIuK": {
+      "ambientLightInteriorColour": "w",
+      "statusAmbientLightInteriorColour": "rs"
+    },
+    "de.bmw.infotainment.drivingexcitement.FES": {
+      "_optional": "the driving mode: colours by mode",
+      "statusFESVehicleDynamicSwitchHMI": "rs"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
+    },
+    "de.bmw.infotainment.vehicle.Vehicle": {
+      "_optional": "day or night: dimmer at night",
+      "statusDayNightChangeOver": "rs"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "_optional": "the car locked and left: the car's own light",
+      "VehicleCondition": "s",
+      "vehicleConditionNoCrc": "s"
+    },
+    "de.bmw.body.Light": {
+      "_optional": "the turn signals: that side's lights breathe green",
+      "StatusFunctionsIndicators": "s"
+    },
+    "de.bmw.body.DoorsWindowsRoofMirrors": {
+      "_optional": "an open door: its lights red",
+      "CentralLockingSystemAndPanelStatus": "s"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "_optional": "the car's speed: driven (for a car that does not say it is locked and left), and the light show only standing still",
+      "statusCarSpeed2": "rs",
+      "statusLightStatus": "rs"
+    }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Ambient config",
+      "buttons": [
+        [
+          "BTN_SETTINGS",
+          "Settings"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "carKind",
+      "label": "Car type",
+      "type": "choice",
+      "default": "ice",
+      "hidden": true,
+      "options": [
+        [
+          "ice",
+          "Petrol or diesel"
+        ],
+        [
+          "hybrid",
+          "Plug-in hybrid"
+        ]
+      ]
+    },
+    {
+      "key": "follow",
+      "label": "Look by driving mode",
+      "type": "bool",
+      "default": true,
+      "hidden": true
+    },
+    {
+      "key": "welcome",
+      "label": "Welcome sweep at start",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "sportPulse",
+      "label": "Sport pulse",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "nightDim",
+      "label": "Dimmer at night",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "keep",
+      "label": "My colour back at each start",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "flashAlerts",
+      "label": "Redline shift flash",
+      "type": "bool",
+      "default": true,
+      "hidden": true
+    },
+    {
+      "key": "turnGlow",
+      "label": "Turn signal glow",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "doorRed",
+      "label": "Open door red",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "doorCar",
+      "label": "Open door: the car's own warning (G20 / G26)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "hazardRed",
+      "label": "Hazard red",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "strobe",
+      "label": "High beam strobe and light show (only for use on private property)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "strobeLeverDriving",
+      "label": "Lever start of the strobe also while driving (only for use on private property)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "strobeLights",
+      "label": "Strobe lights",
+      "type": "choice",
+      "default": "all",
+      "hidden": true,
+      "options": [["all", "All lights"], ["high", "High beam"]]
+    },
+    {
+      "key": "strobeEvery",
+      "label": "Strobe flashes a second",
+      "type": "choice",
+      "default": "0",
+      "hidden": true,
+      "options": [["0", "Max"], ["250", "4"], ["333", "3"], ["500", "2"], ["1000", "1"]]
+    },
+    {
+      "key": "policeBurst",
+      "label": "Police flashes a burst",
+      "type": "choice",
+      "default": "4",
+      "hidden": true,
+      "options": [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"]]
+    },
+    {
+      "key": "strobeFlashMs",
+      "label": "Strobe flash length",
+      "type": "choice",
+      "default": "80",
+      "hidden": true,
+      "options": [["50", "50 ms"], ["80", "80 ms"], ["100", "100 ms"], ["150", "150 ms"]]
+    },
+    {
+      "key": "policeOrder",
+      "label": "Police order",
+      "type": "choice",
+      "default": "lbr",
+      "hidden": true,
+      "options": [["lbr", "Left, both, right"], ["lrb", "Left, right, both"], ["lr", "Left, right"]]
+    },
+    {
+      "key": "strobePattern",
+      "label": "Strobe pattern",
+      "type": "choice",
+      "default": "police",
+      "hidden": true,
+      "options": [["police", "Police"], ["both", "Strobe"], ["alternate", "In turn"]]
+    },
+    {
+      "key": "strobeLever",
+      "label": "Start the strobe with the flasher lever",
+      "type": "bool",
+      "default": false,
+      "hidden": true
+    },
+    {
+      "key": "strobeRate",
+      "label": "Strobe speed",
+      "type": "choice",
+      "default": "normal",
+      "hidden": true,
+      "options": [["fast", "Fast"], ["normal", "Normal"], ["slow", "Slow"]]
+    },
+    {
+      "key": "showRate",
+      "label": "Light show speed",
+      "type": "choice",
+      "default": "normal",
+      "hidden": true,
+      "options": [["fast", "Fast"], ["normal", "Normal"]]
+    },
+    {
+      "key": "drive",
+      "label": "Steering wheel",
+      "type": "choice",
+      "default": "lhd",
+      "options": [
+        [
+          "lhd",
+          "Left"
+        ],
+        [
+          "rhd",
+          "Right"
+        ]
+      ]
+    }
+  ]
+}

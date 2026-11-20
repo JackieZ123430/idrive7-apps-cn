@@ -17,6 +17,7 @@ const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
+const Engine = require('./kit/engine');
 
 const W = 1600, H = 520;
 const BIN = 100, MIN_SPAN = 1500;
@@ -26,7 +27,11 @@ const GO = '#2fd27a';
 mgu.run({
     async start(ctx) {
         const { ui, settings, log } = ctx;
-        const car = new Car(ctx, ['rpm', 'speed', 'accel', 'torque']);
+        // engine profile (diesel / petrol): the graph's rpm axis on Auto
+        const engine = new Engine({ settings, dataDir: ctx.dataDir, log });
+        const car = new Car(ctx, ['rpm', 'speed', 'accel', 'torque'], { [Engine.SIGNAL[0]]: engine.handlers() });
+        car.setRedline(engine.redline());
+        engine.onChange(() => car.setRedline(engine.redline()));
 
         /* ---------- storage ---------- */
         const FILE = path.join(ctx.dataDir, 'dyno_runs.json');
@@ -40,8 +45,11 @@ mgu.run({
         const PU = { hp: [745.7, 'hp'], ps: [735.5, 'PS'], kw: [1000, 'kW'] };
         const pw = (w) => (G.isNum(w) ? w / PU[settings.get('powerUnit')][0] : null);
         const pU = () => PU[settings.get('powerUnit')][1];
-        const tq = (nm) => (G.isNum(nm) ? (settings.get('torqueUnit') === 'lbft' ? nm * 0.73756 : nm) : null);
-        const tU = () => (settings.get('torqueUnit') === 'lbft' ? 'lb-ft' : 'Nm');
+        // torque: [factor from Nm, unit, decimals, plot axis at least, axis rounded to] (1 Nm = 0.73756 lb-ft = 1 / 9.80665 kgm)
+        const TU = { nm: [1, 'Nm', 0, 150, 50], lbft: [0.73756, 'lb-ft', 0, 150, 50], kgm: [1 / 9.80665, 'kgm', 1, 15, 5] };
+        const tUnit = () => TU[settings.get('torqueUnit')] || TU.nm;
+        const tq = (nm) => (G.isNum(nm) ? nm * tUnit()[0] : null);
+        const tU = () => tUnit()[1];
 
         /* ---------- pull detection ---------- */
         let pull = null;            // { segs: [{k, pts: []}], start }
@@ -114,10 +122,10 @@ mgu.run({
         const nice = (x, step) => Math.max(step, Math.ceil(x / step) * step);
 
         function plot(cv, t, x, y, w, h, runs) {
-            const rMin = 1000, rMax = settings.get('maxRpm');
+            const rMin = 1000, rMax = engine.value('maxRpm', { diesel: 6000, petrol: 8000 });
             const all = runs.filter(Boolean).reduce((a, r) => a.concat(r.curve), []);
             const pMax = nice(Math.max(150, ...all.map((c) => pw(c.p) * 1.12)), 50);
-            const tMax = nice(Math.max(150, ...all.map((c) => Math.max(tq(c.t), tq(c.ecu) || 0) * 1.12)), 50);
+            const tMax = nice(Math.max(tUnit()[3], ...all.map((c) => Math.max(tq(c.t), tq(c.ecu) || 0) * 1.12)), tUnit()[4]);
             const X = (r) => x + (G.clamp(r, rMin, rMax) - rMin) / (rMax - rMin) * w;
             const YP = (v) => y + h - (v / pMax) * h, YT = (v) => y + h - (v / tMax) * h;
             for (let i = 0; i <= 5; i++) {
@@ -157,14 +165,16 @@ mgu.run({
             }
         }
 
-        function bigStat(cv, t, x, y, label, val, unit, sub, col, delta) {
+        /** A big number with its unit; dec: decimals (0 unless given), also for the change against the baseline. */
+        function bigStat(cv, t, x, y, label, val, unit, sub, col, delta, dec) {
+            dec = dec || 0;
             cv.text(label, x, y, 22, t.dim, { font: 'bold', spacing: 2 });
-            const vs = G.fmt(val, 0);
+            const vs = G.fmt(val, dec);
             const vw = cv.text(vs, x, y + 82, 96, G.isNum(val) ? col : t.dim, { font: 'num' });
             cv.text(unit, x + vw + 10, y + 82, 26, t.dim);
             if (sub) cv.text(sub, x, y + 114, 22, t.dim, { font: 'bold', spacing: 1 });
-            if (G.isNum(delta) && Math.abs(delta) >= 0.5) {
-                const s = (delta > 0 ? '+' : '') + delta.toFixed(0);
+            if (G.isNum(delta) && Math.abs(delta) >= 0.5 / Math.pow(10, dec)) {
+                const s = (delta > 0 ? '+' : '') + delta.toFixed(dec);
                 cv.text(s, x + 330, y + 82, 32, delta > 0 ? GO : t.crit, { align: 'right', font: 'num' });
             }
         }
@@ -199,7 +209,7 @@ mgu.run({
                 bigStat(cv, t, 1192, 131, 'POWER', cur ? pw(cur.peakP) : null, pU(), cur ? '@ ' + cur.peakPrpm + ' RPM' : null, t.accent,
                     cur && base && cur !== base ? pw(cur.peakP) - pw(base.peakP) : null);
                 bigStat(cv, t, 1192, 299 + Math.round(ex / 2), 'TORQUE', cur ? tq(cur.peakT) : null, tU(), cur ? '@ ' + cur.peakTrpm + ' RPM' : null, t.accent2,
-                    cur && base && cur !== base ? tq(cur.peakT) - tq(base.peakT) : null);
+                    cur && base && cur !== base ? tq(cur.peakT) - tq(base.peakT) : null, tUnit()[2]);
                 // a dyno sheet shows power at the wheels too: the same pull without the drivetrain loss
                 let msg = cur ? 'crank (' + cur.loss + ' % loss)  ·  wheels ' + Math.round(pw(cur.peakP * (1 - cur.loss / 100))) + ' ' + pU() : 'waiting for a pull';
                 let col = t.dim;
@@ -226,7 +236,7 @@ mgu.run({
                 if (cv.own) cv.target(36, y - 28, 1528, 38, () => { sel = i; lastRun = r; cleared = false; return render(); }, 'run' + i, 6);
                 cv.text(p(d.getDate()) + '.' + p(d.getMonth() + 1) + '. ' + p(d.getHours()) + ':' + p(d.getMinutes()), cols[0], y, 24, t.text);
                 cv.text(Math.round(pw(r.peakP)) + ' ' + pU() + ' @ ' + r.peakPrpm, cols[1], y, 24, t.accent, { font: 'bold' });
-                cv.text(Math.round(tq(r.peakT)) + ' ' + tU() + ' @ ' + r.peakTrpm, cols[2], y, 24, t.accent2, { font: 'bold' });
+                cv.text(G.fmt(tq(r.peakT), tUnit()[2]) + ' ' + tU() + ' @ ' + r.peakTrpm, cols[2], y, 24, t.accent2, { font: 'bold' });
                 cv.text(Math.round(r.v0) + '-' + Math.round(r.v1) + ' km/h', cols[3], y, 24, t.text);
                 cv.text(r.weight + ' kg · ' + r.loss + '%  ·  wheels ' + Math.round(pw(r.peakP * (1 - r.loss / 100))) + ' ' + pU(), cols[4], y, 22, t.dim);
                 if (isBase) cv.text('BASELINE', cols[5], y, 22, t.text, { font: 'bold', spacing: 1 });

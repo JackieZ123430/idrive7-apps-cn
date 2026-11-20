@@ -1,0 +1,10 @@
+{
+  "sgbd": "PCU48",
+  "ecu": "48 V DC/DC converter",
+  "revision": "local extracted layout",
+  "comment": "Read-only current operating-status identifier; decoded layout is not yet qualified on a vehicle.",
+  "made": "2026-11-02",
+  "order": ["DA90"],
+  "enums": {},
+  "builtin": true
+}

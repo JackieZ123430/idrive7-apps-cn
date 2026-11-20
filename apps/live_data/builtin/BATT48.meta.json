@@ -1,0 +1,10 @@
+{
+  "sgbd": "BATT48",
+  "ecu": "48 V battery controller",
+  "revision": "local extracted layout",
+  "comment": "Read-only summary identifiers; decoded layouts are not yet qualified on a vehicle.",
+  "made": "2026-11-02",
+  "order": ["AA56", "50AC"],
+  "enums": {},
+  "builtin": true
+}

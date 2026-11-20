@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-01",
+  "source": "BMW DiagDocDb 4.32.12",
+  "database_sha256": "206da522f83c48539eb9ac0ee02d7c859a7080b0b1c50cf76df05451a3930c55",
+  "source_rows_per_language": 113159,
+  "source_label_matches": 113159,
+  "pack_context_pairs": 166581,
+  "database_unique": 86735,
+  "translated": 58898,
+  "missing": 27837,
+  "catalog_keys": 59314,
+  "method": "label ID matching inside DiagDocDb 4.32.12, then ECU variant/address/code context matching onto the bundled database; numeric and hex ID compatibility checks; existing UI translations and manual overrides",
+  "review_status": "official BMW Russian text, context-matched across database versions; not individually human reviewed; unknown descriptions remain English"
+}

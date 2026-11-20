@@ -1,0 +1,15 @@
+{
+  "DA90": {
+    "a": "STATUS_PCU48_BETRIEBSZUSTAND",
+    "d": "PCU48 current status: voltage, current, power and operating mode",
+    "f": [
+      { "n": "STAT_PCU48_SPANNUNG_12V_WERT", "t": "u16", "at": 0, "u": "mV", "d": "12 V side voltage" },
+      { "n": "STAT_PCU48_SPANNUNG_48V_WERT", "t": "u16", "at": 2, "u": "mV", "d": "48 V side voltage" },
+      { "n": "STAT_PCU48_STROM_12V_WERT", "t": "s16", "at": 4, "k": 0.1, "u": "A", "d": "12 V current" },
+      { "n": "STAT_PCU48_STROM_48V_WERT", "t": "s16", "at": 6, "k": 0.1, "u": "A", "d": "48 V current" },
+      { "n": "STAT_PCU48_LEISTUNG_12V_WERT", "t": "s16", "at": 8, "u": "W", "d": "12 V power" },
+      { "n": "STAT_PCU48_LEISTUNG_48V_WERT", "t": "s16", "at": 10, "u": "W", "d": "48 V power" },
+      { "n": "STAT_BETRIEBSMODUS", "t": "u8", "at": 12, "d": "Operating mode" }
+    ]
+  }
+}

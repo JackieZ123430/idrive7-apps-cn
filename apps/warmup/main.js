@@ -10,11 +10,18 @@
  *   - 20-minute temperature trend
  *   - turbo cool-down: hard driving (high rpm or high power) builds up a cool-down
  *     time (30 s - 3 min) that counts down while driving gently or idling
+ *   - gearbox oil (gearbox.js, issue #164): a third gauge, its own "ready in" and trend line, and READY
+ *     waits for it too, on a car that has it (the gearbox unit, else the car's signal)
+ *   - Cold starts tab: the engine's starts, how many with cold oil and how many cold runs went past the safe rev
+ *     limit (coldstarts.js, counted in the background: app.json autostart)
  */
 const mgu = require('./kit/mgu');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const Car = require('./kit/car');
+const Engine = require('./kit/engine');
+const { ColdStarts, COLD_C } = require('./coldstarts');
+const { Gearbox } = require('./gearbox');
 
 const W = 1600, H = 520;
 const GO = '#2fd27a';
@@ -22,15 +29,52 @@ const HARD_RPM = 3800, HARD_KW = 90;       // above either = hard use (heats the
 const GENTLE_RPM = 2800, GENTLE_KW = 40;   // below both = cooling down
 const COOL_MIN = 30, COOL_MAX = 180;       // s of cool-down, growing with the hard-use time
 // typical warm-up rates (deg C / min) until enough has been measured
-const TYPICAL = { oil: { drive: 4, idle: 1.5 }, coolant: { drive: 7, idle: 3 } };
+const TYPICAL = { oil: { drive: 4, idle: 1.5 }, coolant: { drive: 7, idle: 3 }, gearbox: { drive: 3, idle: 0.8 } };
+const HIST = { oil: 1, coolant: 2, gearbox: 5 };   // a value's place in a hist entry
+const GEAR_HOT = 125;                      // deg C: ease off
+const GEAR_C = '#b98cff';                  // the gearbox's colour in the trend
+const TABS = ['Warm-up', 'Cold starts'];
+const RPM = { factor: 0.25, invalid: 65535 }, TEMP = { offset: -48, invalid: 255 };
+
+/** The safe rev limit for the oil's temperature: the cold limit up to the redline, climbing from 30 deg C to warm. */
+function limitFor(engine, settings, oil) {
+    const warm = settings.get('warmOil'), red = engine.redline(), cold = Math.min(engine.value('coldLimit', { diesel: 3000, petrol: 3500 }), red);
+    if (!G.isNum(oil)) return null;
+    if (oil >= warm) return red;
+    return Math.round((cold + (red - cold) * G.clamp((oil - 30) / (warm - 30), 0, 1)) / 100) * 100;
+}
+
+/* With or without the screen (autostart): the cold starts counted. */
+async function background(bg) {
+    const { settings, signals, log } = bg;
+    const engine = new Engine({ settings, dataDir: bg.dataDir, log });
+    const cs = new ColdStarts({ settings, limit: (oil) => limitFor(engine, settings, oil), warm: () => settings.get('warmOil') });
+    const w = (iface, h) => (signals && signals.watch ? Promise.resolve(signals.watch(iface, '1', h, log)).catch((e) => log.warn('cold starts: ' + (e && e.message || e))) : null);
+    w('de.bmw.infotainment.vehicle.CDS', {
+        statusEngineSpeed2: (v) => { const r = v && v.actualValueRPMEngineCrankshaft; if (G.isNum(r) && r !== RPM.invalid) cs.rpm(r * RPM.factor); },
+        statusEngineTemperature: (v) => { const o = v && v.temperatureEngineOilDrive; if (G.isNum(o) && o !== TEMP.invalid) cs.oil(o + TEMP.offset); },
+    });
+    w(Engine.SIGNAL[0], engine.handlers());
+    return { cs };
+}
 
 mgu.run({
+    background,
     async start(ctx) {
         const { ui, settings } = ctx;
-        const car = new Car(ctx, ['rpm', 'speed', 'temps', 'torque']);
+        const cs = (ctx.background || await background(ctx)).cs;
+        let page = 0;
+        // engine profile (diesel / petrol): the Auto redline and cold limit
+        const engine = new Engine({ settings, dataDir: ctx.dataDir, log: ctx.log });
+        const car = new Car(ctx, ['rpm', 'speed', 'temps', 'torque'], { [Engine.SIGNAL[0]]: engine.handlers() });
+        car.setRedline(engine.redline());
+        engine.onChange(() => car.setRedline(engine.redline()));
+        const gearbox = new Gearbox(ctx, ctx.log, () => ctx.ui.isVisible('MAIN')).start();
+        // the gearbox oil: the unit's / the signal's, or in the demo one that follows the oil a little behind
+        const gearT = (d) => (d.demo ? (G.isNum(d.oil) ? d.oil - 12 : null) : gearbox.temp());
 
         /* ---------- tracking ---------- */
-        const hist = [];             // [t, oil, coolant] every 5 s, 20 min; t = steady clock (mono)
+        const hist = [];             // [t, oil, coolant, rpm, speed, gearbox] every 5 s, 20 min; t = steady clock (mono)
         // the head unit sets its clock after start-up: wall-clock times can jump by hours, which
         // threw the trend lines across the screen. A steady clock only ever moves forward.
         const mono = () => { const h = process.hrtime(); return h[0] * 1000 + h[1] / 1e6; };
@@ -38,7 +82,9 @@ mgu.run({
         // cool-down: hardS = seconds of hard use; needS = cool-down it asks for; cool = gentle seconds done
         let hardS = 0, needS = 0, cool = 0, doneAt = 0;
         car.onSample((d, t) => {
-            const dt = lastT ? Math.min(250, t - lastT) / 1000 : 0; lastT = t;
+            // sample times (the demo replays late steps with theirs) are wall-clock: a step back counts as no time,
+            // and "cooled" times its 20 s on the steady clock
+            const dt = lastT ? G.clamp(t - lastT, 0, 250) / 1000 : 0, m = mono(); lastT = t;
             if (G.isNum(d.rpm)) {
                 const kw = G.isNum(d.torque) ? d.torque * d.rpm / 9549 : 0;
                 const hard = d.rpm > HARD_RPM || kw > HARD_KW;
@@ -48,16 +94,15 @@ mgu.run({
                     if (hardS > 8) needS = G.clamp(COOL_MIN + hardS * 3, COOL_MIN, COOL_MAX);
                 } else if (needS > 0 && gentle) {
                     cool += dt;
-                    if (cool >= needS && !doneAt) doneAt = t;
+                    if (cool >= needS && !doneAt) doneAt = m;
                 } else if (!needS) {
                     hardS = Math.max(0, hardS - dt * 0.2);      // short bursts fade away
                 }
                 // "cooled" message stays for 20 s, then all clear
-                if (doneAt && t - doneAt > 20000) { hardS = 0; needS = 0; cool = 0; doneAt = 0; }
+                if (doneAt && m - doneAt > 20000) { hardS = 0; needS = 0; cool = 0; doneAt = 0; }
             }
-            const m = mono();
             if (m - lastHist > 5000 && (G.isNum(d.oil) || G.isNum(d.coolant))) {
-                lastHist = m; hist.push([m, d.oil, d.coolant, d.rpm, d.speed]);
+                lastHist = m; hist.push([m, d.oil, d.coolant, d.rpm, d.speed, gearT(d)]);
                 while (hist.length > 240) hist.shift();
             }
         }, () => { hist.length = 0; hardS = 0; needS = 0; cool = 0; doneAt = 0; });
@@ -66,12 +111,7 @@ mgu.run({
         const T = (c) => (G.isNum(c) ? (F() ? c * 9 / 5 + 32 : c) : null);
         const tU = () => (F() ? '°F' : '°C');
 
-        function limit(oil) {
-            const warm = settings.get('warmOil'), red = settings.get('redline'), cold = Math.min(settings.get('coldLimit'), red);
-            if (!G.isNum(oil)) return null;
-            if (oil >= warm) return red;
-            return Math.round((cold + (red - cold) * G.clamp((oil - 30) / (warm - 30), 0, 1)) / 100) * 100;
-        }
+        const limit = (oil) => limitFor(engine, settings, oil);
 
         /** deg C per minute over the last ~3 min (least squares) and the time it covers (ms). */
         function measured(idx) {
@@ -93,7 +133,7 @@ mgu.run({
             if (!G.isNum(temp)) return { state: 'none' };
             if (temp >= target) return { state: 'ready' };
             if (G.isNum(d.rpm) && d.rpm < 300) return { state: 'off' };
-            const m = measured(key === 'oil' ? 1 : 2);
+            const m = measured(HIST[key]);
             const typ = TYPICAL[key][G.isNum(d.speed) && d.speed > 10 ? 'drive' : 'idle'];
             const w = G.clamp(m.span / 120000, 0, 1);
             const rate = G.isNum(m.rate) ? w * m.rate + (1 - w) * typ : typ;
@@ -117,6 +157,19 @@ mgu.run({
             });
         }
 
+        /** The same in a lower panel (three of them with the gearbox): a thinner bar, smaller scale and number. */
+        function gaugeSmall(cv, t, y, h, val, label, warm) {
+            const p = G.panel(cv, t, 24, y, 880, h, label), st = F() ? 18 : 10, v = T(val);
+            const uw = cv.textWidth(' ' + tU(), 22);
+            cv.text(G.isNum(v) ? String(Math.round(v)) : '--', 880 - uw, y + 48, 48, G.isNum(v) ? t.text : t.dim, { align: 'right', font: 'num' });
+            cv.text(' ' + tU(), 880, y + 48, 22, t.dim, { align: 'right' });
+            G.segBar(cv, t, 48, y + 66, 832, p.h - 66 - 44, {
+                panel: false, value: v, min: T(0), max: T(150), step: st, scale: { every: st * 2.5, size: 20, labelY: 40, tick: 8 },
+                zones: [{ from: T(120), to: T(135), color: 'warn' }, { from: T(135), to: T(160), color: 'crit' }],
+                ramp: 'hot', limit: T(120), marks: [{ value: T(warm), color: GO }],
+            });
+        }
+
         /** One "ready in" row: label + target, big minutes (or the state), a reason on the right. */
         function etaRow(cv, t, y, label, e, target) {
             cv.text(label, 952, y, 22, t.dim, { font: 'bold', spacing: 1.5 });
@@ -133,27 +186,84 @@ mgu.run({
             cv.text('target ' + Math.round(T(target)) + tU(), 1552, y, 22, t.dim, { align: 'right' });
         }
 
+        /* The Cold starts tab: the three counts, the latest starts, Reset. */
+        function renderCold(cv, t) {
+            const st = cs.stats(), pct = (n) => (st.starts ? Math.round(n * 100 / st.starts) + ' %' : '');
+            const since = new Date(st.since), two = (n) => (n < 10 ? '0' : '') + n;
+            [['ENGINE STARTS', st.starts, '', t.text], ['WITH COLD OIL', st.cold, 'under ' + Math.round(T(COLD_C)) + tU() + '  ' + pct(st.cold), t.cold],
+                ['COLD AND REVVED', st.revved, 'past the safe rev limit  ' + pct(st.revved), t.warn]].forEach(([label, n, note, col], i) => {
+                const x = 24 + i * 523;
+                G.panel(cv, t, x, 44, 506, 180, null);
+                cv.text(label, x + 24, 86, 22, t.dim, { font: 'bold', spacing: 1.5 });
+                cv.text(String(n), x + 24, 172, 72, n ? col : t.dim, { font: 'num' });
+                cv.text(note, x + 24, 206, 20, t.dim);
+            });
+            const lp = G.panel(cv, t, 24, 240, 1552, 272, 'Latest starts');
+            const rows = st.last || [];
+            if (!rows.length) cv.text('Counted from the next engine start', 48, 330, 24, t.dim);
+            rows.slice(0, 4).forEach((r, i) => {
+                const at = new Date(r.at), y = 316 + i * 44;
+                cv.text(at.getDate() + '.' + two(at.getMonth() + 1) + '.  ' + at.getHours() + ':' + two(at.getMinutes()), 48, y, 24, t.text);
+                cv.text('oil ' + Math.round(T(r.oil)) + tU(), 360, y, 24, r.cold ? t.cold : t.text, { font: 'bold' });
+                cv.text(r.revved ? 'revved cold' : r.cold ? 'cold start' : '', 560, y, 24, r.revved ? t.warn : t.dim);
+            });
+            cv.text('since ' + since.getDate() + '.' + two(since.getMonth() + 1) + '.' + since.getFullYear(), 1552, 300, 22, t.dim, { align: 'right' });
+            G.button(cv, t, 1336, 240 + lp.h - 70, 216, 50, 'Reset', () => { cs.reset(); return render(); }, { key: 'reset', confirm: true });
+        }
+
+        /** The same, on one line (three of them with the gearbox): label and target left, minutes / state right. */
+        function etaLine(cv, t, y, label, e, target) {
+            cv.text(label, 952, y, 22, t.dim, { font: 'bold', spacing: 1.5 });
+            cv.text('target ' + Math.round(T(target)) + tU(), 952, y + 26, 20, t.dim);
+            let big, col = t.text, unit = '';
+            if (e.state === 'ready') { big = 'READY'; col = GO; }
+            else if (e.state === 'off') { big = 'ENGINE OFF'; col = t.dim; }
+            else if (e.state === 'stalled') { big = 'NOT WARMING'; col = t.warn; }
+            else if (e.state === 'warming') { big = e.min > 60 ? '>60' : '~' + Math.max(1, Math.round(e.min)); unit = 'min'; }
+            else { big = '--'; col = t.dim; }
+            const ux = unit ? 1552 - cv.textWidth(unit, 24) : 1552;
+            cv.text(big, unit ? ux - 8 : 1552, y + 22, unit ? 44 : 32, col, { align: 'right', font: unit || big === '--' ? 'num' : 'bold', spacing: unit ? 0 : 1 });
+            if (unit) cv.text(unit, 1552, y + 22, 24, t.dim, { align: 'right' });
+        }
+
         function render() {
             const t = ctx.theme(), d = car.data(), now = Date.now();
             const cv = ctx.canvas(W, H).clear(t.bg);
+            if (cs && page === 1) {
+                renderCold(cv, t);
+                G.frame(cv, t, TABS, 1, [d.demo && { text: 'DEMO' }]);
+                return ui.image('MAIN_GFX', cv);
+            }
             const warm = settings.get('warmOil'), warmC = settings.get('warmCoolant');
             // the room below the page (on the car, with no bar under it): half to each gauge; the coolant
             // panel ends at the page's bottom, and G.panel adds the room back to it
             const room = G.pageBottom(cv) - G.BOTTOM, half = Math.round(room / 2);
-            gauge(cv, t, G.TOP, 225 + half, d.oil, 'Oil', warm);
-            gauge(cv, t, G.TOP + 242 + half, 225 - half, d.coolant, 'Coolant', warmC);
+            const gb = gearT(d), warmG = settings.get('warmGearbox'), hasGb = G.isNum(gb);
+            if (hasGb) {
+                // three gauges in the room of two: the oil (what matters most) gets the extra room below the page
+                gaugeSmall(cv, t, G.TOP, 144 + half, d.oil, 'Oil', warm);
+                gaugeSmall(cv, t, G.TOP + 161 + half, 144, d.coolant, 'Coolant', warmC);
+                gaugeSmall(cv, t, G.TOP + 322 + half, 145 - half, gb, 'Gearbox oil', warmG);
+            } else {
+                gauge(cv, t, G.TOP, 225 + half, d.oil, 'Oil', warm);
+                gauge(cv, t, G.TOP + 242 + half, 225 - half, d.coolant, 'Coolant', warmC);
+            }
 
             // ---- status panel
             const sp = G.panel(cv, t, 928, 44, 648, 468, null);
             const lim = limit(d.oil);
-            const ready = G.isNum(d.oil) && d.oil >= warm;
+            // ready: the oil warm, and the gearbox oil too where the car tells it
+            const gbCold = hasGb && gb < warmG, gbHot = hasGb && gb > GEAR_HOT;
+            const ready = G.isNum(d.oil) && d.oil >= warm && !gbCold;
             const hot = G.isNum(d.oil) && d.oil > 125;
             const cooling = settings.get('cooldown') && needS > 0;
             let st, col;
             if (!G.isNum(d.oil)) { st = 'NO OIL TEMP'; col = t.dim; }
             else if (hot) { st = 'OIL HOT - EASE OFF'; col = t.crit; }
+            else if (gbHot) { st = 'GEARBOX HOT - EASE OFF'; col = t.crit; }
             else if (cooling) { st = doneAt ? 'COOLED - OK TO SWITCH OFF' : 'TURBO COOL-DOWN'; col = doneAt ? GO : t.warn; }
             else if (ready) { st = 'READY'; col = GO; }
+            else if (d.oil >= warm && gbCold) { st = 'GEARBOX WARMING UP'; col = t.warn; }
             else if (d.oil >= warm - 20) { st = 'WARMING UP'; col = t.warn; }
             else { st = 'COLD'; col = t.cold; }
             cv.roundRect(952, 70, 600, 60, 10, withAlpha(col, 0.22));
@@ -176,13 +286,17 @@ mgu.run({
                 const f = needS ? G.clamp(cool / needS, 0, 1) : 1;
                 cv.roundRect(952, 303, 600, 12, 6, t.track);
                 if (f > 0) cv.rampRect(952, 303, Math.max(12, 600 * f), 12, 6, [t.warn, GO], 952, 600);
+            } else if (hasGb) {
+                etaLine(cv, t, 166, 'OIL READY IN', eta('oil', d.oil, warm, d), warm);
+                etaLine(cv, t, 226, 'COOLANT READY IN', eta('coolant', d.coolant, warmC, d), warmC);
+                etaLine(cv, t, 286, 'GEARBOX READY IN', eta('gearbox', gb, warmG, d), warmG);
             } else {
                 etaRow(cv, t, 170, 'OIL READY IN', eta('oil', d.oil, warm, d), warm);
                 etaRow(cv, t, 255, 'COOLANT READY IN', eta('coolant', d.coolant, warmC, d), warmC);
             }
 
             // ---- safe rev limit (always) + trend
-            const red = settings.get('redline'), fl = lim ? lim / red : 0;
+            const red = engine.redline(), fl = lim ? lim / red : 0;
             cv.text('SAFE REV LIMIT', 952, 350, 22, t.dim, { font: 'bold', spacing: 1.5 });
             cv.text(lim ? lim + ' rpm' : '---- rpm', 1552, 352, 26, ready ? GO : t.text, { align: 'right', font: 'bold' });
             cv.roundRect(1160, 340, 230, 8, 4, t.track);
@@ -198,10 +312,11 @@ mgu.run({
             const X = (ts) => nowX - ((now0 - ts) / span) * (gw - 90), Y = (c) => gy + gh - (G.clamp(c, lo, hi) - lo) / (hi - lo) * gh;
             cv.fillRect(gx, gy - 20, 22, 4, t.oil || t.accent); cv.text('OIL', gx + 30, gy - 11, 20, t.dim, { font: 'bold' });
             cv.fillRect(gx + 100, gy - 20, 22, 4, t.cold); cv.text('COOLANT', gx + 130, gy - 11, 20, t.dim, { font: 'bold' });
+            if (hasGb) { cv.fillRect(gx + 250, gy - 20, 22, 4, GEAR_C); cv.text('GEARBOX', gx + 280, gy - 11, 20, t.dim, { font: 'bold' }); }
             cv.fillRect(gx, Y(warm), gw, 1, withAlpha(GO, 0.5));
             cv.text(String(Math.round(T(warm))), gx + gw + 4, Y(warm) + 7, 20, GO);
             cv.fillRect(nowX, gy, 1, gh, withAlpha(t.tick, 0.5));       // "now"
-            [[1, t.oil || t.accent, 'oil', warm, d.oil], [2, t.cold, 'coolant', warmC, d.coolant]].forEach(([i, c, key, target, cur]) => {
+            [[1, t.oil || t.accent, 'oil', warm, d.oil], [2, t.cold, 'coolant', warmC, d.coolant]].concat(hasGb ? [[5, GEAR_C, 'gearbox', warmG, gb]] : []).forEach(([i, c, key, target, cur]) => {
                 const pts = hist.filter((h) => G.isNum(h[i])).map((h) => [X(h[0]), Y(h[i])]).filter((p) => p[0] >= gx && p[0] <= nowX + 0.5);
                 if (pts.length > 1) cv.polyline(pts, 3, c);
                 // projection to the target, dashed
@@ -216,10 +331,11 @@ mgu.run({
                 }
             });
             cv.fillRect(gx, gy + gh, gw, 1, withAlpha(t.tick, 0.5));
-            G.frame(cv, t, ['Warm-up'], 0, [d.demo && { text: 'DEMO' }]);     // G20-style frame
+            G.frame(cv, t, cs ? TABS : ['Warm-up'], 0, [d.demo && { text: 'DEMO' }]);     // G20-style frame
             return ui.image('MAIN_GFX', cv);
         }
 
+        if (cs && ctx.onTab) ctx.onTab((i) => { page = i; return render(); });
         // every screen refresh (60 fps) with the GPU renderer; 4 fps in software (PNG frames)
         ctx.loop('MAIN', 4, render);
         render().then(() => ctx.log.info('first frame done')).catch((e) => ctx.log.warn('first render: ' + e));

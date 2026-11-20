@@ -2,7 +2,9 @@
 /**
  * car.js - the common driving signals, scaled, with demo fallback.
  *
- *   const car = new Car(ctx, ['rpm', 'speed', 'accel', 'temps', 'gear', 'torque']);
+ *   const car = new Car(ctx, ['rpm', 'speed', 'accel', 'temps', 'gear', 'torque'], extra);
+ *   extra (optional) = { iface: { field: fn } }, more fields on the same watches (one proxy per interface)
+ *   car.setRedline(rpm) -> the demo drive revs to this rpm (default 7000)
  *   car.data()      -> { rpm, speed, gLong, gLat, coolant, oil, gear, torque, demo }
  *   car.onSample(fn)-> fn(data, tMs) on every new speed/rpm/accel sample (also in demo, 20 Hz)
  *
@@ -11,6 +13,8 @@
  * list the interfaces (see SIGNALS below for the exact entries).
  * Demo: setting "demo" = auto (until the car answers) / on / off.
  * data().stage = the selector position 'P' / 'R' / 'N' / 'D' (gearbox signal), else undefined.
+ * data().condition = BMW's vehicle state number ('condition' group; 10 = drive-ready), else undefined;
+ * data().conditionKnown = false while the last state sent isn't one of those (e.g. 15, no value).
  */
 const Sim = require('./sim');
 
@@ -29,6 +33,13 @@ const gearOf = (x) => (typeof x === 'number' ? (x >= 3 && x <= 12 ? x - 2 : x ==
 // the gear field alone can't tell P from N (both N_OR_P)
 const STAGES = { P: 'P', R: 'R', N: 'N', D: 'D', 1: 'P', 2: 'R', 3: 'N', 4: 'D' };
 const stageOf = (x) => STAGES[x];
+// VehicleCondition.statusConditionVehicle (BMW's vehicle state): names or wire numbers -> number.
+// 5 = WOHNEN (living, no ignition), 7 = PRUEFEN_ANALYSE_DIAGNOSE (ignition on), 8 = drive
+// readiness starting, 10 = FAHREN (drive-ready / READY, also with the engine off on a hybrid),
+// 12 = drive readiness ending; 15 = no value.
+const CONDITIONS = { PARKEN_BN_NIO: 1, PARKEN_BN_IO: 2, STANDFUNKTIONEN_KUNDE_NICHT_IM_FZG: 3, WOHNEN: 5,
+    PRUEFEN_ANALYSE_DIAGNOSE: 7, FAHRBEREITSCHAFT_HERSTELLEN: 8, FAHREN: 10, FAHRBEREITSCHAFT_BEENDEN: 12 };
+const conditionOf = (x) => { const n = typeof x === 'number' ? x : CONDITIONS[x]; return n >= 1 && n <= 12 ? n : undefined; };
 /**
  * DataPowerTrain2.statusGearSelectionDrive: P / R / N and the engaged gear in one enum, names or
  * wire numbers (N = 1, R = 2, P = 3, NP = 4, _1 = 5 ... _9 = 13) -> { stage, gear } or undefined.
@@ -52,7 +63,13 @@ const SIGNALS = {
     accel: ['de.bmw.infotainment.vehicle.CDS2', 'statusLongitudinalAccelerationMassCenter', 'statusLateralAccelerationMassCenter'],
     gear: ['de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive', 'DataPowerTrain2'],
     torque: ['de.bmw.infotainment.drivingexcitement.FES', 'statusActualValueTorque2'],
+    condition: ['de.bmw.infrastructure.VehicleCondition', 'VehicleCondition'],
 };
+
+/* No engine runs below this. A hybrid's engine stopping leaves its last value of the run-down as
+ * the signal (160 rpm seen with the engine off), so anything lower reads as stopped. */
+const ENGINE_STOPPED_RPM = 400;
+const engineRpm = (v) => (typeof v === 'number' && v < ENGINE_STOPPED_RPM ? 0 : v);
 
 /**
  * Learns the gearbox from rpm/speed ratios (one cluster per gear) so a gear
@@ -73,7 +90,7 @@ class GearGuess {
 }
 
 class Car {
-    constructor(ctx, groups) {
+    constructor(ctx, groups, extra) {
         this.ctx = ctx; this.log = ctx.log;
         const over = (ctx.spec.config && ctx.spec.config.scaling) || {};
         this.S = Object.assign({}, SCALE, over);
@@ -95,7 +112,7 @@ class Car {
         };
         const watches = {};
         const add = (iface, field, fn) => { (watches[iface] = watches[iface] || {})[field] = fn; };
-        if (groups.includes('rpm')) add('de.bmw.infotainment.vehicle.CDS', 'statusEngineSpeed2', (v) => put('rpm', sc('rpm', v.actualValueRPMEngineCrankshaft), true));
+        if (groups.includes('rpm')) add('de.bmw.infotainment.vehicle.CDS', 'statusEngineSpeed2', (v) => put('rpm', engineRpm(sc('rpm', v.actualValueRPMEngineCrankshaft)), true));
         if (groups.includes('temps')) add('de.bmw.infotainment.vehicle.CDS', 'statusEngineTemperature', (v) => { put('coolant', sc('temp', v.temperatureEngineDrive)); put('oil', sc('temp', v.temperatureEngineOilDrive)); });
         if (groups.includes('speed')) add('de.bmw.infotainment.vehicle.Vehicle2', 'statusCarSpeed2', (v) => put('speed', sc('speed', v.speedVehicleCentreOfGravity), true));
         if (groups.includes('accel')) {
@@ -117,8 +134,19 @@ class Car {
                 put('gear', sel.gear);
             });
         }
+        // (conditionKnown: false while the car's last state was one this table doesn't know, "no value" 15 among them;
+        // condition then keeps the last known one. Each new raw state logged once, so a log shows what a car sends.)
+        const condSeen = [];
+        if (groups.includes('condition')) add('de.bmw.infrastructure.VehicleCondition', 'VehicleCondition', (v) => {
+            const raw = v && v.statusConditionVehicle, n = conditionOf(raw);
+            if (raw === undefined || raw === null) return;
+            if (condSeen.length < 16 && condSeen.indexOf(String(raw)) < 0) { condSeen.push(String(raw)); this.log.info('vehicle state: ' + JSON.stringify(raw) + (n === undefined ? ' (not known)' : '')); }
+            this.live.conditionKnown = n !== undefined;
+            put('condition', n);
+        });
         // negative torque (engine braking while the rpm falls) counts as 0
         if (groups.includes('torque')) add('de.bmw.infotainment.drivingexcitement.FES', 'statusActualValueTorque2', (v) => { const tq = sc('torque', v.actualValueTorqueCrankshaft); put('torque', tq === null ? null : Math.max(0, tq)); });
+        Object.keys(extra || {}).forEach((iface) => Object.keys(extra[iface]).forEach((f) => add(iface, f, extra[iface][f])));
         // a parked car sends nothing new for minutes (fields are notified on change), so "no data for
         // a while" doesn't mean "no car": once a signal's provider is there, stay on live data
         this.subs = [];
@@ -160,6 +188,8 @@ class Car {
 
     /** fn(data, tMs) per sample; fn.reset() (optional) when the source switches live<->demo. */
     onSample(fn, reset) { this.listeners.push({ fn, reset }); }
+    /** The demo drive's rev limit (the app's redline). */
+    setRedline(rpm) { this.sim.setRedline(rpm); }
 
     _emit(d, t) {
         const data = Object.assign({}, d, { demo: this.demoActive });
@@ -170,4 +200,5 @@ class Car {
 Car.SIGNALS = SIGNALS;
 Car.GearGuess = GearGuess;
 Car.selectionOf = selectionOf;
+Car.conditionOf = conditionOf;
 module.exports = Car;

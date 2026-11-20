@@ -11,10 +11,14 @@
  *             restarts it; a failed build keeps the old one running.
  *   renderer  the daemon side of kit/renderd/PROTOCOL.md on a Unix socket (MGU_RENDERD_SOCKET for the app):
  *             HELLO -> X_READY (touch routing, controller gate) + READY, X_STATE, TICK when the browser has
- *             drawn the last frame, touch to the app inside its CLAIMs (CLOSED outside), the controller as
+ *             drawn the last frame (a page that has not ticked for 200 ms does not paint - a background tab, a
+ *             hidden pane, a minimised window: the frames count as drawn when they come, at the FPS cap, until a
+ *             page ticks at a refresh rate again), touch to the app inside its CLAIMs (CLOSED outside), the controller as
  *             X_CCU / CCU while the app grabs it. Every message the app sends goes to the browser unchanged;
  *             a malformed one ends the app's connection, as on the car ("bad message").
  *   page      kit/emu/web over http on 127.0.0.1, a WebSocket (RFC 6455, below) at /ws for this host's pages only.
+ *             Cross-origin isolated (COOP + COEP: the page loads nothing from elsewhere), so performance.now() has
+ *             µs steps for the draw times, not 0.1 ms.
  *
  * WebSocket, server -> page: binary = one or more whole client->renderer messages (gfx.feed); text = JSON
  *   {t:'hello', apps, titles, app, bg, touch}  on connect (titles: { id: app.json title }; icons at /icon/<id>.png)
@@ -26,7 +30,6 @@
  *   {t:'screens', stack, closed}          the app's screen stack; closed: the user left it (the page shows the HMI's app picker)
  *   {t:'focus', id}                       the bar button the HMI's focus is on (controller not grabbed)
  *   {t:'soft', png}                       the HMI's own image of the app's screen (software path), base64 PNG
- *   {t:'stats', msgs, bytes, ticks}       per second
  *   {t:'note', s}                         a short message for the user (the app opened an HMI screen not drawn here)
  * page -> server: JSON
  *   {t:'tick'}                            the frames received so far are drawn: the app may send the next
@@ -164,7 +167,9 @@ const server = http.createServer((req, res) => {
         if (!ic && f !== BG && f.indexOf(WEB + path.sep) !== 0) { fail(403); return; }
         fs.readFile(f, (e, d) => {
             if (e) { fail(404); return; }
-            res.writeHead(200, { 'content-type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store' });
+            // (cross-origin isolated: a finer performance.now() for the draw times; everything the page loads is from here)
+            res.writeHead(200, { 'content-type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-store',
+                'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' });
             res.end(d);
         });
     } catch (e) { fail(500); }
@@ -200,8 +205,14 @@ const BACK_COL = { w: 84, h: 530, head: 76 };   // the HMI's home (in its strip)
 const T0 = Date.now();
 let R = null;                                   // the app's connection
 let pageFps = 60;
-const Tick = { busy: false, want: false, n: 0, last: 0, timer: null, headless: null };
-const counts = { msgs: 0, bytes: 0, ticks: 0 };
+// late: no tick 200 ms after a frame; stalled: the pages do not paint (frames count as drawn when they come);
+// reading: a stalled frame waits for the pages to take it; pageAt: the last page tick (ms)
+const Tick = { busy: false, want: false, n: 0, last: 0, timer: null, headless: null, late: null, stalled: false, reading: null, pageAt: 0 };
+/** a new app connection: no timer of the old one ticks it */
+function tickReset() {
+    clearTimeout(Tick.late); clearTimeout(Tick.reading); clearImmediate(Tick.reading);
+    Object.assign(Tick, { busy: false, want: false, late: null, stalled: false, reading: null, pageAt: 0 });
+}
 
 /** A daemon->client message: u32 words (any number: written as its low 32 bits) or a raw payload. */
 function msg(type, words, raw) {
@@ -225,7 +236,7 @@ const daemon = net.createServer((sock) => {
         cache: { hello: null, mode: null, place: null, claim: null, grab: null, fps: null, show: null, frame: null, res: new Map() },
         parts: [], n: 0, need: 8, gesture: null,
     };
-    Object.assign(Tick, { busy: false, want: false });
+    tickReset();
     toPages({ t: 'reset', app: c.id });
     const drop = (why) => { appLog('error', 'renderer: bad message (' + why + '), connection closed'); sock.destroy(); };
     sock.on('data', (d) => {
@@ -239,10 +250,9 @@ const daemon = net.createServer((sock) => {
             if (len > MAX_MSG) { bad = len + ' bytes'; break; }
             if (b.length - o < 8 + len) break;
             try { handle(c, type, b.slice(o + 8, o + 8 + len), b.slice(o, o + 8 + len)); } catch (e) { bad = 'type ' + type + ': ' + (e instanceof Bad ? e.message : e); break; }
-            counts.msgs++;
             o += 8 + len;
         }
-        if (o) { counts.bytes += o; toPages(b.slice(0, o)); }
+        if (o) toPages(b.slice(0, o));
         if (bad) { drop(bad); return; }
         const rest = b.slice(o);
         c.parts = rest.length ? [Buffer.from(rest)] : []; c.n = rest.length;
@@ -300,6 +310,7 @@ function handle(c, type, p, whole) {
         Tick.busy = true; wantTick();
         // nobody watching: take frames at 10 a second
         if (!pages.size && !Tick.headless) Tick.headless = setTimeout(() => { Tick.headless = null; drawn(); }, 100);
+        else if (pages.size) late();
         break;
     case M.M9: {
         // upstream IMAGE or IterioDev's CLAIM (src/dialect.c)
@@ -393,6 +404,30 @@ function state(c) {
 
 /* TICK: the app sends its next frame when the last one is drawn (the page's {t:'tick'}), at most fps a second */
 function wantTick() { Tick.want = true; pump(); }
+/**
+ * A page ticks from requestAnimationFrame, which a page that is not painted (a background tab, a hidden pane, a
+ * minimised window) does not run: no tick 200 ms after a frame, and the frames count as drawn when they come (pump
+ * keeps the FPS cap, and a frame still queued to a page holds the next: the pages' reading paces it) until a page
+ * ticks at a refresh rate again (two ticks within 100 ms: a hidden pane's stray tick about once a second is not).
+ */
+function late() {
+    if (Tick.stalled) { afterRead(); return; }
+    if (!Tick.late) Tick.late = setTimeout(() => { Tick.late = null; if (Tick.busy && pages.size) { Tick.stalled = true; drawn(); } }, 200);
+}
+/**
+ * Stalled: the frame counts as drawn once nothing is queued to a page (written to the socket; polled, as 'drain'
+ * comes only after a write over the socket's high-water mark). One wait at a time; a page that goes holds nothing.
+ */
+function afterRead() {
+    if (Tick.reading) return;
+    const poll = () => {
+        Tick.reading = null;
+        if (!Tick.stalled || !Tick.busy) return;
+        if (Array.from(pages).some((x) => x.open && x.sock.writableLength)) { Tick.reading = setTimeout(poll, 2); return; }
+        drawn();
+    };
+    Tick.reading = setImmediate(poll);
+}
 function drawn() { Tick.busy = false; if (R) state(R); pump(); }
 function pump() {
     // (no ticks for a hidden app: it is not on screen, as when the user left it for the app picker)
@@ -400,7 +435,7 @@ function pump() {
     const caps = [pageFps, R.fps].filter((x) => x > 0), cap = caps.length ? Math.min.apply(null, caps) : 0;
     const wait = cap ? Tick.last + 1000 / cap - Date.now() : 0;
     if (wait > 1) { Tick.timer = setTimeout(() => { Tick.timer = null; pump(); }, wait); return; }
-    Tick.want = false; Tick.last = Date.now(); counts.ticks++;
+    Tick.want = false; Tick.last = Date.now();
     toApp(msg(E.TICK, [++Tick.n, Date.now() - T0]));
 }
 
@@ -469,15 +504,13 @@ function ccuSend() {
     toChild({ t: 'ccu', grabbed, ev: { seq: Ccu.seq, knob: Ccu.knob, pb: Ccu.pb, df: Ccu.df } });
 }
 
-// STATS once a second: the page's renderer numbers
+// STATS once a second: the page's renderer numbers (the panel's figures are the page's own, in one window)
 let gstats = null;
 const u32 = (x) => Math.max(0, Math.min(0xffffffff, Math.round(Number(x)) || 0));
 setInterval(() => {
     try {
         if (R && R.visible && gstats) toApp(msg(E.STATS, [u32(gstats.fps), u32(gstats.avgMs * 1000), u32(gstats.maxMs * 1000)].concat(R.dialect === 'native' ? [0] : [])));
-        toPages(Object.assign({ t: 'stats' }, counts));
     } catch (e) { console.error('emu: stats: ' + e); }
-    counts.msgs = counts.bytes = counts.ticks = 0;
 }, 1000).unref();
 
 /* ---------------- the page's messages ---------------- */
@@ -485,7 +518,14 @@ const Sig = { mode: 'demo', v: { rpm: 900, speed: 0, coolant: 90, oil: 95, gear:
 const SIG_KEYS = ['rpm', 'speed', 'coolant', 'oil', 'gLong', 'gLat', 'torque'];
 function onPage(ws, m) {
     switch (m.t) {
-    case 'tick': if (Tick.busy) drawn(); break;
+    case 'tick': {
+        // (stalled: a page that paints again ticks twice within 100 ms; a lone tick leaves the server's pace as it is)
+        const now = Date.now();
+        if (!Tick.stalled || now - Tick.pageAt < 100) { clearTimeout(Tick.late); Tick.late = null; Tick.stalled = false; }
+        Tick.pageAt = now;
+        if (Tick.busy) drawn();
+        break;
+    }
     case 'fps': pageFps = Math.max(0, Math.min(1000, Number(m.n) || 0)); pump(); break;
     case 'gstats': gstats = { fps: m.fps, avgMs: m.avgMs, maxMs: m.maxMs }; break;
     case 'touch': touch(m); break;

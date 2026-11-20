@@ -11,6 +11,7 @@ int gate_fd(void);                     /* its reports (poll it), -1 when none */
 /* reads what came; returns 1 when the front set changed, -1 when the gate ended */
 int gate_read(void);
 int gate_reported(void);               /* a report has come (until then no app is in front) */
+int gate_unavailable(void);            /* the gate cannot tell (no RHMI interface on this unit): as without a gate */
 int gate_front(uint32_t uid);          /* uid is in front */
 int gate_any_front(void);              /* some app is in front */
 void gate_stop(void);

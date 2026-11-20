@@ -6,14 +6,19 @@ Output: kit/runtime/fonts/<family>.json  =  {"sizes": [{size, ascent, descent,
 atlasW, atlasH, alpha: base64(zlib(8-bit alpha)), glyphs: {code: [x,y,w,h,ox,oy,adv]}}]}
 ox/oy = glyph bitmap offset from (pen x, baseline y).
 
-Needs Pillow (custom-apps/.venv). Free fonts only (Ubuntu font family).
+Needs Pillow (custom-apps/.venv). Free fonts only: the Ubuntu font family, and Barlow SemiBold (SIL OFL
+1.1, https://github.com/google/fonts/tree/main/ofl/barlow) for the gear on Redline's M layouts.
+
+  python3 bake_fonts.py              every family
+  python3 bake_fonts.py gear_barlow  only the families named
+  FONTDIR=/path/to/ttfs python3 ...  where the .ttf files are (default: the Ubuntu fonts' folder)
 """
 import base64, json, os, sys, zlib
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, '..', 'runtime', 'fonts')
-FONTDIR = '/usr/share/fonts/truetype/ubuntu'
+FONTDIR = os.environ.get('FONTDIR', '/usr/share/fonts/truetype/ubuntu')
 
 TEXT = ''.join(chr(c) for c in range(32, 127)) + '°μ│·–—…×±²³€↑↓→←✓✕'
 DIGITS = '0123456789.,:-+%°/ ' + 'kmhKMHrpmbarpsiVNCFgsxµRPDSWLOT'
@@ -26,6 +31,7 @@ FAMILIES = {
     'num':   ('Ubuntu[wdth,wght].ttf', (75, 500), [(40, TEXT), (64, DIGITS), (96, DIGITS), (150, DIGITS)]),
     'light': ('Ubuntu[wdth,wght].ttf', (85, 300), [(32, TEXT), (64, TEXT), (110, DIGITS)]),
     'gear':  ('Ubuntu[wdth,wght].ttf', (75, 700), [(200, GEAR), (300, GEAR)]),
+    'gear_barlow': ('Barlow-SemiBold.ttf', None, [(200, GEAR), (300, GEAR)]),
 }
 
 
@@ -82,7 +88,10 @@ def bake(fname, var, size, charset):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
+    only = sys.argv[1:]
     for fam, (fname, var, sizes) in FAMILIES.items():
+        if only and fam not in only:
+            continue
         data = {'family': fam, 'source': fname, 'sizes': [bake(fname, var, s, cs) for s, cs in sizes]}
         p = os.path.join(OUT, fam + '.json')
         json.dump(data, open(p, 'w', encoding='utf-8', newline='\n'), separators=(',', ':'))

@@ -18,12 +18,16 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
+const { Program } = require('./program');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
+const { t: translate } = require('./kit/i18n');
 const Demo = require('./demo');
+const Engine = require('./kit/engine');
 const { GearGuess, selectionOf } = require('./kit/car');
 const { Diag } = require('./kit/diag');
 const { DidReader } = require('./kit/dids');
+const TwinDme = require('./kit/twin_dme');
 
 const W = 1600, H = 520;
 const PAGES = ['engine', 'thermal', 'fuel', 'chassis'];
@@ -38,7 +42,7 @@ const HIST_SEC = 300;
 const TYRE_T = [-40, 150], TYRE_P = [0.5, 6], TYRE_PT = [1, 6];
 const RANGE = {
     rpm: [0, 12000], coolant: [-40, 160], oil: [-40, 170], gearbox: [-40, 160], egs: [-40, 160], ambient: [-50, 60], timing: [-64, 64],
-    boostFes: [-1, 4], boostDme: [-1, 4], boostTarget: [-1, 4], boostActual: [-1, 4], loadTarget: [0, 250], loadActual: [0, 250], tFL: TYRE_T, tFR: TYRE_T, tRL: TYRE_T, tRR: TYRE_T,
+    boostFes: [-1, 4], boostDme: [-1, 4], boost2: [-1, 4], boostTarget: [-1, 4], boostActual: [-1, 4], loadTarget: [0, 250], loadActual: [0, 250], tFL: TYRE_T, tFR: TYRE_T, tRL: TYRE_T, tRR: TYRE_T,
     pFL: TYRE_P, pFR: TYRE_P, pRL: TYRE_P, pRR: TYRE_P, ptFL: TYRE_PT, ptFR: TYRE_PT, ptRL: TYRE_PT, ptRR: TYRE_PT,
 };
 /*
@@ -47,6 +51,13 @@ const RANGE = {
  * next start shows them straight away.
  */
 // (tyre temperatures are not doubtful any more: with the right scaling a car's "no data" is 65535)
+/** boostMax setting -> the boost dial's top in bar, in psi and in kPa */
+const BOOST_MAX = { '2.0': [2, 30, 200], '2.5': [2.5, 36, 250], '3.0': [3, 44, 300], '3.5': [3.5, 50, 350] };
+/**
+ * Pressure units (values arrive in bar): [factor from bar, label, decimals for boost / LPFP / tyres].
+ * kPa reads in whole numbers like psi (1 bar = 100 kPa = 14.5038 psi).
+ */
+const PRESS = { bar: [1, 'bar', 2, 1, 1], psi: [14.5038, 'psi', 1, 0, 0], kpa: [100, 'kPa', 0, 0, 0] };
 const MOVE = { gearbox: 1, egs: 1, boostFes: 0.03, boostDme: 0.03 };
 /** Remembered per car: which groups sent real data (the "Auto" setting shows only those). */
 const GROUP = { gearbox: 'gearbox', boostFes: 'boost', boostDme: 'boost', tFL: 'tyreTemp', tFR: 'tyreTemp', tRL: 'tyreTemp', tRR: 'tyreTemp',
@@ -171,6 +182,31 @@ mgu.run({
             awdSeen = true; log.info('all-wheel drive detected');
             try { fs.writeFileSync(AWD_FILE, JSON.stringify({ seen: true })); } catch (e) { log.warn('awd save: ' + e); }
         };
+        // the misfire counter's reset: the counts per cylinder when Reset was pressed, kept until the engine unit
+        // starts a new driving cycle (a count lower than its base) - nothing is cleared in the car
+        const MIS_FILE = path.join(ctx.dataDir, 'misfire.json');
+        let misBase = null;
+        try { misBase = JSON.parse(fs.readFileSync(MIS_FILE, 'utf8')) || null; } catch (e) { /* none */ }
+        const saveMisBase = (b) => {
+            misBase = b;
+            try { if (b) fs.writeFileSync(MIS_FILE, JSON.stringify(b)); else fs.unlinkSync(MIS_FILE); } catch (e) { /* none to remove */ }
+        };
+        /** The counts since Reset ({ counts, since } or { counts } this drive), from the engine unit's counts. */
+        const misShown = (counts) => {
+            if (!Array.isArray(counts) || !counts.length || !misBase) return { counts };
+            // more cylinders than at the Reset (a V8's bank 2 from its second engine unit, found later): those
+            // count from now on, the Reset stays
+            if (Array.isArray(misBase.counts) && misBase.counts.length < counts.length && counts.slice(misBase.counts.length).every(G.isNum)) {
+                saveMisBase(Object.assign({}, misBase, { counts: misBase.counts.concat(counts.slice(misBase.counts.length)) }));
+            }
+            const b = misBase.counts;
+            if (b.length !== counts.length || counts.some((c, i) => G.isNum(c) && G.isNum(b[i]) && c < b[i])) {
+                log.info('misfire counter: a new driving cycle, the reset is done with');
+                saveMisBase(null);
+                return { counts };
+            }
+            return { counts: counts.map((c, i) => (G.isNum(c) ? c - (b[i] || 0) : c)), since: misBase.t };
+        };
         // which groups / sources this car has sent real data for (see MOVE, GROUP)
         const SEEN_FILE = path.join(ctx.dataDir, 'seen.json');
         let seen = {};
@@ -242,6 +278,11 @@ mgu.run({
                 live.gearGuess = live.speed < 3 ? null : g;
             }
         };
+        // engine profile (diesel / petrol): rpm bar end and the Auto redline
+        const engine = new Engine({ settings, dataDir: ctx.dataDir, log });
+        // S / M from the cluster's programme display, steadied with the setting programSteady (program.js, #193)
+        const program = new Program({ steady: () => settings.get('programSteady') === true, onChange: (v) => { live.program = v; } });
+        settings.onChange((key) => { if (key === 'programSteady') program.recheck(); });
         const watches = [
             ['de.bmw.infotainment.vehicle.CDS', {
                 statusEngineSpeed2: (v) => put('rpm', sc('rpm', v.actualValueRPMEngineCrankshaft)),
@@ -270,12 +311,14 @@ mgu.run({
                     log.info('car units: pressure ' + (press || '?') + ', temperature ' + (temp || '?'));
                 },
             }],
-            ['de.bmw.infotainment.vehicle.Vehicle2', { statusCarSpeed2: (v) => put('speed', sc('speed', v.speedVehicleCentreOfGravity)) }],
+            ['de.bmw.infotainment.vehicle.Vehicle2', Object.assign({ statusCarSpeed2: (v) => put('speed', sc('speed', v.speedVehicleCentreOfGravity)) }, engine.handlers())],
             ['de.bmw.infotainment.drivingexcitement.FES', {
                 statusSwitchDriveDynamicSport2: (v) => {
                     logRaw('FES boost', v.displayBoostPressure);
                     logRaw('FES g [lat, long]', [v.displayLateralAcceleration, v.displayLongitudinalAcceleration]);
-                    put('boostFes', sc('boost', v.displayBoostPressure));
+                    // in the car's pressure unit: 0.01 bar (or 1 kPa) a step, 0.1 psi a step on a car set to psi (issue #186)
+                    const b = sc('boost', v.displayBoostPressure);
+                    put('boostFes', G.isNum(b) && carUnits.press === 'PSI' ? b * 10 / 14.5038 : b);
                 },
                 // the HMI's sport display: power / torque in % of the car's maximum
                 statusVehicleDynamicEngine: (v) => { put('powerPct', sc('sportPct', v.displaySportEnginePower)); put('torquePct', sc('sportPct', v.displaySportEngineTorque)); },
@@ -344,7 +387,7 @@ mgu.run({
                 // S / M next to the gear: this car sends no selector programme with the gearbox status
                 dataDisplayGearbox: (v) => {
                     logRaw('gear programme', v && v.displayProgramGearbox);
-                    live.program = PROGRAMS[v && v.displayProgramGearbox] || null;
+                    program.set(PROGRAMS[v && v.displayProgramGearbox] || null);
                 },
             }],
         ];
@@ -356,6 +399,8 @@ mgu.run({
             .then((all) => log.info('signals: ' + all.map((s) => s.iface.split('.').pop() + (s.error ? '(err)' : '')).join(' ')));
 
         const demo = new Demo();
+        demo.setRedline(engine.redline());
+        engine.onChange(() => demo.setRedline(engine.redline()));
         // Auto: demo only until the car answers - a parked car sends nothing new for minutes, which is not "no car"
         const carPresent = () => lastCar > 0 || subs.some((s) => s.available);
         const usingDemo = () => settings.get('demo') === 'on' || (settings.get('demo') === 'auto' && !carPresent() && Date.now() - startT > 5000);
@@ -399,6 +444,12 @@ mgu.run({
         link.quiet = true;
         link.init();
         const rd = new DidReader(link, { ecu: dme.ecu });
+        // a V8 with a second engine unit (0x13, bank 2): its misfire monitors after the master's (kit/twin_dme.js)
+        const twin = new TwinDme(link, { dataDir: ctx.dataDir, log, vin: true });
+        // a V8's own Auto redline for the tach (6500 an N63, 7200 an M car's S63 / S68), once its engine units are known
+        engine.setAuto(twin.redline);
+        const twinRed = setInterval(() => { twin.on(); engine.setAuto(twin.redline); }, 5000);
+        if (twinRed.unref) twinRed.unref();
         // xDrive front axle torque from the transfer case unit (config.xdrive), read while the Chassis page is on screen
         const xcfg = Object.assign({ front: [], gearRatios: [] }, (ctx.spec.config && ctx.spec.config.xdrive) || {});
         let chassisSeen = 0, lmvAt = 0;
@@ -410,15 +461,103 @@ mgu.run({
          * config.dme.misfire.tid, default 0C = this driving cycle). misMode: which request this engine
          * answers (false = service 06, true = UDS F6xx, null = not found yet); misCyl: cylinders found.
          */
-        let misMode = null, misCyl = 0;
-        async function readMisfire() {
-            const m = dme.misfire || {}, ecu = m.ecu == null ? dme.ecu : m.ecu, tid = parseInt(m.tid || '0C', 16);
-            if (misMode === null) {
-                if (await rd.monitor(ecu, 0xA2, false)) misMode = false;
-                else if (await rd.monitor(ecu, 0xA2, true)) misMode = true;
-                else return null;
+        let misMode = null, misCyl = 0, misEcu = null, misRetryAt = 0;
+        const MIS_RETRY_MS = 300000;
+        const hx = (n) => n.toString(16).toUpperCase().padStart(2, '0');
+        /* One misfire monitor's results from the unit that has them: asked directly (service 06 or UDS F6xx), or, for a
+         * unit that only answers OBD requests sent to all units (misMode 'all'), that way and its own reply taken. */
+        async function misMonitor(mid) {
+            if (misMode !== 'all') return rd.monitor(misEcu, mid, misMode);
+            const reps = await link.functional(0x06, [mid], { idleMs: 600, maxMs: 2500 });
+            const u = reps.get(misEcu);
+            return u && u[0] === 0x46 ? DidReader.records06(u, mid, false) : null;
+        }
+        /* Which unit and request give the misfire counts: the engine unit (config.dme.misfire.ecu, else the DME) asked
+         * directly, then the V8's second unit (on an S63 it has all eight cylinders' monitors and the master none), then
+         * UDS F6xx, then service 06 to all units (their lists of monitors, MID A0, say which has cylinder 1's).
+         * Nothing found: asked again after MIS_RETRY_MS. */
+        async function findMisfire(m) {
+            const own = m.ecu == null ? dme.ecu : m.ecu;
+            const units = m.ecu == null && own !== TwinDme.SLAVE ? [own, TwinDme.SLAVE] : [own];
+            for (const e of units) if (await rd.monitor(e, 0xA2, false)) { misEcu = e; misMode = false; return true; }
+            if (await rd.monitor(own, 0xA2, true)) { misEcu = own; misMode = true; return true; }
+            const reps = await link.functional(0x06, [0xA0], { idleMs: 800, maxMs: 3000 });
+            for (const [e, u] of reps) {
+                if (u[0] !== 0x46 || u[1] !== 0xA0 || u.length < 6 || !(u[2] & 0x40)) continue;     // 0x40 = A2, cylinder 1
+                let n = 0;
+                while (n < 12 && u[2 + ((n + 1) >> 3)] & (0x80 >> ((n + 1) & 7))) n++;
+                misEcu = e; misMode = 'all'; misCyl = n;
+                log.info('misfire counter: ' + n + ' cylinders at 0x' + hx(e) + ' (OBD to all units)');
+                return true;
             }
-            if (!misCyl) {
+            return false;
+        }
+        // when the misfire counts are coloured: the total from MIS_WARN (yellow) and MIS_CRIT (red), a cylinder from
+        // MIS_CYL_WARN
+        const MIS_WARN = 100, MIS_CRIT = 500, MIS_CYL_WARN = 50;
+        // the second engine unit's misfire monitor ids (its own list, MID A0): null = not asked yet, false = it has none
+        let misSlave = null, misSlaveT = 0, misSlaveFails = 0;
+        const SLAVE_RETRY_MS = 60000;
+        /**
+         * Bank 2's counts from the second engine unit (0x13) of a twin-unit V8, in its own order, or null.
+         * Only the ids its list (MID A0) names are asked (A2.. on its own numbering, or A6.. on the engine's); a unit
+         * that doesn't answer is asked again after a minute, so the master's counts never wait for it.
+         */
+        // (asked only after the master's counts came: whether the second unit answered at all goes to twin.slaveReply(),
+        // so a head unit moved from a V8 to a car with one engine unit asks the index again)
+        const slaveHeard = (mid) => { const r = rd.raws[rd.monitorKey(TwinDme.SLAVE, mid, misMode)]; heard2(!!(r && r.bytes)); };
+        // when the second unit last left a request unanswered (0 = it answers): its misfires, asked with service 06's
+        // 4 s wait, are left alone a minute after that, so the master's counts don't wait for a unit that isn't there
+        let quiet2T = 0;
+        const heard2 = (ok) => { quiet2T = ok ? 0 : Date.now(); twin.slaveReply(ok); };
+        async function readSlaveMisfire(tid) {
+            if (misSlave === false || (misSlaveFails >= 2 && Date.now() - misSlaveT < SLAVE_RETRY_MS)) return null;
+            if (quiet2T && Date.now() - quiet2T < SLAVE_RETRY_MS) return null;
+            misSlaveT = Date.now();
+            if (misSlave === null) {
+                const sup = await rd.supported(TwinDme.SLAVE, 0xA0, misMode);
+                slaveHeard(0xA0);
+                if (!sup) { misSlaveFails++; return null; }
+                const mids = sup.filter((m) => m >= 0xA2 && m < 0xA2 + 12);
+                misSlave = mids.length ? mids : false;
+                log.info('misfire counter: second engine unit ' + (mids.length ? mids.length + ' cylinders (MID ' + mids.map((m) => m.toString(16).toUpperCase()).join(' ') + ')' : 'has no misfire monitors'));
+                if (!misSlave) return null;
+            }
+            const out = [];
+            for (const mid of misSlave) {
+                const res = await rd.monitor(TwinDme.SLAVE, mid, misMode);
+                slaveHeard(mid);
+                if (!res) { misSlaveFails++; return null; }
+                const tr = res.find((x) => x.tid === tid) || res[0];
+                out.push(tr.value >= 65535 ? null : tr.value);
+            }
+            misSlaveFails = 0;
+            return out;
+        }
+        async function readMisfire() {
+            const counts = await readMasterMisfire();
+            if (!counts) return null;
+            // the counts came from the second unit itself, or by asking all units: nothing more to add
+            if (misEcu !== (dme.misfire && dme.misfire.ecu != null ? dme.misfire.ecu : dme.ecu) || misMode === 'all') return counts;
+            // a twin-unit engine whose master lists only its own bank: bank 2's after it (cylinders perBank + 1 ..)
+            const m = dme.misfire || {};
+            if (m.ecu == null && await twin.detect() && misCyl <= twin.perBank) {
+                const more = await readSlaveMisfire(parseInt(m.tid || '0C', 16));
+                if (more && more.length) return counts.concat(more);
+                // its cylinders known but no answer this time: '-' for them, so the count of cells (and a Reset) stays
+                if (Array.isArray(misSlave)) return counts.concat(misSlave.map(() => null));
+            }
+            return counts;
+        }
+        async function readMasterMisfire() {
+            const m = dme.misfire || {}, tid = parseInt(m.tid || '0C', 16);
+            if (misMode === null) {
+                if (Date.now() < misRetryAt) return null;
+                if (!(await findMisfire(m))) { misRetryAt = Date.now() + MIS_RETRY_MS; return null; }
+                if (misMode !== 'all') log.info('misfire counter: at 0x' + hx(misEcu) + (misMode ? ' (UDS F6xx)' : ' (OBD 06)'));
+            }
+            const ecu = misEcu;
+            if (!misCyl && misMode !== 'all') {
                 // the engine unit's own list of its misfire monitors (MID A0) gives the cylinder count
                 const sup = await rd.supported(ecu, 0xA0, misMode);
                 let n = 0;
@@ -427,11 +566,12 @@ mgu.run({
             }
             const counts = [];
             for (let c = 0; c < (misCyl || 12); c++) {
-                const res = await rd.monitor(ecu, 0xA2 + c, misMode);
+                const res = await misMonitor(0xA2 + c);
                 if (!res) {
                     // counting without the list: a refusal past cylinder 1 ends the engine; no reply is
                     // a missed round, not the end (it would cut a 6-cylinder short)
-                    if (misCyl || !c || !/^NRC/.test(rd.raws[rd.monitorKey(ecu, 0xA2 + c, misMode)].why)) return null;
+                    const r = rd.raws[rd.monitorKey(ecu, 0xA2 + c, misMode)];
+                    if (misCyl || !c || !r || !/^NRC/.test(r.why)) return null;
                     break;
                 }
                 const tr = res.find((x) => x.tid === tid) || res[0];
@@ -444,6 +584,28 @@ mgu.run({
         async function readBoost() {
             await freshBaro();
             const m = await rd.value('boost', dme.boost);
+            return m === null ? null : (m - baro) / 100;
+        }
+        /*
+         * Bank 2's boost on a twin-unit V8: the second engine unit (0x13) answers the same identifiers for its own
+         * bank's turbo. Asked only while the master's SGBD index says two units, and Boost isn't set to Hide; only
+         * the identifier bank 1 is read from (one request a round), with a short wait: a second unit that doesn't
+         * answer (a head unit moved to another car, the unit asleep) mustn't hold up bank 1's readings.
+         */
+        const B2_MS = 600;
+        const boost2List = (dme.boost || []).map((c) => Object.assign({}, c, { ecu: TwinDme.SLAVE, timeoutMs: B2_MS }));
+        const boost2Wanted = () => boost2List.length > 0 && settings.get(SHOW.boost) !== 'off' && twin.on();
+        async function readBoost2() {
+            if (!await twin.detect()) return null;       // a twin answer kept from another car: not before the index says so
+            await freshBaro();
+            const c = boost2List[rd.pick.boost || 0];
+            const m = await rd.value('boost2', [c]);
+            const r = rd.raws[rd.key(c)];
+            // the master's boost answered just before (this round, not an earlier one): whether the second unit answered
+            // at all (a value or a refusal) goes to twin.slaveReply()
+            if (fuelT.boost && fuelT.boost >= (fuelTry.boost || 0) && Date.now() - fuelT.boost < 3000) heard2(!!(r && r.bytes));
+            // its first replies go to the log, to check the second unit's scaling against the master's
+            if (r) logRaw('boost bank 2 ' + DidReader.label(c), r.bytes || r.why);
             return m === null ? null : (m - baro) / 100;
         }
         /** Outside air pressure (kPa), read again once a minute: boost = absolute pressure minus it. */
@@ -483,7 +645,7 @@ mgu.run({
          */
         async function pollFuel() {
             fuelBusy = true; fuelLast = Date.now();
-            const now = Date.now(), needBoost = boostFromDme();
+            const now = Date.now(), needBoost = boostFromDme(), needB2 = boost2Wanted();
             // oil temperature from the engine unit while the car's own signal has none (a 330e sends none)
             const needOil = (dme.oil || []).length > 0 && now - oilCarT > 15000;
             // a value set to Hide is not asked for at all
@@ -492,18 +654,20 @@ mgu.run({
             // transfer case: only on the Chassis page with the xDrive card shown, and only while the car's own split is missing
             const onChassis = now - chassisSeen < 1500 && xcfg.front.length > 0 && settings.get('xdrive') !== 'off'
                 && !(G.isNum(live.splitRear) && now - splitAt < SPLIT_STALE);
-            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && needBoost ? ['boost'] : onChassis ? ['lmv'] : null;
+            // bank 2 is compared with bank 1 from the same identifier, so the master's is read too
+            const engineKeys = [(needBoost || needB2) && 'boost', needB2 && 'boost2'].filter(Boolean);
+            const fast = onFuelPage ? FUEL.filter(want) : now - engineSeen < 1500 && engineKeys.length ? engineKeys : onChassis ? ['lmv'] : null;
             // misfire counts change slowly: every 4th fast round on its page (~2 s), every slow round otherwise
             pollFuel.n = (pollFuel.n || 0) + 1;
             const misNow = want('misfire') && (!fast || (onFuelPage && pollFuel.n % 4 === 0));
             try {
                 if (link.available) {
-                    const keys = (fast || FUEL.filter(want).concat(needBoost ? ['boost'] : [], needOil ? ['oil'] : [], want('egs') ? ['egs'] : [])).concat(misNow ? ['misfire'] : []);
+                    const keys = (fast || FUEL.filter(want).concat(engineKeys, needOil ? ['oil'] : [], want('egs') ? ['egs'] : [])).concat(misNow ? ['misfire'] : []);
                     for (const k of keys) {
                         if ((fuelFail[k] || 0) >= 3 && Date.now() - (fuelTry[k] || 0) < 30000) continue;
                         fuelTry[k] = Date.now();
                         if (k === 'lmv') { await readLmv(); continue; }
-                        const v = k === 'boost' ? await readBoost() : k === 'misfire' ? await readMisfire() : PAIR[k] ? await readPair(k) : await rd.value(k, dme[k]);
+                        const v = k === 'boost' ? await readBoost() : k === 'boost2' ? await readBoost2() : k === 'misfire' ? await readMisfire() : PAIR[k] ? await readPair(k) : await rd.value(k, dme[k]);
                         if (k === 'egs' || k === 'timing') { const c = dme[k][rd.pick[k] || 0], r = c && rd.raws[rd.key(c)]; if (r) logRaw(k === 'egs' ? 'EGS' : 'timing', r.bytes || r.why); }
                         // the first replies of the target / actual identifiers go to the log, to check their scaling
                         if (PAIR[k]) PAIR[k].forEach((x) => { const c = (dme[x] || [])[rd.pick[x] || 0], r = c && rd.raws[rd.key(c)]; if (r) logRaw(x + ' ' + DidReader.label(c), r.bytes || r.why); });
@@ -549,10 +713,12 @@ mgu.run({
         }, 1000);
 
         /* ---------- units ---------- */
-        const T = (c) => (c == null ? null : settings.get('tempUnit') === 'F' ? c * 9 / 5 + 32 : c);
-        const tU = () => (settings.get('tempUnit') === 'F' ? '°F' : '°C');
-        const Pt = (b) => (b == null ? null : settings.get('pressUnit') === 'psi' ? b * 14.5038 : b);
-        const P = (b) => (b == null ? null : settings.get('pressUnit') === 'psi' ? b * 14.5038 : b);
+        const T = (c) => (c == null ? null : settings.get('tempUnit') === 'f' ? c * 9 / 5 + 32 : c);
+        const tU = () => (settings.get('tempUnit') === 'f' ? '°F' : '°C');
+        const pressU = () => PRESS[settings.get('pressUnit')] || PRESS.bar;
+        const P = (b) => (b == null ? null : b * pressU()[0]);
+        const Pt = P;
+        const pU = () => pressU()[1];
         const V = (k) => (k == null ? null : settings.get('speedUnit') === 'mph' ? k * 0.621371 : k);
 
         /* ---------- drawing ---------- */
@@ -575,9 +741,21 @@ mgu.run({
         }
         const PW = (kw) => (G.isNum(kw) ? kw * ({ kw: 1, hp: 1.34102, ps: 1.35962 }[settings.get('powerUnit')] || 1) : null);
         const pwU = () => ({ kw: 'kW', hp: 'hp', ps: 'PS' }[settings.get('powerUnit')] || 'kW');
-        // torque: the car sends Nm; lb-ft on request (1 Nm = 0.737562 lb-ft)
-        const TQ = (nm) => (G.isNum(nm) ? (settings.get('torqueUnit') === 'lbft' ? nm * 0.737562 : nm) : null);
-        const tqU = () => (settings.get('torqueUnit') === 'lbft' ? 'lb-ft' : 'Nm');
+        // torque: the car sends Nm; lb-ft or kgm on request (1 Nm = 0.737562 lb-ft = 1 / 9.80665 kgm)
+        const TQ = (nm) => (G.isNum(nm) ? nm * ({ nm: 1, lbft: 0.737562, kgm: 1 / 9.80665 }[settings.get('torqueUnit')] || 1) : null);
+        const tqU = () => ({ nm: 'Nm', lbft: 'lb-ft', kgm: 'kgm' }[settings.get('torqueUnit')] || 'Nm');
+        /**
+         * End of the torque bar. kgm: the "Torque gauge max (kgm only)" setting as it is (40 = a 0-40 kgm bar);
+         * its default 100 is the Nm scale's end in kgm (900 Nm = 91.8 kgm, rounded up), as before this setting.
+         * Nm / lb-ft: as the original app, 900 Nm in the unit shown, rounded up (the setting is ignored).
+         */
+        function tqScale() {
+            if (settings.get('torqueUnit') === 'kgm') {
+                const m = settings.get('maxTorqueKgm') || 100;
+                return { max: m, niceMax: false, step: m <= 25 ? 5 : m <= 50 ? 10 : 20 };
+            }
+            return { max: TQ(900), niceMax: true };
+        }
 
         /**
          * { letter, num, est } for the gear readout, or null without any gear information.
@@ -614,9 +792,9 @@ mgu.run({
 
         function drawEngine(cv, t, d) {
             engineSeen = Date.now();
-            if (boostFromDme()) kickFuel();
-            const red = settings.get('redline');
-            const max = Math.ceil((red + 1000) / 1000) * 1000;
+            if (boostFromDme() || boost2Wanted()) kickFuel();
+            const red = engine.redline();
+            const max = engine.scaleMax();
             const showPk = settings.get('peaks');
             // demo data keeps its own peaks, so they never mix with the car's; raising them every frame
             // also lets a held peak drop back while the car sends nothing new
@@ -638,18 +816,20 @@ mgu.run({
             const bars = (x, y, w, gap) => {
                 G.bar(cv, t, x, y, w, 92, {
                     label: pw.calc ? 'Power (torque x rpm)' : 'Power', value: PW(pw.kw), unit: pwU(), max: powMax, niceMax: true, ramp: 'hot',
-                    peak: showPk && G.isNum(pk.power) ? PW(pk.power) : null,
+                    peak: showPk && G.isNum(pk.power) ? PW(pk.power) : null, peakText: true,
                 });
-                G.bar(cv, t, x, y + gap, w, 92, { label: 'Torque', value: TQ(d.torque), unit: tqU(), max: TQ(900), niceMax: true, ramp: 'hot', peak: showPk ? TQ(pk.torque) : null });
+                G.bar(cv, t, x, y + gap, w, 92, Object.assign({ label: 'Torque', value: TQ(d.torque), unit: tqU(), decimals: settings.get('torqueUnit') === 'kgm' ? 1 : 0, ramp: 'hot', peak: showPk ? TQ(pk.torque) : null, peakText: true }, tqScale()));
             };
             if (shown('boost')) {
-                const psi = settings.get('pressUnit') === 'psi', pmax = psi ? 36 : 2.5;
+                const pu = settings.get('pressUnit'), psi = pu === 'psi', kpa = pu === 'kpa';
+                const bmax = BOOST_MAX[settings.get('boostMax')] || BOOST_MAX['2.5'], pmax = psi ? bmax[1] : kpa ? bmax[2] : bmax[0];
                 G.segBar(cv, t, 24, G.TOP + 242 + half, 1062, 226 - half, {
-                    label: 'Boost', value: P(d.boost), unit: settings.get('pressUnit'), decimals: psi ? 1 : 2, min: 0, max: pmax,
-                    step: psi ? 2 : 0.125, scale: { every: psi ? 6 : 0.5, decimals: psi ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
+                    label: 'Boost', value: P(d.boost), unit: pU(), decimals: pressU()[2], min: 0, max: pmax,
+                    step: psi ? 2 : kpa ? 12.5 : 0.125, scale: { every: psi ? (pmax > 40 ? 10 : 6) : kpa ? 50 : 0.5, decimals: psi || kpa ? 0 : 1 }, ramp: 'hot', limit: pmax * 0.85,
                     marks: [{ value: pmax * 0.85, color: 'warn' }], peak: showPk ? P(pk.boost) : null,
                 });
                 if (!G.isNum(d.boost) && !usingDemo()) cv.text(boostWhy(), 48, G.pageBottom(cv) - 14, 22, t.dim);
+                bank2Boost(cv, t, d, 24, G.TOP + 242 + half, 1062);
                 speedCard(cv, t, d, 1110, G.TOP, 466, 190);
                 bars(1110, 272 + half, 466, 132 + room - half);
             } else {
@@ -658,6 +838,25 @@ mgu.run({
                 bars(48, p.y + 14, 1014, p.h - 118);       // torque stays 12 over the panel's bottom
                 speedCard(cv, t, d, 1110, G.TOP, 466, G.BOTTOM - G.TOP);
             }
+        }
+        /**
+         * A twin-unit V8's bank 2 boost, left of the bar's own (bank 1) value, once the second engine unit has
+         * answered: '--' while it doesn't. In the warning colour when the banks differ by more than 0.2 bar
+         * under boost (one turbo making less than the other), bank 1 read from the master's same identifier.
+         */
+        function bank2Boost(cv, t, d, x, y, w) {
+            // (only once the master's boost has proven real, as bank 1's readout from it waits for)
+            if (usingDemo() || twin.twin !== true || !fuelT.boost2 || !trusted('boostDme')) return;
+            const now = Date.now(), v = now - fuelT.boost2 < 3000 && G.isNum(live.boost2) ? live.boost2 : null;
+            const b1 = G.isNum(d.boost) ? d.boost : null, dec = pressU()[2];
+            // apart: against bank 1 from the same identifier of the master (the bar may show the sport display's)
+            const m1 = fuelT.boost && now - fuelT.boost < 3000 && G.isNum(live.boostDme) ? live.boostDme : null;
+            const apart = v !== null && m1 !== null && Math.max(v, m1) > 0.3 && Math.abs(v - m1) > 0.2;
+            const uw1 = cv.textWidth(' ' + pU(), 26), nw = cv.textWidth(G.fmt(P(b1), dec), 64, { font: 'num' });
+            let rx = x + w - 24 - uw1 - nw - 44;
+            rx -= cv.text(' ' + pU(), rx, y + 60, 22, t.dim, { align: 'right' });
+            rx -= cv.text(G.fmt(P(v), dec), rx, y + 60, 34, v === null ? t.dim : apart ? t.warn : t.text, { align: 'right', font: 'num' });
+            cv.text('Bank 2', rx - 12, y + 60, 22, t.dim, { align: 'right', font: 'bold' });
         }
         /** Why boost is missing (Auto: tells which sources were tried). */
         function boostWhy() {
@@ -716,20 +915,33 @@ mgu.run({
             ].filter(Boolean));
         }
 
-        /** Misfires this driving cycle: the total big, each cylinder below (from OBD service 06). */
-        function misfireTile(cv, t, x, y, w, h, counts) {
+        /** Misfires this driving cycle, or since Reset: the total big, each cylinder below (from OBD service 06). */
+        function misfireTile(cv, t, x, y, w, h, raw) {
             const p = G.panel(cv, t, x, y, w, h, 'Misfires'), yb = p.y + p.h;       // (a bottom tile's panel goes on down)
+            const { counts, since } = misShown(raw);
             const ok = Array.isArray(counts) && counts.length, big = h > 200 ? 100 : 64;
             const total = ok ? counts.reduce((a, c) => a + (c || 0), 0) : null;
-            const col = !ok ? t.dim : total === 0 ? GO : total < 20 ? t.warn : t.crit;
+            // a healthy engine counts a few each drive; the engine unit only flags misfires at ~1-2 % of revolutions,
+            // so small counts are shown as normal (issue #191)
+            const col = !ok ? t.dim : total === 0 ? GO : total < MIS_WARN ? t.text : total < MIS_CRIT ? t.warn : t.crit;
             const tw = cv.text(ok ? String(total) : '--', x + 18, y + 52 + big * 0.78, big, col, { font: 'num' });
-            cv.text(ok ? 'this drive' : '', x + 28 + tw, y + 52 + big * 0.78, 24, t.dim);
+            const at = since ? new Date(since) : null, pad = (n) => (n < 10 ? '0' : '') + n;
+            cv.text(!ok ? '' : at ? translate('since reset') + ' ' + pad(at.getHours()) + ':' + pad(at.getMinutes()) : 'this drive',
+                x + 28 + tw, y + 52 + big * 0.78, 24, t.dim);
+            // Reset: the counts from now on (asks once more: Confirm); only while there are counts to reset
+            if (ok) {
+                G.button(cv, t, x + w - 18 - 132, y + 14, 132, 40, 'Reset', () => {
+                    saveMisBase({ counts: raw.slice(), t: Date.now() });
+                    log.info('misfire counter reset at ' + raw.join(', '));
+                    return render();
+                }, { key: 'misfire', confirm: true });
+            }
             if (!ok) { cv.text(usingDemo() ? 'no data' : fuelWhy('misfire'), x + 18, yb - G.MARGIN, 22, t.dim); return; }
             // per cylinder: a cell each along the bottom, "Cyl n" over its count; with room below the page (the
             // panel stretched) up to 16 higher, nearer the other tiles' graphs and lines
             const n = counts.length, gap = 8, cw = (w - 36 - gap * (n - 1)) / n, ch = 74, cy = yb - 12 - ch - G.clamp(yb - Math.round(y + h), 0, 16);
             counts.forEach((c, i) => {
-                const cx = x + 18 + i * (cw + gap), hit = G.isNum(c) && c > 0;
+                const cx = x + 18 + i * (cw + gap), hit = G.isNum(c) && c >= MIS_CYL_WARN;
                 cv.roundRect(cx, cy, cw, ch, 8, withAlpha(hit ? t.warn : t.track, hit ? 0.18 : 0.9));
                 cv.text((cw > 84 ? 'Cyl ' : '') + (i + 1), cx + cw / 2, cy + 26, 22, t.dim, { align: 'center', font: 'bold' });
                 cv.text(G.isNum(c) ? String(c) : '-', cx + cw / 2, cy + ch - 10, 34, !G.isNum(c) ? t.dim : hit ? t.warn : t.text, { align: 'center', font: 'num' });
@@ -775,12 +987,12 @@ mgu.run({
         function drawFuel(cv, t, d) {
             fuelSeen = Date.now();
             kickFuel();
-            const pu = settings.get('pressUnit'), running = G.isNum(d.rpm) && d.rpm > 500;
+            const pu = pU(), pd = pressU(), running = G.isNum(d.rpm) && d.rpm > 500;
             const val = (k) => {
                 const fk = GROUP[k] && PAIR[GROUP[k]] ? GROUP[k] : k;
                 return usingDemo() || (fuelT[fk] && Date.now() - fuelT[fk] < 15000) ? d[k] : null;
             };
-            const dT = (x) => (G.isNum(x) ? (settings.get('tempUnit') === 'F' ? x * 1.8 : x) : null);
+            const dT = (x) => (G.isNum(x) ? (settings.get('tempUnit') === 'f' ? x * 1.8 : x) : null);
             const iatRise = G.isNum(val('iat')) && G.isNum(d.ambient) ? d.iat - d.ambient : null;
             const off = running ? '' : '  ·  engine off';
             drawTiles(cv, t, [
@@ -790,9 +1002,9 @@ mgu.run({
                 shown('hpfp') && { label: 'High pressure fuel', value: P(val('hpfp')), unit: pu, decimals: 0, history: hist.hpfp.map(P),
                     zones: running ? [{ from: -99, to: P(20), color: 'crit' }] : [],
                     sub: G.isNum(val('hpfp')) ? mm(hist.hpfp, P, 0) + off : fuelWhy('hpfp') },
-                shown('lpfp') && { label: 'Low pressure fuel', value: P(val('lpfp')), unit: pu, decimals: pu === 'psi' ? 0 : 1, history: hist.lpfp.map(P),
+                shown('lpfp') && { label: 'Low pressure fuel', value: P(val('lpfp')), unit: pu, decimals: pd[3], history: hist.lpfp.map(P),
                     zones: running ? [{ from: -99, to: P(3), color: 'crit' }, { from: P(3), to: P(4), color: 'warn' }] : [],
-                    sub: G.isNum(val('lpfp')) ? mm(hist.lpfp, P, 1) + off : fuelWhy('lpfp') },
+                    sub: G.isNum(val('lpfp')) ? mm(hist.lpfp, P, pu === 'kPa' ? 0 : 1) + off : fuelWhy('lpfp') },
                 shown('iat') && { label: 'Intake air above outside', value: dT(iatRise), unit: tU(), decimals: 0, history: hist.iatRise.map(dT),
                     zones: [{ from: dT(25), to: dT(40), color: 'warn' }, { from: dT(40), to: 999, color: 'crit' }],
                     sub: G.isNum(iatRise) ? mm(hist.iatRise, dT, 0, 'heat soak') : 'needs IAT + outside temperature' },
@@ -800,7 +1012,7 @@ mgu.run({
                     sub: G.isNum(val('timing')) ? mm(hist.timing, (x) => x, 1) : fuelWhy('timing') },
                 shown('boostCtl') && { draw: (c, th, x, y, w, h) => pairTile(c, th, x, y, w, h, {
                     label: 'Boost: target vs actual', targetLabel: 'TARGET', actual: P(val('boostActual')), target: P(val('boostTarget')),
-                    unit: pu, decimals: pu === 'psi' ? 1 : 2, tol: P(0.15), idle: P(0.2), why: fuelWhy('boostCtl'),
+                    unit: pu, decimals: pd[2], tol: P(0.15), idle: P(0.2), why: fuelWhy('boostCtl'),
                     histA: hist.boostActual.map(P), histT: hist.boostTarget.map(P) }) },
                 shown('load') && { draw: (c, th, x, y, w, h) => pairTile(c, th, x, y, w, h, {
                     label: 'Air charge: requested vs actual', targetLabel: 'REQUESTED', actual: val('loadActual'), target: val('loadTarget'),
@@ -823,7 +1035,7 @@ mgu.run({
             // g line ends G.MARGIN over the panel's bottom, as the tyres' and xDrive's last lines; the xDrive bars spread over it
             const room = G.pageBottom(cv) - G.BOTTOM, grow = Math.round(G.toMargin(room, 38) / 2), dx = G.toMargin(room, 28);
             G.panel(cv, t, 24, G.TOP, gw, G.BOTTOM - G.TOP, 'G-force');
-            G.gmeter(cv, t, 24 + gw / 2, 258 + grow, 164 + grow, { lat: d.gLat, long: d.gLong, trail, max: 1.5 });
+            G.gmeter(cv, t, 24 + gw / 2, 258 + grow, 164 + grow, { lat: d.gLat, long: d.gLong, trail, max: 1.5, flipLong: settings.get('flipLong') });
             if (showTyres) drawTyres(cv, t, 528, G.TOP, right - 528, G.BOTTOM - G.TOP, d);
             if (showAwd) {
                 const ax = 1220, aw = 356;
@@ -848,7 +1060,7 @@ mgu.run({
         function drawTyres(cv, t, x, y, w, h, d) {
             const temps = shown('tyreTemp');
             const p = G.panel(cv, t, x, y, w, h, 'Tyres');
-            const unitP = settings.get('pressUnit'), dec = unitP === 'psi' ? 0 : 1;
+            const unitP = pU(), dec = pressU()[4];
             const cx = x + w / 2, top = y + 70, bh = h - 100 + G.toMargin(p.h - h, 26), bw = 150;     // rear tyres: G.MARGIN over the panel's real bottom
             // body: rounded shell, windscreen + rear window, FRONT marker
             cv.roundRect(cx - bw / 2, top, bw, bh, 52, withAlpha(t.track, 0.9));

@@ -1,6 +1,8 @@
 /* ivi-probe - inspect and experiment with the MGU compositor (winston, ivi-controller 1.x).
  *   ivi-probe list                       screens, their layer order, layers and surfaces with properties
  *   ivi-probe order <screen> <ids...>    set a screen's layer render order (bottom first)
+ *   ivi-probe dst <surface> <x> <y> <w> <h>   move / scale a surface on the screen (e.g. the HMI's, 100, to try
+ *                                        a smaller or larger screen; 0 0 1920 720 puts it back on iDrive 7)
  *   ivi-probe test <x> <y> <w> <h> <above|below|top> [secs] [argb hex]
  *        show a solid test surface (ivi id 0x4d470001) on its own layer 0x4d470000,
  *        placed directly above / below the HMI layer (100) or on top of everything.
@@ -82,7 +84,7 @@ static int list(void) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: ivi-probe list | order <screen> <layer ids...> | test x y w h above|below|top [secs] [aarrggbb]\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: ivi-probe list | order <screen> <layer ids...> | dst <surface> x y w h | test x y w h above|below|top [secs] [aarrggbb]\n"); return 2; }
     dpy = wl_display_connect(NULL);
     if (!dpy) { perror("wl_display_connect"); return 1; }
     struct wl_registry *reg = wl_display_get_registry(dpy);
@@ -95,6 +97,15 @@ int main(int argc, char **argv) {
         for (int i = 3; i < argc; i++) *(uint32_t *)wl_array_add(&a, 4) = strtoul(argv[i], 0, 0);
         for (int i = 0; i < nscreens; i++) if (screens[i].id == strtoul(argv[2], 0, 0)) ivi_controller_screen_set_render_order(screens[i].s, &a);
         ivi_controller_commit_changes(ctl); wl_display_roundtrip(dpy); return 0;
+    }
+    if (!strcmp(argv[1], "dst") && argc >= 7) {
+        struct ivi_controller_surface *s = ivi_controller_surface_create(ctl, strtoul(argv[2], 0, 0));
+        ivi_controller_surface_set_destination_rectangle(s, atoi(argv[3]), atoi(argv[4]), atoi(argv[5]), atoi(argv[6]));
+        ivi_controller_commit_changes(ctl);
+        wl_display_roundtrip(dpy);
+        ivi_controller_surface_destroy(s, 0);
+        wl_display_roundtrip(dpy);
+        return 0;
     }
     if (!strcmp(argv[1], "test") && argc >= 7) {
         int x = atoi(argv[2]), y = atoi(argv[3]), w = atoi(argv[4]), h = atoi(argv[5]);

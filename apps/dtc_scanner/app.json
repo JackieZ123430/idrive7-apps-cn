@@ -2,10 +2,12 @@
   "id": "dtc_scanner",
   "title": "Fault Scanner",
   "description": "Read and clear fault memory of every control unit, plus active Check Control messages",
-  "version": "2.8.13",
+  "version": "2.9.8",
   "vendor": "custom",
   "loggingId": "OA95",
   "iconGlyph": "engine",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.18", "mgu-inputgate": "1.1.0" },
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",

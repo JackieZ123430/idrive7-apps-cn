@@ -1,0 +1,35 @@
+{
+  "50AC": {
+    "a": "BAT48_WERT_SOH_C",
+    "d": "Capacity state of health",
+    "f": [
+      { "n": "STAT_SOH_C_WERT", "t": "u8", "at": 0, "u": "%", "d": "Capacity SOH" }
+    ]
+  },
+  "AA56": {
+    "a": "MESSWERTE_BATT48",
+    "d": "48 V battery measurements",
+    "f": [
+      { "n": "STAT_SPANNUNG_WERT", "t": "u16", "at": 0, "k": 0.01, "u": "V", "d": "Battery terminal voltage" },
+      { "n": "STAT_STROM_WERT", "t": "s16", "at": 2, "k": 0.1, "u": "A", "d": "Battery current; negative means charging" },
+      { "n": "STAT_TEMPERATUR_WERT", "t": "s16", "at": 4, "k": 0.5, "u": "°C", "d": "Highest cell temperature" },
+      { "n": "STAT_ENERGIEDURCHSATZ_WERT", "t": "u16", "at": 6, "k": 0.2, "u": "kWh", "d": "Lifetime energy throughput" },
+      { "n": "STAT_LADEZAEHLER_GESAMT_WERT", "t": "u16", "at": 8, "k": 0.1, "u": "Ah", "d": "Lifetime charge counter" },
+      { "n": "STAT_ENTLADEZAEHLER_GESAMT_WERT", "t": "u16", "at": 10, "k": 0.1, "u": "Ah", "d": "Lifetime discharge counter" },
+      { "n": "STAT_LADEZUSTAND_BILANZ_WERT", "t": "s16", "at": 12, "k": 0.1, "u": "Ah", "d": "Charge balance" },
+      { "n": "STAT_SPEICHER_SOC_WERT", "t": "u8", "at": 14, "u": "%", "d": "State of charge" },
+      { "n": "STAT_SPEICHER_SOC_QUALITAET_WERT", "t": "u8", "at": 15, "u": "%", "d": "SOC estimate quality" },
+      { "n": "STAT_PACKSPANNUNG_WERT", "t": "u16", "at": 16, "k": 0.01, "u": "V", "d": "Battery pack voltage" },
+      { "n": "STAT_NENNKAPAZITAET_WERT", "t": "u8", "at": 18, "k": 0.1, "u": "Ah", "d": "Nominal capacity" },
+      { "n": "STAT_INNENWIDERSTAND_INITIAL_WERT", "t": "u8", "at": 19, "k": 0.25, "u": "mOhm", "d": "Initial internal resistance" },
+      { "n": "STAT_INNENWIDERSTAND_AKTUELL_WERT", "t": "u8", "at": 20, "k": 0.25, "u": "mOhm", "d": "Current internal resistance" },
+      { "n": "STAT_INNENWIDERSTAND_AKTUELL_QUALITAET_WERT", "t": "u8", "at": 21, "u": "%", "d": "Internal resistance estimate quality" },
+      { "n": "STAT_KAPAZITAET_IST_WERT", "t": "u8", "at": 22, "k": 0.1, "u": "Ah", "d": "Measured capacity" },
+      { "n": "STAT_KAPAZITAET_AKTUELL_WERT", "t": "u8", "at": 23, "k": 0.1, "u": "Ah", "d": "Current capacity" },
+      { "n": "STAT_KAPAZITAET_IST_QUALITAET_WERT", "t": "u8", "at": 24, "u": "%", "d": "Measured capacity estimate quality" },
+      { "n": "STAT_KAPAZITAET_AKTUELL_QUALITAET_WERT", "t": "u8", "at": 25, "u": "%", "d": "Current capacity estimate quality" },
+      { "n": "STAT_SPEICHER_SOH_WERT", "t": "u8", "at": 26, "u": "%", "d": "State of health" },
+      { "n": "STAT_SPEICHER_SOH_QUALITAET_WERT", "t": "u8", "at": 27, "u": "%", "d": "SOH estimate quality" }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+ "_": "Translation credit, shipped in Russian (ru) builds only: the corner text, the settings rows and the entry-file comment",
+ "corner": "Перевод: Иван · GitHub Fieldistor",
+ "settingsTitle": "Перевод на русский: Иван",
+ "settingsLink": "GitHub Fieldistor · github.com/Fieldistor/idrive7-apps",
+ "comment": [
+  "Translation by: Иван / GitHub Fieldistor",
+  "https://github.com/Fieldistor/idrive7-apps"
+ ]
+}

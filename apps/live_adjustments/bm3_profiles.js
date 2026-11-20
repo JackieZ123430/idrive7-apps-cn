@@ -77,7 +77,7 @@ const layouts = [
             "F4C9L8G02",
             "F4C9L8G03",
             "F4C9L8G04",
-            "F4C9L8G05",
+            "F4C9L8G06",
             "F4C9L8J00",
             "F4C9L8J01",
             "F4C9L8J02",
@@ -89,7 +89,6 @@ const layouts = [
             "F4C9L8R03",
             "F4C9L8R04",
             "F4C9L8R05",
-            "F4C9L8Y04",
             "R4C920000",
             "R4C920001",
             "R4C920002",
@@ -184,6 +183,29 @@ const layouts = [
             "R1C900001",
             "R1C900002",
             "R1C9JD004"
+        ]
+    },
+    {
+        "mapSwActAddr": "50038006",
+        "burbleActAddr": "50038099",
+        "timingAddress": "50038100",
+        "factor": 2,
+        "wmbaCmd": "3e",
+        "roms": [
+            "F4C9G5705",
+            "F4C9G5905",
+            "F4C9G5F05",
+            "F4C9G5H05",
+            "F4C9L8A05",
+            "F4C9L8C05",
+            "F4C9L8E05",
+            "F4C9L8G05",
+            "F4C9L8J05",
+            "F4C9L8N05",
+            "F4C9L8R06",
+            "F4C9L8R07",
+            "F4C9L8Y04",
+            "F4C9L8Y05"
         ]
     }
 ];

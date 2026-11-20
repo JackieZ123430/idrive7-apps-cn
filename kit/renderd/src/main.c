@@ -66,8 +66,12 @@
 #include "ivi-application-client-protocol.h"
 #include "ivi-controller-client-protocol.h"
 
-#define MAX_CLIENTS 16
+/* apps connected at once: ours and, on the community socket, IterioDev's (they connect there too while this renderer
+ * has it). 16 filled up on an iDrive 8 car with both sets installed (issue #152). A slot costs only while connected
+ * (pictures stay under GFX_IMG_ALL for all apps together); layer and surface ids are base + slot, 0x00-0x3f each. */
+#define MAX_CLIENTS 64
 #define MAX_MSG (24u << 20)
+#define MAX_IN (MAX_MSG + (1u << 17))  /* an app's input buffer: a whole MAX_MSG message, its header and some of the next */
 #define LAYER_BASE layer_base      /* "MR"; the community renderers use "MG", 0x4d470000 and 0x4d470100 */
 #define SURF_BASE surf_base
 static uint32_t layer_base = 0x4d520000u, surf_base = 0x4d520100u;
@@ -94,10 +98,32 @@ static EGLDisplay edpy;
 static EGLConfig ecfg;
 static EGLContext ectx;
 static EGLSurface init_es = EGL_NO_SURFACE;
+/* The screen apps are told (READY) and lay out on: the HMI's design size, 1920 x 720 (iDrive 7) or 2880 x 960
+ * (iDrive 8). The HMI may show smaller or larger than that (an iDrive 6 retrofit's screen, an 8.8" display, a
+ * custom one): what apps place in design px is mapped onto the rectangle the HMI covers on the screen. */
 static int screen_w = 1920, screen_h = 720, refresh_mhz;
+static int out_w, out_h;                    /* the centre output's current mode */
+/* the HMI's own surface (found by its process): where the compositor shows it and its buffer's size */
+static struct { uint32_t id; struct ivi_controller_surface *s; int dst[4], buf[2]; } hmi;
+/* design px -> screen px */
+static float map_kx = 1, map_ky = 1;
+static int map_ox, map_oy;
+static void geom_update(void);
+static void map_rect(int x, int y, int w, int h, int r[4]) {
+    int x0 = (int)lroundf((float)map_ox + (float)x * map_kx), y0 = (int)lroundf((float)map_oy + (float)y * map_ky);
+    r[0] = x0; r[1] = y0;
+    r[2] = (int)lroundf((float)map_ox + (float)(x + w) * map_kx) - x0;
+    r[3] = (int)lroundf((float)map_oy + (float)(y + h) * map_ky) - y0;
+}
+/* a touch on the screen, in design px (touch.c) */
+void touch_unmap(int *x, int *y) {
+    *x = (int)lroundf(((float)*x - (float)map_ox) / map_kx);
+    *y = (int)lroundf(((float)*y - (float)map_oy) / map_ky);
+}
 
 /* yield surfaces (camera, video): layer mode hides while one is visible */
-static struct { uint32_t id; struct ivi_controller_surface *s; int visible; } yield[CFG_MAX_YIELD];
+/* an HMI surface the layer apps yield to: visible and with a size (its configuration); a visible 0x0 one shows nothing */
+static struct { uint32_t id; struct ivi_controller_surface *s; int visible, w, h; } yield[CFG_MAX_YIELD];
 static int nyield, yielding;
 
 typedef struct client {
@@ -129,7 +155,7 @@ typedef struct client {
     uint32_t frames_shown, ticks;
     /* watchdog: an app on screen that stops talking (hung) is hidden until it talks again */
     uint64_t last_msg; int stale;
-    int layer_on;                /* the layer was last made visible (apply_visibility) */
+    int layer_on;                /* the layer was last made visible, on top of the screen (apply_visibility) */
     /* touch claims, logical px (CLAIM) */
     int nclaim; float claim[16][4];
     /* frame cap (MI_FPS): at least min_us between two frames drawn; 0 = none */
@@ -172,20 +198,29 @@ static void c_screen(void *d, struct ivi_controller *c, uint32_t id, struct ivi_
 static void c_layer(void *d, struct ivi_controller *c, uint32_t id) { (void)d, (void)c, (void)id; }
 
 static void update_all(void);
-static void y_visibility(void *d, struct ivi_controller_surface *s, int32_t v) {
-    (void)s;
-    int i = (int)(intptr_t)d, any = 0;
-    yield[i].visible = v != 0;
-    for (int k = 0; k < nyield; k++) any |= yield[k].visible;
+static void yield_update(int i) {
+    int any = 0;
+    for (int k = 0; k < nyield; k++) any |= yield[k].visible && yield[k].w > 0 && yield[k].h > 0;
     if (any != yielding) {
         yielding = any;
         log_info(any ? "surface %#x visible: layer apps yield the screen" : "surface %#x hidden: layer apps may show", yield[i].id);
         update_all();
     }
 }
+static void y_visibility(void *d, struct ivi_controller_surface *s, int32_t v) {
+    (void)s;
+    int i = (int)(intptr_t)d;
+    yield[i].visible = v != 0;
+    yield_update(i);
+}
 static void y_opacity(void *d, struct ivi_controller_surface *s, wl_fixed_t o) { (void)d, (void)s, (void)o; }
 static void y_rect(void *d, struct ivi_controller_surface *s, int32_t x, int32_t y, int32_t w, int32_t h) { (void)d, (void)s, (void)x, (void)y, (void)w, (void)h; }
-static void y_config(void *d, struct ivi_controller_surface *s, int32_t w, int32_t h) { (void)d, (void)s, (void)w, (void)h; }
+static void y_config(void *d, struct ivi_controller_surface *s, int32_t w, int32_t h) {
+    (void)s;
+    int i = (int)(intptr_t)d;
+    yield[i].w = w; yield[i].h = h;
+    yield_update(i);
+}
 static void y_int(void *d, struct ivi_controller_surface *s, int32_t v) { (void)d, (void)s, (void)v; }
 static void y_layer(void *d, struct ivi_controller_surface *s, struct ivi_controller_layer *l) { (void)d, (void)s, (void)l; }
 static void y_stats(void *d, struct ivi_controller_surface *s, uint32_t a, uint32_t b, uint32_t c, uint32_t p, const char *n) {
@@ -195,21 +230,92 @@ static void y_destroyed(void *d, struct ivi_controller_surface *s) {
     int i = (int)(intptr_t)d;
     wl_proxy_destroy((struct wl_proxy *)s);
     yield[i].s = NULL;
-    y_visibility(d, NULL, 0);
+    yield[i].visible = 0;
+    yield_update(i);
 }
 static const struct ivi_controller_surface_listener yield_listener = {
     y_visibility, y_opacity, y_rect, y_rect, y_config, y_int, y_int, y_layer, y_stats, y_destroyed, y_int,
 };
 
+/* The HMI's surface: each surface the compositor reports (until the HMI's is known) is asked for its process;
+ * its position and buffer size come first, so they are kept until the answer says whose it is. */
+#define MAX_PROBES 32
+static struct { uint32_t id; struct ivi_controller_surface *s; int dst[4], buf[2]; } probes[MAX_PROBES];
+static void p_none(void *d, struct ivi_controller_surface *s, int32_t v) { (void)d, (void)s, (void)v; }
+static void p_opacity(void *d, struct ivi_controller_surface *s, wl_fixed_t o) { (void)d, (void)s, (void)o; }
+static void p_src(void *d, struct ivi_controller_surface *s, int32_t x, int32_t y, int32_t w, int32_t h) { (void)d, (void)s, (void)x, (void)y, (void)w, (void)h; }
+static void p_dst(void *d, struct ivi_controller_surface *s, int32_t x, int32_t y, int32_t w, int32_t h) {
+    int i = (int)(intptr_t)d;
+    if (s == hmi.s) {
+        if (hmi.dst[0] == x && hmi.dst[1] == y && hmi.dst[2] == w && hmi.dst[3] == h) return;
+        hmi.dst[0] = x; hmi.dst[1] = y; hmi.dst[2] = w; hmi.dst[3] = h;
+        geom_update();
+    } else if (i >= 0 && probes[i].s == s) { probes[i].dst[0] = x; probes[i].dst[1] = y; probes[i].dst[2] = w; probes[i].dst[3] = h; }
+}
+static void p_config(void *d, struct ivi_controller_surface *s, int32_t w, int32_t h) {
+    int i = (int)(intptr_t)d;
+    if (s == hmi.s) {
+        if (hmi.buf[0] == w && hmi.buf[1] == h) return;
+        hmi.buf[0] = w; hmi.buf[1] = h;
+        geom_update();
+    } else if (i >= 0 && probes[i].s == s) { probes[i].buf[0] = w; probes[i].buf[1] = h; }
+}
+static void p_layer(void *d, struct ivi_controller_surface *s, struct ivi_controller_layer *l) { (void)d, (void)s, (void)l; }
+static void p_stats(void *d, struct ivi_controller_surface *s, uint32_t a, uint32_t b, uint32_t c, uint32_t pid, const char *n) {
+    (void)a, (void)b, (void)c;
+    int i = (int)(intptr_t)d;
+    if (i < 0 || probes[i].s != s) return;
+    const char *base = n ? strrchr(n, '/') : NULL;
+    base = base ? base + 1 : n ? n : "";
+    if (!hmi.s && !strcmp(base, cfg.hmi_process)) {
+        hmi.id = probes[i].id; hmi.s = s;
+        memcpy(hmi.dst, probes[i].dst, sizeof hmi.dst); memcpy(hmi.buf, probes[i].buf, sizeof hmi.buf);
+        log_info("the HMI's surface %u (%s, pid %u): buffer %dx%d shown at %d,%d %dx%d", hmi.id, base, pid,
+                 hmi.buf[0], hmi.buf[1], hmi.dst[0], hmi.dst[1], hmi.dst[2], hmi.dst[3]);
+        probes[i].s = NULL;
+        geom_update();
+        return;
+    }
+    probes[i].s = NULL;
+    ivi_controller_surface_destroy(s, 0);                 /* our handle only: the surface stays */
+}
+static void p_destroyed(void *d, struct ivi_controller_surface *s) {
+    int i = (int)(intptr_t)d;
+    if (s == hmi.s) {
+        log_info("the HMI's surface %u is gone", hmi.id);
+        memset(&hmi, 0, sizeof hmi);
+        geom_update();
+    } else if (i >= 0 && probes[i].s == s) probes[i].s = NULL;
+    wl_proxy_destroy((struct wl_proxy *)s);
+}
+static const struct ivi_controller_surface_listener probe_listener = {
+    p_none, p_opacity, p_src, p_dst, p_config, p_none, p_none, p_layer, p_stats, p_destroyed, p_none,
+};
+static void hmi_probe(struct ivi_controller *c, uint32_t id) {
+    if (hmi.s || (id >= SURF_BASE && id < SURF_BASE + MAX_CLIENTS)) return;
+    int k = -1;
+    for (int i = 0; i < MAX_PROBES; i++) {
+        if (probes[i].s && probes[i].id == id) return;     /* asked already */
+        if (!probes[i].s && k < 0) k = i;
+    }
+    if (k < 0) return;
+    memset(&probes[k], 0, sizeof probes[k]);
+    probes[k].id = id;
+    probes[k].s = ivi_controller_surface_create(c, id);
+    ivi_controller_surface_add_listener(probes[k].s, &probe_listener, (void *)(intptr_t)k);
+    ivi_controller_surface_send_stats(probes[k].s);
+}
+
 static void c_surface(void *d, struct ivi_controller *c, uint32_t id) {
     (void)d;
+    hmi_probe(c, id);
     for (int i = 0; i < cfg.n_yield; i++) {
         if (cfg.yield_surfaces[i] != id) continue;
         int k = 0;
         while (k < nyield && yield[k].id != id) k++;
         if (k == nyield) { if (nyield == CFG_MAX_YIELD) return; nyield++; }
         if (yield[k].s) return;
-        yield[k].id = id; yield[k].visible = 0;
+        yield[k].id = id; yield[k].visible = 0; yield[k].w = yield[k].h = 0;
         yield[k].s = ivi_controller_surface_create(c, id);
         ivi_controller_surface_add_listener(yield[k].s, &yield_listener, (void *)(intptr_t)k);
         log_info("watching surface %#x", id);
@@ -226,8 +332,10 @@ static void o_geom(void *d, struct wl_output *o, int32_t x, int32_t y, int32_t p
 }
 static void o_mode(void *d, struct wl_output *o, uint32_t flags, int32_t w, int32_t h, int32_t r) {
     (void)o;
+    if (!(flags & WL_OUTPUT_MODE_CURRENT)) return;
+    log_info("output %d: %dx%d@%d", (int)(intptr_t)d, w, h, r / 1000);
     /* the first output is the centre display (HDMI-A-1 in winston's command line) */
-    if ((flags & WL_OUTPUT_MODE_CURRENT) && d == (void *)1) { screen_w = w; screen_h = h; refresh_mhz = r; log_debug("centre output %dx%d@%d", w, h, r / 1000); }
+    if (d == (void *)1) { out_w = w; out_h = h; refresh_mhz = r; geom_update(); }
 }
 static void o_done(void *d, struct wl_output *o) { (void)d, (void)o; }
 static void o_scale(void *d, struct wl_output *o, int32_t f) { (void)d, (void)o, (void)f; }
@@ -309,7 +417,7 @@ static int gate_applies(const client *c) {
  * when their screen goes; for them the gate only hides while it names another app in front, so a gate that reads
  * nothing (on a unit it cannot read) leaves them as they were without it. */
 static int in_front(const client *c) {
-    if (!gate_applies(c)) return 1;
+    if (!gate_applies(c) || gate_unavailable()) return 1;
     if (legacy(c) && c->mode == MODE_LAYER) return !gate_any_front() || gate_front(c->uid);
     return gate_reported() && gate_front(c->uid);
 }
@@ -326,39 +434,33 @@ static void origin(const client *c, float *x, float *y) {
 }
 
 static struct ivi_controller_screen *centre_screen(void);
-
-/* The compositor reports the layer's screen: none means the screen's layers were set without it (the HMI's scene, an
- * app manager's in-place update of another app). While the app is shown it goes straight back on, on top - it would
- * stay visible but on no screen, a blank page until the app is shown again. */
-static void l_screen(void *d, struct ivi_controller_layer *l, struct wl_output *o) {
-    client *c = d;
-    if (o || !c->cl || c->cl != l || !c->layer_on) return;
-    struct ivi_controller_screen *scr = centre_screen();
-    if (!scr) return;
-    log_info("%s: layer taken off the screen while shown - put back", c->app);
-    ivi_controller_screen_add_layer(scr, c->cl);
-    ivi_controller_commit_changes(ictl);
-}
-static void l_int(void *d, struct ivi_controller_layer *l, int32_t v) { (void)d, (void)l, (void)v; }
-static void l_fixed(void *d, struct ivi_controller_layer *l, wl_fixed_t v) { (void)d, (void)l, (void)v; }
-static void l_rect(void *d, struct ivi_controller_layer *l, int32_t x, int32_t y, int32_t w, int32_t h) { (void)d, (void)l, (void)x, (void)y, (void)w, (void)h; }
-static void l_config(void *d, struct ivi_controller_layer *l, int32_t w, int32_t h) { (void)d, (void)l, (void)w, (void)h; }
-static void l_destroyed(void *d, struct ivi_controller_layer *l) { (void)d, (void)l; }
-static const struct ivi_controller_layer_listener layer_listener = {
-    l_int, l_fixed, l_rect, l_rect, l_config, l_int, l_screen, l_destroyed,
-};
-
+static int layer_onto_screen(uint32_t layer_id, int w, int h);
 static void apply_visibility(client *c) {
     if (!c->cl) return;
     int on = shown(c);                                     /* never show an empty or dead surface */
-    /* shown again: the layer back on the centre screen, on top. Another renderer (the MGU Store's beside
-     * idrive7-apps') or the HMI may have set the screen's layers without it meanwhile: it was then visible
-     * but not on any screen, and the app showed a black page. */
-    if (on && !c->layer_on) {
+    /* shown again: the layer back on the centre screen, on top, before it is made visible (so it never shows
+     * under another program's layer), through a fresh connection (layer_onto_screen). Another renderer (the MGU
+     * Store's beside idrive7-apps') or the HMI may have set the screen's layers without it meanwhile: it was then
+     * visible but not on any screen, and the app showed a black page. Should that fail, through our own connection
+     * as before 2.1.12, in the same commit as its visibility: the app shows, at the old cost of other programs'
+     * layers taken off the screen. Our other shown layers go on again first: that connection's copy of the list
+     * no longer has them (they went on through connections of their own). With no screen at all, the next update
+     * tries again (layer_on stays 0). */
+    int placed = 1;
+    if (on && !c->layer_on &&
+        layer_onto_screen(LAYER_BASE + c->slot, out_w > 0 ? out_w : screen_w, out_h > 0 ? out_h : screen_h)) {
         struct ivi_controller_screen *scr = centre_screen();
-        if (scr) ivi_controller_screen_add_layer(scr, c->cl);
+        if (scr) {
+            for (int i = 0; i < MAX_CLIENTS; i++) {
+                client *o = clients[i];
+                if (o && o != c && o->cl && o->layer_on) ivi_controller_screen_add_layer(scr, o->cl);
+            }
+            ivi_controller_screen_add_layer(scr, c->cl);
+        }
+        placed = scr != NULL;
+        log_warn("%s: its layer %s", c->app, scr ? "went on the screen through the renderer's own connection" : "could not be put on any screen");
     }
-    c->layer_on = on;
+    c->layer_on = on && placed;
     ivi_controller_layer_set_visibility(c->cl, on);
     ivi_controller_surface_set_visibility(c->cs, on);
     ivi_controller_commit_changes(ictl);
@@ -445,6 +547,7 @@ static void surface_destroy(client *c) {
     if (c->frame_cb) { wl_callback_destroy(c->frame_cb); c->frame_cb = NULL; }
     if (c->cl) { ivi_controller_layer_destroy(c->cl, 1); c->cl = NULL; }
     if (c->cs) { ivi_controller_surface_destroy(c->cs, 1); c->cs = NULL; }
+    c->layer_on = 0;                                       /* a new layer goes on the screen at its first show */
     if (c->es != EGL_NO_SURFACE) { eglMakeCurrent(edpy, init_es, init_es, ectx); eglDestroySurface(edpy, c->es); c->es = EGL_NO_SURFACE; }
     if (c->win) { wl_egl_window_destroy(c->win); c->win = NULL; }
     if (c->is) { ivi_surface_destroy(c->is); c->is = NULL; }
@@ -458,6 +561,66 @@ static struct ivi_controller_screen *centre_screen(void) {
     struct ivi_controller_screen *best = NULL; uint32_t bid = 0xffffffffu;
     for (int i = 0; i < nscreens; i++) if (screens[i].id < bid) { bid = screens[i].id; best = screens[i].s; }
     return best;
+}
+
+/* A layer onto the centre screen, on top, through a connection made for it and closed again.
+ *
+ * Winston applies a screen's add_layer to the screen's layer list as the calling connection last saw it: its copy
+ * is taken when the connection binds the controller and changes only with its own requests. Added through our
+ * long-open connection, our layer took the screen back to the list of the day we started, and every layer other
+ * programs had put on the screen since was dropped: the movie player's (mgu-player) flashed off on each of its app's
+ * BACK while that app's own screen came back. A new connection sees the list as it is, so other layers stay. */
+struct fresh_scr { struct ivi_controller *ctl; struct wl_output *out[16]; int nout; struct { uint32_t id; struct ivi_controller_screen *s; } scr[16]; int nscr; int failed; };
+static void fs_screen(void *d, struct ivi_controller *c, uint32_t id, struct ivi_controller_screen *s) {
+    struct fresh_scr *f = d; (void)c;
+    if (f->nscr < 16) { f->scr[f->nscr].id = id; f->scr[f->nscr].s = s; f->nscr++; }
+    else wl_proxy_destroy((struct wl_proxy *)s);
+}
+static void fs_id(void *d, struct ivi_controller *c, uint32_t id) { (void)d, (void)c, (void)id; }
+static void fs_error(void *d, struct ivi_controller *c, int32_t o, int32_t t, int32_t code, const char *m) {
+    struct fresh_scr *f = d; (void)c;
+    f->failed = 1;
+    log_warn("layer onto the screen: ivi error object %d type %d code %d: %s", o, t, code, m ? m : "");
+}
+static const struct ivi_controller_listener fs_ctl = { fs_screen, fs_id, fs_id, fs_error };
+static void fs_global(void *d, struct wl_registry *r, uint32_t name, const char *iface, uint32_t ver) {
+    struct fresh_scr *f = d; (void)ver;
+    /* winston reports a screen to a controller for each output the connection bound */
+    if (!strcmp(iface, "wl_output") && f->nout < 16) f->out[f->nout++] = wl_registry_bind(r, name, &wl_output_interface, 1);
+    else if (!strcmp(iface, "ivi_controller") && !f->ctl) { f->ctl = wl_registry_bind(r, name, &ivi_controller_interface, 1); ivi_controller_add_listener(f->ctl, &fs_ctl, f); }
+}
+static void fs_global_remove(void *d, struct wl_registry *r, uint32_t n) { (void)d, (void)r, (void)n; }
+static const struct wl_registry_listener fs_reg = { fs_global, fs_global_remove };
+
+static int layer_onto_screen(uint32_t layer_id, int w, int h) {
+    struct wl_display *d = wl_display_connect(cfg.wayland_display);
+    if (!d) { log_warn("layer onto the screen: cannot connect to %s (%s)", cfg.wayland_display, strerror(errno)); return -1; }
+    struct fresh_scr f;
+    memset(&f, 0, sizeof f);
+    struct wl_registry *r = wl_display_get_registry(d);
+    wl_registry_add_listener(r, &fs_reg, &f);
+    int ok = wl_display_roundtrip(d) >= 0 && f.ctl && wl_display_roundtrip(d) >= 0;
+    struct ivi_controller_screen *scr = NULL;
+    uint32_t bid = 0xffffffffu;
+    for (int i = 0; ok && i < f.nscr; i++) {   /* the configured screen, else the lowest id (the centre display) */
+        if (cfg.screen_id && f.scr[i].id == cfg.screen_id) { scr = f.scr[i].s; break; }
+        if (f.scr[i].id < bid) { bid = f.scr[i].id; scr = f.scr[i].s; }
+    }
+    struct ivi_controller_layer *l = NULL;
+    if (scr) {
+        l = ivi_controller_layer_create(f.ctl, layer_id, w, h);   /* the existing layer (winston takes the id) */
+        ivi_controller_screen_add_layer(scr, l);
+        ivi_controller_commit_changes(f.ctl);
+        ok = wl_display_roundtrip(d) >= 0 && !f.failed;
+    } else ok = 0;
+    /* proxies freed only (no destroy request): the layer belongs to the scene, not to this connection */
+    if (l) wl_proxy_destroy((struct wl_proxy *)l);
+    for (int i = 0; i < f.nscr; i++) wl_proxy_destroy((struct wl_proxy *)f.scr[i].s);
+    for (int i = 0; i < f.nout; i++) wl_proxy_destroy((struct wl_proxy *)f.out[i]);
+    if (f.ctl) wl_proxy_destroy((struct wl_proxy *)f.ctl);
+    wl_registry_destroy(r);
+    wl_display_disconnect(d);
+    return ok ? 0 : -1;
 }
 
 static int surface_create(client *c) {
@@ -482,20 +645,19 @@ static int surface_create(client *c) {
     ivi_controller_surface_set_source_rectangle(c->cs, 0, 0, c->w, c->h);
     ivi_controller_surface_set_destination_rectangle(c->cs, 0, 0, c->w, c->h);
     ivi_controller_surface_set_visibility(c->cs, 0);
-    c->cl = ivi_controller_layer_create(ictl, lid, screen_w, screen_h);
-    ivi_controller_layer_add_listener(c->cl, &layer_listener, c);
+    int m[4];                                            /* design px -> where the HMI shows */
+    map_rect(c->x, c->y, c->w, c->h, m);
+    c->cl = ivi_controller_layer_create(ictl, lid, out_w > 0 ? out_w : screen_w, out_h > 0 ? out_h : screen_h);
     ivi_controller_layer_set_source_rectangle(c->cl, 0, 0, c->w, c->h);
-    ivi_controller_layer_set_destination_rectangle(c->cl, c->x, c->y, c->w, c->h);
+    ivi_controller_layer_set_destination_rectangle(c->cl, m[0], m[1], m[2], m[3]);
     ivi_controller_layer_set_opacity(c->cl, wl_fixed_from_int(1));
     ivi_controller_layer_add_surface(c->cl, c->cs);
     ivi_controller_layer_set_visibility(c->cl, 0);
     ivi_controller_commit_changes(ictl);
-    struct ivi_controller_screen *scr = centre_screen();
-    if (scr) ivi_controller_screen_add_layer(scr, c->cl);   /* on top of the screen's layers */
-    else log_warn("%s: no screen to put the layer on", c->app);
-    ivi_controller_commit_changes(ictl);
-    wl_display_roundtrip(dpy);
-    log_info("%s: surface 0x%x on layer 0x%x at %d,%d %dx%d (scale %.3f)", c->app, sid, lid, c->x, c->y, c->w, c->h, c->xf.s);
+    wl_display_roundtrip(dpy);                            /* the layer exists before another connection puts it on */
+    /* it goes on the screen, on top, when it is first shown (apply_visibility) */
+    log_info("%s: surface 0x%x on layer 0x%x at %d,%d %dx%d (scale %.3f; on the screen %d,%d %dx%d)", c->app, sid, lid,
+             c->x, c->y, c->w, c->h, c->xf.s, m[0], m[1], m[2], m[3]);
     return 0;
 }
 
@@ -627,8 +789,8 @@ void embed_frame_done(void) {
 
 void embed_changed(void) { update_all(); }
 
-/* the HMI's process id, or -1 */
-static int hmi_pid(void) {
+/* the process id of the HMI (name: cfg.hmi_process; with gate8, also Hmi8, iDrive 8's), or -1 */
+static int hmi_pid_any(int gate8) {
     DIR *d = opendir("/proc");
     if (!d) return -1;
     struct dirent *e;
@@ -641,11 +803,12 @@ static int hmi_pid(void) {
         if (!f) continue;
         if (fgets(name, sizeof name, f)) name[strcspn(name, "\n")] = 0;
         fclose(f);
-        if (!strcmp(name, cfg.hmi_process)) pid = atoi(e->d_name);
+        if (!strcmp(name, cfg.hmi_process) || (gate8 && !strcmp(name, "Hmi8"))) pid = atoi(e->d_name);
     }
     closedir(d);
     return pid;
 }
+static int hmi_pid(void) { return hmi_pid_any(0); }
 
 /* the HMI started after mgu-render-hmi.sh mounted the template (its marker) */
 static int template_loaded(void) {
@@ -674,7 +837,9 @@ static int template_loaded(void) {
 static uint64_t t_listen;
 static int embed_settling(uint64_t t) { return cfg.embed && embed_connecting() && t - t_listen < 3000000; }
 
-static int embed_available(void) { return cfg.embed && embed_connected() && template_loaded(); }
+/* the HMI's page is in its buffer's px: apps' design px only when the buffer has the design size */
+static int embed_geometry(void) { return !hmi.s || !hmi.buf[0] || (hmi.buf[0] == screen_w && hmi.buf[1] == screen_h); }
+static int embed_available(void) { return cfg.embed && embed_connected() && template_loaded() && embed_geometry(); }
 
 /* ---------------- touch (touch.c asks) ---------------- */
 int touch_owner_at(int x, int y) {
@@ -735,7 +900,11 @@ static void touch_defaults(int area[4]) {
     if (cfg.touch_area[2]) { memcpy(area, cfg.touch_area, 4 * sizeof *area); return; }
     area[0] = area[1] = area[2] = area[3] = 0;
     if (screen_w == 2880 && screen_h == 960) { area[1] = 76; area[2] = 2880; area[3] = 764; }   /* iDrive 8: title strip, climate bar */
-    else if (screen_w == 1920 && screen_h == 720) { area[0] = 84; area[1] = 76; area[2] = 1836; area[3] = 644; }   /* iDrive 7: back column, title strip */
+    /* iDrive 7: the whole screen. A tap nobody claims still goes to the HMI, and the kit's layouts claim right of the
+     * back column only, so its arrow keeps working; an app drawn over the column (a fill layout) may claim it too, so a
+     * tap there no longer goes to the HMI underneath, which would close the app. Status icons are never claimed. The
+     * units used to pass an area as touch_area; built in, the same unit serves iDrive 8 too. */
+    else if (screen_w == 1920 && screen_h == 720) { area[2] = 1920; area[3] = 720; }
 }
 
 /* ---------------- controller gate (upstream inputgate) ---------------- */
@@ -755,7 +924,9 @@ static void ctl_gate_update(uint64_t t) {
     if (ccu_fd < 0) want = 0;
     if (want) {
         if (!ctl_gate_on || t - ctl_gate_t >= GATE_TOUCH_US) {
-            int fd = open(cfg.controller_gate, O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0644);
+            /* emptied: an empty file holds the whole controller (gate 1.2.0 reads part words that another renderer
+             * may have left; older gates only look at its age) */
+            int fd = open(cfg.controller_gate, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
             if (fd >= 0) { futimens(fd, NULL); close(fd); }
             if (!ctl_gate_on) log_info("controller: held for an app");
             ctl_gate_on = 1; ctl_gate_t = t;
@@ -782,7 +953,7 @@ static void ccu_read(void) {
 
 /* the HMI runs with the controller gate library */
 static int ctl_gate_loaded(void) {
-    int pid = cfg.controller_lib[0] ? hmi_pid() : -1;
+    int pid = cfg.controller_lib[0] ? hmi_pid_any(1) : -1;      /* the gate goes into Hmi8 on iDrive 8 */
     if (pid < 0) return 0;
     char p[64], line[512];
     snprintf(p, sizeof p, "/proc/%d/maps", pid);
@@ -824,10 +995,50 @@ static void app_area(int r[4]) {
     else { r[0] = 108; r[1] = 82; r[2] = 1790; r[3] = 638; }
 }
 
+static void send_ready(client *c);
 static void hello(client *c, const uint8_t *p, uint32_t len) {
     int native = hello_parse(p, len, c->app, sizeof c->app);
-    if (native) {
-        c->dialect = DIALECT_NATIVE;
+    if (native) c->dialect = DIALECT_NATIVE;
+    log_info("%s: connected (uid %u%s)", c->app, c->uid, native ? ", mgu-render/1" : "");
+    send_ready(c);
+}
+
+/* Where the HMI is, so apps fit it: the rectangle its surface covers on the screen (else its buffer, else the
+ * centre output). Apps lay out in the HMI's design size; that is mapped onto the rectangle. Placed apps move,
+ * and apps are told the new size when it changed. */
+static void geom_update(void) {
+    int r[4] = { 0, 0, out_w, out_h }, nat[2] = { out_w, out_h };
+    const char *from = "the centre output";
+    if (hmi.s && hmi.buf[0] >= 320 && hmi.buf[1] >= 120) { nat[0] = hmi.buf[0]; nat[1] = hmi.buf[1]; }
+    if (hmi.s && hmi.dst[2] >= 320 && hmi.dst[3] >= 120) { memcpy(r, hmi.dst, sizeof r); from = "the HMI"; }
+    else if (hmi.s && hmi.buf[0] >= 320 && hmi.buf[1] >= 120) { r[0] = r[1] = 0; r[2] = hmi.buf[0]; r[3] = hmi.buf[1]; from = "the HMI"; }
+    if (r[2] < 320 || r[3] < 120) return;                /* nothing known yet: 1920 x 720 as told */
+    int dw = 1920, dh = 720;                             /* the iDrive 7 HMI's design, whatever it is shown at */
+    if (nat[0] == 2880 && nat[1] == 960) { dw = 2880; dh = 960; }   /* iDrive 8 */
+    float kx = (float)r[2] / (float)dw, ky = (float)r[3] / (float)dh;
+    int moved = kx != map_kx || ky != map_ky || r[0] != map_ox || r[1] != map_oy, resized = dw != screen_w || dh != screen_h;
+    if (!moved && !resized) return;
+    map_kx = kx; map_ky = ky; map_ox = r[0]; map_oy = r[1];
+    screen_w = dw; screen_h = dh;
+    if (kx == 1 && ky == 1 && !r[0] && !r[1]) log_info("screen: %dx%d from %s", dw, dh, from);
+    else log_info("screen: apps lay out on %dx%d, shown at %d,%d %dx%d (%s; x %.3f, y %.3f)", dw, dh, r[0], r[1], r[2], r[3], from, kx, ky);
+    if (!dpy) return;
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        client *c = clients[i];
+        if (!c) continue;
+        if (moved && c->cl && c->placed) {
+            int m[4];
+            map_rect(c->x, c->y, c->w, c->h, m);
+            ivi_controller_layer_set_destination_rectangle(c->cl, m[0], m[1], m[2], m[3]);
+        }
+        /* our kit takes a second READY (it places again); other dialects get the size they were told */
+        if (resized && c->dialect == DIALECT_NATIVE) send_ready(c);
+    }
+    if (ictl) ivi_controller_commit_changes(ictl);
+}
+
+static void send_ready(client *c) {
+    if (c->dialect == DIALECT_NATIVE) {
         int emb = embed_available(), area[4];
         app_area(area);
         uint32_t caps = CAP_PIXMAP | CAP_VIDEO | (touch_on ? CAP_TOUCH_ROUTE : 0) | (cfg.foreground_gate[0] ? CAP_FRONT_GATE : 0) |
@@ -837,7 +1048,6 @@ static void hello(client *c, const uint8_t *p, uint32_t len) {
         x[11] = GFX_PIXMAP_SIDE; x[12] = (uint32_t)refresh_mhz;
         send_msg(c, X_READY, x, 13 * 4);
     }
-    log_info("%s: connected (uid %u%s)", c->app, c->uid, native ? ", mgu-render/1" : "");
     uint32_t r[4] = { MGU_PROTO_VERSION, (uint32_t)screen_w, (uint32_t)screen_h, (uint32_t)touch_on };
     send_msg(c, E_READY, r, sizeof r);
 }
@@ -968,7 +1178,9 @@ static int handle(client *c, uint32_t type, const uint8_t *p, uint32_t len) {
             c->frames_shown = 0;
             if (c->mode == MODE_LAYER && surface_create(c) < 0) { send_error(c, "surface"); return -1; }
         } else if (c->mode == MODE_LAYER) {
-            ivi_controller_layer_set_destination_rectangle(c->cl, x, y, ww, hh);
+            int m[4];
+            map_rect(x, y, ww, hh, m);
+            ivi_controller_layer_set_destination_rectangle(c->cl, m[0], m[1], m[2], m[3]);
             ivi_controller_commit_changes(ictl);
         } else {
             c->dirty = c->frame_words > 0;
@@ -997,7 +1209,7 @@ static int handle(client *c, uint32_t type, const uint8_t *p, uint32_t len) {
     case M_RAMP: {
         if (nw < 2 || w[1] > 64 || nw < 2 + (size_t)w[1]) return -1;
         make_current_any(c);
-        gfx_ramp(&c->g, w[0], (int)w[1], w + 2);
+        if (gfx_ramp(&c->g, w[0], (int)w[1], w + 2) < 0) { log_warn("%s: %s", c->app, gfx_error()); send_error(c, gfx_error()); }
         return 0;
     }
     case M_LAYER: {
@@ -1214,16 +1426,8 @@ static void record(client *c, uint32_t type, const uint8_t *msg, uint32_t len) {
     if (c->rec) fwrite(msg, 1, 8 + (size_t)len, c->rec);
 }
 
-static int client_read(client *c) {
-    for (;;) {
-        if (c->incap - c->inlen < 65536) { c->incap = c->incap ? c->incap * 2 : 262144; c->in = realloc(c->in, c->incap); }
-        ssize_t r = recv(c->fd, c->in + c->inlen, c->incap - c->inlen, MSG_DONTWAIT);
-        if (r == 0) return -1;
-        if (r < 0) { if (errno == EAGAIN || errno == EWOULDBLOCK) break; if (errno == EINTR) continue; return -1; }
-        c->inlen += (size_t)r;
-        c->last_msg = now_us();
-        if (c->stale) { c->stale = 0; log_info("%s: talking again", c->app); update_all(); }
-    }
+/* the whole messages in c->in; makes room for the one that is not whole yet */
+static int client_parse(client *c) {
     if (!c->started && c->inlen >= 4 && dbr_is_magic(c->in)) {
         c->dialect = DIALECT_DBR;
         snprintf(c->app, sizeof c->app, "display-bridge app (uid %u)", c->uid);
@@ -1258,13 +1462,35 @@ static int client_read(client *c) {
         /* payload must be 4-byte aligned for the word views: copy if it is not */
         const uint8_t *pl = c->in + off + 8;
         uint8_t *tmp = NULL;
-        if (((uintptr_t)pl & 3) != 0) { tmp = malloc(len + 4); memcpy(tmp, pl, len); pl = tmp; }
+        if (((uintptr_t)pl & 3) != 0) { if (!(tmp = malloc(len + 4))) return -1; memcpy(tmp, pl, len); pl = tmp; }
         int rc = handle(c, type, pl, len);
         free(tmp);
         if (rc < 0) { log_warn("%s: bad message %u (len %u)", c->app, type, len); return -1; }
         off += 8 + len;
     }
     if (off) { memmove(c->in, c->in + off, c->inlen - off); c->inlen -= off; }
+    return 0;
+}
+
+/* parses between reads: the buffer holds at most one message being received (MAX_IN), however fast the app sends.
+   Reads about MAX_IN a wakeup: an app that never pauses does not hold up the others (poll comes back for the rest). */
+static int client_read(client *c) {
+    for (size_t got = 0; got < MAX_IN;) {
+        if (c->incap - c->inlen < 65536 && c->incap < MAX_IN) {
+            size_t cap = c->incap ? c->incap * 2 : 262144;
+            if (cap > MAX_IN) cap = MAX_IN;
+            uint8_t *n = realloc(c->in, cap);
+            if (!n) { log_warn("%s: out of memory for its messages", c->app); return -1; }
+            c->in = n; c->incap = cap;
+        }
+        ssize_t r = recv(c->fd, c->in + c->inlen, c->incap - c->inlen, MSG_DONTWAIT);
+        if (r == 0) return -1;
+        if (r < 0) { if (errno == EAGAIN || errno == EWOULDBLOCK) return 0; if (errno == EINTR) continue; return -1; }
+        c->inlen += (size_t)r; got += (size_t)r;
+        c->last_msg = now_us();
+        if (c->stale) { c->stale = 0; log_info("%s: talking again", c->app); update_all(); }
+        if (client_parse(c) < 0) return -1;
+    }
     return 0;
 }
 
@@ -1472,6 +1698,47 @@ static void usage(const char *a0) {
     fprintf(stderr, "usage: %s [-c FILE] [-s key=value]... [-v] [--share | --unshare] | --replay FILE --out FILE.pam [--raw FILE.rgba] [--uid N]\n", a0);
 }
 
+/* IterioDev's renderer (his App Manager's service package, also as the Store's "mgu-renderd" tool): it binds the same
+ * community socket and uses the same ivi ids as this renderer, so the two cannot run together. Installed (its unit,
+ * started with "--socket"; this repository's installer writes a unit of the same name, with "-s socket_path=" and its
+ * marker line) or running (a mgu-renderd with "--socket"): why, else 0. */
+static int iterio_renderer(char *why, size_t n) {
+    static const char *units[] = { "/etc/systemd/system/mgu-renderd.service", "/run/systemd/system/mgu-renderd.service",
+                                   "/lib/systemd/system/mgu-renderd.service" };
+    for (size_t i = 0; i < sizeof units / sizeof *units; i++) {
+        FILE *f = fopen(units[i], "r");
+        if (!f) continue;
+        char line[1024]; int theirs = 0, ours = 0;
+        while (fgets(line, sizeof line, f)) {
+            if (strstr(line, "added by mgu-app-install.sh")) ours = 1;
+            if (!strncmp(line, "ExecStart=", 10) && strstr(line, " --socket")) theirs = 1;
+        }
+        fclose(f);
+        if (theirs && !ours) { snprintf(why, n, "its unit %s", units[i]); return 1; }
+    }
+    DIR *d = opendir("/proc");
+    struct dirent *e;
+    pid_t me = getpid();
+    while (d && (e = readdir(d))) {
+        char *end; long pid = strtol(e->d_name, &end, 10);
+        if (*end || pid <= 0 || pid == me) continue;
+        char p[64], b[1024]; snprintf(p, sizeof p, "/proc/%ld/cmdline", pid);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) continue;
+        ssize_t len = read(fd, b, sizeof b - 1);
+        close(fd);
+        if (len <= 0) continue;
+        b[len] = 0;
+        const char *base = strrchr(b, '/'); base = base ? base + 1 : b;
+        if (strcmp(base, "mgu-renderd")) continue;
+        for (char *a = b + strlen(b) + 1; a < b + len; a += strlen(a) + 1) {
+            if (!strcmp(a, "--socket")) { snprintf(why, n, "process %ld", pid); closedir(d); return 1; }
+        }
+    }
+    if (d) closedir(d);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *rin = NULL, *rout = "out.pam", *rraw = NULL;
     uint32_t ruid = (uint32_t)getuid();
@@ -1512,6 +1779,20 @@ int main(int argc, char **argv) {
 
     signal(SIGPIPE, SIG_IGN);
     signal(SIGTERM, on_sig); signal(SIGINT, on_sig);
+    /* on the community socket: stand down while IterioDev's renderer is installed or runs (its apps and ours then
+     * draw on it), looked at again every 30 s; nothing of ours (socket, touch divert, layers) is set up meanwhile */
+    if (!strcmp(cfg.socket_path, "/run/mgu-renderd/renderd.sock")) {
+        char why[128];
+        int said = 0;
+        while (!quit && iterio_renderer(why, sizeof why)) {
+            if (!said) log_warn("IterioDev's renderer is installed (%s): it has the apps' socket, this renderer stands down "
+                                "until it is removed", why);
+            said = 1;
+            sleep(30);
+        }
+        if (quit) return 0;
+        if (said) log_info("IterioDev's renderer is gone: starting");
+    }
     if (!getenv("XDG_RUNTIME_DIR")) setenv("XDG_RUNTIME_DIR", "/run/wayland", 1);
     dpy = wl_display_connect(cfg.wayland_display);
     if (!dpy) { log_error("cannot connect to the compositor %s (%s)", cfg.wayland_display, strerror(errno)); return 1; }
@@ -1519,7 +1800,9 @@ int main(int argc, char **argv) {
     wl_registry_add_listener(reg, &reg_listener, NULL);
     wl_display_roundtrip(dpy); wl_display_roundtrip(dpy);
     if (!comp || !iapp || !ictl) { log_error("compositor lacks wl_compositor / ivi_application / ivi_controller"); return 1; }
-    log_info("compositor: %d screens, centre output %dx%d", nscreens, screen_w, screen_h);
+    wl_display_roundtrip(dpy);                           /* the HMI's surface answers whose it is */
+    log_info("compositor: %d screens, centre output %dx%d, apps lay out on %dx%d", nscreens, out_w, out_h, screen_w, screen_h);
+    if (!hmi.s) log_info("the HMI's surface (%s) is not there yet: placed by the centre output until it is", cfg.hmi_process);
     /* forks the guard: before the GL driver loads */
     if (cfg.touch) touch_on = touch_start();
     if (egl_setup((EGLNativeDisplayType)dpy, 0) < 0) return 1;

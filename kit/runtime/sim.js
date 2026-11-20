@@ -14,7 +14,11 @@ class Sim {
     constructor() {
         this.t0 = Date.now(); this.last = null;
         this.v = 0; this.gear = 1; this.oil = 18; this.coolant = 20; this.lat = 0;
+        this.red = 7000;
     }
+
+    /** Rev limit of the simulated engine (7000 = the petrol drive; a diesel cuts off lower). */
+    setRedline(rpm) { this.red = rpm; this.shiftRpm = 0; }
 
     sample(now) {
         now = now || Date.now();
@@ -26,7 +30,7 @@ class Sim {
         else if (t < 17) {                                                  // full-throttle pull
             throttle = 1;
             const shifting = this.shiftUntil && now < this.shiftUntil;
-            const pwr = 255000 * (0.3 + 0.7 * Math.sin(Math.min(1, (this.rpm || 3000) / 7000) * Math.PI * 0.6));
+            const pwr = 255000 * (0.3 + 0.7 * Math.sin(Math.min(1, (this.rpm || 3000) / this.red) * Math.PI * 0.6));
             accel = shifting ? 0.2 : Math.min(9.5, pwr * 0.85 / 1750 / Math.max(3, this.v / 3.6)) - 0.39 * Math.pow(this.v / 3.6, 2) / 1750 - 0.13;
         } else if (t < 19) { accel = -0.6; }                                // lift
         else if (t < 25) { accel = this.v > 0.3 ? -10.2 : 0; }              // hard stop
@@ -38,15 +42,15 @@ class Sim {
         this.v = Math.max(0, this.v + accel * dt * 3.6);
         if (this.v === 0 && accel < 0) accel = 0;
 
-        // gearbox: upshift around 6450-7000 under throttle, downshift below 1400
+        // gearbox: upshift 550-0 rpm below the redline under throttle (6450-7010 at 7000), downshift below 1400
         if (this.v < 3) this.gear = 1;
         let rpm = Math.max(850, rpmFor(this.v, this.gear));
-        if (!this.shiftRpm) this.shiftRpm = 6750;
-        if (throttle > 0.9 && rpm > this.shiftRpm && this.gear < 6) { this.gear++; this.shiftRpm = 6450 + Math.random() * 560; this.shiftUntil = now + 180; rpm = rpmFor(this.v, this.gear); }
+        if (!this.shiftRpm) this.shiftRpm = this.red - 250;
+        if (throttle > 0.9 && rpm > this.shiftRpm && this.gear < 6) { this.gear++; this.shiftRpm = this.red - 550 + Math.random() * 560; this.shiftUntil = now + 180; rpm = rpmFor(this.v, this.gear); }
         if (throttle <= 0.9 && rpm > 3000 && this.gear < 6) { this.gear++; rpm = rpmFor(this.v, this.gear); }
         if (rpm < 1400 && this.gear > 1) { this.gear--; rpm = rpmFor(this.v, this.gear); }
         if (this.v < 3) rpm = throttle > 0.9 ? 3200 : 850 + Math.random() * 20;
-        rpm = Math.min(rpm, 7020 + Math.random() * 30);      // rev limiter
+        rpm = Math.min(rpm, this.red + 20 + Math.random() * 30);      // rev limiter
         this.rpm = rpm;
 
         // warm-up: oil lags coolant
@@ -56,7 +60,7 @@ class Sim {
         return {
             rpm, speed: this.v, gear: this.v < 0.5 && throttle < 0.9 ? 0 : this.gear,
             gLong: accel / 9.81 + (Math.random() - 0.5) * 0.02, gLat: this.lat / 9.81 + (Math.random() - 0.5) * 0.02,
-            coolant: this.coolant, oil: this.oil, torque: throttle > 0.9 ? 380 + 200 * Math.sin(Math.min(1, rpm / 7000) * Math.PI) : 40,
+            coolant: this.coolant, oil: this.oil, torque: throttle > 0.9 ? 380 + 200 * Math.sin(Math.min(1, rpm / this.red) * Math.PI) : 40,
             throttle,
         };
     }

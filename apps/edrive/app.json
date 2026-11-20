@@ -1,11 +1,14 @@
 {
   "id": "edrive",
   "title": "eDrive",
-  "description": "Real electric range, live battery power, cells and climate power, HV battery health (SOH) and energy, last charge, charge log, 12 V battery voltage and a home-screen widget",
-  "version": "2.6.13",
+  "description": "Real electric range (plug-in hybrids and fully electric cars such as the iX3), live battery power, cells and climate power, HV battery health (SOH) and energy, last charge, charge log, the 12 V battery (charge, voltage, what it does, regen, history) and a home-screen widget; on a 48 V mild hybrid its 48 V battery and DC/DC converter",
+  "version": "2.11.0",
+  "autostart": true,
   "vendor": "custom",
   "loggingId": "OA9C",
   "iconGlyph": "battery",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "idrive7-renderd": "2.1.15" },
   "signals": {
     "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
       "_instances": "SystemFunctionsInternalTasuInst1",
@@ -24,7 +27,12 @@
       "highVoltageStorageInfoToExternal": "s"
     },
     "de.bmw.infotainment.vehicle.CDS": {
-      "statusEngineSpeed2": "rs"
+      "statusEngineSpeed2": "rs",
+      "statusBattery2": "rs"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "_optional": "the car locked and left: nothing read, so it can sleep",
+      "VehicleCondition": "s"
     },
     "de.bmw.infotainment.climate.climatemaster.ClimateMaster": {
       "statusClimateSystemOn": "rs",
@@ -48,24 +56,26 @@
       "statusDisplayElectricalPowerDistribution": "rs"
     },
     "de.bmw.infotainment.drivingexcitement.Efficiencytainment2": {
-      "statusBatteryTemperature": "rs"
+      "statusBatteryTemperature": "rs",
+      "statusPowerRelativHybrid": "rs"
     },
     "de.bmw.infotainment.lsc.LSCDataSink": {
       "statusHighVoltageStorage": "s"
     }
   },
   "startWidget": {
-    "comment": "Home-screen widget. Layout and cell names are those of BMW's Drive Recorder widget on this firmware: the drawn image goes into BackgroundImage1, the layout shows Title above it. If the image doesn't show or sits wrong, try another 'image' cell or adjust 'size' (pixels: the HMI scales the picture to the big widget and crops it centred; 384 x 256 fits the G05).",
+    "comment": "Home-screen widget. Layout and cell names are those of BMW's Drive Recorder widget on this firmware: the drawn image goes into BackgroundImage1, the layout shows Title above it. If the image doesn't show or sits wrong, try another 'image' cell or adjust 'size' (pixels: the HMI scales the picture to the big widget and crops it centred; 384 x 256 fits the G05). safe: the share it crops off each side ([x, y] or [left, top, right, bottom]); it also fades the picture towards the edges, the top most, so the setting widgetFit keeps the content further in (live.js WIDGET_FIT).",
     "name": "eDrive",
     "layout": "LT_Table_OnlineApps_DriveRecorderWidget",
     "image": "BackgroundImage1",
+    "scale": 2,
     "size": [
       384,
       256
     ],
     "safe": [
       0.09,
-      0.1
+      0.17
     ],
     "cells": {
       "ErrorInfo": [
@@ -114,6 +124,7 @@
   "settings": [
     {
       "key": "range20",
+      "when": { "hybrid": ["auto", "yes"] },
       "label": "Electric range when full, 20 °C",
       "type": "number",
       "unit": "km",
@@ -135,6 +146,7 @@
     },
     {
       "key": "reserve",
+      "when": { "hybrid": ["auto", "yes"] },
       "label": "Engine starts at",
       "type": "choice",
       "default": "auto",
@@ -187,7 +199,7 @@
     },
     {
       "key": "hybrid",
-      "label": "Hybrid system",
+      "label": "Drive system",
       "type": "choice",
       "default": "auto",
       "options": [
@@ -196,17 +208,26 @@
           "Auto"
         ],
         [
+          "bev",
+          "Fully electric (BEV)"
+        ],
+        [
           "yes",
-          "Yes"
+          "Plug-in hybrid"
+        ],
+        [
+          "48v",
+          "48 V mild hybrid"
         ],
         [
           "no",
-          "No (12 V only)"
+          "None (12 V only)"
         ]
       ]
     },
     {
       "key": "designKwh",
+      "when": { "hybrid": ["auto", "yes"] },
       "label": "Battery size when new (gross)",
       "type": "number",
       "unit": "kWh",
@@ -226,7 +247,60 @@
       ]
     },
     {
+      "key": "designKwhBev",
+      "when": { "hybrid": ["auto", "bev"] },
+      "label": "Fully electric: usable battery when new",
+      "type": "number",
+      "unit": "kWh",
+      "default": 74,
+      "steps": [
+        28.9,
+        40,
+        50,
+        60,
+        64.7,
+        66,
+        70,
+        71,
+        74,
+        80.7,
+        81.2,
+        101.7,
+        105.2
+      ]
+    },
+    {
+      "key": "bevReserve",
+      "when": { "hybrid": ["auto", "bev"] },
+      "label": "Fully electric: range counts down to",
+      "type": "choice",
+      "default": "0",
+      "options": [
+        [
+          "0",
+          "0 % (empty)"
+        ],
+        [
+          "5",
+          "5 %"
+        ],
+        [
+          "10",
+          "10 %"
+        ],
+        [
+          "15",
+          "15 %"
+        ],
+        [
+          "20",
+          "20 %"
+        ]
+      ]
+    },
+    {
       "key": "price",
+      "when": { "hybrid": ["auto", "yes", "bev"] },
       "label": "Electricity price",
       "type": "number",
       "unit": "EUR/kWh",
@@ -302,6 +376,12 @@
       ]
     },
     {
+      "key": "diagPage",
+      "label": "Diagnostics pages (UDS replies, scan, raw signals)",
+      "type": "bool",
+      "default": false
+    },
+    {
       "key": "poll",
       "label": "Read charge every",
       "type": "number",
@@ -313,7 +393,10 @@
         15,
         30,
         60
-      ]
+      ],
+      "when": {
+        "diagPage": true
+      }
     },
     {
       "key": "sohDays",
@@ -325,27 +408,10 @@
         1,
         7,
         30
-      ]
-    },
-    {
-      "key": "diagPage",
-      "label": "Diagnostics pages (UDS replies, scan, raw signals)",
-      "type": "bool",
-      "default": false
-    },
-    {
-      "key": "gaugeKw",
-      "label": "Power gauge up to",
-      "type": "number",
-      "unit": "kW",
-      "default": 100,
-      "steps": [
-        60,
-        80,
-        100,
-        120,
-        150
-      ]
+      ],
+      "when": {
+        "diagPage": true
+      }
     },
     {
       "key": "widgetFps",
@@ -358,7 +424,10 @@
         4,
         8,
         12
-      ]
+      ],
+      "when": {
+        "diagPage": true
+      }
     },
     {
       "key": "slowPoll",
@@ -371,7 +440,10 @@
         5,
         10,
         30
-      ]
+      ],
+      "when": {
+        "diagPage": true
+      }
     },
     {
       "key": "scanUnit",
@@ -386,6 +458,56 @@
         [
           "120",
           "Climate, heater, A/C (IHKA 0x78)"
+        ]
+      ],
+      "when": {
+        "diagPage": true
+      }
+    },
+    {
+      "key": "kwFast",
+      "label": "Battery power",
+      "type": "choice",
+      "default": "fast",
+      "options": [
+        ["fast", "Fast (the car's eDRIVE needle)"],
+        ["readings", "Battery readings only"]
+      ]
+    },
+    {
+      "key": "gaugeKw",
+      "label": "Power gauge up to",
+      "type": "number",
+      "unit": "kW",
+      "default": 100,
+      "steps": [
+        60,
+        80,
+        100,
+        120,
+        150,
+        200,
+        250,
+        300
+      ]
+    },
+    {
+      "key": "widgetFit",
+      "label": "Home-screen widget: picture",
+      "type": "choice",
+      "default": "large",
+      "options": [
+        [
+          "small",
+          "Small, clear of the edges"
+        ],
+        [
+          "medium",
+          "Medium"
+        ],
+        [
+          "large",
+          "Fill the widget"
         ]
       ]
     },
@@ -467,7 +589,7 @@
     }
   ],
   "config": {
-    "comment": "HV battery values and the 12 V voltage are read with UDS ReadDataByIdentifier (0x22). Each value tries its candidates in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). 'ecu' on a candidate overrides battery.ecu (decimal: 7 = SME battery unit, 18 = DME engine unit). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong. F442 is the standard OBD 'control module voltage' (terminal 30, i.e. the 12 V battery). The live pages (live.js) read config.battery.fast (pack voltage and current, as fast as the car answers) and config.battery.slow (cells, temperatures, limits, every slowPoll s): each a list of candidates { ecu (optional, decimal), did, fields }, every field { at, bytes, factor, offset, signed, min, max } on the same reply; the first that answers is used. powerSign: kW = V x A / 1000 x powerSign (+ = the battery gives power); if regen shows while accelerating, set it to 1. probes: climate-unit values (IHKA 0x78; with a factor, the climate's kW on the Energy page); scanKnown: identifiers the Scan page compares when a unit has no saved scan.",
+    "comment": "HV battery values and the 12 V voltage are read with UDS ReadDataByIdentifier (0x22). Each value tries its candidates in order and keeps the first that answers with a plausible number: value = raw * factor + offset, raw = 'bytes' big-endian bytes from 'at' (0 = first data byte after the DID). 'ecu' on a candidate overrides battery.ecu (decimal: 7 = SME battery unit, 18 = DME engine unit). DIDs differ between models: check the Diagnostics page in the app and adjust here if a value shows n/a or looks wrong. F442 is the standard OBD 'control module voltage' (terminal 30, i.e. the 12 V battery). The live pages (live.js) read config.battery.fast (pack voltage and current, as fast as the car answers) and config.battery.slow (cells, temperatures, limits, every slowPoll s): each a list of candidates { ecu (optional, decimal), did, fields }, every field { at, bytes, factor, offset, signed, min, max } on the same reply; the first that answers is used. powerSign: kW = V x A / 1000 x powerSign (+ = the battery gives power); if regen shows while accelerating, set it to 1. probes: climate-unit values (IHKA 0x78; with a factor, the climate's kW on the Energy page); scanKnown: identifiers the Scan page compares when a unit has no saved scan. Without a hybrid system (battery12.js): soc40 (40AD) and cap12 (40A9) are candidates with fields too; v12 keeps asking the candidate that answered (an engine unit like a G20 320i's answers 402B with all FF and refuses F442: OBD 42 or the gearbox unit then). Fully electric (fifth-generation eDrive, e.g. the iX3 G08): the battery unit answers DDBC with zero bytes (so its min is 0.5: a zero is never taken as an empty battery) and has the charge in E5CE, stored and usable energy in E5C7 (energy; usable kWh over bevMinKwh = a fully electric car), pack voltage in E54D and current in E561; it refuses DD68, DD69, DDBF, DFA0 and 6335 (OBDb captures of 2021-2023 iX3s and the iX). E5CE also holds the lowest and highest cell's charge (the Battery page's Cells when no cell voltages answer); fifth-generation battery units keep the cell voltages in E554 (every cell) and E553 (lowest, highest), confirmed on the iX1, tried first. Without a voltage reading, packV (V at 0 % and 100 %) estimates it from the charge for the live power on a fully electric car. The v12 candidates on the engine and gearbox units (0x12, 0x13, 0x18) are not asked on a fully electric car.",
     "battery": {
       "ecu": 7,
       "soc": [
@@ -477,10 +599,50 @@
           "at": 0,
           "factor": 0.1,
           "offset": 0,
+          "min": 0.5,
+          "max": 100,
+          "note": "plug-in hybrids; min 0.5: fully electric cars answer zero bytes here"
+        },
+        {
+          "did": "E5CE",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.01,
+          "offset": 0,
           "min": 0,
-          "max": 100
+          "max": 100,
+          "note": "fully electric (iX3 G08, iX): charge in 0.01 %, then the lowest and highest cell's"
         }
       ],
+      "energy": [
+        {
+          "did": "E5C7",
+          "fields": {
+            "stored": {
+              "bytes": 2,
+              "factor": 0.01,
+              "offset": -50,
+              "min": -2,
+              "max": 200
+            },
+            "cap": {
+              "at": 2,
+              "bytes": 2,
+              "factor": 0.01,
+              "offset": -50,
+              "min": 10,
+              "max": 200
+            }
+          },
+          "note": "fully electric (iX3 G08, iX): energy stored now and usable capacity, kWh"
+        }
+      ],
+      "bevMinKwh": 45,
+      "packV": {
+        "empty": 330,
+        "full": 395,
+        "note": "iX3: 94 cells in series, about 3.5 V empty and 4.2 V full; only used on a fully electric car without a voltage reading"
+      },
       "soh": [
         {
           "did": "DD7B",
@@ -574,6 +736,50 @@
           "offset": 0,
           "min": 5,
           "max": 18
+        },
+        {
+          "ecu": 18,
+          "did": "402B",
+          "bytes": 2,
+          "at": 2,
+          "factor": 0.00025,
+          "offset": 6,
+          "min": 5,
+          "max": 18,
+          "note": "the battery sensor (IBS) itself; a G20 320i's engine unit answers all FF (out of range): then the ones above"
+        },
+        {
+          "ecu": 18,
+          "did": "5853",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "battery voltage from the battery sensor, 1 mV (seen on F32 DMEs)"
+        },
+        {
+          "ecu": 64,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "body domain controller BDC (0x40), not yet confirmed on a car"
+        },
+        {
+          "ecu": 26,
+          "did": "F442",
+          "bytes": 2,
+          "at": 0,
+          "factor": 0.001,
+          "offset": 0,
+          "min": 5,
+          "max": 18,
+          "note": "electric drive unit EME (0x1A, holds the DC/DC converter on fully electric cars), not yet confirmed on a car"
         }
       ],
       "chargeMinPct": 3,
@@ -582,6 +788,7 @@
         "hvV": [
           {
             "did": "DDB4",
+            "timeoutMs": 600,
             "fields": {
               "v": {
                 "bytes": 2,
@@ -624,11 +831,25 @@
                 "max": 500
               }
             }
+          },
+          {
+            "did": "E54D",
+            "timeoutMs": 600,
+            "fields": {
+              "v": {
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 150,
+                "max": 500
+              }
+            },
+            "note": "fully electric (fifth-generation eDrive): confirmed on the iX, likely on the iX3"
           }
         ],
         "hvI": [
           {
             "did": "DD69",
+            "timeoutMs": 600,
             "fields": {
               "a": {
                 "bytes": 4,
@@ -638,6 +859,20 @@
                 "max": 800
               }
             }
+          },
+          {
+            "did": "E561",
+            "timeoutMs": 600,
+            "fields": {
+              "a": {
+                "bytes": 4,
+                "factor": 0.01,
+                "signed": true,
+                "min": -800,
+                "max": 800
+              }
+            },
+            "note": "fully electric (iX3 G08, iX): the same layout and direction as DD69 (negative = the battery gives power)"
           }
         ]
       },
@@ -649,13 +884,69 @@
               "pct": {
                 "bytes": 2,
                 "factor": 0.1,
-                "min": 0,
+                "min": 0.5,
                 "max": 100
               }
             }
+          },
+          {
+            "did": "E5CE",
+            "fields": {
+              "pct": {
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 0,
+                "max": 100
+              },
+              "cellMin": {
+                "at": 2,
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 0,
+                "max": 100
+              },
+              "cellMax": {
+                "at": 4,
+                "bytes": 2,
+                "factor": 0.01,
+                "min": 0,
+                "max": 100
+              }
+            },
+            "note": "fully electric: the charge, then the lowest and highest cell's charge (confirmed on 2021-2023 iX3s: 24.22, 23.84, 24.69 %)"
           }
         ],
         "cellV": [
+          {
+            "did": "E554",
+            "array": {
+              "bytes": 2,
+              "factor": 0.001,
+              "min": 2.5,
+              "max": 4.4
+            },
+            "note": "fifth-generation eDrive (iX1, likely the iX3): every cell's voltage, 2 bytes each in 112 slots, 7FFF after the last cell"
+          },
+          {
+            "did": "E553",
+            "fields": {
+              "min": {
+                "at": 0,
+                "bytes": 2,
+                "factor": 0.001,
+                "min": 2.5,
+                "max": 4.4
+              },
+              "max": {
+                "at": 2,
+                "bytes": 2,
+                "factor": 0.001,
+                "min": 2.5,
+                "max": 4.4
+              }
+            },
+            "note": "fifth-generation eDrive (iX1, likely the iX3): the lowest and highest cell's voltage"
+          },
           {
             "did": "DFA5",
             "array": {
@@ -752,14 +1043,334 @@
             }
           }
         ]
-      }
+      },
+      "b48": [
+        {
+          "ecu": 2,
+          "did": "AA56",
+          "timeoutMs": 1500,
+          "fields": {
+            "v": {
+              "bytes": 2,
+              "factor": 0.01,
+              "min": 30,
+              "max": 60
+            },
+            "a": {
+              "at": 2,
+              "bytes": 2,
+              "factor": 0.1,
+              "signed": true,
+              "min": -1000,
+              "max": 1000
+            },
+            "temp": {
+              "at": 4,
+              "bytes": 2,
+              "factor": 0.5,
+              "signed": true,
+              "min": -40,
+              "max": 100
+            },
+            "soc": {
+              "at": 14,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "soh": {
+              "at": 26,
+              "bytes": 1,
+              "min": 40,
+              "max": 110
+            },
+            "kwh": {
+              "at": 6,
+              "bytes": 2,
+              "factor": 0.2
+            },
+            "ahIn": {
+              "at": 8,
+              "bytes": 2,
+              "factor": 0.1
+            },
+            "ahOut": {
+              "at": 10,
+              "bytes": 2,
+              "factor": 0.1
+            },
+            "socQ": {
+              "at": 15,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "pack": {
+              "at": 16,
+              "bytes": 2,
+              "factor": 0.01,
+              "min": 30,
+              "max": 60
+            },
+            "capNom": {
+              "at": 18,
+              "bytes": 1,
+              "factor": 0.1,
+              "min": 1
+            },
+            "rNew": {
+              "at": 19,
+              "bytes": 1,
+              "factor": 0.25,
+              "min": 0.25
+            },
+            "rNow": {
+              "at": 20,
+              "bytes": 1,
+              "factor": 0.25,
+              "min": 0.25
+            },
+            "capMeas": {
+              "at": 22,
+              "bytes": 1,
+              "factor": 0.1,
+              "min": 1
+            },
+            "capNow": {
+              "at": 23,
+              "bytes": 1,
+              "factor": 0.1,
+              "min": 1
+            },
+            "sohQ": {
+              "at": 27,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            }
+          },
+          "note": "48 V battery BATT48 (MESSWERTE_BATT48): terminal voltage first, current negative = charging; layout from Live Data's builtin/BATT48.json, not yet confirmed on a car"
+        }
+      ],
+      "dc48": [
+        {
+          "ecu": 84,
+          "did": "DA90",
+          "timeoutMs": 1500,
+          "fields": {
+            "v12": {
+              "bytes": 2,
+              "factor": 0.001,
+              "min": 5,
+              "max": 18
+            },
+            "v48": {
+              "at": 2,
+              "bytes": 2,
+              "factor": 0.001,
+              "min": 20,
+              "max": 60
+            },
+            "a12": {
+              "at": 4,
+              "bytes": 2,
+              "factor": 0.1,
+              "signed": true,
+              "min": -500,
+              "max": 500
+            },
+            "a48": {
+              "at": 6,
+              "bytes": 2,
+              "factor": 0.1,
+              "signed": true,
+              "min": -200,
+              "max": 200
+            },
+            "w12": {
+              "at": 8,
+              "bytes": 2,
+              "signed": true,
+              "min": -6000,
+              "max": 6000
+            },
+            "w48": {
+              "at": 10,
+              "bytes": 2,
+              "signed": true,
+              "min": -6000,
+              "max": 6000
+            },
+            "mode": {
+              "at": 12,
+              "bytes": 1
+            }
+          },
+          "note": "48 V / 12 V converter PCU48 (STATUS_PCU48_BETRIEBSZUSTAND); layout from Live Data's builtin/PCU48.json, not yet confirmed on a car"
+        }
+      ],
+      "i12": [
+        {
+          "ecu": 18,
+          "did": "5852",
+          "bytes": 2,
+          "factor": 0.02,
+          "offset": -200,
+          "min": -200,
+          "max": 200,
+          "note": "12 V battery current from the battery sensor (IBS), negative = discharging"
+        },
+        {
+          "ecu": 18,
+          "did": "402B",
+          "bytes": 2,
+          "at": 4,
+          "factor": -0.08,
+          "offset": 200,
+          "min": -200,
+          "max": 200,
+          "note": "the battery sensor's current in 402B (sent + while discharging: turned round); all FF on a G20 320i"
+        }
+      ],
+      "soc40": [
+        {
+          "ecu": 18,
+          "did": "40AD",
+          "note": "state of charge the engine unit keeps (%), the 5 values before it, time per charge band (b..: 0-40 % .. 90-100 %)",
+          "fields": {
+            "soc": {
+              "at": 0,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "h1": {
+              "at": 2,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "h2": {
+              "at": 4,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "h3": {
+              "at": 6,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "h4": {
+              "at": 8,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "h5": {
+              "at": 10,
+              "bytes": 1,
+              "min": 0,
+              "max": 100
+            },
+            "b0_40": {
+              "at": 12,
+              "bytes": 2
+            },
+            "b40_60": {
+              "at": 14,
+              "bytes": 2
+            },
+            "b60_70": {
+              "at": 16,
+              "bytes": 2
+            },
+            "b70_80": {
+              "at": 18,
+              "bytes": 2
+            },
+            "b80_90": {
+              "at": 20,
+              "bytes": 2
+            },
+            "b90_100": {
+              "at": 22,
+              "bytes": 2
+            }
+          }
+        }
+      ],
+      "cap12": [
+        {
+          "ecu": 18,
+          "did": "40A9",
+          "note": "battery capacity as registered in the engine unit (Ah) and the original battery's",
+          "fields": {
+            "cap": {
+              "at": 0,
+              "bytes": 1,
+              "min": 10,
+              "max": 250
+            },
+            "capNew": {
+              "at": 2,
+              "bytes": 1,
+              "min": 10,
+              "max": 250
+            }
+          }
+        }
+      ],
+      "soc12": [
+        {
+          "ecu": 18,
+          "did": "56F0",
+          "bytes": 1,
+          "signed": true,
+          "min": 1,
+          "max": 100
+        }
+      ],
+      "soh12": [
+        {
+          "ecu": 18,
+          "did": "59AA",
+          "bytes": 1,
+          "signed": true,
+          "min": 1,
+          "max": 100
+        }
+      ],
+      "t12": [
+        {
+          "ecu": 18,
+          "did": "5854",
+          "bytes": 1,
+          "factor": 0.75,
+          "offset": -48,
+          "min": -40,
+          "max": 90
+        }
+      ],
+      "alt12": [
+        {
+          "ecu": 18,
+          "did": "4604",
+          "bytes": 2,
+          "factor": 0.125,
+          "signed": true,
+          "min": -50,
+          "max": 400
+        }
+      ]
     },
     "scaling": {
       "batteryTemp": {
         "factor": 1,
-        "offset": -40,
+        "offset": -50,
         "invalid": 255,
-        "comment": "HV battery temperature (Efficiencytainment2.statusBatteryTemperature, avg / min / max): raw on the Signals page - adjust if it doesn't match"
+        "comment": "HV battery temperature (Efficiencytainment2.statusBatteryTemperature, avg / min / max): raw on the Signals page - adjust if it doesn't match. X5 45e: raw 76 with the cells at ~26 C (DDC0), so -50"
       },
       "ambient": {
         "factor": 0.5,
