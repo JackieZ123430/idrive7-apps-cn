@@ -6,7 +6,7 @@ from pathlib import Path
 
 DIRECTORY = Path(__file__).resolve().parent.parent / 'runtime/locales'
 # Forms per plural row ("one|other<TAB>forms"); must match PLURAL_RULES in runtime/i18n.js.
-PLURAL_FORMS = {'ru': 3, 'zh-CN': 1, 'ko': 1, 'es': 2}
+PLURAL_FORMS = {'ru': 3, 'zh-CN': 1, 'zh-TW': 1, 'ko': 1, 'es': 2}
 
 sources = sorted(DIRECTORY.glob('*.tsv'))
 if sys.argv[1:]:

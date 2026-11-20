@@ -1,0 +1,10 @@
+{
+ "_": "Translation credit, shipped in Traditional Chinese (zh-TW) builds only: the corner text, the settings rows and the entry-file comment",
+ "corner": "Translation by: 加速度SpeedUP（繁體中文）· 簡中原譯 JackieZ123430",
+ "settingsTitle": "Translation by: 加速度SpeedUP（繁體中文）",
+ "settingsLink": "GitHub JSD-SpeedUP · 簡中原譯 JackieZ123430",
+ "comment": [
+  "Traditional Chinese (zh-TW) by 加速度SpeedUP / GitHub JSD-SpeedUP",
+  "Based on the Simplified Chinese (zh-CN) translation by JackieZ123430: https://github.com/JackieZ123430/idrive7-apps-cn"
+ ]
+}
