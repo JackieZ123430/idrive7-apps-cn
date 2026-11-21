@@ -149,6 +149,75 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     await sleep(300);
     ok(to10.some((r) => r[0] === 0x2e), 'colours written to 0x10');
     g05.stop();
+    // #197 blind: a G21's body module answers the light reads "busy" for the whole drive but takes writes: one light per
+    // bus (NAD 0), any colour on all of them; not read again, "Look again" (force) reads
+    const busyCar = (o) => {
+        const c = { reads: 0, writes: [], readsWork: false };
+        c.diag = {
+            physical: async (t, sid, data) => {
+                if (t !== L.BDC) return null;
+                if (sid === 0x22 && data[0] === 0xf1) return [0x62, 0xf1, 0x86, 0x01];
+                if (sid === 0x22) { c.reads++; return c.readsWork ? reply(data, data[0] === 0xda ? [0x0f, 0x0c] : [0x15]) : (o && o.empty ? reply(data, []) : [0x7f, 0x22, 0x21]); }
+                c.writes.push(data.slice());
+                return o && o.noWrites ? null : [0x6e, data[0], data[1]];
+            },
+        };
+        return c;
+    };
+    const fastSleep = () => Promise.resolve();
+    const bc1 = busyCar(), saidB = [];
+    const blind = new Lights({ diag: bc1.diag, sleep: fastSleep, log: { info: (m) => saidB.push(m), warn: (m) => saidB.push(m) } });
+    let foundB = null; blind.on('found', (l) => { foundB = l; });
+    const gotB = await blind.find();
+    const blindKnown = foundB;
+    ok(blind.blind && gotB.length === 2 && gotB.every((l) => l.nad === 0 && l.blind) && foundB && foundB.length === 2, 'reads busy, writes taken: one light per bus (NAD 0)');
+    ok(bc1.writes.length === 2 && bc1.writes.every((w) => w[2] === 0 && w[3] === 0) && saidB.some((m) => /takes writes but not the light reads/.test(m)), 'the write test is a give-back (NAD 0 off), logged');
+    bc1.writes.length = 0;
+    blind.show(look('solid', { upper: { rgb: [0, 255, 0], bright: 80 } }));
+    await sleep(300);
+    ok(bc1.writes.some((w) => w[0] === 0xda && w[2] === 0 && w[3] === 1 && w[5] === 0 && w[6] === 254) && bc1.writes.some((w) => w[0] === 0xe3 && w[2] === 0 && w[3] === 1), 'a colour goes to every light of both buses (NAD 0)');
+    const readsB = bc1.reads;
+    await blind.find();
+    ok(bc1.reads === readsB, 'blind: not read again');
+    bc1.readsWork = true;
+    const full = await blind.find({ force: true });
+    ok(!blind.blind && full.length === 3 && full.every((l) => l.nad > 0), '"Look again" reads: the lights answering now replace the blind ones');
+    blind.stop();
+    // known blind lights at a start: used at once, not read
+    const bc2 = busyCar();
+    const known = new Lights({ diag: bc2.diag, log, known: blindKnown });
+    await known.find();
+    ok(known.blind && bc2.reads === 0 && known.lights.length === 2, 'blind lights from an earlier start: used, not read');
+    known.stop();
+    // writeFirst (reads failed before): the write test first, no read at all
+    const bc3 = busyCar();
+    const wf = new Lights({ diag: bc3.diag, log, writeFirst: true });
+    await wf.find();
+    ok(wf.blind && bc3.reads === 0, 'write first: blind without a single read');
+    wf.stop();
+    const bc4 = busyCar({ noWrites: true });
+    const wf2 = new Lights({ diag: bc4.diag, log, writeFirst: true });
+    const got4 = await wf2.find();
+    ok(!got4.length && bc4.reads === 0 && wf2.readFail && wf2.state === 'none', 'write first, writes not taken: no read either (the module asleep or hung)');
+    wf2.stop();
+    // a reply without lights (a car without them) is not what blind mode is for
+    const bc5 = busyCar({ empty: true });
+    const em = new Lights({ diag: bc5.diag, sleep: fastSleep, log });
+    await em.find();
+    ok(!em.blind && !em.readFail && bc5.writes.length === 0, 'a reply without lights: no write test, not counted');
+    em.stop();
+    // the write taken only at the BDC's gateway address (0x10): the lights written there
+    const bw = [];
+    const gwOnly = new Lights({ diag: { physical: async (t, sid, data) => {
+        if (sid === 0x22) return t === L.BDC ? [0x7f, 0x22, 0x21] : null;
+        if (t !== 0x10) return null;
+        bw.push(data.slice()); return [0x6e, data[0], data[1]];
+    } }, sleep: fastSleep, log });
+    await gwOnly.find();
+    gwOnly.show(look('solid', { upper: { rgb: [0, 0, 255], bright: 80 } }));
+    await sleep(300);
+    ok(gwOnly.blind && gwOnly.bdc === 0x10 && bw.some((w) => w[3] === 1), 'writes taken only at 0x10: blind there, the colour written to 0x10');
+    gwOnly.stop();
     // and one where no address answers with lights: the probe once, nothing moved
     const said4 = [];
     const none = new Lights({ diag: { physical: async () => null, functional: async () => new Map([[0x10, [0x62, 0xf1, 0x50, 0x0f, 0x25, 0xf0]]]) }, log: { info: (m) => said4.push(m), warn: (m) => said4.push(m) } });
