@@ -60,11 +60,37 @@ class Lights extends EventEmitter {
         this._holds = new Set(); this._idle = [];
         this._cmds = [];               // one-off writes (command()), sent between the lights' writes
         this._own = new Map();         // carOwn(): key -> test(light), the lights the car drives itself meanwhile
+        this.bdc = BDC;                // where the body module's light functions answer (0x40; another address: _findBdc)
     }
 
     get rate() { const t = this.now(); this._times = this._times.filter((x) => t - x < 3000); return this._times.length / 3; }
     /** Whole frames a second (every light on the same moment of a moving scene). */
     get fps() { const t = this.now(); this._frames = this._frames.filter((x) => t - x < 5000); return this._frames.length / 5; }
+
+    /**
+     * The body module's light functions at another address (once a start, when 0x40 doesn't answer): every unit's
+     * index (22 F150 to all), then the light read (bus 1) at the gateway (0x10) and at any other address that names
+     * itself a body module. -> true when one answered with lights (this.bdc is then that address).
+     */
+    async _findBdc() {
+        let units = new Map();
+        try { units = await this.diag.functional(0x22, [0xf1, 0x50], { idleMs: 3000, maxMs: 15000 }); } catch (e) { this.log.info('lights: units scan: ' + (e && e.message || e)); }
+        const idx = (u) => (u && u[0] === 0x62 ? u.slice(3, 6).map((x) => (x < 16 ? '0' : '') + x.toString(16).toUpperCase()).join('') : null);
+        const list = Array.from(units.keys()).sort((a, b) => a - b).map((a) => a.toString(16).toUpperCase() + (idx(units.get(a)) ? ':' + idx(units.get(a)) : ''));
+        this.log.info('lights: units answering: ' + (list.join(' ') || 'none'));
+        const BODY = ['0F2680', '0F2050', '0F19C0'];        // BDC_G05, BDC_G11, BDC
+        const tries = [0x10].concat(Array.from(units.keys()).filter((a) => a !== BDC && a !== 0x10 && BODY.indexOf(idx(units.get(a))) >= 0));
+        for (const at of tries) {
+            const did = BUSES[0].read;
+            let r = null, err = null;
+            try { r = await this.diag.physical(at, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000 }); } catch (e) { err = String(e && e.message || e); }
+            const got = r ? parseStatus(0, r) : null;
+            this.log.info('lights: the light read at ' + at.toString(16).toUpperCase() + ': ' + (got ? got.length + ' lights'
+                : r ? 'no lights (' + r.map((x) => x.toString(16)).join(' ') + ')' : 'no answer' + (err ? ' (' + err + ')' : '')));
+            if (got && got.length) { this.bdc = at; this.log.info('lights: the body module\'s lights answer at ' + at.toString(16).toUpperCase() + ': using it'); return true; }
+        }
+        return false;
+    }
 
     /** Reads which lights the car has (the ones known so far stay while it reads, and when nothing answers). */
     async find() {
@@ -80,7 +106,7 @@ class Lights extends EventEmitter {
             const t0 = this.now();
             for (let tries = 0; ; tries++) {
                 reply = null;
-                try { reply = await this.diag.physical(BDC, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000, onPending: () => { pending++; } }); } catch (e) { this.error = String(e && e.message || e); }
+                try { reply = await this.diag.physical(this.bdc, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000, onPending: () => { pending++; } }); } catch (e) { this.error = String(e && e.message || e); }
                 if (!(reply && reply[0] === 0x7f && reply[2] === 0x21) || tries >= BUSY_TRIES) break;
                 await this.sleep(BUSY_MS * (tries + 1));
             }
@@ -102,6 +128,9 @@ class Lights extends EventEmitter {
             try { r = await this.diag.physical(BDC, 0x22, [0xf1, 0x86], 5000, echo(0x22, [0xf1, 0x86])); } catch (e) { err = String(e && e.message || e); }
             this.log.info('lights: the body module itself: ' + (r ? 'answers (' + r.map((x) => x.toString(16)).join(' ') + ')'
                 : 'no answer either' + (err ? ' (' + err + ')' : '')));
+            // nothing at 0x40 at all: where does this car's body module answer? (#197: a G05 whose BDC shows only its
+            // gateway, 0x10, and the head unit refuses 0x40.) Read-only; the lights move there only if one answers.
+            if (!r && await this._findBdc()) return this.find();
         }
         if (!found.length && had.length) {
             this.log.warn('lights: no answer' + (this.error ? ': ' + this.error : '') + ', the ' + had.length + ' known kept');
@@ -213,6 +242,8 @@ class Lights extends EventEmitter {
     _ownRelease() { return this._own.size ? this.lights.filter((l) => this._last.has(l) && this.carOwns(l)).map((l) => ({ light: l })) : []; }
 
     dim(f) { if (f !== this._dim) { this._dim = f; this._frame = null; this._kick(); } }
+    /** The lights' colours worked out again (a light changed zone: setting decorWith). */
+    redraw() { this._frame = null; this._kick(); }
     /**
      * A one-off write to the body module (2E <data>), sent in turn with the lights' writes (the gateway takes one at a
      * time) -> its reply, or null (no answer, or the lights not writing: none found, held, stopped).
@@ -334,7 +365,7 @@ class Lights extends EventEmitter {
                 if (this._cmds.length) {
                     const c = this._cmds.shift();
                     let r = null;
-                    try { r = await this.diag.physical(BDC, 0x2e, c.data, 1500, echo(0x2e, c.data), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { r = null; }
+                    try { r = await this.diag.physical(this.bdc, 0x2e, c.data, 1500, echo(0x2e, c.data), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { r = null; }
                     c.res(r);
                     continue;
                 }
@@ -351,7 +382,7 @@ class Lights extends EventEmitter {
                 }
                 let reply = null;
                 // one write at a time (the gateway takes no second); a busy gateway is asked again soon, not after 1 s
-                try { reply = await this.diag.physical(BDC, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }
+                try { reply = await this.diag.physical(this.bdc, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }
                 if (reply && reply[0] === 0x6e) {
                     this._fails = 0; this.writes++; this._times.push(this.now());
                     // (a bus given back: once more later; one not taken is not)

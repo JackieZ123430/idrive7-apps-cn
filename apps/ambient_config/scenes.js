@@ -43,9 +43,18 @@ const lasts = (scene) => ONCE[scene && scene.kind] || 0;
 /** Whether a scene moves (the lights are written over and over). */
 const moves = (scene) => !!scene && scene.kind !== 'solid';
 
-/** What a light shows: the scene, the light ({ part, y }), t ms since the scene started. */
+/*
+ * The decor lights (the strip under each door's accent, the dash decor, the console decor) are upper lights; with the
+ * setting decorWith = 'lower' they go with the lower ones, as BMW's own menu has them (a G01: upper = the door lines,
+ * lower = decor, footwells, pockets, #140).
+ */
+let decorLower = false;
+function setDecor(v) { decorLower = v === 'lower'; }
+const partOf = (light) => (light.part === 'upper' && decorLower && /\bdecor\b/i.test(light.name || '') ? 'lower' : light.part);
+
+/** What a light shows: the scene, the light ({ part, name, y }), t ms since the scene started. */
 function lightAt(scene, light, t) {
-    const own = scene[light.part === 'upper' ? 'upper' : 'lower'] || scene.upper;
+    const own = scene[partOf(light) === 'upper' ? 'upper' : 'lower'] || scene.upper;
     const base = scene.upper, k = PERIOD[scene.speed] || 1;
     switch (scene.kind) {
     case 'breathing': {
@@ -80,4 +89,4 @@ function lightAt(scene, light, t) {
     }
 }
 
-module.exports = { KINDS, NAMES, lightAt, lasts, moves, hsv, hueOf, snapHue, stepHue, hex, mix };
+module.exports = { KINDS, NAMES, lightAt, setDecor, partOf, lasts, moves, hsv, hueOf, snapHue, stepHue, hex, mix };

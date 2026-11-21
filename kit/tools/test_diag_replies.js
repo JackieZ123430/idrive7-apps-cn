@@ -44,7 +44,7 @@ function bus(respond) {
     const d = new Diag({ call: async (p, m, a) => {
         const data = Array.from(a.udsData);
         sent.push([a.serviceID].concat(data));
-        (respond(a.serviceID, data) || []).forEach((uds, i) => setTimeout(() => d.emit('frame', { ecu: a.targetAddress, uds }), 2 + i * 2));
+        (respond(a.serviceID, data, a.targetAddress) || []).forEach((uds, i) => setTimeout(() => d.emit('frame', { ecu: a.targetAddress, uds }), 2 + i * 2));
         return 'NO_ERROR';
     } }, log);
     d.p = {}; d.available = true;
@@ -187,6 +187,56 @@ const echo = (sid, data) => [sid + 0x40].concat(data);
     n = sent.length;
     await set('theme', 'ice');
     assert.strictEqual(sent.length, n, 'found again: a theme change sends nothing');
-    console.log('Diag reply checks passed (flap echo + busy gate / DID echo + flap probe / MHD echo / settings refresh).');
+    // 4. A G-series V8 (DME8FF_R at 0x12, DME8FF_L at 0x13, #214): each unit drives its bank's flap, both are sent it.
+    //    A unit that refuses 60FD but has the controlled flap (22 631E) gets 2F 611E; OEM hands back what took it.
+    Mg1ElAgk.armed = true;
+    let refuse60 = 0;                           // the unit that refuses 2F 60FD 03 (the controlled flap running)
+    const v8 = (sid, data, to) => {
+        if (sid === 0x22) {
+            const did = (data[0] << 8) | data[1];
+            if (did === 0xF150) return to === 0x12 ? [[0x62, 0xF1, 0x50, 0x0F, 0x24, 0x2C]] : [[0x62, 0xF1, 0x50, 0x0F, 0x24, 0x2E]];
+            if (did === 0x62FD || did === 0x64FD || did === 0x631E) return [[0x62, data[0], data[1], 0x00, 0x00]];
+            return [[0x7F, 0x22, 0x31]];
+        }
+        if (sid === 0x2F && data[0] === 0x60 && data[2] === 0x03 && to === refuse60) return [[0x7F, 0x2F, 0x22]];
+        if (sid === 0x2F) return [echo(sid, data)];
+        return null;
+    };
+    b = bus(v8);
+    const id8 = await b.link.identifyDme();
+    assert.strictEqual(id8.twin, true);
+    assert.deepStrictEqual(id8.elAgk.units, ['12 el ger', '13 el ger']);
+    assert.strictEqual(Mg1ElAgk.match(id8), true);
+    b.sent.length = 0;
+    r = await Mg1ElAgk.open(b.link);
+    assert.strictEqual(r.accepted, true);
+    assert.strictEqual(r.detail, '12: accepted, 13: accepted');
+    assert.deepStrictEqual(b.sent, [[0x2F, 0x60, 0xFD, 0x03, 0x03, 0xE8], [0x2F, 0x60, 0xFD, 0x03, 0x03, 0xE8]]);
+    refuse60 = 0x13; b.sent.length = 0;
+    r = await Mg1ElAgk.open(b.link);
+    assert.strictEqual(r.detail, '12: accepted, 13: accepted (controlled flap)');
+    assert.deepStrictEqual(b.sent.slice(1), [[0x2F, 0x60, 0xFD, 0x03, 0x03, 0xE8], [0x2F, 0x61, 0x1E, 0x03, 0x20, 0x00]], '100 % = 8192');
+    b.sent.length = 0;
+    r = await Mg1ElAgk.closed(b.link);
+    assert.deepStrictEqual(b.sent.slice(-1), [[0x2F, 0x61, 0x1E, 0x03, 0x00, 0x00]], 'closed = 0 %');
+    b.sent.length = 0;
+    r = await Mg1ElAgk.oem(b.link);
+    assert.strictEqual(r.accepted, true);
+    assert.deepStrictEqual(b.sent, [[0x2F, 0x60, 0xFD, 0x00], [0x2F, 0x60, 0xFD, 0x00], [0x2F, 0x61, 0x1E, 0x00]], 'OEM hands back the controlled flap it took');
+    b.sent.length = 0;
+    await Mg1ElAgk.oem(b.link);
+    assert.deepStrictEqual(b.sent, [[0x2F, 0x60, 0xFD, 0x00], [0x2F, 0x60, 0xFD, 0x00]], 'then only 60FD');
+    // a six-cylinder (one unit): 0x13 is never asked, the command goes to 0x12 only as before
+    b = bus((sid, data, to) => (to === 0x13 ? assert.fail('0x13 asked on a six') : sid === 0x22
+        ? (data[0] === 0xF1 && data[1] === 0x50 ? [[0x62, 0xF1, 0x50, 0x0F, 0x23, 0x00]] : data[0] === 0x62 || data[0] === 0x64 ? [[0x62, data[0], data[1], 0, 0]] : [[0x7F, 0x22, 0x31]])
+        : [echo(sid, data)]));
+    const id6 = await b.link.identifyDme();
+    assert.deepStrictEqual(id6.elAgk.units, ['12 el']);
+    b.sent.length = 0;
+    r = await Mg1ElAgk.open(b.link);
+    assert.strictEqual(r.detail, 'DME accepted');
+    assert.deepStrictEqual(b.sent, [[0x2F, 0x60, 0xFD, 0x03, 0x03, 0xE8]]);
+
+    console.log('Diag reply checks passed (flap echo + busy gate / DID echo + flap probe / MHD echo / settings refresh / V8 both units + controlled flap).');
     process.exit(0);
 })().catch((e) => { console.error(e); process.exit(1); });

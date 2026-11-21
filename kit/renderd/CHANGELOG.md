@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- iDrive 7: the renderer's built-in touch area is the whole screen, 0,0,1920,720 (it was 84,0,1836,720). The area only limits what apps may claim; a tap nobody claims goes to the HMI as before, and the kit's layouts claim right of the back column only, so its arrow works as it did. An app drawn over the column (a fill layout, e.g. RideTube) can now claim it: before, a tap there went to the HMI's hidden back arrow, which closed the app. `-s touch_area=` still sets any other area. Same change as mgu-store's `native/mgu-render`.
 - The controller gate (`mgu-inputgate.so`) follows the HMI's knob re-centres. Once an app had held the knob, the gate took the turns made meanwhile off every later knob position for the rest of the HMI's run; when the HMI re-centred the knob (the car woken, the display on or off, a controller overflow) it took 0x7fff as the last position it saw, so the next turn reached it as one jump of about that many detents (seen as the Surround View camera ring cycling on its own, robertnisipeanu/mgu-store#326). The gate drops that offset at each re-centre: the HMI's `rotaryEncoderControl` setter with `frontMidPositionValueSet` = 1, or an overflow event that moves the knob. The position it gives the HMI stays within 0..0xfffe, so it never wraps past 0 / 65535 (a jump of ~65,000 detents to the HMI). Store tool `mgu-inputgate` 1.2.1.
 
 ## idrive7-apps mgu-renderd 2.1.19

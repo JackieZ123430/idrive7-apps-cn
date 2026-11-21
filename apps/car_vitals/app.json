@@ -2,7 +2,7 @@
   "id": "car_vitals",
   "title": "M Vitals",
   "description": "Live engine, thermal, intake / fuel / ignition, tyre and chassis gauges",
-  "version": "2.27.8",
+  "version": "2.27.9",
   "vendor": "custom",
   "loggingId": "OA93",
   "iconGlyph": "gauge",
@@ -347,6 +347,12 @@
     {
       "key": "flipLong",
       "label": "G-force circle: swap accel / brake (brake on top)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "programSteady",
+      "label": "M-Track (or similar) module: S while S / M flickers",
       "type": "bool",
       "default": false
     },

@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const mgu = require('./kit/mgu');
+const { Program } = require('./program');
 const { withAlpha } = require('./kit/canvas');
 const G = require('./kit/gauges');
 const { t: translate } = require('./kit/i18n');
@@ -279,6 +280,9 @@ mgu.run({
         };
         // engine profile (diesel / petrol): rpm bar end and the Auto redline
         const engine = new Engine({ settings, dataDir: ctx.dataDir, log });
+        // S / M from the cluster's programme display, steadied with the setting programSteady (program.js, #193)
+        const program = new Program({ steady: () => settings.get('programSteady') === true, onChange: (v) => { live.program = v; } });
+        settings.onChange((key) => { if (key === 'programSteady') program.recheck(); });
         const watches = [
             ['de.bmw.infotainment.vehicle.CDS', {
                 statusEngineSpeed2: (v) => put('rpm', sc('rpm', v.actualValueRPMEngineCrankshaft)),
@@ -383,7 +387,7 @@ mgu.run({
                 // S / M next to the gear: this car sends no selector programme with the gearbox status
                 dataDisplayGearbox: (v) => {
                     logRaw('gear programme', v && v.displayProgramGearbox);
-                    live.program = PROGRAMS[v && v.displayProgramGearbox] || null;
+                    program.set(PROGRAMS[v && v.displayProgramGearbox] || null);
                 },
             }],
         ];

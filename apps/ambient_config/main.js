@@ -80,6 +80,7 @@ async function background(bg) {
     const diag = await new Diag(signals, log).init();
     diag.quiet = true; diag.busyLog = false;
     // the lights found at an earlier start: the colour goes out at once, and the buses are read again after it
+    S.setDecor(settings.get('decorWith'));
     const lights = new Lights({ diag, log, known: settings.get('lightsKnown') });
     const control = new Control({ settings, lights, ambient, log });
     control.start();
@@ -142,6 +143,7 @@ async function background(bg) {
         .catch((e) => log.warn('doors: ' + (e && e.message || e)));
     settings.onChange((key) => {
         if (key === 'nightDim') control.night(control._night);
+        if (key === 'decorWith') { S.setDecor(settings.get('decorWith')); lights.redraw(); }
         if (key === 'follow') control.apply();
         if (key === 'turnGlow' || key === 'doorRed' || key === 'hazardRed' || key === 'drive') control.signals();
         if (key === 'doorCar') control.carDoorSetting();

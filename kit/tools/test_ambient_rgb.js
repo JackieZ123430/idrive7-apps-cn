@@ -126,6 +126,35 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     await lonely.find(); await lonely.find();
     ok(probes.length === 1 && said2.some((m) => /body module itself: answers \(62 f1 86 1\)/.test(m)), 'every bus silent: the body module asked once if it answers at all');
     lonely.stop();
+    // #197: a G05 whose BDC answers only at its gateway address (0x10, ZGW_SP18) and the head unit refuses 0x40: the
+    // units scan, then the light read at 0x10, which answers; the lights then read and written there
+    const said3 = [], to10 = [];
+    const gw = {
+        physical: async (t, sid, data) => {
+            if (t === L.BDC) throw new Error('transport refused: APP_REQUEST_TEMPORARILY_NOT_ACCEPTED');
+            if (t !== 0x10) return null;
+            to10.push([sid].concat(data));
+            if (sid === 0x22 && data[0] === 0xda) return reply([0xda, 0x5f], [0x0f, 0x0c]);
+            if (sid === 0x22 && data[0] === 0xe3) return reply([0xe3, 0xd1], [0x15, 0x01]);
+            if (sid === 0x2e) return [0x6e, data[0], data[1]];
+            return null;
+        },
+        functional: async () => new Map([[0x10, [0x62, 0xf1, 0x50, 0x0f, 0x25, 0xf0]], [0x12, [0x62, 0xf1, 0x50, 0x0f, 0x26, 0xb4]]]),
+    };
+    const g05 = new Lights({ diag: gw, log: { info: (m) => said3.push(m), warn: (m) => said3.push(m) } });
+    const got = await g05.find();
+    ok(g05.bdc === 0x10 && got.length === 4, 'body module only at 0x10: its lights found there (' + got.length + ')');
+    ok(said3.some((m) => /units answering: 10:0F25F0 12:0F26B4/.test(m)) && said3.some((m) => /answer at 10: using it/.test(m)), 'the units and the address logged');
+    g05.show(look('solid', { upper: { rgb: [0, 255, 0], bright: 80 }, lower: { rgb: [0, 255, 0], bright: 80 } }));
+    await sleep(300);
+    ok(to10.some((r) => r[0] === 0x2e), 'colours written to 0x10');
+    g05.stop();
+    // and one where no address answers with lights: the probe once, nothing moved
+    const said4 = [];
+    const none = new Lights({ diag: { physical: async () => null, functional: async () => new Map([[0x10, [0x62, 0xf1, 0x50, 0x0f, 0x25, 0xf0]]]) }, log: { info: (m) => said4.push(m), warn: (m) => said4.push(m) } });
+    await none.find(); await none.find();
+    ok(none.bdc === L.BDC && said4.filter((m) => /units answering/.test(m)).length === 1 && said4.some((m) => /light read at 10: no answer/.test(m)), 'no lights anywhere: 0x40 kept, asked once');
+    none.stop();
     fresh.stop();
     await sleep(100);
     writes.length = 0; lit.forEach((b) => b.forEach((x, i) => { b[i] = [0, 0, 0]; }));
@@ -427,6 +456,21 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
         ok(hw.some((w) => w.on === 1 && w.at - end < 5000), 'after a blink: the still colour renewed before the blink\'s 5 s hold runs out');
         lc.stop();
         await sleep(50);
+    }
+
+    // decorWith (#140): the decor lights with the upper colour (default) or the lower one, as BMW groups them
+    {
+        const sc = { kind: 'solid', upper: { rgb: [255, 0, 0], bright: 80 }, lower: { rgb: [0, 0, 255], bright: 40 } };
+        const decor = { name: 'Driver front door decor', part: 'upper' }, line = { name: 'Driver front door line', part: 'upper' };
+        const dash = { name: 'Dash decor passenger', part: 'upper' }, foot = { name: 'Footwell driver front', part: 'lower' };
+        ok(S.lightAt(sc, decor, 0).rgb[0] === 255, 'decor: upper by default');
+        S.setDecor('lower');
+        ok(S.lightAt(sc, decor, 0).rgb[2] === 255 && S.lightAt(sc, decor, 0).bright === 40, 'decorWith lower: door decor takes the lower colour');
+        ok(S.lightAt(sc, dash, 0).rgb[2] === 255, 'decorWith lower: dash decor too');
+        ok(S.lightAt(sc, line, 0).rgb[0] === 255, 'decorWith lower: the door line stays upper');
+        ok(S.lightAt(sc, foot, 0).rgb[2] === 255, 'a footwell stays lower');
+        S.setDecor('upper');
+        ok(S.lightAt(sc, decor, 0).rgb[0] === 255, 'decorWith upper: back to upper');
     }
 
     fs.unlinkSync(process.env.MGU_AMBIENT_FLASH); fs.rmdirSync(TMP);
