@@ -81,7 +81,10 @@ async function background(bg) {
     diag.quiet = true; diag.busyLog = false;
     // the lights found at an earlier start: the colour goes out at once, and the buses are read again after it
     S.setDecor(settings.get('decorWith'));
-    const lights = new Lights({ diag, log, known: settings.get('lightsKnown') });
+    // light reads that failed (busy or silent) READ_FAILS times in a row: the body module's write is tried first and the
+    // reads are left out, as they hang it on some cars (#197, lights.js "Blind")
+    const READ_FAILS = 3;
+    const lights = new Lights({ diag, log, known: settings.get('lightsKnown'), writeFirst: (Number(settings.get('lightsReadFails')) || 0) >= READ_FAILS });
     const control = new Control({ settings, lights, ambient, log });
     control.start();
     // with the lights answering, the driving modes' looks replace BMW's colours by mode (ambient.js)
@@ -89,7 +92,16 @@ async function background(bg) {
     lights.on('found', (l) => settings.set('lightsKnown', l));
     // lights that did not answer: asked again every 2 min while the car is in use (parked and left: the car sleeps)
     const again = () => setTimeout(() => { if (control._away) again(); else find(); }, 120000);
-    const find = () => lights.find().then((l) => { if (!l.length) again(); }, (e) => { log.warn('lights: ' + e); again(); });
+    const counted = (l) => {
+        const n = Number(settings.get('lightsReadFails')) || 0;
+        if (l.length && !lights.blind) { if (n) settings.set('lightsReadFails', 0); }
+        else if (!l.length && lights.readFail && !control._away) {
+            settings.set('lightsReadFails', n + 1);
+            if (n + 1 >= READ_FAILS && !lights.writeFirst) { lights.writeFirst = true; log.info('lights: the reads failed ' + (n + 1) + ' times: the write is tried first from now'); }
+        }
+        return l;
+    };
+    const find = () => lights.find().then(counted).then((l) => { if (!l.length) again(); }, (e) => { log.warn('lights: ' + e); again(); });
     setTimeout(find, lights.lights.length ? FIND_LATER_MS : 0);
     signals.watch('de.bmw.infotainment.vehicle.Vehicle', '1', {
         statusDayNightChangeOver: (v) => {
@@ -209,7 +221,7 @@ async function background(bg) {
         if (key === 'strobeLever') watchLever();
     });
     // (the car locked and left mid-flash: the gate says no at the next step and the strobe stops)
-    return { ambient, lights, control, active, others, strobe, checks };
+    return { ambient, lights, control, active, others, strobe, checks, lookAgain: () => lights.find({ force: true }).then(counted) };
 }
 
 const nearest = (rgb) => {
@@ -226,7 +238,7 @@ mgu.run({
     background,
     async start(ctx) {
         const { ui, settings, log } = ctx;
-        const { ambient, lights, control, active, others, strobe, checks } = ctx.background || await background(ctx);
+        const { ambient, lights, control, active, others, strobe, checks, lookAgain } = ctx.background || await background(ctx);
         // the Strobe tab only with its experimental setting on
         const tabs = () => TABS.concat(settings.get('strobe') === true ? ['Strobe'] : []);
         // editing: null (the driver's own look) or a driving mode whose look the Colour and Animations tabs change
@@ -284,7 +296,8 @@ mgu.run({
             const n = lights.lights.length;
             const s = lights.state === 'finding' ? 'Looking for the car\'s lights...'
                 : lights.state === 'none' ? 'The car\'s lights did not answer'
-                    : lights.state === 'car' ? 'Original colour (as set in BMW\'s menu)' : 'On in the car: ' + n + ' lights';
+                    : lights.state === 'car' ? 'Original colour (as set in BMW\'s menu)'
+                        : lights.blind ? 'On in the car: one colour on all lights' : 'On in the car: ' + n + ' lights';
             cv.text(s, x, y, 20, lights.state === 'none' ? t.warn : t.dim);
             if (lights.error && lights.state !== 'none') cv.text(lights.error, x, y + 26, 18, t.warn);
         }
@@ -349,7 +362,7 @@ mgu.run({
                 G.button(cv, t, 796 + (i % 4) * 132, 186 + Math.floor(i / 4) * 62, 120, 50, String(n), () => { ambient.setSlot(n); return redraw(); },
                     { primary: n === now, busy: !ambient.available, key: 'slot-' + n });
             }
-            G.button(cv, t, 796, 386, 0, 48, 'Look again', () => { lights.find(); return redraw(); }, { key: 'again' });
+            G.button(cv, t, 796, 386, 0, 48, 'Look again', () => { lookAgain().catch((e) => log.warn('lights: ' + e)); return redraw(); }, { key: 'again' });
             if (others.comfort) warnOthers(cv, t, 1346, 136, 214);
         }
 
