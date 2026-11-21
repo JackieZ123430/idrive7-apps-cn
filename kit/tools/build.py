@@ -688,6 +688,11 @@ def build(app_id, language='en', preview_only=False):
             p = os.path.join(src, 'javascript', 'kit', 'locales', name)
             if os.path.exists(p):
                 os.remove(p)
+    if language != 'zh-TW':
+        for name in ('zh-TW.json', 'zh-TW.tsv'):
+            p = os.path.join(src, 'javascript', 'kit', 'locales', name)
+            if os.path.exists(p):
+                os.remove(p)
     if language == 'ru':
         shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'cyrillic-ru.json'),
                     os.path.join(src, 'javascript', 'kit', 'fonts', 'cyrillic.json'))
@@ -704,6 +709,11 @@ def build(app_id, language='en', preview_only=False):
         for name in ('korean.json', 'OFL-NotoSansKR.txt'):
             shutil.copy(os.path.join(KIT, 'localization', 'fonts', name),
                         os.path.join(src, 'javascript', 'kit', 'fonts', name))
+    if language == 'zh-TW':
+        fonts = os.path.join(src, 'javascript', 'kit', 'fonts')
+        # Keep the cjk family so the runtime splits this tall atlas into GPU pieces.
+        for name, target in (('cjk-zh-TW.json', 'cjk.json'), ('OFL-NotoSansTC.txt', 'OFL-NotoSansTC.txt')):
+            shutil.copy(os.path.join(KIT, 'localization', 'fonts', name), os.path.join(fonts, target))
     if language == 'zh-CN':
         # Diagnostic glyphs are Chinese-only; keep the English runtime atlas intact.
         if app_id == 'dtc_scanner':
