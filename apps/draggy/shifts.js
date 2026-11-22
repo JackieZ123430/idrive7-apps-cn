@@ -3,8 +3,9 @@
  * shifts.js - Drag Timer: the upshifts in a run, when and at what speed and rpm.
  *
  * From the gearbox's gear signal once the car has sent one (each step up = one upshift, also one that skips a gear, at
- * the moment the new gear shows; the signal comes on change only, so a long time in one gear sends nothing); else from
- * the rpm: a fall of at least DROP_RPM (or DROP_SHARE of the rpm) within DROP_MS while the car
+ * the moment the new gear shows; the signal comes on change only, so a long time in one gear sends nothing), while the
+ * car still gets faster after it (an automatic shifts up as the driver lifts at the end of a pull: no shift of the
+ * pull); else from the rpm: a fall of at least DROP_RPM (or DROP_SHARE of the rpm) within DROP_MS while the car
  * keeps getting faster afterwards (a lift ends a run with a fall too, but the speed then drops). Gears from the
  * rpm alone are counted from 1st for a launch, and not known for a pull from a roll.
  *
@@ -52,8 +53,9 @@ class ShiftLog {
     between(t1, t2, fromGear) {
         if (!(t2 > t1)) return [];
         const kmh = (t) => { const v = ShiftLog.at(this.v, t); return v === null ? null : Math.round(v); };
+        const rising = (t) => { const a = ShiftLog.at(this.v, t), b = ShiftLog.at(this.v, t + AFTER_MS); return a !== null && b !== null && b > a + 0.5; };
         if (this.hasGear()) {
-            return this.g.filter((x) => x[0] > t1 && x[0] <= t2 && x[1] >= 1 && x[2] > x[1])
+            return this.g.filter((x) => x[0] > t1 && x[0] <= t2 && x[1] >= 1 && x[2] > x[1] && rising(x[0]))
                 .map((x) => ({ t: x[0], from: x[1], to: x[2], rpm: roundRpm(this._rpmMax(x[0] - 800, x[0])), kmh: kmh(x[0]) }));
         }
         const out = [];
@@ -66,7 +68,7 @@ class ShiftLog {
             // a shift: the car still gets faster after it (a lift doesn't), and some time after the last one
             const v0 = ShiftLog.at(this.v, peak[0]), v1 = ShiftLog.at(this.v, s[0] + AFTER_MS);
             const last = out[out.length - 1];
-            if (s[0] + AFTER_MS <= t2 && v0 !== null && v1 !== null && v1 > v0 + 0.5 && (!last || peak[0] - last.t >= GAP_MS)) {
+            if (s[0] + AFTER_MS <= t2 && v0 !== null && v1 !== null && v1 > v0 + 0.5 && (!last || peak[0] - last.t >= GAP_MS)) {      // (rising, from the bottom of the fall)
                 out.push({ t: peak[0], from: gear, to: gear === null ? null : gear + 1, rpm: roundRpm(peak[1]), kmh: kmh(peak[0]) });
                 if (gear !== null) gear++;
             }

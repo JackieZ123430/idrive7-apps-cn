@@ -268,6 +268,14 @@ check('shifts: a gear sent once, a minute before a pull in that gear: the gear s
     for (let t = 60000; t <= 75000; t += 50) { s.speed(t, 100 + (t - 60000) / 150); s.rpm(t, sawRpm(t - 60000)); }
     assert.strictEqual(s.between(60000, 75000, null).length, 0, 'rpm saw-tooth taken for shifts');
 });
+check('shifts: the upshift an automatic makes as the driver lifts (5-6, the car slowing) is no shift of the pull', () => {
+    const s = new ShiftLog();
+    for (let t = 0; t <= 15000; t += 50) {
+        s.speed(t, t < 12000 ? 100 + t / 100 : 220 - (t - 12000) / 100);
+        s.gear(t, t < 6000 ? 4 : t < 12000 ? 5 : 6);
+    }
+    assert.deepStrictEqual(s.between(0, 15000, null).map((x) => [x.from, x.to]), [[4, 5]]);
+});
 check('shifts: an upshift that skips a gear (3-5) counts', () => {
     const s = pullLog((t) => (t < 6000 ? 3 : 5), (t) => 4000);
     assert.deepStrictEqual(s.between(0, 15000, null).map((x) => [x.from, x.to]), [[3, 5]]);
