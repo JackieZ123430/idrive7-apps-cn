@@ -200,5 +200,6 @@ class Car {
 Car.SIGNALS = SIGNALS;
 Car.GearGuess = GearGuess;
 Car.selectionOf = selectionOf;
+Car.gearOf = gearOf;
 Car.conditionOf = conditionOf;
 module.exports = Car;
