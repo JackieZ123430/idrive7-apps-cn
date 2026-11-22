@@ -62,14 +62,31 @@ const PLACES = {
 [[0x47, 0.45, 0.30], [0x48, 0.45, 0.46], [0x49, 0.55, 0.30], [0x4a, 0.55, 0.46]]
     .forEach(([c, x, y]) => { PLACES[c] = ['Console backlit decor', 'upper', x, y]; });
 
-/** A location code -> { loc, name, part, x, y, x2, y2 } (an unknown code: a lower light in the middle). */
-function place(loc) {
+// BDC_G11 (G30, G11, G01 ...: body module index 0F2050) numbers the doors and the dash by height, not by kind
+// (TAB_INNENLICHT_VERBAUORT_LIN): 0x0A / 0x11 a rear door's bottom strip, 0x14 / 0x16 / 0x18 the dash's bottom
+// strips are BMW's lower lights there, where BDC_G05's are decor lines (#182: the lower colour missed them)
+const G11 = {
+    0x05: ['Driver front door top', 'upper'], 0x06: ['Driver front door middle', 'upper'], 0x07: ['Driver front door bottom', 'lower'],
+    0x09: ['Driver rear door top', 'upper'], 0x0a: ['Driver rear door bottom', 'lower'],
+    0x0c: ['Passenger front door top', 'upper'], 0x0d: ['Passenger front door middle', 'upper'], 0x0e: ['Passenger front door bottom', 'lower'],
+    0x10: ['Passenger rear door top', 'upper'], 0x11: ['Passenger rear door bottom', 'lower'],
+    0x13: ['Dash top driver', 'upper'], 0x14: ['Dash bottom driver', 'lower'], 0x15: ['Dash top centre', 'upper'],
+    0x16: ['Dash bottom centre', 'lower'], 0x17: ['Dash top passenger', 'upper'], 0x18: ['Dash bottom passenger', 'lower'],
+};
+const BDC_G11 = '0F2050';
+
+/**
+ * A location code -> { loc, name, part, x, y, x2, y2 } (an unknown code: a lower light in the middle). kind: the body
+ * module's index ('0F2050': BDC_G11's names and zones), else BDC_G05's.
+ */
+function place(loc, kind) {
     const p = PLACES[loc] || ['Light ' + loc.toString(16).toUpperCase(), 'lower', 0.5, 0.5];
+    if (kind === BDC_G11 && G11[loc]) return { loc, name: G11[loc][0], part: G11[loc][1], x: p[2], y: p[3], x2: p[4] == null ? null : p[4], y2: p[5] == null ? null : p[5] };
     return { loc, name: p[0], part: p[1], x: p[2], y: p[3], x2: p[4] == null ? null : p[4], y2: p[5] == null ? null : p[5] };
 }
 
 /** The modules in a status reply (62 <DID> records...): [{ bus, nad, loc, name, part, x, y, rgb, bright, fault }]. */
-function parseStatus(bus, uds) {
+function parseStatus(bus, uds, kind) {
     const b = Array.prototype.slice.call(uds || []);
     const ok = b[0] === 0x62 && b[1] === BUSES[bus].read[0] && b[2] === BUSES[bus].read[1];
     if (!ok) return null;
@@ -77,7 +94,7 @@ function parseStatus(bus, uds) {
     for (let i = 0; i < RECORDS; i++) {
         const r = b.slice(3 + i * RECORD, 3 + (i + 1) * RECORD);
         if (r.length < RECORD || r[0] === 0xff) continue;
-        out.push(Object.assign(place(r[0]), { bus, nad: i + 1, rgb: [r[3], r[2], r[1]], bright: r[4], fault: !!(r[6] || r[7] || r[8] || r[9]) }));
+        out.push(Object.assign(place(r[0], kind), { bus, nad: i + 1, rgb: [r[3], r[2], r[1]], bright: r[4], fault: !!(r[6] || r[7] || r[8] || r[9]) }));
     }
     return out;
 }
@@ -100,4 +117,4 @@ const sample = () => {
     return G20.map(([bus, loc]) => Object.assign(place(loc), { bus, nad: ++n[bus], rgb: [120, 60, 254], bright: 100, fault: false }));
 };
 
-module.exports = { BDC, BUSES, PLACES, place, parseStatus, writeFrame, releaseFrame, sample };
+module.exports = { BDC, BUSES, PLACES, G11, BDC_G11, place, parseStatus, writeFrame, releaseFrame, sample };
