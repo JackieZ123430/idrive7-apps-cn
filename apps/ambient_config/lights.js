@@ -32,7 +32,7 @@
  *   l.at(light) -> what the light shows now ({ rgb, bright })     l.rate -> writes a second
  */
 const EventEmitter = require('events');
-const { BDC, BUSES, parseStatus, writeFrame, releaseFrame } = require('./lin');
+const { BDC, BUSES, BDC_G11, parseStatus, writeFrame, releaseFrame } = require('./lin');
 const S = require('./scenes');
 
 const HOLD_S = 60, RENEW_MS = 40000, MOVE_HOLD_S = 5, MOVE_RENEW_MS = 3000;
@@ -134,6 +134,14 @@ class Lights extends EventEmitter {
         return true;
     }
 
+    /** The body module's index (22 F150), once, when it first answers with lights: which names its location codes have. */
+    async _kind() {
+        let r = null;
+        try { r = await this.diag.physical(this.bdc, 0x22, [0xf1, 0x50], 5000, echo(0x22, [0xf1, 0x50])); } catch (e) { r = null; }
+        this.kind = r && r[0] === 0x62 && r.length >= 6 ? r.slice(3, 6).map((x) => (x < 16 ? '0' : '') + x.toString(16).toUpperCase()).join('') : null;
+        this.log.info('lights: body module ' + (this.kind ? this.kind + (this.kind === BDC_G11 ? ' (BDC_G11: its light names)' : '') : 'index not read'));
+    }
+
     /** Reads which lights the car has (the ones known so far stay while it reads, and when nothing answers). */
     async find(opts) {
         const force = !!(opts && opts.force);
@@ -167,7 +175,8 @@ class Lights extends EventEmitter {
                 if (!(reply && reply[0] === 0x7f && reply[2] === 0x21) || tries >= BUSY_TRIES) break;
                 await this.sleep(BUSY_MS * (tries + 1));
             }
-            const got = reply ? parseStatus(bus, reply) : null;
+            if (reply && reply[0] === 0x62 && this.kind === undefined) await this._kind();
+            const got = reply ? parseStatus(bus, reply, this.kind) : null;
             if (got) { found.push.apply(found, got); continue; }
             silent.push(bus);
             if (!reply || (reply[0] === 0x7f && (reply[2] === 0x21 || reply[2] === 0x78))) hung++;
@@ -209,7 +218,10 @@ class Lights extends EventEmitter {
         this.state = found.length ? (this.scene ? 'ours' : 'car') : 'none';
         if (found.length) {
             this.error = null;
-            this.log.info('lights: ' + found.length + ' found (' + found.map((l) => l.name).join(', ') + ')');
+            // (in groups of 8: a log line is cut at 300 characters)
+            for (let i = 0; i < found.length; i += 8) {
+                this.log.info('lights: ' + (i ? '(more) ' : found.length + ' found: ') + found.slice(i, i + 8).map((l) => l.name + (l.part === 'lower' ? ' (lower)' : '')).join(', '));
+            }
             this.emit('found', found.map((l) => Object.assign({}, l)));
         } else this.log.warn('lights: none found' + (this.error ? ': ' + this.error : ''));
         this.emit('change');

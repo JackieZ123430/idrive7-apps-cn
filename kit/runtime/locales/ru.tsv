@@ -1861,3 +1861,39 @@ Bank 2	Банк 2
 SOOT, BANK 1	САЖА, БАНК 1
 SOOT, BANK 2	САЖА, БАНК 2
 Bank 1	Банк 1
+Standing launch	С места
+Rolling start	С ходу
+Standing launch (rollout)	С места (вычет фута)
+STANDING LAUNCH (rollout)	С МЕСТА (ВЫЧЕТ ФУТА)
+Rolling windows	Разгон с ходу
+TRAP	ФИНИШ
+SLOPE	УКЛОН
+RUN	ЗАЕЗД
+ACCELERATE PAST	РАЗГОНИТЕСЬ ВЫШЕ
+SLOW DOWN TO ARM	СБАВЬТЕ СКОРОСТЬ
+Accelerate through a window	Разгонитесь через диапазон
+WHEELSPIN	ПРОБУКСОВКА
+SPIN	БУКС.
+DOWNHILL	СПУСК
+CUSTOM: "TO" MUST BE ABOVE "FROM"	СВОЙ: «ДО» ДОЛЖНО БЫТЬ БОЛЬШЕ «ОТ»
+No runs yet - launch from a stop or accelerate through a rolling window.	Заездов пока нет - стартуйте с места или разгонитесь через диапазон с ходу.
+1/2 mile	1/2 мили
+Longest distance	Макс. дистанция
+Downhill limit for best times	Предел спуска для рекордов
+Custom speed window	Свой диапазон скорости
+Custom window from (km/h or mph)	Свой диапазон от (km/h или mph)
+Custom window to (km/h or mph)	Свой диапазон до (km/h или mph)
+250-300 km/h window (160-190 mph)	Диапазон 250-300 km/h (160-190 mph)
+STANDING LAUNCH	С МЕСТА
+ROLLING START	С ХОДУ
+VALID RUN	ЗАЕЗД ЗАСЧИТАН
+INVALID RUN	ЗАЕЗД НЕ ЗАСЧИТАН
+ROLLOUT	ВЫЧЕТ ФУТА
+NO SLOPE	УКЛОН НЕИЗВЕСТЕН
+ELEVATION	ПЕРЕПАД ВЫСОТЫ
+NO AIR DATA	НЕТ ДАННЫХ О ВОЗДУХЕ
+DA	ПВ
+Outside air with each run	Наружный воздух в каждом заезде
+Show (pressure from the engine unit)	Показывать (давление от блока двигателя)
+Show, times corrected to standard air (SAE J1349)	Показывать, время с поправкой на стандартный воздух (SAE J1349)
+Off (no engine unit requests)	Выкл. (без запросов к блоку двигателя)

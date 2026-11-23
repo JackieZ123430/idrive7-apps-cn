@@ -38,6 +38,11 @@ ok(S.stepHue(0, -15) === 345 && S.stepHue(345, 15) === 0, '< from red wraps to 3
 const bus1 = L.parseStatus(0, reply([0xda, 0x5f], [0x0f, 0x0e, 0x0c], 1));
 ok(bus1.length === 3 && bus1[2].nad === 3 && bus1[2].name === 'Passenger front door line' && bus1[2].part === 'upper' && bus1[1].part === 'lower', 'status: lights, places, upper / lower');
 ok(bus1[0].rgb.join() === '120,60,254' && bus1[0].bright === 100 && bus1[1].fault && !bus1[0].fault, 'status: colour read red, green, blue; a fault');
+// #182: BDC_G11 (G30) names doors and dash by height: 0x0A / 0x11 / 0x14 / 0x16 / 0x18 its lower strips
+const g11 = L.parseStatus(0, reply([0xda, 0x5f], [0x0a, 0x11, 0x14, 0x16, 0x18, 0x13, 0x05]), L.BDC_G11);
+ok(g11.slice(0, 5).every((l) => l.part === 'lower') && g11[5].part === 'upper' && g11[6].part === 'upper' && g11[4].name === 'Dash bottom passenger', 'BDC_G11: rear door / dash bottom strips are lower lights');
+const g05 = L.parseStatus(0, reply([0xda, 0x5f], [0x0a, 0x18]));
+ok(g05.every((l) => l.part === 'upper') && /decor/i.test(g05[1].name), 'BDC_G05 (no index): the same codes stay decor lines');
 ok(L.parseStatus(0, [0x7f, 0x22, 0x31]) === null && L.parseStatus(1, reply([0xda, 0x5f], [1])) === null, 'status: a refusal or another bus\'s reply is none');
 ok(L.writeFrame(0, 3, [255, 0, 300], 120, 400).join() === [0xda, 0x5e, 3, 1, 100, 0xfe, 0, 0xfe, 254].join(), 'write: colours stop at FE, brightness 100, 254 s');
 ok(L.writeFrame(1, 1, [10, 20, 30], 50, 5).slice(0, 2).join() === [0xe3, 0xd1].join() && L.releaseFrame(1, 4).join() === [0xe3, 0xd1, 4, 0, 0, 0, 0, 0, 0].join(), 'bus 2 write; give back');
@@ -218,6 +223,16 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     await sleep(300);
     ok(gwOnly.blind && gwOnly.bdc === 0x10 && bw.some((w) => w[3] === 1), 'writes taken only at 0x10: blind there, the colour written to 0x10');
     gwOnly.stop();
+    // the body module's index read once when it answers with lights: BDC_G11's names used
+    const g11log = [];
+    const g30 = new Lights({ diag: { physical: async (t, sid, data) => {
+        if (t !== L.BDC || sid !== 0x22) return sid === 0x2e ? [0x6e, data[0], data[1]] : null;
+        if (data[0] === 0xf1 && data[1] === 0x50) return [0x62, 0xf1, 0x50, 0x0f, 0x20, 0x50];
+        return data[0] === 0xda ? reply(data, [0x0a, 0x18, 0x05]) : [0x7f, 0x22, 0x31];
+    } }, sleep: fastSleep, log: { info: (m) => g11log.push(m), warn: (m) => g11log.push(m) } });
+    const got30 = await g30.find();
+    ok(g30.kind === '0F2050' && got30.filter((l) => l.part === 'lower').length === 2 && g11log.some((m) => /BDC_G11/.test(m)) && g11log.some((m) => /3 found: .*Dash bottom passenger \(lower\)/.test(m)), 'G30: BDC_G11 read, its lower strips lower, logged');
+    g30.stop();
     // and one where no address answers with lights: the probe once, nothing moved
     const said4 = [];
     const none = new Lights({ diag: { physical: async () => null, functional: async () => new Map([[0x10, [0x62, 0xf1, 0x50, 0x0f, 0x25, 0xf0]]]) }, log: { info: (m) => said4.push(m), warn: (m) => said4.push(m) } });
