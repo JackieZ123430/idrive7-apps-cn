@@ -2,7 +2,8 @@
 /**
  * carview.js - the car as a see-through line drawing after a G20 saloon, nose up, seen from straight above or tilted
  * (a finger drags it: pitch leans the view back over the boot, roll turns it about its length to show a side), with its
- * ambient lights glowing inside at their places. The bonnet and boot are a little short, so more of the cabin shows.
+ * ambient lights glowing inside at their places. Only the cabin: from the windscreen's foot to the rear window's, with
+ * its dash, steering wheel, console, seats and door cards, so the lights' places read.
  *
  *   drawCarView(cv, t, box, lights, colourOf, opts)
  *     box       { x, y, w, h }: the car fits its height, centred
@@ -45,59 +46,70 @@ function section(x) {
         [-tw * 0.4, t + 0.02], [-tw, t], [-(hw + tw) / 2 * 1.03, mid], [-hw * 0.995, b], [-hw, 0.5], [-hw * 0.94, 0.28]];
 }
 
-/** The car's lines: [[points], kind]. */
+/* The cabin's ends: the windscreen's foot (the dash) and the rear window's; the bonnet and the boot are left out. */
+const XF = 1.3, XR = -1.55, XM = (XF + XR) / 2;
+const SEATS = [0.42, -0.42];                   // the front seats' middles across
+
+/** The cabin's lines: [[points], kind]. Its shell (body, glass) and what is inside (kind 'inside'). */
 function carLines() {
     const out = [];
-    const N = 36, ST = [];
-    for (let i = 0; i <= N; i++) ST.push(L * Math.cos(Math.PI * i / N));        // closer together at the ends, where it curves
+    const N = 22, ST = [];
+    for (let i = 0; i <= N; i++) ST.push(XF - (XF - XR) * i / N);
     const secs = ST.map((x) => section(x).map(([y, z]) => [x, y, z]));
     for (let k = 0; k < secs[0].length; k++) {
-        const kind = k === 0 || k === 12 ? 'sill' : k === 2 || k === 10 ? 'body' : k === 4 || k === 8 ? 'edge' : 'mesh';
-        out.push([secs.map((s) => s[k]), kind]);
+        // (the roof's middle lines left out: they would cross what is inside)
+        if (k >= 5 && k <= 7) continue;
+        const kind = k === 0 || k === 12 ? 'sill' : k === 2 || k === 10 ? 'body' : k === 4 || k === 8 ? 'glass' : 'mesh';
+        out.push([secs.map((sc) => sc[k]), kind]);
     }
-    secs.forEach((pts, i) => { if (i % 3 === 0 && i > 0 && i < N) out.push([pts, 'mesh']); });
-    // the windows: the side glass, the windscreen's and rear window's edges, the roof panel and its sunroof
+    secs.forEach((pts, i) => { if (i % 4 === 0 && i > 0 && i < N) { out.push([pts.slice(0, 5), 'mesh']); out.push([pts.slice(8), 'mesh']); } });
+    out.push([secs[0].slice(0, 5), 'body'], [secs[0].slice(8), 'body'], [secs[N].slice(0, 5), 'body'], [secs[N].slice(8), 'body']);   // the cut ends, up to the glass
     [1, -1].forEach((s) => {
         const xs = []; for (let i = 0; i <= 30; i++) xs.push(1.2 - 2.8 * i / 30);
         out.push([xs.map((x) => [x, s * plan(x) * 0.985, belt(x) + 0.03]), 'glass']);
         out.push([[[0.42, s * roofW(0.42), top(0.42) - 0.01], [0.38, s * plan(0.38) * 0.98, belt(0.38) + 0.03]], 'glass']);   // B pillar
         out.push([[[-0.62, s * roofW(-0.62), top(-0.62) - 0.01], [-0.7, s * plan(-0.7) * 0.98, belt(-0.7) + 0.03]], 'glass']);
-        // doors' cuts, door handles
         [[1.15, 0.3], [0.05, 0.3], [-1.1, 0.32]].forEach(([x, z]) => out.push([[[x, s * plan(x) * 0.95, z], [x - 0.03, s * plan(x - 0.03), belt(x - 0.03)]], 'mesh']));
         [0.55, -0.55].forEach((x) => out.push([[[x, s * plan(x) * 1.005, 0.82], [x - 0.16, s * plan(x - 0.16) * 1.005, 0.82]], 'body']));
-        // mirrors at the windscreen's foot, angled forward
         out.push([[[1.15, s * plan(1.15), 0.96], [1.02, s * (plan(1.02) + 0.2), 0.98], [0.9, s * (plan(0.9) + 0.16), 0.98], [0.95, s * plan(0.95), 0.96]], 'body']);
-        // the wheels' arches and tyres
-        [1.45, -1.42].forEach((cx) => {
-            const ring = (r, yy, a0, a1, n) => { const pts = []; for (let a = 0; a <= n; a++) { const q = a0 + (a1 - a0) * a / n; pts.push([cx + r * Math.cos(q), s * yy, 0.34 + r * Math.sin(q)]); } return pts; };
-            out.push([ring(0.33, plan(cx) * 0.97, 0, Math.PI * 2, 32), 'wheel']);
-            out.push([ring(0.4, plan(cx) * 1.0, 0, Math.PI, 18), 'body']);
-        });
-        // the headlights, angled at the nose's corners; the tail lights round the rear corners
-        out.push([[[2.18, s * 0.3, 0.74], [2.08, s * plan(2.08) * 0.8, 0.76], [1.92, s * plan(1.92) * 0.97, 0.78]], 'lamp']);
-        out.push([[[-2.22, s * 0.4, 0.9], [-2.16, s * plan(-2.16) * 0.92, 0.9], [-1.98, s * plan(-1.98) * 0.99, 0.88]], 'tail']);
-        // the bonnet's creases
-        out.push([[[1.25, s * 0.42, top(1.25)], [2.1, s * 0.3, top(2.1) + 0.01]], 'mesh']);
+        // the door cards inside: the armrest along each door, its pull handle
+        out.push([[[1.0, s * plan(1.0) * 0.9, 0.66], [0.45, s * plan(0.45) * 0.9, 0.68]], 'inside']);
+        out.push([[[0.3, s * plan(0.3) * 0.9, 0.68], [-0.6, s * plan(-0.6) * 0.9, 0.68]], 'inside']);
+        out.push([[[-0.75, s * plan(-0.75) * 0.9, 0.68], [-1.35, s * plan(-1.35) * 0.88, 0.66]], 'inside']);
     });
     const ac = (x, z, k, kind) => out.push([[[x, k * plan(x), z], [x, 0, z + 0.03], [x, -k * plan(x), z]], kind]);
     ac(1.22, top(1.22) + 0.01, 0.72, 'glass'); ac(0.5, top(0.5) - 0.01, 0.68, 'glass'); ac(-0.78, top(-0.78) - 0.01, 0.7, 'glass'); ac(-1.62, top(-1.62) + 0.01, 0.76, 'glass');
-    // the sunroof
     out.push([[[0.36, 0.36, 1.43], [0.36, -0.36, 1.43], [-0.32, -0.36, 1.42], [-0.32, 0.36, 1.42], [0.36, 0.36, 1.43]], 'glass']);
-    // inside: the dash, the console, the front seats and the rear bench, the steering wheel on the driver's side
-    const box3 = (x0, x1, y0, y1, z) => [[x0, y0, z], [x0, y1, z], [x1, y1, z], [x1, y0, z], [x0, y0, z]];
-    out.push([[[1.02, 0.78, 0.9], [1.08, 0, 0.92], [1.02, -0.78, 0.9]], 'inside']);
-    out.push([box3(0.95, -0.2, 0.1, -0.1, 0.62), 'inside']);
-    [0.42, -0.42].forEach((y) => {
-        out.push([box3(0.35, -0.2, y + 0.24, y - 0.24, 0.55), 'inside']);           // the seat
-        out.push([box3(-0.2, -0.32, y + 0.23, y - 0.23, 1.05), 'inside']);          // its back, upright
-    });
-    out.push([box3(-0.75, -1.25, 0.72, -0.72, 0.55), 'inside']);
-    out.push([box3(-1.25, -1.36, 0.7, -0.7, 1.0), 'inside']);
-    { const pts = []; for (let a = 0; a <= 24; a++) { const q = a / 24 * Math.PI * 2; pts.push([0.75, 0.42 + 0.18 * Math.cos(q), 0.88 + 0.18 * Math.sin(q)]); } out.push([pts, 'inside']); }
-    // the kidneys
-    [1, -1].forEach((s) => out.push([[[2.27, s * 0.03, 0.7], [2.25, s * 0.2, 0.7]], 'lamp']));
+    INSIDE.forEach(([pts]) => out.push([pts.concat([pts[0]]), 'inside']));
+    // the dash's top edge, the steering wheel and its hub, the iDrive knob
+    out.push([[[1.12, 0.8, 0.9], [1.06, 0.4, 0.93], [1.05, 0, 0.94], [1.06, -0.4, 0.93], [1.12, -0.8, 0.9]], 'inside']);
+    const ring = (cx2, cy2, cz, r, n, flat) => { const pts = []; for (let a = 0; a <= n; a++) { const q = a / n * Math.PI * 2; pts.push(flat ? [cx2 + r * Math.cos(q), cy2 + r * Math.sin(q), cz] : [cx2 + r * 0.45 * Math.sin(q), cy2 + r * Math.cos(q), cz + r * 0.9 * Math.sin(q)]); } return pts; };
+    out.push([ring(0.72, SEATS[0], 0.86, 0.19, 28), 'inside'], [ring(0.72, SEATS[0], 0.86, 0.06, 14), 'inside']);
+    out.push([ring(0.02, 0, 0.66, 0.045, 14, true), 'inside']);
     return out;
 }
+/* What is inside, as flat shapes (filled, then outlined): [points, fill]. Seats: cushion, back, headrest. */
+const INSIDE = (() => {
+    const h = (x0, x1, y0, y1, z) => [[x0, y0, z], [x0, y1, z], [x1, y1, z], [x1, y0, z]];
+    const back = (x0, x1, y0, y1, z0, z1) => [[x0, y0, z0], [x0, y1, z0], [x1, y1, z1], [x1, y0, z1]];
+    const SEAT = [62, 68, 80, 255], BACK = [72, 78, 92, 255], HEAD = [82, 88, 102, 255], TRIM = [44, 48, 57, 255];
+    const out = [];
+    out.push([h(1.1, 0.78, 0.86, -0.86, 0.9), TRIM]);                                     // the dash's top
+    out.push([[[0.98, 0.16, 0.94], [0.98, -0.16, 0.94], [1.02, -0.16, 1.1], [1.02, 0.16, 1.1]], [20, 24, 30, 255]]);   // the centre screen
+    out.push([h(0.93, 0.8, SEATS[0] + 0.2, SEATS[0] - 0.2, 0.97), [20, 24, 30, 255]]);  // the instruments' hood
+    out.push([h(0.9, -0.62, 0.11, -0.11, 0.6), TRIM]);                                    // the console
+    out.push([h(-0.18, -0.6, 0.12, -0.12, 0.7), SEAT]);                                    // its armrest
+    out.push([h(0.3, 0.18, 0.05, -0.05, 0.64), [96, 104, 120, 255]]);                    // the gear selector
+    SEATS.forEach((y) => {
+        out.push([h(0.36, -0.12, y + 0.24, y - 0.24, 0.55), SEAT]);
+        out.push([back(-0.12, -0.3, y + 0.23, y - 0.23, 0.6, 1.15), BACK]);
+        out.push([h(-0.27, -0.36, y + 0.12, y - 0.12, 1.3), HEAD]);
+    });
+    out.push([h(-0.66, -1.16, 0.72, -0.72, 0.55), SEAT]);
+    out.push([back(-1.16, -1.36, 0.7, -0.7, 0.58, 1.05), BACK]);
+    [0.48, 0, -0.48].forEach((y) => out.push([h(-1.32, -1.42, y + 0.12, y - 0.12, 1.12), HEAD]));
+    return out;
+})();
 const LINES = carLines();
 
 /** The view: a point -> [screen x, screen y (down), depth (larger: nearer the eye)], before fitting. */
@@ -111,7 +123,7 @@ function viewer(pitchDeg, rollDeg) {
 
 /** The cabin's light at fx across, fy from the dash, in metres: upper ones at the dash and the doors' tops, lower ones at the floor. */
 function lightPoint(fx, fy, part) {
-    return [0.95 - fy * 2.15, (0.5 - fx) * 2 * W * 0.86, part === 'upper' ? (fy < 0.2 ? 0.98 : 0.92) : 0.38];
+    return [1.25 - fy * 2.9, (0.5 - fx) * 2 * W * 0.86, part === 'upper' ? (fy < 0.2 ? 0.98 : 0.92) : 0.38];
 }
 
 const glow = (rgb, bright, a) => { const f = 0.25 + 0.75 * Math.max(0, Math.min(100, bright)) / 100; return [rgb[0], rgb[1], rgb[2], Math.round(255 * a * f)]; };
@@ -123,18 +135,15 @@ function drawCarView(cv, t, box, lights, colourOf, opts) {
     const pitch = Math.max(0, Math.min(MAX_PITCH, o.pitch || 0)), roll = Math.max(-MAX_ROLL, Math.min(MAX_ROLL, o.roll || 0));
     const pr = viewer(pitch, o.rhd ? -roll : roll);
     // a scale that stays as the view turns: the car's length fits the box's height from straight above
-    const k = Math.min(box.h / (2 * L * 1.04), box.w / (2 * W * 1.5)), cx = box.x + box.w / 2, cy = box.y + box.h / 2;
-    const S = (p) => { const q = pr(p); return [cx + (o.rhd ? -q[0] : q[0]) * k, cy + (q[1] + 0.55 * Math.sin(pitch * Math.PI / 180)) * k, q[2]]; };
+    const k = Math.min(box.h / ((XF - XR) * 1.12), box.w / (2 * W * 1.45)), cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+    const S = (p) => { const q = pr([p[0] - XM, p[1], p[2]]); return [cx + (o.rhd ? -q[0] : q[0]) * k, cy + (q[1] + 0.55 * Math.sin(pitch * Math.PI / 180)) * k, q[2]]; };
     // its shadow on the ground, then the body's mass: the plan at the belt filled dark
-    const strip = (f, z, c) => { for (let i = 0; i < 40; i++) { const xa = L - 2 * L * i / 40, xb = L - 2 * L * (i + 1) / 40; cv.quad([S([xa, f(xa), z]), S([xa, -f(xa), z]), S([xb, -f(xb), z]), S([xb, f(xb), z])].map((q) => [q[0], q[1]]), c); } };
+    const strip = (f, z, c) => { for (let i = 0; i < 24; i++) { const xa = XF - (XF - XR) * i / 24, xb = XF - (XF - XR) * (i + 1) / 24; cv.quad([S([xa, f(xa), z]), S([xa, -f(xa), z]), S([xb, -f(xb), z]), S([xb, f(xb), z])].map((q) => [q[0], q[1]]), c); } };
     strip((x) => plan(x) * 1.06, 0, [0, 0, 0, 120]);
     strip(plan, 0.5, [22, 25, 30, 235]);
-    // the cabin's floor a shade lighter, the seats filled, so the lights' places read against them
-    const flat = (x0, x1, y0, y1, z, c) => cv.quad([S([x0, y0, z]), S([x0, y1, z]), S([x1, y1, z]), S([x1, y0, z])].map((q) => [q[0], q[1]]), c);
-    flat(1.0, -1.45, plan(0) * 0.86, -plan(0) * 0.86, 0.1, [27, 30, 36, 255]);
-    [0.42, -0.42].forEach((y) => { flat(0.35, -0.2, y + 0.24, y - 0.24, 0.55, [60, 66, 78, 255]); flat(-0.2, -0.32, y + 0.23, y - 0.23, 1.05, [68, 74, 86, 255]); });
-    flat(-0.75, -1.25, 0.72, -0.72, 0.55, [60, 66, 78, 255]); flat(-1.25, -1.36, 0.7, -0.7, 1.0, [68, 74, 86, 255]);
-    flat(0.95, -0.2, 0.1, -0.1, 0.62, [40, 44, 52, 255]);
+    // the cabin's floor a shade lighter, what is inside filled, so the lights' places read against them
+    strip((x) => plan(x) * 0.9, 0.1, [27, 30, 36, 255]);
+    INSIDE.forEach(([pts, c]) => cv.quad(pts.map((q) => { const r = S(q); return [r[0], r[1]]; }), c));
     const segs = [];
     LINES.forEach(([pts, kind]) => { const q = pts.map(S); for (let i = 1; i < q.length; i++) segs.push([q[i - 1], q[i], kind]); });
     let d0 = Infinity, d1 = -Infinity;
@@ -145,7 +154,7 @@ function drawCarView(cv, t, box, lights, colourOf, opts) {
     // round it (where a footwell or a door pocket lights), the lamp itself a dot in the middle
     const drawLights = () => {
         const pool = (l, c) => {
-            const [x, y, z] = lightPoint(l.x, l.y, l.part), rgb = c.rgb, br = c.bright, r = 0.24;
+            const [x, y, z] = lightPoint(l.x, l.y, l.part), rgb = c.rgb, br = c.bright, r = 0.17;
             for (let ring = 3; ring >= 1; ring--) {
                 const rr = r * ring / 3, pts = [];
                 for (let a = 0; a < 16; a++) { const q = a / 16 * Math.PI * 2; pts.push(S([x + rr * Math.cos(q), y + rr * 0.8 * Math.sin(q), 0.08])); }
@@ -173,7 +182,7 @@ function drawCarView(cv, t, box, lights, colourOf, opts) {
     segs.forEach(([a, b, kind]) => {
         const n = near((a[2] + b[2]) / 2);
         if (!lit && n > 0.55) { drawLights(); lit = true; }
-        const c = COL[kind], al = kind === 'lamp' || kind === 'tail' ? 0.95 : kind === 'inside' ? 0.7 : (kind === 'mesh' ? 0.08 : 0.16) + (kind === 'mesh' ? 0.4 : 0.78) * n * n;
+        const c = COL[kind], al = kind === 'lamp' || kind === 'tail' ? 0.95 : kind === 'inside' ? 0.75 : (kind === 'mesh' ? 0.08 : 0.16) + (kind === 'mesh' ? 0.4 : 0.78) * n * n;
         cv.line(a[0], a[1], b[0], b[1], WID[kind], [c[0], c[1], c[2], Math.round(255 * al)]);
     });
     if (!lit) drawLights();
