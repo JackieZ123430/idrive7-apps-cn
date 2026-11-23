@@ -45,6 +45,7 @@ const RING = { cx: 290, cy: 288, R: 186, r: 136 }, DIAL = { cx: 655, cy: 400, R:
 const ON_BY_DEFAULT = ['follow', 'flashAlerts'];
 const MOVE_DRAW_MS = 250;            // a moving scene's picture: at most 4 a second
 const FIND_LATER_MS = 5000;          // lights known from an earlier start: read again once the first colour is out
+const FAULT_RECHECK_MS = 30000;      // a light faulty at the search: read again this long after our colour is on
 const IDLE_MS = 15 * 60000;          // without the car's own state: not driven nor the app used this long = parked and left
 /* The car's turn signals (Light.StatusFunctionsIndicators activeFunctionIndicateDirection, by name or number): the
  * driver's (held or tapped), the driving assistant's, and the hazards; the lock and alarm flashes are none. */
@@ -103,6 +104,16 @@ async function background(bg) {
     };
     const find = () => lights.find().then(counted).then((l) => { if (!l.length) again(); }, (e) => { log.warn('lights: ' + e); again(); });
     setTimeout(find, lights.lights.length ? FIND_LATER_MS : 0);
+    // a light read as faulty at the search may only have been off (IterioDev's Comfort 0.6.5: an M8's footwells read
+    // "faulty" with the car off and clean later): read once more FAULT_RECHECK_MS after our colour is on, once a start
+    let faultCheck = null;
+    lights.on('change', () => {
+        if (faultCheck || lights.state !== 'ours' || !lights.lights.some((l) => l.fault)) return;
+        faultCheck = setTimeout(() => {
+            log.info('lights: ' + lights.lights.filter((l) => l.fault).map((l) => l.name).join(', ') + ' reported a fault at the search: read again, the lights on');
+            find();
+        }, FAULT_RECHECK_MS);
+    });
     signals.watch('de.bmw.infotainment.vehicle.Vehicle', '1', {
         statusDayNightChangeOver: (v) => {
             const x = v && typeof v === 'object' ? v.dayNightChangeOver : v, c = typeof x === 'string' ? DAY_NIGHT[x] : x;
