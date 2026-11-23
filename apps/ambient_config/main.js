@@ -31,7 +31,8 @@ const { Strobe, gateChecks, gateWhy } = require('./strobe');
 const { Lever, beamOf } = require('./lever');
 const Parked = require('./kit/parked');
 const { t: translate } = require('./kit/i18n');
-const { drawCabin, legendMark } = require('./cabin');
+const { legendMark } = require('./cabin');
+const { drawCarView, MAX_PITCH, MAX_ROLL } = require('./carview');
 const { sample } = require('./lin');
 const S = require('./scenes');
 
@@ -265,6 +266,11 @@ mgu.run({
         const partColour = (l) => (part === 'lower' ? l.lower : l.upper);
         const shown = () => (lights.lights.length ? lights.lights : sample());
         const rhd = () => settings.get('drive') === 'rhd';
+        // the car's picture on the Colour and Animations tabs, and how a finger has turned it (carview.js): leaned back
+        // (pitch) and turned about its length (roll), the nose always up
+        const CAR_BOX = [{ x: 790, y: 92, w: 330, h: 404 }, { x: 700, y: 92, w: 420, h: 404 }];
+        const carView = { pitch: 0, roll: 0 };
+        const carAt = (x, y) => page <= 1 && x >= CAR_BOX[page].x && x < CAR_BOX[page].x + CAR_BOX[page].w && y >= CAR_BOX[page].y && y < CAR_BOX[page].y + CAR_BOX[page].h;
         // (a tap: the app in use - the car is not left, also for a car that does not say so)
         const redraw = () => { dirty = true; if (active) active(); return render(); };
 
@@ -344,7 +350,7 @@ mgu.run({
 
             G.panel(cv, t, 776, 44, 800, 468, editing ? MODE_NAMES[editing] + ' will look' : 'In the car');
             if (lights.state === 'none' && !editing) return drawBmwColours(cv, t);
-            drawCabin(cv, t, { x: 790, y: 92, w: 330, h: 404 }, shown(), pictureOf(carNow, l), { rhd: rhd() });
+            drawCarView(cv, t, CAR_BOX[0], shown(), pictureOf(carNow, l), Object.assign({ rhd: rhd() }, carView));
             const x = 1150;
             legend(cv, t, x, l, true);
             if (editing) return editBar(cv, t, x);
@@ -400,7 +406,7 @@ mgu.run({
             G.panel(cv, t, 678, 44, 898, 468, editing ? MODE_NAMES[editing] + ' will look' : 'In the car');
             // the picture shows the animation picked even before the car has answered
             const preview = (x) => (lights.scene ? lights.at(x) : control.on() ? S.lightAt(l, x, Date.now() - T0) : null);
-            drawCabin(cv, t, { x: 700, y: 92, w: 420, h: 404 }, shown(), pictureOf(preview, l), { rhd: rhd() });
+            drawCarView(cv, t, CAR_BOX[1], shown(), pictureOf(preview, l), Object.assign({ rhd: rhd() }, carView));
             const x = 1150;
             legend(cv, t, x, l, false);
             cv.text('Colours: on the Colour tab', x, 214, 18, t.dim);
@@ -634,16 +640,27 @@ mgu.run({
         // a finger on the ring or the dial: the colour or the brightness follows it while it moves, sent to the lights at
         // most every DRAG_MS and once more where it lets go (a tap: there at once)
         const DRAG_MS = 120;
-        let drag = null;                                    // { what: 'ring' | 'dial', at, x, y, timer }
+        let drag = null;                                    // { what: 'ring' | 'dial' | 'car', at, x, y, timer }
         const dragApply = () => {
             if (!drag) return null;
             drag.at = Date.now(); clearTimeout(drag.timer); drag.timer = null;
+            if (drag.what === 'car') {
+                // a finger across turns the car about its length, up and down leans it back; it stays as left
+                carView.roll = Math.max(-MAX_ROLL, Math.min(MAX_ROLL, drag.r0 + (drag.x - drag.x0) * 0.25));
+                carView.pitch = Math.max(0, Math.min(MAX_PITCH, drag.p0 + (drag.y - drag.y0) * 0.25));
+                return redraw();
+            }
             return drag.what === 'ring' ? setRgb(S.hsv(hueAt(drag.x, drag.y), 1, 1)) : setBright(brightAt(drag.x, drag.y));
         };
         if (ctx.onTouch) {
             ctx.onTouch((phase, x, y) => {
                 if (phase === 1) {
                     drag = null;
+                    // the car's picture, where it shows (not over the body module's colour buttons)
+                    if (carAt(x, y) && (page === 1 || lights.state !== 'none' || editing)) {
+                        drag = { what: 'car', at: 0, x, y, x0: x, y0: y, r0: carView.roll, p0: carView.pitch, timer: null };
+                        return true;
+                    }
                     if (page !== 0) return false;
                     const what = ringAt(x, y) ? 'ring' : dialAt(x, y) ? 'dial' : null;
                     if (!what) return false;
