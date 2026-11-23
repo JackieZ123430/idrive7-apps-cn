@@ -873,7 +873,7 @@ function button(cv, t, x, y, w, h, label, run, opts) {
     const fg = o.primary ? (o.busy ? withAlpha(onColour(c), 0.6) : onColour(c)) : o.busy ? withAlpha(t.dim, 0.7) : o.color || t.text;
     if (o.glyph) glyph(cv, o.glyph, x + w / 2, y + h / 2, h * 0.2, fg);
     else cv.text(text, x + w / 2, y + h / 2 + h * 0.13, h * 0.36, fg, opt);
-    if (!o.busy && run) cv.target(x, y, w, h, pressing(o.key || label, run), o.key || label);
+    if (!o.busy && run) cv.target(x, y, w, h, pressing(o.key || label, run), o.key || label, r);
     return w;
 }
 /** A button's glyph, centred at cx, cy, s px from the centre to its tips. */
@@ -908,7 +908,7 @@ function segment(cv, t, x, y, w, h, items) {
         if (lit(it.key || it.label)) cv.roundRect(ix, iy, iw, ih, 9, withAlpha('#ffffff', 0.18));
         cv.text(fit(cv, upperText(it.label), size, iw - 16, opt), ix + iw / 2, iy + ih / 2 + size * 0.36, size,
             it.on ? onColour(S) : it.busy ? withAlpha(t.dim, 0.55) : t.dim, opt);
-        if (!it.busy && it.run) cv.target(ix, iy, iw, ih, pressing(it.key || it.label, it.run), it.key || it.label);
+        if (!it.busy && it.run) cv.target(ix, iy, iw, ih, pressing(it.key || it.label, it.run), it.key || it.label, 9);
     });
     return w;
 }
@@ -932,7 +932,7 @@ function chip(cv, t, x, y, w, h, label, n, run, opts) {
         cv.circle(cx, cy, cr, withAlpha(S, a));
         if (n !== true) cv.text(String(n), cx, cy + cr * 0.45, cr * 1.15, onColour(S), { align: 'center', font: 'bold' });
     } else cv.arc(cx, cy, cr - 1.5, cr, 0, 360, withAlpha('#ffffff', 0.3 * a));
-    if (!o.busy && run) cv.target(x, y, w, h, pressing(o.key || label, run), o.key || label);
+    if (!o.busy && run) cv.target(x, y, w, h, pressing(o.key || label, run), o.key || label, 10);
     return w;
 }
 /** s cut to w px at size (with an ellipsis). */
