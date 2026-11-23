@@ -694,11 +694,8 @@ function frame(cv, t, tabs, sel, badges) {
     labels.forEach((label, i) => {
         const tw = widths[i], on = i === sel;
         cv.tabRects.push({ i, x, y: 0, w: tw, h: BAR_H });
-        if (on) {
-            cv.gradientRect(x, 0, tw, BAR_H, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.22)]]);
-            cv.fillRect(x, BAR_H - 4, tw, 4, S);
-        }
-        cv.text(label, x + tw / 2, 25, 20, on ? t.selText || S : t.dim, opt);
+        if (on) cv.roundRect(x + tw / 2 - 16, BAR_H - 7, 32, 3, 1.5, S);
+        cv.text(label, x + tw / 2, 24, 20, on ? t.text : t.dim, opt);
         if (i < tabs.length - 1) cv.fillRect(x + tw, 9, 1, BAR_H - 18, withAlpha('#ffffff', 0.12));
         x += tw;
     });
@@ -748,11 +745,8 @@ function header(cv, t, x, y, w, h, title, tabs, sel, badges, flat, compact) {
         const on = i === sel, bw = tw[i];
         if (tx + bw > right) return;
         cv.tabRects.push({ i, x: tx, y, w: bw, h });
-        if (on) {
-            cv.gradientRect(tx, y, bw, h, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.25)]]);
-            cv.fillRect(tx, y + h - 5, bw, 5, S);
-        }
-        cv.text(n, tx + bw / 2, y + h / 2 + 7, 20, on ? t.selText || '#ffffff' : t.dim, opt);
+        if (on) cv.roundRect(tx + bw / 2 - 18, y + h - 10, 36, 4, 2, S);
+        cv.text(n, tx + bw / 2, y + h / 2 + 7, 20, on ? t.text : t.dim, opt);
         if (i < names.length - 1) cv.fillRect(tx + bw, y + h * 0.28, 1, h * 0.44, withAlpha('#ffffff', 0.14));
         tx += bw;
     });
@@ -787,11 +781,8 @@ function headerCompact(cv, t, x, y, w, h, title, tabs, sel, badges) {
         const on = i === sel, bw = tw[i];
         if (tx + bw > x + room) return;
         cv.tabRects.push({ i, x: tx, y, w: bw, h });
-        if (on) {
-            cv.gradientRect(tx, y, bw, h, [[0, withAlpha(S, 0)], [1, withAlpha(S, 0.25)]]);
-            cv.fillRect(tx, y + h - 4, bw, 4, S);
-        }
-        cv.text(n, tx + bw / 2, y + h / 2 + 6, 18, on ? t.selText || '#ffffff' : t.dim, opt);
+        if (on) cv.roundRect(tx + bw / 2 - 16, y + h - 9, 32, 3, 1.5, S);
+        cv.text(n, tx + bw / 2, y + h / 2 + 6, 18, on ? t.text : t.dim, opt);
         if (i < names.length - 1) cv.fillRect(tx + bw, y + h * 0.3, 1, h * 0.4, withAlpha('#ffffff', 0.14));
         tx += bw;
     });
@@ -825,22 +816,42 @@ function menuBar(cv, t, x, y, w, h, buttons, focus, variant, flash) {
 }
 
 /**
- * A button on the page: a pill with its label, pressed by a tap or the controller (cv.target). Drawn
+ * A button on the page: a rounded box with its label, pressed by a tap or the controller (cv.target). Drawn
  * only where the kit runs the screen (display.js: the app's bar button then leaves the bar, hideButton).
- * opts: { key (default: the label), color (a warning colour, for resets), primary (filled), busy (drawn
- * dimmed, nothing to press), confirm (a reset: the first press asks, Confirm pressed within 5 s runs it) }.
+ * opts: { key (default: the label), color (a warning colour, for resets), primary (filled in the theme's
+ * colour), busy (drawn dimmed, nothing to press), confirm (a reset: the first press asks, Confirm pressed
+ * within 5 s runs it), round (a pill), glyph ('minus', 'plus', 'up', 'down', 'left', 'right', 'centre':
+ * drawn in place of the label) }.
  * Returns the button's width.
  */
 const armed = new Map();                // confirm buttons pressed once: key -> when
 let onArmed = null;
 /** fn() when a confirm button is armed or runs out (display.js: the app draws its next frame). */
 function onConfirm(fn) { onArmed = fn; }
+/** Text readable on colour c: black on a light one (Ice White, Night Amber), else white. */
+function onColour(c) {
+    const n = parseInt(String(c).slice(1, 7), 16);
+    const l = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] > 0.35 ? '#000000' : '#ffffff';
+}
+const BTN_FILL = '#ffffff17', BTN_EDGE = '#ffffff33';
+const SIGNS = { '-': 'minus', '+': 'plus', '<': 'left', '>': 'right', '^': 'up', v: 'down' };
+/** A pressed button, chip or choice lights up this long (pressed: key -> when). */
+const PRESS_MS = 180, pressed = new Map();
+function pressing(key, run) {
+    return () => {
+        pressed.set(key, Date.now());
+        if (onArmed) { onArmed(); setTimeout(onArmed, PRESS_MS + 20); }
+        return run();
+    };
+}
+const lit = (key) => pressed.has(key) && Date.now() - pressed.get(key) < PRESS_MS;
 function button(cv, t, x, y, w, h, label, run, opts) {
     let o = opts || {};
     if (!cv.own) return 0;              // elsewhere the HMI's bar has the button
     if (o.confirm && run) {
         const key = o.key || label, act = run, live = () => armed.has(key) && Date.now() - armed.get(key) < 5000;
-        if (live()) { label = 'Confirm'; o = Object.assign({}, o, { color: t.crit, primary: true }); }
+        if (live()) { label = 'Confirm'; o = Object.assign({}, o, { color: t.crit, primary: true, glyph: null }); }
         run = () => {
             if (live()) { armed.delete(key); if (onArmed) onArmed(); return act(); }
             armed.set(key, Date.now());
@@ -848,14 +859,88 @@ function button(cv, t, x, y, w, h, label, run, opts) {
             return null;
         };
     }
-    const S = t.sel || t.accent, c = o.color || S;
-    if (!w) w = Math.max(h * 3, cv.textWidth(String(label).toUpperCase(), h * 0.4, { font: 'bold', spacing: 1.5 }) + h * 1.2);
-    cv.roundRect(x, y, w, h, h / 2, o.primary ? withAlpha(c, o.busy ? 0.35 : 0.85) : withAlpha('#ffffff', 0.07));
-    if (!o.primary) cv.strokeRoundRect(x, y, w, h, h / 2, 1.5, withAlpha(o.color || '#ffffff', o.busy ? 0.25 : o.color ? 0.75 : 0.3));
-    cv.text(String(label).toUpperCase(), x + w / 2, y + h / 2 + h * 0.15, h * 0.4, o.primary ? '#ffffff' : o.busy ? t.dim : o.color || t.text,
-        { align: 'center', font: 'bold', spacing: 1.5 });
-    if (!o.busy && run) cv.target(x, y, w, h, run, o.key || label);
+    // a one-character label of a sign or an arrow is drawn as its glyph
+    if (!o.glyph && SIGNS[label]) o = Object.assign({}, o, { glyph: SIGNS[label] });
+    const S = t.sel || t.accent, c = o.color || S, r = o.round ? h / 2 : Math.min(10, h / 2);
+    const text = upperText(label), opt = { align: 'center', font: 'bold', spacing: 1.5 };
+    if (!w) w = Math.max(h * 2.4, cv.textWidth(text, h * 0.36, opt) + h * 0.9);
+    if (o.primary) cv.roundRect(x, y, w, h, r, o.busy ? withAlpha(c, 0.35) : c);
+    else {
+        cv.roundRect(x, y, w, h, r, BTN_FILL);
+        cv.strokeRoundRect(x, y, w, h, r, 1.5, o.color ? withAlpha(o.color, o.busy ? 0.3 : 0.8) : o.busy ? '#ffffff1a' : BTN_EDGE);
+    }
+    if (lit(o.key || label)) cv.roundRect(x, y, w, h, r, withAlpha('#ffffff', 0.22));
+    const fg = o.primary ? (o.busy ? withAlpha(onColour(c), 0.6) : onColour(c)) : o.busy ? withAlpha(t.dim, 0.7) : o.color || t.text;
+    if (o.glyph) glyph(cv, o.glyph, x + w / 2, y + h / 2, h * 0.2, fg);
+    else cv.text(text, x + w / 2, y + h / 2 + h * 0.13, h * 0.36, fg, opt);
+    if (!o.busy && run) cv.target(x, y, w, h, pressing(o.key || label, run), o.key || label);
     return w;
+}
+/** A button's glyph, centred at cx, cy, s px from the centre to its tips. */
+function glyph(cv, g, cx, cy, s, c) {
+    const lw = Math.max(2, s * 0.32);
+    if (g === 'minus' || g === 'plus') {
+        cv.line(cx - s, cy, cx + s, cy, lw, c);
+        if (g === 'plus') cv.line(cx, cy - s, cx, cy + s, lw, c);
+    } else if (g === 'centre') cv.arc(cx, cy, s * 0.55, s * 0.55 + lw, 0, 360, c);
+    else {
+        const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[g] || [0, -1], [dx, dy] = d, px = -dy, py = dx;
+        cv.line(cx - dx * s, cy - dy * s, cx + dx * s, cy + dy * s, lw, c);
+        cv.polyline([[cx + dx * s - (dx - px) * s * 0.6, cy + dy * s - (dy - py) * s * 0.6], [cx + dx * s, cy + dy * s],
+            [cx + dx * s - (dx + px) * s * 0.6, cy + dy * s - (dy + py) * s * 0.6]], lw, c);
+    }
+}
+
+/**
+ * A row of choices in one box, the chosen one filled: items = [{ label, run, on, busy, key }]. Drawn where
+ * G.button is. Returns the width.
+ */
+function segment(cv, t, x, y, w, h, items) {
+    if (!cv.own) return 0;
+    const S = t.sel || t.accent, p = 4, iw = (w - 2 * p) / Math.max(1, items.length);
+    cv.roundRect(x, y, w, h, 12, '#00000073');
+    cv.strokeRoundRect(x, y, w, h, 12, 1, '#ffffff1a');
+    const opt = { align: 'center', font: 'bold', spacing: 2 }, size = Math.min(17, Math.max(15, h * 0.4));
+    items.forEach((it, i) => {
+        const ix = x + p + i * iw, iy = y + p, ih = h - 2 * p;
+        if (it.on && !it.busy) cv.roundRect(ix - 3, iy - 3, iw + 6, ih + 6, 12, withAlpha(S, 0.18));
+        if (it.on) cv.roundRect(ix, iy, iw, ih, 9, it.busy ? withAlpha(S, 0.4) : S);
+        if (lit(it.key || it.label)) cv.roundRect(ix, iy, iw, ih, 9, withAlpha('#ffffff', 0.18));
+        cv.text(fit(cv, upperText(it.label), size, iw - 16, opt), ix + iw / 2, iy + ih / 2 + size * 0.36, size,
+            it.on ? onColour(S) : it.busy ? withAlpha(t.dim, 0.55) : t.dim, opt);
+        if (!it.busy && it.run) cv.target(ix, iy, iw, ih, pressing(it.key || it.label, it.run), it.key || it.label);
+    });
+    return w;
+}
+
+/**
+ * One of a list to pick: label on the left, on the right a ring, or while picked the box in the theme's
+ * colour and the ring filled with its place n (a number, or true for a dot). Drawn where G.button is.
+ */
+function chip(cv, t, x, y, w, h, label, n, run, opts) {
+    const o = opts || {};
+    if (!cv.own) return 0;
+    const S = t.sel || t.accent, on = !!n, a = o.busy ? 0.45 : 1;
+    if (on && !o.busy) cv.roundRect(x - 3, y - 3, w + 6, h + 6, 13, withAlpha(S, 0.14));
+    cv.roundRect(x, y, w, h, 10, BTN_FILL);
+    if (on) cv.roundRect(x, y, w, h, 10, withAlpha(S, 0.22 * a));
+    if (lit(o.key || label)) cv.roundRect(x, y, w, h, 10, withAlpha('#ffffff', 0.18));
+    cv.strokeRoundRect(x, y, w, h, 10, 1.5, on ? withAlpha(S, 0.75 * a) : withAlpha('#ffffff', 0.2 * a));
+    const opt = { font: 'bold', spacing: 1.2 }, size = Math.min(15, h * 0.37), cr = h * 0.27, cx = x + w - cr - 12, cy = y + h / 2;
+    cv.text(fit(cv, upperText(label), size, w - 2 * cr - 40, opt), x + 16, cy + size * 0.36, size, withAlpha(t.text, a), opt);
+    if (on) {
+        cv.circle(cx, cy, cr, withAlpha(S, a));
+        if (n !== true) cv.text(String(n), cx, cy + cr * 0.45, cr * 1.15, onColour(S), { align: 'center', font: 'bold' });
+    } else cv.arc(cx, cy, cr - 1.5, cr, 0, 360, withAlpha('#ffffff', 0.3 * a));
+    if (!o.busy && run) cv.target(x, y, w, h, pressing(o.key || label, run), o.key || label);
+    return w;
+}
+/** s cut to w px at size (with an ellipsis). */
+function fit(cv, s, size, w, opt) {
+    if (cv.textWidth(s, size, opt) <= w) return s;
+    let n = s.length;
+    while (n > 1 && cv.textWidth(s.slice(0, n) + '…', size, opt) > w) n--;
+    return s.slice(0, n) + '…';
 }
 
 /** Accent stripes (M-style) under a header. */
@@ -867,6 +952,6 @@ function stripes(cv, t, x, y, w) {
 
 module.exports = {
     BAR_H, TOP, BOTTOM, pageBottom, MARGIN, toMargin, frame, header, layer, onLayerDrop, panel, segBar, radial, needle, ring, bar, stat, readout,
-    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, button, onConfirm, smooth, hold, niceStep,
+    shiftLights, gear, chart, table, pill, tyres, gmeter, menuBar, stripes, button, segment, chip, glyph, onColour, onConfirm, smooth, hold, niceStep,
     fmt, isNum, clamp, mix, zoneColor, withAlpha, ramp,
 };

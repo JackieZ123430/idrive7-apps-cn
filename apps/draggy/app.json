@@ -2,7 +2,7 @@
   "id": "draggy",
   "title": "Drag Timer",
   "description": "Standing 0-100 and 1/4 mile, rolling 100-200, valid runs, slope, air and shifts per run, best times",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "vendor": "custom",
   "loggingId": "OA94",
   "iconGlyph": "flag",
