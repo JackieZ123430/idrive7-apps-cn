@@ -31,7 +31,7 @@ const { Strobe, gateChecks, gateWhy } = require('./strobe');
 const { Lever, beamOf } = require('./lever');
 const Parked = require('./kit/parked');
 const { t: translate } = require('./kit/i18n');
-const { drawCabin } = require('./cabin');
+const { drawCabin, legendMark } = require('./cabin');
 const { sample } = require('./lin');
 const S = require('./scenes');
 
@@ -346,16 +346,22 @@ mgu.run({
             if (lights.state === 'none' && !editing) return drawBmwColours(cv, t);
             drawCabin(cv, t, { x: 790, y: 92, w: 330, h: 404 }, shown(), pictureOf(carNow, l), { rhd: rhd() });
             const x = 1150;
-            [['Upper', l.upper], ['Lower', l.lower]].forEach(([n, v], i) => {
-                cv.roundRect(x, 104 + i * 40, 26, 26, 7, v.rgb);
-                cv.text(n + ': ' + nearest(v.rgb) + ', ' + v.bright + '%', x + 38, 124 + i * 40, 20, t.text);
-            });
+            legend(cv, t, x, l, true);
             if (editing) return editBar(cv, t, x);
             G.button(cv, t, x, 210, 268, 48, 'Original colour', () => { control.carColour(); return redraw(); }, { primary: !control.on(), key: 'car' });
             G.button(cv, t, x, 270, 268, 48, 'Save favourite', () => { control.saveFav(); return redraw(); }, { key: 'save' });
             status(cv, t, x, 352);
         }
 
+        // the key to the car's picture: each part's mark, its colour (and brightness), where its lights are
+        function legend(cv, t, x, l, bright) {
+            [['upper', 'Upper', l.upper, 'Dash and door lines'], ['lower', 'Lower', l.lower, 'Footwells, door pockets and handles']].forEach(([k, n, v, where], i) => {
+                const y = 100 + i * 46;
+                legendMark(cv, k, x, y + 12, v.rgb);
+                cv.text(n + ': ' + nearest(v.rgb) + (bright ? ', ' + v.bright + '%' : ''), x + 40, y + 19, 20, t.text);
+                cv.text(where, x + 40, y + 37, 15, t.dim);
+            });
+        }
         // changing a driving mode's look: which mode, and Done back to the Driving modes tab
         function editBar(cv, t, x) {
             cv.text('Changing ' + MODE_NAMES[editing] + '\'s look', x, 222, 22, t.text, { font: 'bold' });
@@ -388,19 +394,15 @@ mgu.run({
                 cv.text(d, 284, y + 32, 20, on ? t.text : t.dim);
             });
             cv.text('Speed', 44, 470, 20, t.dim);
-            [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']].forEach(([v, n], i) => {
-                G.button(cv, t, 120 + i * 150, 440, 136, 48, n, () => { setLook({ speed: v }); return redraw(); }, { primary: (l.speed || 2) === v, key: 'sp-' + v });
-            });
+            G.segment(cv, t, 120, 440, 436, 48, [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']]
+                .map(([v, n]) => ({ label: n, run: () => { setLook({ speed: v }); return redraw(); }, on: (l.speed || 2) === v, key: 'sp-' + v })));
 
             G.panel(cv, t, 678, 44, 898, 468, editing ? MODE_NAMES[editing] + ' will look' : 'In the car');
             // the picture shows the animation picked even before the car has answered
             const preview = (x) => (lights.scene ? lights.at(x) : control.on() ? S.lightAt(l, x, Date.now() - T0) : null);
             drawCabin(cv, t, { x: 700, y: 92, w: 420, h: 404 }, shown(), pictureOf(preview, l), { rhd: rhd() });
             const x = 1150;
-            [['Upper', l.upper], ['Lower', l.lower]].forEach(([n, v], i) => {
-                cv.roundRect(x, 104 + i * 40, 26, 26, 7, v.rgb);
-                cv.text(n + ': ' + nearest(v.rgb), x + 38, 124 + i * 40, 20, t.text);
-            });
+            legend(cv, t, x, l, false);
             cv.text('Colours: on the Colour tab', x, 214, 18, t.dim);
             if (editing) return editBar(cv, t, x);
             G.button(cv, t, x, 240, 0, 48, 'Original colour', () => { control.carColour(); return redraw(); }, { primary: !control.on(), key: 'car2' });

@@ -7,6 +7,7 @@
  *     lights    [{ part, x, y, x2, y2, fault }] (lin.js), x 0..1 across from the driver's side, y 0..1 from the dash
  *     colourOf  (light) -> { rgb, bright } | null (null: the car's own colour, drawn dim grey)
  *     opts.rhd  the driver on the right (the picture mirrored)
+ *   legendMark(cv, part, x, y, rgb)   the key to it: an upper light's line, a lower light's pill
  */
 const { withAlpha } = require('./kit/canvas');
 
@@ -59,4 +60,15 @@ function drawCabin(cv, t, box, lights, colourOf, opts) {
     return { x: x0, y: y0, w: W, h: H };
 }
 
-module.exports = { drawCabin };
+/** The key to the picture: an upper light's line or a lower light's dot, at x, y (its middle), in rgb. */
+function legendMark(cv, part, x, y, rgb) {
+    if (part === 'upper') {
+        cv.line(x, y, x + 26, y, 10, glow(cv, rgb, 100, 0.3));
+        cv.line(x, y, x + 26, y, 5, rgb);
+    } else {
+        cv.roundRect(x, y - 9, 26, 18, 9, glow(cv, rgb, 100, 0.3));
+        cv.roundRect(x + 3, y - 4, 20, 8, 4, rgb);
+    }
+}
+
+module.exports = { drawCabin, legendMark };
