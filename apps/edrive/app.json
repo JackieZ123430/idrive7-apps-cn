@@ -2,7 +2,7 @@
   "id": "edrive",
   "title": "eDrive",
   "description": "Real electric range (plug-in hybrids and fully electric cars such as the iX3), live battery power, cells and climate power, HV battery health (SOH) and energy, last charge, charge log, the 12 V battery (charge, voltage, what it does, regen, history) and a home-screen widget; on a 48 V mild hybrid its 48 V battery and DC/DC converter",
-  "version": "2.11.0",
+  "version": "2.11.3",
   "autostart": true,
   "vendor": "custom",
   "loggingId": "OA9C",

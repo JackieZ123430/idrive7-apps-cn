@@ -70,7 +70,7 @@ async function main(){
   assert(cv.textWidth(fitted,22)<=190,'localized truncated text must fit');
   assert.strictEqual(t('FAULTS'),'故障');
   const G=require(path.join(kit,'gauges')),theme=require(path.join(kit,'themes')).theme('m_tricolour');
-  const labels=[],mock={w:1600,fillRect:()=>{},gradientRect:()=>{},textWidth:()=>50,text:(s)=>labels.push(s)};
+  const labels=[],mock={w:1600,fillRect:()=>{},gradientRect:()=>{},roundRect:()=>{},strokeRoundRect:()=>{},textWidth:()=>50,text:(s)=>labels.push(s)};
   G.frame(mock,theme,['History','Faults'],0,[]);
   assert(labels.includes('历史')&&labels.includes('故障'),'translate heading context before uppercasing');
  }

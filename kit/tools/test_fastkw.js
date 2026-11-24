@@ -3,7 +3,7 @@
 // it follows the pedal at once, the AC compressor and the rest of the car's draw included.
 //   node kit/tools/test_fastkw.js
 const path = require('path');
-const { FastKw, MIN_FIT } = require(path.join(__dirname, '..', '..', 'apps', 'edrive', 'fastkw'));
+const { FastKw, MIN_FIT, HOLD_MS } = require(path.join(__dirname, '..', '..', 'apps', 'edrive', 'fastkw'));
 
 let fails = 0, checks = 0;
 const ok = (c, msg) => { checks++; if (!c) { fails++; console.log('FAIL ' + msg); } };
@@ -49,6 +49,20 @@ const g = new FastKw();
 for (let t = 0; t <= 30000; t += 100) { const [d, r] = needleAt(t); g.needle(d, r, t); if (t % 1000 === 0 && t) g.reading(realAt(t - 250), t); }
 g.needle(90, 0, 30100);
 ok(Math.abs(g.now(30100) - (A * 90 + C)) < 2, 'full pedal: ' + g.now(30100).toFixed(1) + ' kW at once');
-ok(g.now(30100 + 2000) === null, 'no needle for 2 s: no fast value (the readings shown)');
+ok(g.now(30100 + 20000) !== null, 'the needle unchanged for 20 s (sent only as it changes): still the fast value');
+ok(g.now(30100 + HOLD_MS + 1) === null, 'no needle for ' + HOLD_MS / 1000 + ' s: no fast value (the readings shown)');
+
+// the needle sent only as it changes, as the car does: a steady cruise still has the fast value, on the readings
+const h = new FastKw();
+let last = null;
+const errCruise = [];
+for (let t = 0; t <= 180000; t += 100) {
+    const [d, r] = needleAt(t);
+    if (!last || last[0] !== d || last[1] !== r) { h.needle(d, r, t); last = [d, r]; }
+    h.ac(acAt(t));
+    if (t % 1000 === 0 && t > 0) h.reading(realAt(t - 250), t);
+    if (t > 90000 && (t / 1000) % 20 >= 12) { const v = h.now(t); errCruise.push(v === null ? Infinity : Math.abs(v - realAt(t))); }
+}
+ok(mean(errCruise) < 0.5, 'steady cruise with a quiet needle: off by ' + mean(errCruise).toFixed(2) + ' kW');
 console.log('fast kW: ' + checks + ' checks, ' + fails + ' failed');
 process.exit(fails ? 1 : 0);

@@ -31,7 +31,8 @@ const { Strobe, gateChecks, gateWhy } = require('./strobe');
 const { Lever, beamOf } = require('./lever');
 const Parked = require('./kit/parked');
 const { t: translate } = require('./kit/i18n');
-const { drawCabin } = require('./cabin');
+const { legendMark } = require('./cabin');
+const { drawCarView, MAX_PITCH, MAX_ROLL } = require('./carview');
 const { sample } = require('./lin');
 const S = require('./scenes');
 
@@ -45,6 +46,7 @@ const RING = { cx: 290, cy: 288, R: 186, r: 136 }, DIAL = { cx: 655, cy: 400, R:
 const ON_BY_DEFAULT = ['follow', 'flashAlerts'];
 const MOVE_DRAW_MS = 250;            // a moving scene's picture: at most 4 a second
 const FIND_LATER_MS = 5000;          // lights known from an earlier start: read again once the first colour is out
+const FAULT_RECHECK_MS = 30000;      // a light faulty at the search: read again this long after our colour is on
 const IDLE_MS = 15 * 60000;          // without the car's own state: not driven nor the app used this long = parked and left
 /* The car's turn signals (Light.StatusFunctionsIndicators activeFunctionIndicateDirection, by name or number): the
  * driver's (held or tapped), the driving assistant's, and the hazards; the lock and alarm flashes are none. */
@@ -103,6 +105,16 @@ async function background(bg) {
     };
     const find = () => lights.find().then(counted).then((l) => { if (!l.length) again(); }, (e) => { log.warn('lights: ' + e); again(); });
     setTimeout(find, lights.lights.length ? FIND_LATER_MS : 0);
+    // a light read as faulty at the search may only have been off (IterioDev's Comfort 0.6.5: an M8's footwells read
+    // "faulty" with the car off and clean later): read once more FAULT_RECHECK_MS after our colour is on, once a start
+    let faultCheck = null;
+    lights.on('change', () => {
+        if (faultCheck || lights.state !== 'ours' || !lights.lights.some((l) => l.fault)) return;
+        faultCheck = setTimeout(() => {
+            log.info('lights: ' + lights.lights.filter((l) => l.fault).map((l) => l.name).join(', ') + ' reported a fault at the search: read again, the lights on');
+            find();
+        }, FAULT_RECHECK_MS);
+    });
     signals.watch('de.bmw.infotainment.vehicle.Vehicle', '1', {
         statusDayNightChangeOver: (v) => {
             const x = v && typeof v === 'object' ? v.dayNightChangeOver : v, c = typeof x === 'string' ? DAY_NIGHT[x] : x;
@@ -254,6 +266,11 @@ mgu.run({
         const partColour = (l) => (part === 'lower' ? l.lower : l.upper);
         const shown = () => (lights.lights.length ? lights.lights : sample());
         const rhd = () => settings.get('drive') === 'rhd';
+        // the car's picture on the Colour and Animations tabs, and how a finger has turned it (carview.js): leaned back
+        // (pitch) and turned about its length (roll), the nose always up
+        const CAR_BOX = [{ x: 790, y: 92, w: 330, h: 404 }, { x: 700, y: 92, w: 420, h: 404 }];
+        const carView = { pitch: 0, roll: 0 };
+        const carAt = (x, y) => page <= 1 && x >= CAR_BOX[page].x && x < CAR_BOX[page].x + CAR_BOX[page].w && y >= CAR_BOX[page].y && y < CAR_BOX[page].y + CAR_BOX[page].h;
         // (a tap: the app in use - the car is not left, also for a car that does not say so)
         const redraw = () => { dirty = true; if (active) active(); return render(); };
 
@@ -333,18 +350,24 @@ mgu.run({
 
             G.panel(cv, t, 776, 44, 800, 468, editing ? MODE_NAMES[editing] + ' will look' : 'In the car');
             if (lights.state === 'none' && !editing) return drawBmwColours(cv, t);
-            drawCabin(cv, t, { x: 790, y: 92, w: 330, h: 404 }, shown(), pictureOf(carNow, l), { rhd: rhd() });
+            drawCarView(cv, t, CAR_BOX[0], shown(), pictureOf(carNow, l), Object.assign({ rhd: rhd() }, carView));
             const x = 1150;
-            [['Upper', l.upper], ['Lower', l.lower]].forEach(([n, v], i) => {
-                cv.roundRect(x, 104 + i * 40, 26, 26, 7, v.rgb);
-                cv.text(n + ': ' + nearest(v.rgb) + ', ' + v.bright + '%', x + 38, 124 + i * 40, 20, t.text);
-            });
+            legend(cv, t, x, l, true);
             if (editing) return editBar(cv, t, x);
             G.button(cv, t, x, 210, 268, 48, 'Original colour', () => { control.carColour(); return redraw(); }, { primary: !control.on(), key: 'car' });
             G.button(cv, t, x, 270, 268, 48, 'Save favourite', () => { control.saveFav(); return redraw(); }, { key: 'save' });
             status(cv, t, x, 352);
         }
 
+        // the key to the car's picture: each part's mark, its colour (and brightness), where its lights are
+        function legend(cv, t, x, l, bright) {
+            [['upper', 'Upper', l.upper, 'Dash and door lines'], ['lower', 'Lower', l.lower, 'Footwells, door pockets and handles']].forEach(([k, n, v, where], i) => {
+                const y = 100 + i * 46;
+                legendMark(cv, k, x, y + 12, v.rgb);
+                cv.text(n + ': ' + nearest(v.rgb) + (bright ? ', ' + v.bright + '%' : ''), x + 40, y + 19, 20, t.text);
+                cv.text(where, x + 40, y + 37, 15, t.dim);
+            });
+        }
         // changing a driving mode's look: which mode, and Done back to the Driving modes tab
         function editBar(cv, t, x) {
             cv.text('Changing ' + MODE_NAMES[editing] + '\'s look', x, 222, 22, t.text, { font: 'bold' });
@@ -377,19 +400,15 @@ mgu.run({
                 cv.text(d, 284, y + 32, 20, on ? t.text : t.dim);
             });
             cv.text('Speed', 44, 470, 20, t.dim);
-            [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']].forEach(([v, n], i) => {
-                G.button(cv, t, 120 + i * 150, 440, 136, 48, n, () => { setLook({ speed: v }); return redraw(); }, { primary: (l.speed || 2) === v, key: 'sp-' + v });
-            });
+            G.segment(cv, t, 120, 440, 436, 48, [[1, 'Slow'], [2, 'Normal'], [3, 'Fast']]
+                .map(([v, n]) => ({ label: n, run: () => { setLook({ speed: v }); return redraw(); }, on: (l.speed || 2) === v, key: 'sp-' + v })));
 
             G.panel(cv, t, 678, 44, 898, 468, editing ? MODE_NAMES[editing] + ' will look' : 'In the car');
             // the picture shows the animation picked even before the car has answered
             const preview = (x) => (lights.scene ? lights.at(x) : control.on() ? S.lightAt(l, x, Date.now() - T0) : null);
-            drawCabin(cv, t, { x: 700, y: 92, w: 420, h: 404 }, shown(), pictureOf(preview, l), { rhd: rhd() });
+            drawCarView(cv, t, CAR_BOX[1], shown(), pictureOf(preview, l), Object.assign({ rhd: rhd() }, carView));
             const x = 1150;
-            [['Upper', l.upper], ['Lower', l.lower]].forEach(([n, v], i) => {
-                cv.roundRect(x, 104 + i * 40, 26, 26, 7, v.rgb);
-                cv.text(n + ': ' + nearest(v.rgb), x + 38, 124 + i * 40, 20, t.text);
-            });
+            legend(cv, t, x, l, false);
             cv.text('Colours: on the Colour tab', x, 214, 18, t.dim);
             if (editing) return editBar(cv, t, x);
             G.button(cv, t, x, 240, 0, 48, 'Original colour', () => { control.carColour(); return redraw(); }, { primary: !control.on(), key: 'car2' });
@@ -621,16 +640,27 @@ mgu.run({
         // a finger on the ring or the dial: the colour or the brightness follows it while it moves, sent to the lights at
         // most every DRAG_MS and once more where it lets go (a tap: there at once)
         const DRAG_MS = 120;
-        let drag = null;                                    // { what: 'ring' | 'dial', at, x, y, timer }
+        let drag = null;                                    // { what: 'ring' | 'dial' | 'car', at, x, y, timer }
         const dragApply = () => {
             if (!drag) return null;
             drag.at = Date.now(); clearTimeout(drag.timer); drag.timer = null;
+            if (drag.what === 'car') {
+                // a finger across turns the car about its length, up and down leans it back; it stays as left
+                carView.roll = Math.max(-MAX_ROLL, Math.min(MAX_ROLL, drag.r0 + (drag.x - drag.x0) * 0.25));
+                carView.pitch = Math.max(0, Math.min(MAX_PITCH, drag.p0 + (drag.y - drag.y0) * 0.25));
+                return redraw();
+            }
             return drag.what === 'ring' ? setRgb(S.hsv(hueAt(drag.x, drag.y), 1, 1)) : setBright(brightAt(drag.x, drag.y));
         };
         if (ctx.onTouch) {
             ctx.onTouch((phase, x, y) => {
                 if (phase === 1) {
                     drag = null;
+                    // the car's picture, where it shows (not over the body module's colour buttons)
+                    if (carAt(x, y) && (page === 1 || lights.state !== 'none' || editing)) {
+                        drag = { what: 'car', at: 0, x, y, x0: x, y0: y, r0: carView.roll, p0: carView.pitch, timer: null };
+                        return true;
+                    }
                     if (page !== 0) return false;
                     const what = ringAt(x, y) ? 'ring' : dialAt(x, y) ? 'dial' : null;
                     if (!what) return false;
