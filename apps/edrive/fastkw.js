@@ -23,6 +23,9 @@
  */
 const LAG_MS = 250;          // a reading arrives this long after the battery measured it (request and answer)
 const HOLD_MS = 30000;       // the needle holds this long after the last one sent (it is sent as it changes)
+const LEARN_MS = 1500;       // a reading is learned only against a needle sent this recently (a held one teaches nothing)
+const P_MAX = 50;            // the fit's uncertainty at most this (anti-windup: a share that stays still never grows it)
+const KW_MAX = 400;          // a fast value past this (either way) is no value: the readings are shown
 const KEEP_MS = 4000;        // needle history kept (to match readings that arrive late; the last one always)
 const OFFSET_K = 0.3;        // the offset follows each reading's gap this much
 const MIN_FIT = 4;           // readings learned before a fast value is given
@@ -52,17 +55,19 @@ class FastKw {
 
     ac(kw) { this.acKw = isNum(kw) && kw > 0 ? kw : 0; }
 
-    /** The needle as it was at t (the last one sent before it), or null. */
-    at(t) {
+    /** The needle as it was at t (the last one sent before it, at most within ms), or null. */
+    at(t, ms) {
         let best = null;
         for (const h of this.hist) { if (h[0] <= t) best = h; else break; }
-        return best && t - best[0] < HOLD_MS ? best : null;
+        return best && t - best[0] < (ms || HOLD_MS) ? best : null;
     }
 
     /** A battery reading (kW, + the battery gives power) that arrived at t: learned against the needle then. */
     reading(kw, t) {
         if (!isNum(kw)) return;
-        const h = this.at(t - this.lag);
+        // learned only against a needle just sent: one held through a steady cruise or a stop says nothing new, and
+        // learning from it again and again would wind the fit up
+        const h = this.at(t - this.lag, LEARN_MS);
         if (!h) return;
         const x = [h[1], -h[2], 1], y = kw - this.acKw;
         const Px = this.P.map((r) => r[0] * x[0] + r[1] * x[1] + r[2] * x[2]);
@@ -71,6 +76,11 @@ class FastKw {
         const e = y - (this.theta[0] * x[0] + this.theta[1] * x[1] + this.theta[2] * x[2]);
         this.theta = this.theta.map((v, i) => v + k[i] * e);
         this.P = this.P.map((r, i) => r.map((v, j) => (v - k[i] * Px[j]) / FORGET));
+        // anti-windup: a share that has not moved (no recuperation on a long cruise) keeps its uncertainty bounded, so
+        // the first time it moves cannot throw the fit off
+        const big = Math.max(this.P[0][0], this.P[1][1], this.P[2][2]);
+        if (big > P_MAX) this.P = this.P.map((r) => r.map((v) => v * P_MAX / big));
+        if (!this.theta.every(isFinite)) this.reset();
         // a full needle is never less than nothing; keeps a wild early reading from turning the gauge round
         this.theta[0] = Math.max(0.05, this.theta[0]); this.theta[1] = Math.max(0, this.theta[1]);
         this.err = this.err === null ? Math.abs(e) : this.err * 0.8 + Math.abs(e) * 0.2;
@@ -84,7 +94,15 @@ class FastKw {
         if (this.n < MIN_FIT || !this.hist.length) return null;
         const h = this.hist[this.hist.length - 1];
         if (t - h[0] > HOLD_MS) return null;
-        return this.theta[0] * h[1] - this.theta[1] * h[2] + this.acKw + this.theta[2] + this.off;
+        const kw = this.theta[0] * h[1] - this.theta[1] * h[2] + this.acKw + this.theta[2] + this.off;
+        return isFinite(kw) && Math.abs(kw) <= KW_MAX ? kw : null;
+    }
+
+    /** Learning from the start again (the fit went wrong). */
+    reset() {
+        this.theta = [1, 0.6, 0.8];
+        this.P = [[4, 0, 0], [0, 4, 0], [0, 0, 4]];
+        this.n = 0; this.err = null; this.off = 0;
     }
 
     get fit() { return { a: this.theta[0], b: this.theta[1], c: this.theta[2], n: this.n, err: this.err }; }
