@@ -240,7 +240,7 @@ module.exports = function live(ctx, sh) {
      * last minute (useNow). This is what "range at this rate" on the Energy page divides by. */
     const USE_KM = 10, NOW_S = 60, useNow = [];
     const KW_KEEP = 15000;           // a missed power read: the last value stays (dimmed) this long
-    function onPower(kw, now) {
+    function onPower(kw, now, taken) {
         // a gap in the power readings while shown: say how many were missed and how often the link was held
         if (live.kwT && now - live.kwT > 3000 && shown()) log.warn('power gap ' + (now - live.kwT) + ' ms' + (pMiss ? ', ' + pMiss + ' missed so far' : '') + ', stalls ' + (exclusive.stalls || 0));
         if (live.kwT && G.isNum(live.kw)) {
@@ -267,7 +267,7 @@ module.exports = function live(ctx, sh) {
         }
         trip.peakOut = Math.max(trip.peakOut, kw);
         if (G.isNum(L.speed) && L.speed > 1) trip.peakIn = Math.max(trip.peakIn, -kw);
-        fast.ac(L.acKw); fast.reading(kw, now);
+        fast.ac(L.acKw); fast.reading(kw, now, taken);
         live.kw = kw; live.kwT = now;
         push(trace, TRACE_S, kw);
         learnBaseline(kw, now);
@@ -329,7 +329,9 @@ module.exports = function live(ctx, sh) {
                 const a = r[fieldsOf(cfg.fast.hvI[pick.hvI])[0]], now = Date.now();
                 live.a = a;
                 const volts = live.vT && now - live.vT < 60000 ? live.v : L.lscVT && now - L.lscVT < 60000 ? L.lscV : estV();
-                if (G.isNum(volts) && G.isNum(a)) onPower(volts * a / 1000 * (cfg.powerSign < 0 ? -1 : 1), now);
+                // the battery measured it while its request was out: the middle of the read, not its end (a read takes
+                // half a second and more)
+                if (G.isNum(volts) && G.isNum(a)) onPower(volts * a / 1000 * (cfg.powerSign < 0 ? -1 : 1), now, (iTry + now) / 2);
             } catch (e) { log.warn('power: ' + e); }
         }, true, 'power');
     }

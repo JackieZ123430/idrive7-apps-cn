@@ -79,5 +79,12 @@ for (let t = 0; t <= 45 * 60000; t += 100) {
 ok(worst < 20, '45 minutes without recuperation, then a regen: never further off than 20 kW (' + worst.toFixed(1) + ')');
 ok(new FastKw().now(0) === null && (() => { const z = new FastKw(); z.theta = [1e9, 0, 0]; z.n = 9; z.needle(50, 0, 0); return z.now(0) === null; })(),
     'a fast value past 400 kW is none (the readings shown)');
+// slow reads (taken 700 ms before they arrive, the time the caller passes): learned against the needle then
+const q = new FastKw();
+for (let t = 0; t <= 120000; t += 100) {
+    const [d, r] = needleAt(t); q.needle(d, r, t);
+    if (t % 1000 === 0 && t > 0) q.reading(realAt(t - 700), t, t - 700);
+}
+ok(Math.abs(q.fit.a - A) < 0.05 && Math.abs(q.fit.b - B) < 0.05, 'reads taken 700 ms early, said so: learned the car (' + q.fit.a.toFixed(2) + ' / ' + q.fit.b.toFixed(2) + ')');
 console.log('fast kW: ' + checks + ' checks, ' + fails + ' failed');
 process.exit(fails ? 1 : 0);

@@ -18,7 +18,7 @@
  * few readings have been learned, or with no needle for HOLD_MS, there is no fast value and the readings are shown.
  *
  *   const f = new FastKw();
- *   f.needle(drive, recup, t)   f.ac(kw)   f.reading(kw, t)
+ *   f.needle(drive, recup, t)   f.ac(kw)   f.reading(kw, t, taken)
  *   f.now(t) -> kW | null        f.fit -> { a, b, c, n, err }
  */
 const LAG_MS = 250;          // a reading arrives this long after the battery measured it (request and answer)
@@ -62,12 +62,13 @@ class FastKw {
         return best && t - best[0] < (ms || HOLD_MS) ? best : null;
     }
 
-    /** A battery reading (kW, + the battery gives power) that arrived at t: learned against the needle then. */
-    reading(kw, t) {
+    /** A battery reading (kW, + the battery gives power) that arrived at t: learned against the needle when the battery
+     *  measured it - taken (the middle of its request, when the caller knows it), else LAG_MS before it arrived. */
+    reading(kw, t, taken) {
         if (!isNum(kw)) return;
         // learned only against a needle just sent: one held through a steady cruise or a stop says nothing new, and
         // learning from it again and again would wind the fit up
-        const h = this.at(t - this.lag, LEARN_MS);
+        const h = this.at(isNum(taken) && taken <= t ? taken : t - this.lag, LEARN_MS);
         if (!h) return;
         const x = [h[1], -h[2], 1], y = kw - this.acKw;
         const Px = this.P.map((r) => r[0] * x[0] + r[1] * x[1] + r[2] * x[2]);
