@@ -2,7 +2,7 @@
   "id": "ambient_config",
   "title": "Ambient config",
   "description": "Any colour on the ambient light, animations, and a look for each driving mode",
-  "version": "2.7.13",
+  "version": "2.7.23",
   "vendor": "custom",
   "loggingId": "OAA4",
   "iconGlyph": "ambient",
@@ -101,6 +101,13 @@
       "type": "bool",
       "default": false,
       "hidden": true
+    },
+    {
+      "key": "decorWith",
+      "label": "Decor lights (dash, under the door trim) with",
+      "type": "choice",
+      "default": "upper",
+      "options": [["upper", "Upper lights"], ["lower", "Lower lights (like BMW)"]]
     },
     {
       "key": "nightDim",

@@ -2606,3 +2606,39 @@ Small	Pequeño
 The app's log as codes to photograph	El registro de la app como códigos para fotografiar
 IterioDev's Comfort tool is running: it writes the ambient lights too, so the colours jump between the two apps	La herramienta Comfort de IterioDev está en marcha: también escribe en la luz ambiente, así que los colores saltan entre las dos apps
 IterioDev's Comfort tool is no longer running	La herramienta Comfort de IterioDev ya no está en marcha
+Standing launch	Salida parada
+Rolling start	Salida lanzada
+Standing launch (rollout)	Salida parada (rollout)
+STANDING LAUNCH (rollout)	SALIDA PARADA (ROLLOUT)
+Rolling windows	Tramos lanzados
+TRAP	VEL. FINAL
+SLOPE	PENDIENTE
+RUN	PASADA
+ACCELERATE PAST	ACELERA Y SUPERA
+SLOW DOWN TO ARM	REDUCE PARA ARMAR
+Accelerate through a window	Acelera a través de un tramo
+WHEELSPIN	PATINAJE
+SPIN	PATIN.
+DOWNHILL	CUESTA ABAJO
+CUSTOM: "TO" MUST BE ABOVE "FROM"	PROPIO: "HASTA" DEBE SUPERAR "DESDE"
+No runs yet - launch from a stop or accelerate through a rolling window.	Aún no hay pasadas - sal desde parado o acelera a través de un tramo lanzado.
+1/2 mile	1/2 de milla
+Longest distance	Distancia máxima
+Downhill limit for best times	Límite de bajada para récords
+Custom speed window	Tramo de velocidad propio
+Custom window from (km/h or mph)	Tramo propio desde (km/h o mph)
+Custom window to (km/h or mph)	Tramo propio hasta (km/h o mph)
+250-300 km/h window (160-190 mph)	Tramo 250-300 km/h (160-190 mph)
+STANDING LAUNCH	SALIDA PARADA
+ROLLING START	SALIDA LANZADA
+VALID RUN	PASADA VÁLIDA
+INVALID RUN	PASADA NO VÁLIDA
+ROLLOUT	ROLLOUT
+NO SLOPE	SIN PENDIENTE
+ELEVATION	DESNIVEL
+NO AIR DATA	SIN DATOS DEL AIRE
+DA	AD
+Outside air with each run	Aire exterior en cada pasada
+Show (pressure from the engine unit)	Mostrar (presión de la unidad del motor)
+Show, times corrected to standard air (SAE J1349)	Mostrar, tiempos corregidos a aire estándar (SAE J1349)
+Off (no engine unit requests)	Desactivado (sin consultas a la unidad del motor)

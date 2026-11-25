@@ -83,10 +83,23 @@ class GearGuess {
         let c = this.cl.find((x) => Math.abs(x.k - k) / x.k < 0.05);
         if (!c) { if (this.cl.length > 24) this.cl.sort((a, b) => b.n - a.n).pop(); c = { k, n: 0 }; this.cl.push(c); }
         c.n++; c.k += (k - c.k) / Math.min(c.n, 50);
+        if (c.n > 30 && c.age !== 0) { c.age = 0; this.changed = true; }
         const gears = this.cl.filter((x) => x.n > 30).sort((a, b) => b.k - a.k);
         const i = gears.findIndex((x) => Math.abs(x.k - k) / x.k < 0.05);
         return i < 0 ? null : i + 1;
     }
+    /** The gears learned on earlier drives (save()'s list): each counts at once, so a gear is numbered right
+     * before the lower ones were used this drive (a manual: the car sends no gear). One not used for 5 drives
+     * is dropped (a ratio from a slipping clutch, a changed final drive). */
+    load(list) {
+        if (!Array.isArray(list)) return;
+        list.forEach((x) => {
+            if (!x || !(x.k > 0) || !isFinite(x.k) || this.cl.length > 24) return;
+            const age = (Number(x.age) || 0) + 1;
+            if (age <= 5) this.cl.push({ k: x.k, n: 31, age });
+        });
+    }
+    save() { this.changed = false; return this.cl.filter((x) => x.n > 30).map((x) => ({ k: Math.round(x.k * 1e4) / 1e4, age: x.age || 0 })); }
 }
 
 class Car {
@@ -97,6 +110,7 @@ class Car {
         this.live = {}; this.lastCar = 0; this.listeners = [];
         this.sim = new Sim(); this.simData = this.sim.sample();
         this.demoActive = false; this.guess = new GearGuess();
+        this._gearFile();
         const sc = (k, raw) => {
             const c = this.S[k];
             if (!c || raw === undefined || raw === null || raw === c.invalid || (c.invalidFrom !== undefined && raw >= c.invalidFrom)) return null;
@@ -123,15 +137,20 @@ class Car {
             add('de.bmw.infrastructure.VehicleInformation', 'statusGearboxDrive', (v) => {
                 const g = gearOf(v.statusActualGearDrive), s = stageOf(v.statusActualStageDrive);
                 if (s !== undefined) put('stage', s);
-                if (g !== undefined) put('gear', g);
+                if (g !== undefined) { put('gear', g); this.selOwns = false; }
             });
             const selSeen = [];
             add('de.bmw.infrastructure.VehicleInformation', 'DataPowerTrain2', (v) => {
                 const raw = v && v.statusGearSelectionDrive, sel = selectionOf(raw);
                 if (selSeen.length < 12 && selSeen.indexOf(String(raw)) < 0) { selSeen.push(String(raw)); this.log.info('gear selection: ' + JSON.stringify(raw)); }
-                if (!sel) return;
+                if (!sel) {
+                    // no value ("INITIALISIERUNG"): a manual sends "R" with reverse in and this otherwise, so the
+                    // R it sent last no longer holds (issue #209); the gear then comes from the rpm and speed
+                    if (this.selOwns) { delete this.live.stage; delete this.live.gear; this.selOwns = false; }
+                    return;
+                }
                 if (sel.stage !== undefined) put('stage', sel.stage);
-                put('gear', sel.gear);
+                put('gear', sel.gear); this.selOwns = true;
             });
         }
         // (conditionKnown: false while the car's last state was one this table doesn't know, "no value" 15 among them;
@@ -171,6 +190,18 @@ class Car {
         }, 50);
     }
 
+    /** The learned gears kept in the app's data folder (gear_ratios.json): loaded now, saved a minute after one is new. */
+    _gearFile() {
+        if (!this.ctx.dataDir) return;
+        const fs = require('fs'), file = require('path').join(this.ctx.dataDir, 'gear_ratios.json');
+        try { this.guess.load(JSON.parse(fs.readFileSync(file, 'utf8')).gears); } catch (e) { /* none yet */ }
+        const t = setInterval(() => {
+            if (!this.guess.changed) return;
+            try { fs.writeFileSync(file, JSON.stringify({ gears: this.guess.save() })); } catch (e) { this.log.warn('gear ratios: ' + e.message); }
+        }, 60000);
+        if (t.unref) t.unref();
+    }
+
     /** Has the car answered: a value arrived, or a signal's provider is available. */
     carPresent() { return this.lastCar > 0 || this.subs.some((s) => s.available); }
 
@@ -200,5 +231,6 @@ class Car {
 Car.SIGNALS = SIGNALS;
 Car.GearGuess = GearGuess;
 Car.selectionOf = selectionOf;
+Car.gearOf = gearOf;
 Car.conditionOf = conditionOf;
 module.exports = Car;

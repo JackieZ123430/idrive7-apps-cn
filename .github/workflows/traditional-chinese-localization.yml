@@ -1,0 +1,37 @@
+name: Traditional Chinese localization
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: traditional-chinese-localization-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  traditional-chinese-tests:
+    name: Traditional Chinese translations and fonts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install catalog checker dependency
+        run: python3 -m pip install opencc-python-reimplemented==0.1.7
+      - name: Check Traditional Chinese catalog matches editable TSV
+        run: |
+          python3 kit/tools/sync_locales.py zh-TW
+          git diff --exit-code -- kit/runtime/locales/zh-TW.json
+      - name: Check Traditional Chinese layouts, catalog and glyph coverage
+        run: python3 kit/tools/test_zh_TW.py
+      - name: Check Traditional Chinese preview and GPU atlas pieces
+        run: node kit/tools/test_zh_TW.js

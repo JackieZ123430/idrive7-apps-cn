@@ -624,15 +624,13 @@ mgu.run({
                 });
             });
         }
-        /** One row of choice buttons: label, then [value, text] options; the current one filled. */
+        /** One row of choices: label, then [value, text] options in one bar to its column's end (the left one's: RX - 40,
+         *  the right one's: the page's), the current one filled. */
         function choiceRow(cv, t, y, label, key, cur, options, disabled, x0, lw) {
             cv.text(label, x0 ? x0 : 40, y + 27, 18, t.dim, { font: 'bold', spacing: 1 });
-            let x = (x0 || 40) + (lw || (x0 ? 120 : 160));
-            options.forEach((op) => {
-                const w = G.button(cv, t, x, y, 0, 40, op[1], () => { (studio.P || settings).set(key, op[0]); return render(); },
-                    { key: 'studio_' + key + '_' + op[0], primary: op[0] === cur, busy: disabled });
-                x += (w || 160) + 12;
-            });
+            const x = (x0 || 40) + (lw || (x0 ? 120 : 160)), end = x0 ? 1576 : 800;
+            G.segment(cv, t, x, y, end - x, 40, options.map((op) => ({ label: op[1], run: () => { (studio.P || settings).set(key, op[0]); return render(); },
+                on: op[0] === cur, busy: disabled, key: 'studio_' + key + '_' + op[0] })));
         }
         function drawLooks(cv, t) {
             const now = Date.now();
@@ -728,7 +726,7 @@ mgu.run({
             panels.forEach((pn) => {
                 const sel = studio.panel === pn[0], w = cv.textWidth(pn[1], 20, { font: 'bold', spacing: 2 });
                 cv.text(pn[1], tx, 388, 20, sel ? t.text : t.dim, { font: 'bold', spacing: 2 });
-                if (sel) cv.fillRect(tx - 4, 395, w + 8, 4, t.accent);
+                if (sel) cv.roundRect(tx + w / 2 - 16, 394, 32, 3, 1.5, t.sel || t.accent);
                 cv.target(tx - 16, 362, w + 32, 40, () => { studio.panel = pn[0]; return render(); }, 'studio_tab_' + pn[0]);
                 tx += w + 48;
             });
@@ -854,13 +852,14 @@ mgu.run({
          */
         function segmented(cv, t, x, y, options, cur, pick, key) {
             const h = 36, fs = 14, f = { font: 'bold', spacing: 1 };
-            const ws = options.map((op) => Math.round(cv.textWidth(op[1].toUpperCase(), fs, f)) + 36), total = ws.reduce((a, b) => a + b, 0);
-            cv.roundRect(x, y, total, h, h / 2, withAlpha('#ffffff', 0.06));
-            cv.strokeRoundRect(x, y, total, h, h / 2, 1.5, withAlpha('#ffffff', 0.16));
+            const ws = options.map((op) => Math.round(cv.textWidth(op[1].toUpperCase(), fs, f)) + 40), total = ws.reduce((a, b) => a + b, 0);
+            const S = t.sel || t.accent;
+            cv.roundRect(x, y, total, h, 10, withAlpha('#000000', 0.45));
+            cv.strokeRoundRect(x, y, total, h, 10, 1, withAlpha('#ffffff', 0.1));
             options.forEach((op, i) => {
                 const sel = op[0] === cur;
-                if (sel) cv.roundRect(x + 3, y + 3, ws[i] - 6, h - 6, (h - 6) / 2, withAlpha('#ffffff', 0.9));
-                cv.text(op[1].toUpperCase(), x + ws[i] / 2, y + h / 2 + 5, fs, sel ? '#000000' : t.dim, Object.assign({ align: 'center' }, f));
+                if (sel) cv.roundRect(x + 3, y + 3, ws[i] - 6, h - 6, 8, S);
+                cv.text(op[1].toUpperCase(), x + ws[i] / 2, y + h / 2 + 5, fs, sel ? G.onColour(S) : t.dim, Object.assign({ align: 'center' }, f));
                 cv.target(x, y, ws[i], h, () => { pick(op[0]); return render(); }, key + op[0]);
                 x += ws[i];
             });
@@ -868,8 +867,8 @@ mgu.run({
         }
         /**
          * On / off switches at y, after a section label: [label, on, flip]. Drawn as switches, not like
-         * the choice buttons: a green LED dot lit when on (an empty ring when off), the chip tinted and
-         * outlined bright when on, dim when off, so on / off reads at a glance.
+         * the choice bars: a green LED dot lit when on (an empty ring when off), the chip tinted in the
+         * theme's colour with a faint glow when on, dim when off, so on / off reads at a glance.
          */
         const SWITCH_ON = '#2ee66b';
         function switches(cv, t, y, label, list, x0) {
@@ -877,8 +876,11 @@ mgu.run({
             let x = x0 ? x0 + (label ? 150 : 0) : 200;
             list.forEach((c, i) => {
                 const on = !!c[1], txt = c[0], w = cv.textWidth(txt, 18, { font: 'bold' }) + 64, h = 40;
-                if (on) cv.roundRect(x, y, w, h, h / 2, withAlpha(t.accent, 0.16));
-                cv.strokeRoundRect(x, y, w, h, h / 2, 2, on ? t.accent : withAlpha('#ffffff', 0.3));
+                const S = t.sel || t.accent;
+                if (on) cv.roundRect(x - 3, y - 3, w + 6, h + 6, 13, withAlpha(S, 0.14));
+                cv.roundRect(x, y, w, h, 10, withAlpha('#ffffff', 0.09));
+                if (on) cv.roundRect(x, y, w, h, 10, withAlpha(S, 0.22));
+                cv.strokeRoundRect(x, y, w, h, 10, 1.5, on ? withAlpha(S, 0.75) : withAlpha('#ffffff', 0.2));
                 // the dot is a little LED: lit green when on, an empty ring when off
                 if (on) { cv.circle(x + 22, y + h / 2, 11, withAlpha(SWITCH_ON, 0.25)); cv.circle(x + 22, y + h / 2, 7, SWITCH_ON); } else cv.arc(x + 22, y + h / 2, 5.5, 7.5, 0, 360, withAlpha('#ffffff', 0.45));
                 cv.text(txt, x + 40, y + 27, 18, on ? t.text : t.dim, { font: 'bold' });

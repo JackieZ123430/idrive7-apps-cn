@@ -506,7 +506,7 @@ def make_icon(spec, out):
 WIDGET_COMPONENT_ID = 501
 
 
-def build_start_widget(spec, app_id, icon_src, out, pkg_out=None):
+def build_start_widget(spec, app_id, icon_src, out, pkg_out=None, language='en'):
     """app.json "startWidget" -> rhmiDataStartWidget/ (installed format), the home-screen widget.
 
     With pkg_out, also the package format inside source/ (application.json with uiDescriptions
@@ -552,7 +552,8 @@ def build_start_widget(spec, app_id, icon_src, out, pkg_out=None):
                                              'SelectionIcon': {'value': icon, 'type': 'ResourceId'}}}}}}}
     json.dump(ui, open(os.path.join(out, 'uiDescription', 'uiDescription.json'), 'w', encoding='utf-8', newline='\n'), indent=1)
     widget_strings = {sid_name: name}
-    widget_strings.update({'SID_CN_DYNAMIC_%04d' % n: '' for n in range(256)})
+    if language == 'zh-CN':
+        widget_strings.update({'SID_CN_DYNAMIC_%04d' % n: '' for n in range(256)})
     for lang in LANGS:
         json.dump(widget_strings, open(os.path.join(out, 'strings', lang + '.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
     shutil.copy(icon_src, os.path.join(out, 'resources', icon))
@@ -690,6 +691,11 @@ def build(app_id, language='en', preview_only=False):
             p = os.path.join(src, 'javascript', 'kit', 'locales', name)
             if os.path.exists(p):
                 os.remove(p)
+    if language != 'zh-TW':
+        for name in ('zh-TW.json', 'zh-TW.tsv'):
+            p = os.path.join(src, 'javascript', 'kit', 'locales', name)
+            if os.path.exists(p):
+                os.remove(p)
     if language == 'ru':
         shutil.copy(os.path.join(KIT, 'localization', 'fonts', 'cyrillic-ru.json'),
                     os.path.join(src, 'javascript', 'kit', 'fonts', 'cyrillic.json'))
@@ -706,6 +712,11 @@ def build(app_id, language='en', preview_only=False):
         for name in ('korean.json', 'OFL-NotoSansKR.txt'):
             shutil.copy(os.path.join(KIT, 'localization', 'fonts', name),
                         os.path.join(src, 'javascript', 'kit', 'fonts', name))
+    if language == 'zh-TW':
+        fonts = os.path.join(src, 'javascript', 'kit', 'fonts')
+        # Keep the cjk family so the runtime splits this tall atlas into GPU pieces.
+        for name, target in (('cjk-zh-TW.json', 'cjk.json'), ('OFL-NotoSansTC.txt', 'OFL-NotoSansTC.txt')):
+            shutil.copy(os.path.join(KIT, 'localization', 'fonts', name), os.path.join(fonts, target))
     if language == 'zh-CN':
         # Diagnostic glyphs are Chinese-only; keep the English runtime atlas intact.
         if app_id == 'dtc_scanner':
@@ -785,7 +796,7 @@ def build(app_id, language='en', preview_only=False):
     shutil.copy(os.path.join(pr, 'variantGroups', 'Common', 'images', icon), os.path.join(ir, 'resources', icon))
     if spec.get('startWidget'):
         info = build_start_widget(spec, app_id, os.path.join(ir, 'resources', icon), os.path.join(stage, 'rhmiDataStartWidget'),
-                                  os.path.join(src, 'rhmiDataStartWidget'))
+                                  os.path.join(src, 'rhmiDataStartWidget'), language=language)
         print('  home-screen widget: %s (%s)' % (info['component'], info['layout']))
 
     # --- installer helpers + metadata ---

@@ -38,6 +38,11 @@ ok(S.stepHue(0, -15) === 345 && S.stepHue(345, 15) === 0, '< from red wraps to 3
 const bus1 = L.parseStatus(0, reply([0xda, 0x5f], [0x0f, 0x0e, 0x0c], 1));
 ok(bus1.length === 3 && bus1[2].nad === 3 && bus1[2].name === 'Passenger front door line' && bus1[2].part === 'upper' && bus1[1].part === 'lower', 'status: lights, places, upper / lower');
 ok(bus1[0].rgb.join() === '120,60,254' && bus1[0].bright === 100 && bus1[1].fault && !bus1[0].fault, 'status: colour read red, green, blue; a fault');
+// #182: BDC_G11 (G30) names doors and dash by height: 0x0A / 0x11 / 0x14 / 0x16 / 0x18 its lower strips
+const g11 = L.parseStatus(0, reply([0xda, 0x5f], [0x0a, 0x11, 0x14, 0x16, 0x18, 0x13, 0x05]), L.BDC_G11);
+ok(g11.slice(0, 5).every((l) => l.part === 'lower') && g11[5].part === 'upper' && g11[6].part === 'upper' && g11[4].name === 'Dash bottom passenger', 'BDC_G11: rear door / dash bottom strips are lower lights');
+const g05 = L.parseStatus(0, reply([0xda, 0x5f], [0x0a, 0x18]));
+ok(g05.every((l) => l.part === 'upper') && /decor/i.test(g05[1].name), 'BDC_G05 (no index): the same codes stay decor lines');
 ok(L.parseStatus(0, [0x7f, 0x22, 0x31]) === null && L.parseStatus(1, reply([0xda, 0x5f], [1])) === null, 'status: a refusal or another bus\'s reply is none');
 ok(L.writeFrame(0, 3, [255, 0, 300], 120, 400).join() === [0xda, 0x5e, 3, 1, 100, 0xfe, 0, 0xfe, 254].join(), 'write: colours stop at FE, brightness 100, 254 s');
 ok(L.writeFrame(1, 1, [10, 20, 30], 50, 5).slice(0, 2).join() === [0xe3, 0xd1].join() && L.releaseFrame(1, 4).join() === [0xe3, 0xd1, 4, 0, 0, 0, 0, 0, 0].join(), 'bus 2 write; give back');
@@ -126,6 +131,114 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
     await lonely.find(); await lonely.find();
     ok(probes.length === 1 && said2.some((m) => /body module itself: answers \(62 f1 86 1\)/.test(m)), 'every bus silent: the body module asked once if it answers at all');
     lonely.stop();
+    // #197: a G05 whose BDC answers only at its gateway address (0x10, ZGW_SP18) and the head unit refuses 0x40: the
+    // units scan, then the light read at 0x10, which answers; the lights then read and written there
+    const said3 = [], to10 = [];
+    const gw = {
+        physical: async (t, sid, data) => {
+            if (t === L.BDC) throw new Error('transport refused: APP_REQUEST_TEMPORARILY_NOT_ACCEPTED');
+            if (t !== 0x10) return null;
+            to10.push([sid].concat(data));
+            if (sid === 0x22 && data[0] === 0xda) return reply([0xda, 0x5f], [0x0f, 0x0c]);
+            if (sid === 0x22 && data[0] === 0xe3) return reply([0xe3, 0xd1], [0x15, 0x01]);
+            if (sid === 0x2e) return [0x6e, data[0], data[1]];
+            return null;
+        },
+        functional: async () => new Map([[0x10, [0x62, 0xf1, 0x50, 0x0f, 0x25, 0xf0]], [0x12, [0x62, 0xf1, 0x50, 0x0f, 0x26, 0xb4]]]),
+    };
+    const g05 = new Lights({ diag: gw, log: { info: (m) => said3.push(m), warn: (m) => said3.push(m) } });
+    const got = await g05.find();
+    ok(g05.bdc === 0x10 && got.length === 4, 'body module only at 0x10: its lights found there (' + got.length + ')');
+    ok(said3.some((m) => /units answering: 10:0F25F0 12:0F26B4/.test(m)) && said3.some((m) => /answer at 10: using it/.test(m)), 'the units and the address logged');
+    g05.show(look('solid', { upper: { rgb: [0, 255, 0], bright: 80 }, lower: { rgb: [0, 255, 0], bright: 80 } }));
+    await sleep(300);
+    ok(to10.some((r) => r[0] === 0x2e), 'colours written to 0x10');
+    g05.stop();
+    // #197 blind: a G21's body module answers the light reads "busy" for the whole drive but takes writes: one light per
+    // bus (NAD 0), any colour on all of them; not read again, "Look again" (force) reads
+    const busyCar = (o) => {
+        const c = { reads: 0, writes: [], readsWork: false };
+        c.diag = {
+            physical: async (t, sid, data) => {
+                if (t !== L.BDC) return null;
+                if (sid === 0x22 && data[0] === 0xf1) return [0x62, 0xf1, 0x86, 0x01];
+                if (sid === 0x22) { c.reads++; return c.readsWork ? reply(data, data[0] === 0xda ? [0x0f, 0x0c] : [0x15]) : (o && o.empty ? reply(data, []) : [0x7f, 0x22, 0x21]); }
+                c.writes.push(data.slice());
+                return o && o.noWrites ? null : [0x6e, data[0], data[1]];
+            },
+        };
+        return c;
+    };
+    const fastSleep = () => Promise.resolve();
+    const bc1 = busyCar(), saidB = [];
+    const blind = new Lights({ diag: bc1.diag, sleep: fastSleep, log: { info: (m) => saidB.push(m), warn: (m) => saidB.push(m) } });
+    let foundB = null; blind.on('found', (l) => { foundB = l; });
+    const gotB = await blind.find();
+    const blindKnown = foundB;
+    ok(blind.blind && gotB.length === 2 && gotB.every((l) => l.nad === 0 && l.blind) && foundB && foundB.length === 2, 'reads busy, writes taken: one light per bus (NAD 0)');
+    ok(bc1.writes.length === 2 && bc1.writes.every((w) => w[2] === 0 && w[3] === 0) && saidB.some((m) => /takes writes but not the light reads/.test(m)), 'the write test is a give-back (NAD 0 off), logged');
+    bc1.writes.length = 0;
+    blind.show(look('solid', { upper: { rgb: [0, 255, 0], bright: 80 } }));
+    await sleep(300);
+    ok(bc1.writes.some((w) => w[0] === 0xda && w[2] === 0 && w[3] === 1 && w[5] === 0 && w[6] === 254) && bc1.writes.some((w) => w[0] === 0xe3 && w[2] === 0 && w[3] === 1), 'a colour goes to every light of both buses (NAD 0)');
+    const readsB = bc1.reads;
+    await blind.find();
+    ok(bc1.reads === readsB, 'blind: not read again');
+    bc1.readsWork = true;
+    const full = await blind.find({ force: true });
+    ok(!blind.blind && full.length === 3 && full.every((l) => l.nad > 0), '"Look again" reads: the lights answering now replace the blind ones');
+    blind.stop();
+    // known blind lights at a start: used at once, not read
+    const bc2 = busyCar();
+    const known = new Lights({ diag: bc2.diag, log, known: blindKnown });
+    await known.find();
+    ok(known.blind && bc2.reads === 0 && known.lights.length === 2, 'blind lights from an earlier start: used, not read');
+    known.stop();
+    // writeFirst (reads failed before): the write test first, no read at all
+    const bc3 = busyCar();
+    const wf = new Lights({ diag: bc3.diag, log, writeFirst: true });
+    await wf.find();
+    ok(wf.blind && bc3.reads === 0, 'write first: blind without a single read');
+    wf.stop();
+    const bc4 = busyCar({ noWrites: true });
+    const wf2 = new Lights({ diag: bc4.diag, log, writeFirst: true });
+    const got4 = await wf2.find();
+    ok(!got4.length && bc4.reads === 0 && wf2.readFail && wf2.state === 'none', 'write first, writes not taken: no read either (the module asleep or hung)');
+    wf2.stop();
+    // a reply without lights (a car without them) is not what blind mode is for
+    const bc5 = busyCar({ empty: true });
+    const em = new Lights({ diag: bc5.diag, sleep: fastSleep, log });
+    await em.find();
+    ok(!em.blind && !em.readFail && bc5.writes.length === 0, 'a reply without lights: no write test, not counted');
+    em.stop();
+    // the write taken only at the BDC's gateway address (0x10): the lights written there
+    const bw = [];
+    const gwOnly = new Lights({ diag: { physical: async (t, sid, data) => {
+        if (sid === 0x22) return t === L.BDC ? [0x7f, 0x22, 0x21] : null;
+        if (t !== 0x10) return null;
+        bw.push(data.slice()); return [0x6e, data[0], data[1]];
+    } }, sleep: fastSleep, log });
+    await gwOnly.find();
+    gwOnly.show(look('solid', { upper: { rgb: [0, 0, 255], bright: 80 } }));
+    await sleep(300);
+    ok(gwOnly.blind && gwOnly.bdc === 0x10 && bw.some((w) => w[3] === 1), 'writes taken only at 0x10: blind there, the colour written to 0x10');
+    gwOnly.stop();
+    // the body module's index read once when it answers with lights: BDC_G11's names used
+    const g11log = [];
+    const g30 = new Lights({ diag: { physical: async (t, sid, data) => {
+        if (t !== L.BDC || sid !== 0x22) return sid === 0x2e ? [0x6e, data[0], data[1]] : null;
+        if (data[0] === 0xf1 && data[1] === 0x50) return [0x62, 0xf1, 0x50, 0x0f, 0x20, 0x50];
+        return data[0] === 0xda ? reply(data, [0x0a, 0x18, 0x05]) : [0x7f, 0x22, 0x31];
+    } }, sleep: fastSleep, log: { info: (m) => g11log.push(m), warn: (m) => g11log.push(m) } });
+    const got30 = await g30.find();
+    ok(g30.kind === '0F2050' && got30.filter((l) => l.part === 'lower').length === 2 && g11log.some((m) => /BDC_G11/.test(m)) && g11log.some((m) => /3 found: .*Dash bottom passenger \(lower\)/.test(m)), 'G30: BDC_G11 read, its lower strips lower, logged');
+    g30.stop();
+    // and one where no address answers with lights: the probe once, nothing moved
+    const said4 = [];
+    const none = new Lights({ diag: { physical: async () => null, functional: async () => new Map([[0x10, [0x62, 0xf1, 0x50, 0x0f, 0x25, 0xf0]]]) }, log: { info: (m) => said4.push(m), warn: (m) => said4.push(m) } });
+    await none.find(); await none.find();
+    ok(none.bdc === L.BDC && said4.filter((m) => /units answering/.test(m)).length === 1 && said4.some((m) => /light read at 10: no answer/.test(m)), 'no lights anywhere: 0x40 kept, asked once');
+    none.stop();
     fresh.stop();
     await sleep(100);
     writes.length = 0; lit.forEach((b) => b.forEach((x, i) => { b[i] = [0, 0, 0]; }));
@@ -427,6 +540,21 @@ ok(Math.round(S.hueOf([0, 0, 255])) === 240 && S.hsv(120, 1, 1).join() === '0,25
         ok(hw.some((w) => w.on === 1 && w.at - end < 5000), 'after a blink: the still colour renewed before the blink\'s 5 s hold runs out');
         lc.stop();
         await sleep(50);
+    }
+
+    // decorWith (#140): the decor lights with the upper colour (default) or the lower one, as BMW groups them
+    {
+        const sc = { kind: 'solid', upper: { rgb: [255, 0, 0], bright: 80 }, lower: { rgb: [0, 0, 255], bright: 40 } };
+        const decor = { name: 'Driver front door decor', part: 'upper' }, line = { name: 'Driver front door line', part: 'upper' };
+        const dash = { name: 'Dash decor passenger', part: 'upper' }, foot = { name: 'Footwell driver front', part: 'lower' };
+        ok(S.lightAt(sc, decor, 0).rgb[0] === 255, 'decor: upper by default');
+        S.setDecor('lower');
+        ok(S.lightAt(sc, decor, 0).rgb[2] === 255 && S.lightAt(sc, decor, 0).bright === 40, 'decorWith lower: door decor takes the lower colour');
+        ok(S.lightAt(sc, dash, 0).rgb[2] === 255, 'decorWith lower: dash decor too');
+        ok(S.lightAt(sc, line, 0).rgb[0] === 255, 'decorWith lower: the door line stays upper');
+        ok(S.lightAt(sc, foot, 0).rgb[2] === 255, 'a footwell stays lower');
+        S.setDecor('upper');
+        ok(S.lightAt(sc, decor, 0).rgb[0] === 255, 'decorWith upper: back to upper');
     }
 
     fs.unlinkSync(process.env.MGU_AMBIENT_FLASH); fs.rmdirSync(TMP);

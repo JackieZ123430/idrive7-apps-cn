@@ -19,12 +19,20 @@
  * something else talks to the body controller (the strobe: the gateway takes one request at a time, and ours in
  * between got its requests refused); it resolves once no write of ours is under way. hold(key, false) goes on.
  *
+ * Blind (#197: G21 / G22 whose body module answers the light read "busy" for a whole drive, or goes silent after
+ * it, while BMW's menu still works): the read is a job of its own in the body module and hangs there, the write is
+ * another. When the reads fail that way (busy or silent, never a reply without lights), one give-back write per bus
+ * (NAD 0, harmless: the car's own colour) shows whether the writes are taken; if so the lights are one light per bus
+ * (NAD 0, blind: true) and any colour goes on all of them at once. o.writeFirst (reads failed on earlier tries):
+ * that write test comes first and the reads are left out, so a fresh body module isn't hung by them; blind lights
+ * are not read again. find({ force: true }) ("Look again") reads anyway.
+ *
  *   const l = new Lights({ diag, log }); await l.find();
  *   l.lights -> [{ bus, nad, name, part, x, y, ... }]   l.state -> 'finding' | 'none' | 'car' | 'ours'
  *   l.at(light) -> what the light shows now ({ rgb, bright })     l.rate -> writes a second
  */
 const EventEmitter = require('events');
-const { BDC, BUSES, parseStatus, writeFrame, releaseFrame } = require('./lin');
+const { BDC, BUSES, BDC_G11, parseStatus, writeFrame, releaseFrame } = require('./lin');
 const S = require('./scenes');
 
 const HOLD_S = 60, RENEW_MS = 40000, MOVE_HOLD_S = 5, MOVE_RENEW_MS = 3000;
@@ -60,17 +68,100 @@ class Lights extends EventEmitter {
         this._holds = new Set(); this._idle = [];
         this._cmds = [];               // one-off writes (command()), sent between the lights' writes
         this._own = new Map();         // carOwn(): key -> test(light), the lights the car drives itself meanwhile
+        this.bdc = BDC;                // where the body module's light functions answer (0x40; another address: _findBdc)
+        this.writeFirst = !!o.writeFirst;
+        this.blind = this.lights.length > 0 && this.lights.every((l) => l.blind);
+        this.readFail = false;         // the last find(): reads busy or silent (the kind blind mode is for)
     }
 
     get rate() { const t = this.now(); this._times = this._times.filter((x) => t - x < 3000); return this._times.length / 3; }
     /** Whole frames a second (every light on the same moment of a moving scene). */
     get fps() { const t = this.now(); this._frames = this._frames.filter((x) => t - x < 5000); return this._frames.length / 5; }
 
+    /**
+     * The body module's light functions at another address (once a start, when 0x40 doesn't answer): every unit's
+     * index (22 F150 to all), then the light read (bus 1) at the gateway (0x10) and at any other address that names
+     * itself a body module. -> true when one answered with lights (this.bdc is then that address).
+     */
+    async _findBdc() {
+        let units = new Map();
+        try { units = await this.diag.functional(0x22, [0xf1, 0x50], { idleMs: 3000, maxMs: 15000 }); } catch (e) { this.log.info('lights: units scan: ' + (e && e.message || e)); }
+        const idx = (u) => (u && u[0] === 0x62 ? u.slice(3, 6).map((x) => (x < 16 ? '0' : '') + x.toString(16).toUpperCase()).join('') : null);
+        const list = Array.from(units.keys()).sort((a, b) => a - b).map((a) => a.toString(16).toUpperCase() + (idx(units.get(a)) ? ':' + idx(units.get(a)) : ''));
+        // (in lines of 12: a log line is cut at 300 characters)
+        if (!list.length) this.log.info('lights: units answering: none');
+        for (let i = 0; i < list.length; i += 12) this.log.info('lights: units answering' + (i ? ' (more)' : '') + ': ' + list.slice(i, i + 12).join(' '));
+        const BODY = ['0F2680', '0F2050', '0F19C0'];        // BDC_G05, BDC_G11, BDC
+        const tries = [0x10].concat(Array.from(units.keys()).filter((a) => a !== BDC && a !== 0x10 && BODY.indexOf(idx(units.get(a))) >= 0));
+        for (const at of tries) {
+            const did = BUSES[0].read;
+            let r = null, err = null;
+            try { r = await this.diag.physical(at, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000 }); } catch (e) { err = String(e && e.message || e); }
+            const got = r ? parseStatus(0, r) : null;
+            this.log.info('lights: the light read at ' + at.toString(16).toUpperCase() + ': ' + (got ? got.length + ' lights'
+                : r ? 'no lights (' + r.map((x) => x.toString(16)).join(' ') + ')' : 'no answer' + (err ? ' (' + err + ')' : '')));
+            if (got && got.length) { this.bdc = at; this.log.info('lights: the body module\'s lights answer at ' + at.toString(16).toUpperCase() + ': using it'); return true; }
+        }
+        return false;
+    }
+
+    /**
+     * One give-back write per bus (NAD 0: the car's own colour) -> true when one is taken: the lights are then one
+     * per bus that took it (blind), any colour on all of them at once.
+     */
+    async _tryBlind(why) {
+        let took = [];
+        // at the body module (0x40), then at the BDC's gateway address (0x10: the unit Live Data and Fault Scanner reach)
+        for (const at of [this.bdc].concat(this.bdc !== 0x10 ? [0x10] : [])) {
+            for (let bus = 0; bus < BUSES.length; bus++) {
+                const f = releaseFrame(bus, ALL);
+                let r = null;
+                try { r = await this.diag.physical(at, 0x2e, f, 1500, echo(0x2e, f), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { r = null; }
+                this.log.info('lights: write test at ' + at.toString(16).toUpperCase() + ' bus ' + (bus + 1) + ' (' + why + '): ' + (r ? r.map((x) => x.toString(16)).join(' ') : 'no answer'));
+                if (r && r[0] === 0x6e) took.push(bus);
+            }
+            if (took.length) { this.bdc = at; break; }
+        }
+        if (!took.length) return false;
+        this.lights = took.map((bus) => ({ bus, nad: ALL, loc: 0, name: 'All lights, bus ' + (bus + 1), part: 'upper', x: 0.5, y: 0.35 + 0.3 * bus,
+            x2: null, y2: null, rgb: [0, 0, 0], bright: 0, fault: false, blind: true }));
+        this.blind = true; this.error = null;
+        this.state = this.scene ? 'ours' : 'car';
+        this.log.info('lights: the body module takes writes but not the light reads: one colour on all lights (bus ' + took.map((b) => b + 1).join(', ') + ')');
+        this.emit('found', this.lights.map((l) => Object.assign({}, l)));
+        this.emit('change');
+        this._kick();
+        return true;
+    }
+
+    /** The body module's index (22 F150), once, when it first answers with lights: which names its location codes have. */
+    async _kind() {
+        let r = null;
+        try { r = await this.diag.physical(this.bdc, 0x22, [0xf1, 0x50], 5000, echo(0x22, [0xf1, 0x50])); } catch (e) { r = null; }
+        this.kind = r && r[0] === 0x62 && r.length >= 6 ? r.slice(3, 6).map((x) => (x < 16 ? '0' : '') + x.toString(16).toUpperCase()).join('') : null;
+        this.log.info('lights: body module ' + (this.kind ? this.kind + (this.kind === BDC_G11 ? ' (BDC_G11: its light names)' : '') : 'index not read'));
+    }
+
     /** Reads which lights the car has (the ones known so far stay while it reads, and when nothing answers). */
-    async find() {
+    async find(opts) {
+        const force = !!(opts && opts.force);
+        if (this.blind && !force) {
+            this.log.info('lights: one colour on all lights (the light reads hang on this car), not read again; "Look again" reads');
+            this._kick();
+            return this.lights;
+        }
+        if (this.writeFirst && !force && !this.lights.length) {
+            if (await this._tryBlind('the light reads failed before')) return this.lights;
+            // no write taken either: the body module is asleep or hung, and a read now would only keep it so
+            this.readFail = true;
+            if (this.state !== 'none') { this.state = 'none'; this.emit('change'); }
+            this.log.warn('lights: none found (writes not taken, reads left out)');
+            return this.lights;
+        }
         const had = this.lights;
         if (!had.length) { this.state = 'finding'; this.emit('change'); }
         const found = [], silent = [];
+        let hung = 0;                  // buses whose read was busy or got no answer (what blind mode is for)
         for (let bus = 0; bus < BUSES.length; bus++) {
             const did = BUSES[bus].read;
             let reply = null;
@@ -80,13 +171,15 @@ class Lights extends EventEmitter {
             const t0 = this.now();
             for (let tries = 0; ; tries++) {
                 reply = null;
-                try { reply = await this.diag.physical(BDC, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000, onPending: () => { pending++; } }); } catch (e) { this.error = String(e && e.message || e); }
+                try { reply = await this.diag.physical(this.bdc, 0x22, did, 15000, echo(0x22, did), { pendingTimeoutMs: 15000, onPending: () => { pending++; } }); } catch (e) { this.error = String(e && e.message || e); }
                 if (!(reply && reply[0] === 0x7f && reply[2] === 0x21) || tries >= BUSY_TRIES) break;
                 await this.sleep(BUSY_MS * (tries + 1));
             }
-            const got = reply ? parseStatus(bus, reply) : null;
+            if (reply && reply[0] === 0x62 && this.kind === undefined) await this._kind();
+            const got = reply ? parseStatus(bus, reply, this.kind) : null;
             if (got) { found.push.apply(found, got); continue; }
             silent.push(bus);
+            if (!reply || (reply[0] === 0x7f && (reply[2] === 0x21 || reply[2] === 0x78))) hung++;
             if (reply) this.log.info('lights: bus ' + (bus + 1) + ' refused (' + reply.map((x) => x.toString(16)).join(' ') + ')');
             else {
                 // silent, or "still working" (7F 22 78) until the wait ran out: which one says what the body module does
@@ -102,7 +195,12 @@ class Lights extends EventEmitter {
             try { r = await this.diag.physical(BDC, 0x22, [0xf1, 0x86], 5000, echo(0x22, [0xf1, 0x86])); } catch (e) { err = String(e && e.message || e); }
             this.log.info('lights: the body module itself: ' + (r ? 'answers (' + r.map((x) => x.toString(16)).join(' ') + ')'
                 : 'no answer either' + (err ? ' (' + err + ')' : '')));
+            // nothing at 0x40 at all: where does this car's body module answer? (#197: a G05 whose BDC shows only its
+            // gateway, 0x10, and the head unit refuses 0x40.) Read-only; the lights move there only if one answers.
+            if (!r && await this._findBdc()) return this.find(opts);
         }
+        this.readFail = !found.length && hung === BUSES.length;
+        if (this.readFail && !had.length && await this._tryBlind('the light reads failed')) return this.lights;
         if (!found.length && had.length) {
             this.log.warn('lights: no answer' + (this.error ? ': ' + this.error : '') + ', the ' + had.length + ' known kept');
             return had;
@@ -116,10 +214,14 @@ class Lights extends EventEmitter {
         }
         // a light known already stays the same object (what it shows is kept by it)
         this.lights = found.map((f) => { const k = had.find((l) => l.bus === f.bus && l.nad === f.nad); return k ? Object.assign(k, f) : f; });
+        if (found.length) this.blind = false;
         this.state = found.length ? (this.scene ? 'ours' : 'car') : 'none';
         if (found.length) {
             this.error = null;
-            this.log.info('lights: ' + found.length + ' found (' + found.map((l) => l.name).join(', ') + ')');
+            // (in groups of 8: a log line is cut at 300 characters)
+            for (let i = 0; i < found.length; i += 8) {
+                this.log.info('lights: ' + (i ? '(more) ' : found.length + ' found: ') + found.slice(i, i + 8).map((l) => l.name + (l.part === 'lower' ? ' (lower)' : '')).join(', '));
+            }
             this.emit('found', found.map((l) => Object.assign({}, l)));
         } else this.log.warn('lights: none found' + (this.error ? ': ' + this.error : ''));
         this.emit('change');
@@ -213,6 +315,8 @@ class Lights extends EventEmitter {
     _ownRelease() { return this._own.size ? this.lights.filter((l) => this._last.has(l) && this.carOwns(l)).map((l) => ({ light: l })) : []; }
 
     dim(f) { if (f !== this._dim) { this._dim = f; this._frame = null; this._kick(); } }
+    /** The lights' colours worked out again (a light changed zone: setting decorWith). */
+    redraw() { this._frame = null; this._kick(); }
     /**
      * A one-off write to the body module (2E <data>), sent in turn with the lights' writes (the gateway takes one at a
      * time) -> its reply, or null (no answer, or the lights not writing: none found, held, stopped).
@@ -334,7 +438,7 @@ class Lights extends EventEmitter {
                 if (this._cmds.length) {
                     const c = this._cmds.shift();
                     let r = null;
-                    try { r = await this.diag.physical(BDC, 0x2e, c.data, 1500, echo(0x2e, c.data), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { r = null; }
+                    try { r = await this.diag.physical(this.bdc, 0x2e, c.data, 1500, echo(0x2e, c.data), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { r = null; }
                     c.res(r);
                     continue;
                 }
@@ -351,7 +455,7 @@ class Lights extends EventEmitter {
                 }
                 let reply = null;
                 // one write at a time (the gateway takes no second); a busy gateway is asked again soon, not after 1 s
-                try { reply = await this.diag.physical(BDC, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }
+                try { reply = await this.diag.physical(this.bdc, 0x2e, w.frame, 1500, echo(0x2e, w.frame), { retryBaseMs: 20, maxRetries: 10 }); } catch (e) { this.error = String(e && e.message || e); }
                 if (reply && reply[0] === 0x6e) {
                     this._fails = 0; this.writes++; this._times.push(this.now());
                     // (a bus given back: once more later; one not taken is not)

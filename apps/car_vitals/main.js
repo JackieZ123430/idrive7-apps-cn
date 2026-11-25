@@ -253,6 +253,7 @@ mgu.run({
             return { rear: null, from: null };
         };
         const guess = new GearGuess();
+        let selOwns = false;     // live.gear / stage came from DataPowerTrain2's gear selection
         let gearLogs = 0, lastModeKey = '';
         const put = (k, v) => {
             if (v === null || v === undefined || !isFinite(v)) return;
@@ -328,7 +329,7 @@ mgu.run({
             ['de.bmw.infrastructure.VehicleInformation', {
                 statusGearboxDrive: (v) => {
                     const g = gearOf(v && v.statusActualGearDrive);
-                    if (g !== undefined) { live.gear = g; lastCar = Date.now(); }
+                    if (g !== undefined) { live.gear = g; lastCar = Date.now(); selOwns = false; }
                     live.stage = STAGES[v && v.statusActualStageDrive];
                     live.gearMode = modeOf(v);
                     // field names / values differ per car: log them so the D/S/M detection can be checked
@@ -339,9 +340,10 @@ mgu.run({
                 DataPowerTrain2: (v) => {
                     logRaw('gear selection', v && v.statusGearSelectionDrive);
                     const sel = selectionOf(v && v.statusGearSelectionDrive);
-                    if (!sel) return;
+                    // no value: a manual sends "R" with reverse in and this otherwise, so that R no longer holds (#209)
+                    if (!sel) { if (selOwns) { live.stage = undefined; live.gear = undefined; selOwns = false; } return; }
                     if (sel.stage !== undefined) live.stage = sel.stage;
-                    live.gear = sel.gear; lastCar = Date.now();
+                    live.gear = sel.gear; lastCar = Date.now(); selOwns = true;
                 },
             }],
             ['de.bmw.infrastructure.analytics.BasicDataSet', {

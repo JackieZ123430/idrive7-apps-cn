@@ -276,7 +276,7 @@ car sends no torque split	车辆未提供扭矩分配
 transfer case	分动箱
 transfer case, estimated	分动箱估算
 transfer case: clutch open	分动箱离合器断开
-(transfer case)	（分动箱）
+ (transfer case)	（分动箱）
 target	目标
 max	最大
 min	分钟
@@ -571,6 +571,7 @@ Assist sensors: Unexpected Ethernet communication/link	辅助传感器：以太�
 Service requirements	保养需求
 Next service	下次保养
 Service due	保养到期
+Engine oil	发动机机油
 Front brakes	前制动器
 Rear brakes	后制动器
 Brake fluid	制动液
@@ -636,6 +637,7 @@ in	剩余
 by	到期
 or	或
 of	共
+Fault Scanner	故障检测
 Scan	扫描
 Reading	读取中
 Fault	故障
@@ -754,6 +756,8 @@ Intake air temperature sensor: Short to B+	进气温度传感器：对 B+ 短路
 BDC: LED GEN2: Headlight temperature too high	BDC：第二代 LED 前照灯温度过高
 Head unit: Bluetooth/Wi-Fi aerial 1: Disconnected line	主机：蓝牙 / Wi-Fi 天线 1 线路断路
 KAFAS: camera calibration missing	KAFAS：摄像头缺少标定
+
+# Updated app and home-screen widget labels (2026-10-31).
 The car standing still (light show)	车辆静止（灯光表演）
 EDrive	eDrive助手
 Battery power now	当前电池功率
@@ -1165,8 +1169,11 @@ ago	前
 Max Cooling ON	最大冷却 开启
 Max Cooling OFF	最大冷却 关闭
 up	升挡
+down	降挡
+skip	跳挡降挡
 m ago	分钟前
 Boost gauge max	增压表最大值
+# eDrive: the 48 V mild hybrid page and the 12 V details
 Plug-in hybrid	插电混动
 48 V mild hybrid	48 V 轻混
 None (12 V only)	无（仅 12 V 电池）
@@ -1221,6 +1228,7 @@ SOOT	碳烟
 LOAD (ADAPTED)	碳载量（自适应）
 ASH (ADAPTED)	灰分（自适应）
 Reading the engine unit...	正在读取发动机控制单元...
+# Service: the CBS read states and the Engine page.
 From the engine unit (B58 / B48 / B38), read	来自发动机控制单元（B58 / B48 / B38），读取于
 From the engine unit	来自发动机控制单元
 the engine unit has none of these values	发动机控制单元没有这些数据
@@ -1249,6 +1257,7 @@ Not read / unavailable	未读取 / 不可用
 Diagnostics - read-only CBS	诊断 - 只读 CBS
 UDS candidate fields - validate for this car	UDS 候选字段，请结合本车核对
 UDS only - not a native service requirement	仅 UDS，不是车辆原生保养项目
+# Settings pages.
 Auto (from the car)	自动（读取车辆）
 Diesel	柴油
 Petrol	汽油
@@ -1277,6 +1286,7 @@ Off · nothing is sent (safe)	关闭 · 不发送任何指令（安全）
 On · xDrive tab, xDrive off until ignition off	开启 · 显示 xDrive 页，关闭 xDrive 直到熄火
 xDrive (experimental)	xDrive（实验）
 Reset is off - turn on "Service reset" in Settings	保养重置已关闭，请在设置中打开“保养重置”
+# Live Data: trip computer, Gauges, signal names and prompts.
 Live Data	实时数据
 Gauges	仪表
 Trips	行程
@@ -1578,11 +1588,13 @@ Open loop (load)	开环（负荷）
 page	页
 values read	项已读取
 with a value	项有数值
+# Sentences where "back" is not the Back button, so the short row must not reach them.
 xDrive on brings it back	打开 xDrive 可恢复
 back after an ignition cycle	点火关闭再打开后恢复
 Press again to switch xDrive back on	再按一次重新打开 xDrive
 xDrive is back · the transfer case reports it on	xDrive 已恢复 · 分动箱报告已开启
 Cleared; back at once (still present):	已清除，但立即再次出现（故障仍存在）：
+# eDrive 12 V battery (battery12.js)
 orig.	原装
 collecting...	正在收集...
 the car's signal	车辆信号
@@ -1629,6 +1641,7 @@ Last hour	最近 1 小时
 Recorded by the car	车辆记录
 CURRENT  (A, + = INTO THE BATTERY)	电流  （A，+ = 流入电池）
 HEALTH (SOH)	健康度 (SOH)
+# Engine Config: Exhaust Flap - Drive mode, hold, the Close rpm guard (auto.js)
 Drive mode	驾驶模式
 Hold Open / Close	保持打开/关闭
 On · sent again every 15 s	开启：每 15 秒重新发送
@@ -1687,6 +1700,44 @@ Bank 2	气缸列 2
 SOOT, BANK 1	碳烟，气缸列 1
 SOOT, BANK 2	碳烟，气缸列 2
 Bank 1	气缸列 1
+Standing launch	静止起步
+Rolling start	中途加速
+Standing launch (rollout)	静止起步（起步豁免）
+STANDING LAUNCH (rollout)	静止起步（起步豁免）
+Rolling windows	中途加速区间
+TRAP	终速
+SLOPE	坡度
+RUN	测试
+ACCELERATE PAST	加速超过
+SLOW DOWN TO ARM	减速以准备
+Accelerate through a window	加速通过一个区间
+WHEELSPIN	车轮空转
+SPIN	空转
+DOWNHILL	下坡
+CUSTOM: "TO" MUST BE ABOVE "FROM"	自定义：终点应大于起点
+No runs yet - launch from a stop or accelerate through a rolling window.	暂无测试记录 - 请静止起步，或在行驶中加速通过一个区间。
+1/2 mile	1/2 英里
+Longest distance	最长距离
+Downhill limit for best times	最佳成绩下坡限制
+Custom speed window	自定义速度区间
+Custom window from (km/h or mph)	自定义区间起点（km/h 或 mph）
+Custom window to (km/h or mph)	自定义区间终点（km/h 或 mph）
+250-300 km/h window (160-190 mph)	250-300 km/h 区间（160-190 mph）
+STANDING LAUNCH	静止起步
+ROLLING START	中途加速
+VALID RUN	有效成绩
+INVALID RUN	无效成绩
+ROLLOUT	起步豁免
+NO SLOPE	无坡度数据
+ELEVATION	高度变化
+NO AIR DATA	无空气数据
+DA	等效高度
+Outside air with each run	每次测试记录车外空气
+Show (pressure from the engine unit)	显示（大气压力取自发动机控制单元）
+Show, times corrected to standard air (SAE J1349)	显示，时间修正至标准空气（SAE J1349）
+Off (no engine unit requests)	关闭（不查询发动机控制单元）
+
+# Additional Chinese settings and status labels
 All lights	全部灯光
 Dimmer at night	夜间调暗
 Hazard red	危险警示红色

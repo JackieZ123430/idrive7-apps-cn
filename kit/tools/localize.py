@@ -56,7 +56,7 @@ def localize_spec(spec, language):
     s = copy.deepcopy(spec)
     s['version'] = package_version(s['version'], language)
     s['title'] = text(s['title'], words)
-    if isinstance(s.get('startWidget'), dict) and 'name' in s['startWidget']:
+    if language == 'zh-CN' and isinstance(s.get('startWidget'), dict) and 'name' in s['startWidget']:
         s['startWidget']['name'] = text(s['startWidget']['name'], words)
     for screen in s.get('screens', []):
         if 'title' in screen:

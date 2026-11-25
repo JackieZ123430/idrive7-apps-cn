@@ -3,7 +3,7 @@
 // it follows the pedal at once, the AC compressor and the rest of the car's draw included.
 //   node kit/tools/test_fastkw.js
 const path = require('path');
-const { FastKw, MIN_FIT } = require(path.join(__dirname, '..', '..', 'apps', 'edrive', 'fastkw'));
+const { FastKw, MIN_FIT, HOLD_MS } = require(path.join(__dirname, '..', '..', 'apps', 'edrive', 'fastkw'));
 
 let fails = 0, checks = 0;
 const ok = (c, msg) => { checks++; if (!c) { fails++; console.log('FAIL ' + msg); } };
@@ -49,6 +49,42 @@ const g = new FastKw();
 for (let t = 0; t <= 30000; t += 100) { const [d, r] = needleAt(t); g.needle(d, r, t); if (t % 1000 === 0 && t) g.reading(realAt(t - 250), t); }
 g.needle(90, 0, 30100);
 ok(Math.abs(g.now(30100) - (A * 90 + C)) < 2, 'full pedal: ' + g.now(30100).toFixed(1) + ' kW at once');
-ok(g.now(30100 + 2000) === null, 'no needle for 2 s: no fast value (the readings shown)');
+ok(g.now(30100 + 20000) !== null, 'the needle unchanged for 20 s (sent only as it changes): still the fast value');
+ok(g.now(30100 + HOLD_MS + 1) === null, 'no needle for ' + HOLD_MS / 1000 + ' s: no fast value (the readings shown)');
+
+// the needle sent only as it changes, as the car does: a steady cruise still has the fast value, on the readings
+const h = new FastKw();
+let last = null;
+const errCruise = [];
+for (let t = 0; t <= 180000; t += 100) {
+    const [d, r] = needleAt(t);
+    if (!last || last[0] !== d || last[1] !== r) { h.needle(d, r, t); last = [d, r]; }
+    h.ac(acAt(t));
+    if (t % 1000 === 0 && t > 0) h.reading(realAt(t - 250), t);
+    if (t > 90000 && (t / 1000) % 20 >= 12) { const v = h.now(t); errCruise.push(v === null ? Infinity : Math.abs(v - realAt(t))); }
+}
+ok(mean(errCruise) < 0.5, 'steady cruise with a quiet needle: off by ' + mean(errCruise).toFixed(2) + ' kW');
+// a long drive with no recuperation, the needle sent as it changes, readings each second, then a regen: the fit must
+// not wind up (the recuperation share's uncertainty growing unbounded) and throw the value off by orders of magnitude
+const w = new FastKw();
+let lastN = null, worst = 0;
+for (let t = 0; t <= 45 * 60000; t += 100) {
+    const regen = t > 45 * 60000 - 20000;
+    const d = regen ? 0 : Math.round(20 + 3 * Math.sin(t / 9000)), r = regen ? 30 : 0;
+    if (!lastN || lastN[0] !== d || lastN[1] !== r) { w.needle(d, r, t); lastN = [d, r]; }
+    if (t % 1000 === 0 && t > 0) w.reading(A * d - B * r + C, t);
+    const v = w.now(t);
+    if (v !== null) worst = Math.max(worst, Math.abs(v - (A * d - B * r + C)));
+}
+ok(worst < 20, '45 minutes without recuperation, then a regen: never further off than 20 kW (' + worst.toFixed(1) + ')');
+ok(new FastKw().now(0) === null && (() => { const z = new FastKw(); z.theta = [1e9, 0, 0]; z.n = 9; z.needle(50, 0, 0); return z.now(0) === null; })(),
+    'a fast value past 400 kW is none (the readings shown)');
+// slow reads (taken 700 ms before they arrive, the time the caller passes): learned against the needle then
+const q = new FastKw();
+for (let t = 0; t <= 120000; t += 100) {
+    const [d, r] = needleAt(t); q.needle(d, r, t);
+    if (t % 1000 === 0 && t > 0) q.reading(realAt(t - 700), t, t - 700);
+}
+ok(Math.abs(q.fit.a - A) < 0.05 && Math.abs(q.fit.b - B) < 0.05, 'reads taken 700 ms early, said so: learned the car (' + q.fit.a.toFixed(2) + ' / ' + q.fit.b.toFixed(2) + ')');
 console.log('fast kW: ' + checks + ' checks, ' + fails + ' failed');
 process.exit(fails ? 1 : 0);
